@@ -68,7 +68,6 @@ this flow**. Reunion transfers nothing back — nothing was taken away. Custody 
 | `pet_id`, `created_by` | Publisher is a registered person (account + phone verified) |
 | `last_seen_point`, `last_seen_at` | Map pin + timestamp |
 | `contact_prefs` | `expose_whatsapp`, `expose_email`, `in_app_only` |
-| `broadcast_radius_m` | Default 3000; range 2000–5000 |
 | `status` | See state machine |
 | `resolution`, `resolution_attribution` | Set on terminal transition |
 | `published_at`, `next_checkin_at`, `resolved_at` | |
