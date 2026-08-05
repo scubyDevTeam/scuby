@@ -33,6 +33,8 @@ The neighborhood responds in **two structurally different ways**, and collapsing
 Sightings are volume plays; recovery claims are the resolution path. Separate tables, separate rate
 limits, separate moderation treatment.
 
+
+
 ---
 
 ## Entities
@@ -65,7 +67,6 @@ this flow**. Reunion transfers nothing back — nothing was taken away. Custody 
 |---|---|
 | `pet_id`, `created_by` | Publisher is a registered person (account + phone verified) |
 | `last_seen_point`, `last_seen_at` | Map pin + timestamp |
-| `reward` | Optional — display only, never escrowed |
 | `contact_prefs` | `expose_whatsapp`, `expose_email`, `in_app_only` |
 | `broadcast_radius_m` | Default 3000; range 2000–5000 |
 | `status` | See state machine |
@@ -78,7 +79,9 @@ this flow**. Reunion transfers nothing back — nothing was taken away. Custody 
 `status: visible | hidden_by_owner | removed_by_moderation`.
 
 Default `visible` — publishing a sighting must be instant, or the map dies. The owner can hide any
-pin; moderation removes abuse. Anti-spam is **rate limiting + owner-hides-pin**, never pre-approval.
+pin; moderation removes abuse. Anti-spam is **rate limiting + owner-hides-pin**, never pre-approval, we can handle this by making the users just being able to drop a point per case at the time, in case they want to put other we need to remove it, the how needs to be validate in terms of UX if the user should remove the pin by a button, just by clicking another place, others.
+
+we should limit the map to put the sighting at least to the city or a radius of certain meters near you. nice to have.
 
 ### `recovery_claim`
 `case_id`, `claimant` (person or anonymous contact), `point?`, `photos[]`,
