@@ -56,7 +56,8 @@ App is **nationwide** from day one. Feeds are **local-first with national fallba
 | 5 | Actor model | One person account + org accounts | Roles-at-signup (wrong-door friction, blocks cross-role actions) |
 | 6 | Core entity | Pet + Case (see [01-actors-and-entities.md](01-actors-and-entities.md)) | Post-per-vertical (loses cross-vertical continuity, contradicts build-wide); embedded-with-optional-profile (two storage shapes, perpetual migration) |
 | 7 | Contact | WhatsApp/email without account + optional registered identity for attribution | In-app-chat-only (loses helpers at the most time-critical moment) |
-| 8 | Adoption depth | Structured application, decision off-platform | Directory-only (zero value over foundation's Instagram); full pipeline with contracts (pulls legal into v1) |
+| 8 | Adoption depth | Listing + 4-field intro before contact; screening in chat; outcome recorded as a responsibility transfer; inbox deferred (revised 2026-08-22, see [08](08-adoption-workflow_draft_1.md)) | Directory-only (zero value over foundation's Instagram); full pipeline with contracts (pulls legal into v1); ranked inbox now (foundations have their own process; individuals are the first users) |
+| 12 | Client | PWA first → Capacitor shell → native rewrite under the same bundle ID (see [arch/frontend.md](arch/frontend.md)) | Native first (two surfaces, install friction, doesn't ship at 10–15 h/week) |
 | 9 | Legal posture | Intermediary ToS + Ley 1581 privacy policy, SAS deferred | Company-now (cost with zero revenue and minimal liability) |
 | 10 | Matching v1 | Structured + geo scored candidates; photo similarity as parallel learning track | Photo-similarity-first (weeks of work, GPU cost, early bad matches erode trust) |
 | 11 | Points | Status only for now | Designing a redemption economy before there's anything to redeem |
