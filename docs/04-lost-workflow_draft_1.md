@@ -74,8 +74,14 @@ this flow**. Reunion transfers nothing back — nothing was taken away. Custody 
 
 ### `sighting`
 `case_id`, `point`, `seen_at`, `photos[]`, `note`, `source: anonymous | registered`,
-`reporter_person_id?`, `reporter_contact`,
+`reporter_person_id?`, `reporter_contact?`,
 `status: visible | hidden_by_owner | removed_by_moderation`.
+
+**Only `point` and `seen_at` are required** — and `seen_at` defaults to now. Photos, note, and contact
+are optional for everyone, anonymous included. A bare pin is worth less to an owner than a pin with a
+phone number behind it, but it is worth far more than the report that never got submitted because the
+form demanded one. Ask for contact, explain why («el dueño va a querer preguntarte en qué esquina
+exactamente»), and let it be skipped.
 
 Default `visible` — publishing a sighting must be instant, or the map dies. The owner can hide any
 pin; moderation removes abuse. Anti-spam is **rate limiting + owner-hides-pin**, never pre-approval.
@@ -90,6 +96,39 @@ the case status by itself.
 ### `case_checkin`
 `case_id`, `scheduled_at`, `trigger: time_based | post_recovery_claim`, `sent_at`, `channel`,
 `responded_at`, `response: still_lost | reunited | delete`.
+
+### `report` — anyone can report a publication
+Cross-cutting: the same table covers every vertical, so it lives here once and
+[05-found-workflow.md](05-found-workflow.md) reuses it.
+
+`target_type: lost_case | found_case | sighting | recovery_claim | ownership_claim`, `target_id`,
+`reporter_person_id?`, `reporter_contact?`, `reason`, `note`, `created_at`,
+`status: open | actioned | dismissed`, `reviewed_by`, `reviewed_at`, `resolution_note`.
+
+`reason`: `spam` · `duplicate` · `scam_or_extortion` · `harassment` · `graphic_content` ·
+`personal_data` · `animal_welfare` · `other`.
+
+**Reporting is anonymous and one tap.** Requiring an account to report abuse means abuse goes
+unreported — the person best placed to flag a scam is usually a stranger who just saw it in the feed.
+Rate-limit by device/IP, exactly like sightings.
+
+Three rules:
+
+> **A report never hides an active case by itself.** Same logic as the recovery-claim rule below: if a
+> stranger can silently reduce a search's reach, a scammer or a spiteful neighbor can end one. Reports
+> queue for human review; the case keeps broadcasting.
+
+> **Two exceptions auto-hide pending review**, because the harm compounds every hour they stay up:
+> `graphic_content` and `personal_data` (someone published a home address, a full phone number, an
+> ID). These hide on the *first* report and get reviewed fast, with a one-tap restore.
+
+> **Reports are the channel for what the owner can't fix.** The owner already hides bad sighting pins
+> themselves — that stays the primary tool. Reports exist for the cases the owner won't act on or *is*:
+> a fake case, a reward scam, harassment in the contact channel.
+
+Reporter identity is never shown to the reported party. Repeat reporters whose reports are always
+dismissed get their weight lowered — and repeat *targets* across cases are the real signal, so the
+queue groups by target's author, not by report.
 
 ---
 
@@ -170,15 +209,18 @@ pet record.
 | Action | Anonymous | Registered |
 |---|---|---|
 | View, share the card | ✓ | ✓ |
-| Report a sighting | ✓ — pin + time **+ contact (required)**, photo optional | ✓ — contact from profile, photo optional |
+| Report a sighting | ✓ — pin required; time, photo, note, contact optional | ✓ — contact prefilled from profile |
+| Report a publication (abuse) | ✓ — one tap, reason required | ✓ |
 | "Lo tengo" | ✓ — WhatsApp | ✓ — WhatsApp **or** in-app thread |
 | Contact the owner | ✓ — WhatsApp deep link | ✓ — WhatsApp or in-app thread |
 | Earn points / attribution | ✗ | ✓ |
 | Publish a lost case | ✗ | ✓ — OAuth + phone verified |
 
-Contact is **required** for anonymous sightings: a pin nobody can follow up on is nearly worthless to
-an owner, whose immediate next question is always «¿en qué esquina exactamente?». Registered users
-supply it implicitly from their profile, so the field only ever appears to anonymous reporters.
+The only hard requirement on a sighting is the pin. Contact is *asked for* and its value is explained
+in the form — the owner's immediate next question is always «¿en qué esquina exactamente?», and a pin
+nobody can follow up on answers it badly — but it is never a gate. The submit button works with one
+tap on a map. Registered users supply contact implicitly from their profile, so the field only ever
+appears to anonymous reporters, already softened as optional.
 
 ---
 
@@ -205,6 +247,7 @@ For analytics, notifications, and points attribution:
 `lost_case.published` · `lost_case.broadcast_sent` · `sighting.reported` · `sighting.hidden` ·
 `recovery_claim.opened` · `recovery_claim.confirmed` · `recovery_claim.dismissed` ·
 `contact.opened` (whatsapp_click | thread_created) · `checkin.sent` · `checkin.responded` ·
+`report.submitted` · `report.actioned` · `report.dismissed` · `content.hidden_by_moderation` ·
 `lost_case.reunited` · `lost_case.expired` · `lost_case.cancelled` · `pet.merged`
 
 ---
@@ -213,9 +256,11 @@ For analytics, notifications, and points attribution:
 
 | # | Question | Recommendation |
 |---|---|---|
-| 1 | OTP-verify the anonymous sighting phone? | **No.** OTP at the sighting moment costs more reports than it stops spam. Rate-limit by device/IP; the owner hides bad pins |
+| 1 | OTP-verify the anonymous sighting phone? | **No** — and moot now that contact itself is optional. OTP at the sighting moment costs more reports than it stops spam. Rate-limit by device/IP; the owner hides bad pins |
+| 1b | Contact optional lowers the value of each pin — how much? | Measure it: `sighting.reported` carries `has_contact`. If contactless pins dominate and owners complain, the fix is better copy at the ask, not a required field |
 | 2 | Public precision of sighting pins and `last_seen_point` | Fuzz the public marker to ~200 m. A last-seen pin is a home address by proxy — real Ley 1581 exposure |
 | 3 | Rewards attract fake "lo tengo" claims | Keep the field, display-only, plus warning copy: never pay before recovering the pet |
 | 4 | Duplicate lost cases for the same pet (owner + a well-meaning neighbor) | Detect on publish by geo + species + time window; offer «¿es la misma mascota?» rather than blocking |
 | 5 | Re-push when sightings cluster far from the original pin? | v2 — powerful («se movió hacia el norte»), but measure the first broadcast before adding a second |
 | 6 | Can a registered helper convert their own sighting into "lo tengo"? | Yes, one tap — it's the natural escalation and preserves attribution |
+| 7 | Who reviews the report queue at v1, and how fast? | Us, manually. Set an explicit SLA before launch (auto-hidden content ≤4h, everything else ≤48h) — an unstaffed report button is worse than none, because it promises action we don't take |

@@ -24,26 +24,32 @@ Independently-posted `found` reports are compared against open `lost` cases: spe
 ### 5. Resolve
 Owner marks **reunited** (prompted to post the happy-ending photo — the platform's best organic marketing, and the moment to ask "who helped you?" for points attribution) or the case quietly expires. After resolution the owner owes the platform nothing.
 
-## Adoption
+## Adoption — P2P in v1
 
-Depth decision: **structured application, decision off-platform.**
+Depth decision: **mediated contact; decision and handoff off-platform.** Full detail in [06-adoption-workflow.md](06-adoption-workflow.md).
 
-1. **Foundation lists a pet** — org-held Pet + `adoptable` Case: photos, temperament, requirements.
-2. **Adopter applies in-app** — shared base screening form (housing, experience, household, other pets). Account required, always.
-3. **Foundation works a ranked, filterable application inbox** instead of 40 "¿todavía está disponible?" WhatsApp chats. Accept/reject/shortlist in-app. *This inbox is the reason foundations list with us.*
-4. **Real world takes over** — interviews, home visit, handoff happen off-platform, per the foundation's own process.
-5. **Foundation records the outcome** — adopted (by whom) → responsibility link transfers to the adopter → case resolves. The pet's history (found as a stray, fostered, funded) travels with it.
+1. **A person lists a pet** — claimed Pet + `adoption` Case: photos, story, temperament, structured requirement flags, and a **mandatory fee disclosure including zero**. Most v1 inventory arrives via `converted_to_adoptable` from a found case.
+2. **An interested person answers** — "Me interesa": a free message plus three one-tap chips («tengo patio», «tengo otros perros», «primera mascota»). Account required, always: they are receiving an animal, not helping.
+3. **The publisher works a short list, not a chat thread** — open / shortlisted / accepted / declined / lapsed. Small in v1 by design, and deliberately the same surface B2P will sort and filter.
+4. **Real world takes over** — meeting, questions, handoff, all off-platform. We rank evidence and warn; the publisher decides. We never approve an adopter.
+5. **The publisher records the outcome** — `adopted` → responsibility link transfers → case resolves, and we ask who helped. The pet's history (found as a stray, treated, fostered) travels with it.
 
-## Donations (Phase 2)
+**Deferred to B2P** (Phase 2, trigger-driven): organization accounts, the shared screening form, the ranked filterable inbox, the public response-time label. The seams for all of it ship in v1.
 
-Money **never** touches the platform.
+## Help (Phase 2) — supersedes "Donations"
 
-1. Campaign attached to a Pet: goal, story, evidence (vet diagnosis/invoice), beneficiary's own payment info (Nequi/Daviplata/bank/link).
-2. Trust tier displayed prominently: **unverified** (basic identity only — clearly labeled) vs **verified** (evidence reviewed; personería jurídica for foundations).
-3. Donors pay the beneficiary directly. Raised totals are self-reported by the campaign owner.
-4. Every campaign carries a report/flag button; reports feed the moderation queue.
+Money **never** touches the platform, and money is only one of eight needs. Full detail in [07-help-workflow.md](07-help-workflow.md).
 
-## Cross-cutting: moderation & verification (operator flows)
+1. **A help case carries needs** — `funds`, `transport`, `foster`, `supplies`, `blood`, `rescue`, `vet_access`, `hands`. Each need has a unit and an optional target; a case can have three at once.
+2. **Helpers pledge; only the beneficiary confirms.** Every kind of help is the same ledger, which is all we could honestly know about an off-platform donation anyway.
+3. **Two numbers, never one** — *confirmado* large and primary, *prometido* small and secondary. A single self-reported total is the scam's favourite instrument.
+4. **Funds needs require evidence to publish** (diagnosis, invoice, or a vet we can call) and display a trust tier. The preferred `payout_target` is a **clinic**: you cannot steal a surgery.
+5. **Updates are mandatory** — a real case produces a shaved leg and a discharge sheet week after week; a fake one produces silence.
 
-- **Verification queue**: manual review of evidence submissions (vet invoices, personería jurídica). Fine at low volume; revisit if it exceeds the side-project hour budget.
-- **Report queue**: community flags on any post/campaign/sighting. First strike: hide + contact publisher. Scams: remove + ban.
+## Cross-cutting: reporting, moderation & verification
+
+- **`report`** — one table over every publication in every vertical. Anonymous, one tap, a reason required, rate-limited by device.
+- **Reports never hide an active case by themselves.** If a stranger can silently suppress a case, a scammer or a spiteful neighbour can end one. Three carve-outs: `graphic_content` and `personal_data` auto-hide on the first report; a credible `scam_or_extortion` report on a `funds` case suspends it loudly, with an SLA.
+- **`animal_welfare` on a found case** is the highest-priority queue — and the one report type where contacting the finder beats hiding the post.
+- **Verification queue**: manual review of evidence (vet invoices, personería jurídica). Fine at low volume; revisit if it exceeds the side-project hour budget.
+- An unstaffed report button is worse than none. Set the SLA before launch.
