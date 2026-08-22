@@ -87,10 +87,11 @@ later problem.
 
 #### Publishing: who, and what gets written
 
-**Only the owner publishes a lost case.** Anyone else — a neighbor who saw a stray wandering, a
-person who took one home — goes through **Found**, which carries a `holding: true | false` flag for
-exactly that distinction. The lost form is never the place for "I saw a dog that looked lost"; the
-model must not force non-owners into the `owner` role because it offered them no other door.
+**Only the owner publishes a lost case.** Anyone else goes through «Encontré un animal», whose
+first question — «¿Lo tienes contigo?» — routes a person who took the animal home to a found case
+and a person who only saw it to a sighting. The lost form is never the place for "I saw a dog that
+looked lost"; the model must not force non-owners into the `owner` role because it offered them no
+other door.
 
 Publishing writes three rows in **one transaction**: the `pet` (or reuses one, see picker above),
 the `responsibility_link` with `role = owner` (or reuses it), and the `lost_case`. A pet without a
@@ -128,10 +129,15 @@ nothing to average out across loads.
 push), which is a reach decision owned by the broadcast rules. Don't derive one from the other.
 
 ### `sighting`
-`case_id`, `point`, `seen_at`, `created_at`, `photos[]`, `note`, `source: anonymous | registered`,
+`case_id?`, `point`, `seen_at`, `created_at`, `photos[]`, `note`, `source: anonymous | registered`,
 `reporter_person_id?`, `reporter_device_key?`, `reporter_contact`,
 `status: visible | hidden_by_owner | removed_by_moderation`, `highlighted_by_owner: bool`,
 `editable_until`.
+
+`case_id` is nullable and may point at a lost **or** found case. A sighting with no case is an
+**orphan** — a witness report matching couldn't attach yet. Orphans, their extra fields, and how
+they get attached are defined in [07-found-workflow_draft_1.md](07-found-workflow_draft_1.md);
+everything in this section assumes a sighting attached to a lost case.
 
 `seen_at` is when the reporter saw the animal; `created_at` is when they told us. They differ
 whenever someone reports late («lo vi ayer»), and everything below orders by `seen_at`.
@@ -403,33 +409,31 @@ under `recovery_claim`.
 
 ---
 
-## Interaction with FOUND cases (the merge path)
+## Interaction with FOUND cases and sightings
 
-The boundary is **perspective, not custody**: Lost is "I lost *mine*"; Found is "I encountered an
-animal that isn't mine" — whether or not I have it.
+The boundary is **perspective, not custody**, three doors: **Lost** is the owner ("I lost
+*mine*"); **Found** is the custodian ("I have an animal that isn't mine"); **Sighting** is everyone
+else ("I saw one"), attached to a case when matching can, kept as an orphan when it can't. A found
+case always means custody — there is no witness variant.
 
-Two entry points that must not be confused:
+What this flow needs to know:
 
-1. **"Lo tengo" on an existing lost case** → `recovery_claim`. No new pet, no new case; the pet is
-   already `claimed` and identified.
-2. **Independent found publication** (no lost case in sight) → new `unclaimed` pet + `found_case`
-   with `holding: true | false`. `true`: the finder took the animal in and is linked as
-   **custodian**. `false`: they saw it roaming and are a witness — no custody link, no owner link.
+- **"Lo tengo" on an existing lost case** → `recovery_claim`. No new pet, no new case.
+- **A finder publishing custody** is matched against active lost cases *before* a found case is
+  created; a hit becomes a `recovery_claim` on this case instead of a second card.
+- **Publishing a lost case** matches against active found cases («¿Es tu mascota?» →
+  `ownership_claim` on the found case) and against orphan sightings ≤ 30 days («Vieron uno
+  parecido…» → attached with its original `seen_at`, so the owner gets trail from before they
+  published).
+- **Merge** — when both sides confirm the same animal — folds the unclaimed pet into this one,
+  resolves both cases as reunited, and is reversible.
 
-Matching bridges them, in both directions. Publishing a found case near a recent lost case asks
-«¿es esta?» — yes turns it into a sighting (`holding: false`) or a claim (`holding: true`) on the
-lost case instead of a new record. Publishing a lost case near a recent found case asks «¿es tu
-mascota?». When a `found_case` and a `lost_case` are mutually confirmed as the same animal, the
-unclaimed pet folds into the claimed pet, the custodian link (if any) closes, the owner link
-continues, and **both** cases resolve as reunited. The merge must be reversible — a wrong merge
-otherwise destroys two records at once.
+Matching contract, outcomes by pet situation, orphan sightings, and the merge mechanics:
+[07-found-workflow_draft_1.md](07-found-workflow_draft_1.md).
 
 What remains of the "duplicate lost case" problem after this routing is the rare same-household
 case — two people, two accounts, same pet. Detect on publish by `last_seen_point` + species + time
 window; offer «¿es la misma mascota?», never block.
-
-> The `holding` flag, both-direction matching, and the merge mechanics belong to the found workflow
-> doc (not yet written). They're sketched here only so the lost side's boundary is explicit.
 
 ---
 
@@ -441,7 +445,7 @@ For analytics, notifications, and points attribution:
 `sighting.hidden` · `sighting.highlighted` ·
 `recovery_claim.opened` · `recovery_claim.confirmed` · `recovery_claim.dismissed` · `recovery_claim.stale` ·
 `contact.opened` (whatsapp_click | thread_created) · `checkin.sent` · `checkin.responded` ·
-`lost_case.reunited` · `lost_case.expired` · `lost_case.cancelled` · `pet.merged`
+`lost_case.reunited` · `lost_case.expired` · `lost_case.cancelled` · `pet.merged` · `pet.unmerged`
 
 ---
 

@@ -4,12 +4,13 @@
 
 The whole game: **maximize the eyeballs that see the pet in the first 48 hours, in the neighborhood where it was lost.**
 
-> Summary only. The lost flow's entities, state machine, follow-up loop, and rules live in
-> [04-lost-workflow_draft_1.md](04-lost-workflow_draft_1.md); notifications in
-> [05-notifications.md](05-notifications.md). Where this summary disagrees with those, they win.
+> Summary only. Lost lives in [04-lost-workflow_draft_1.md](04-lost-workflow_draft_1.md); found,
+> sightings, matching contract, and merge in [07-found-workflow_draft_1.md](07-found-workflow_draft_1.md);
+> notifications in [05-notifications.md](05-notifications.md). Where this summary disagrees with
+> those, they win.
 
 ### 1. Publish
-One form: photos, species/breed/size/colors/marks, last-seen **area** (pin + a radius chip: ~1 cuadra / ~3 cuadras / ~1 km — the owner rarely knows the exact spot), time, contact preference (expose WhatsApp/email or not). No reward field, by design — people help because it's a lost pet. Requires an account (OAuth one-tap + phone verification). **Only the owner publishes Lost**; a neighbor who saw a stray or took one in publishes Found. Behind the scenes: claimed Pet (reused if the user already has one — «¿Cuál se perdió?») + owner link + `lost` Case, in one transaction.
+One form: photos, species/breed/size/colors/marks, last-seen **area** (pin + a radius chip: ~1 cuadra / ~3 cuadras / ~1 km — the owner rarely knows the exact spot), time, contact preference (expose WhatsApp/email or not). No reward field, by design — people help because it's a lost pet. Requires an account (OAuth one-tap + phone verification). **Only the owner publishes Lost**; everyone else goes through «Encontré un animal», whose first question — «¿Lo tienes contigo?» — routes to a found case (custody) or a sighting (just saw it). Behind the scenes: claimed Pet (reused if the user already has one — «¿Cuál se perdió?») + owner link + `lost` Case, in one transaction.
 
 ### 2. Broadcast — three channels, in order of importance
 1. **Geo push**: every opted-in user within ~2–5 km gets "🐕 Perro perdido cerca de ti" with photo. This is *the* differentiator — Facebook groups have no geo-targeting and posts drown in the feed.
@@ -20,8 +21,8 @@ One form: photos, species/breed/size/colors/marks, last-seen **area** (pin + a r
 - **"Lo vi" (sighting)** — lightweight, no account needed: location + time + contact number (required, not verified) + optional photo. Sightings pin onto a map on the post so the owner sees the trajectory ("moving toward the park"); one reporter may file several, and nothing is deleted to make room — recency is shown, not enforced. Low commitment, high volume. Anti-spam: rate limiting + owner can hide pins, never pre-approval.
 - **"Lo tengo" (found/secured)** — always creates a `recovery_claim` first (anonymous: phone required), *then* opens contact with the owner (WhatsApp deep link if exposed; in-app thread for registered users). The claim shows as a «posible hallazgo» badge and accelerates the owner's check-ins; it never resolves the case by itself — only the owner confirms.
 
-### 4. Matching (background)
-Independently-posted `found` reports are compared against open `lost` cases: species, size, colors, marks, breed-guess × geo distance × time window → **scored candidate list** surfaced to *both* sides as "¿es tu mascota?". Mutual confirmation triggers the Pet merge (see entities doc).
+### 4. Matching
+Matches **pets, not cases**: identity first, then the pet's situation says what a report means. Runs at publish time on both sides and on every witness report — species, size, colors, marks, breed-guess × geo distance × time window → **candidate list with human-readable reasons**, always confirmed by a human, never auto-attached. A finder publishing custody is matched *before* a found case is created (a hit becomes a «lo tengo» claim on the lost case, no second card). A witness report that matches nothing is kept internally as an orphan sighting for 30 days and re-matched against lost cases published later. Mutual confirmation triggers the reversible Pet merge (see 07).
 
 **v2 (parallel AI-learning track):** photo-embedding similarity added as one more score into the same pipeline. Additive, never a rewrite. Known failure mode to design for: dirty/wet/injured pets photographed badly at night look nothing like their fluffy profile photo.
 

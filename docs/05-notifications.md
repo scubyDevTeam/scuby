@@ -61,7 +61,44 @@ budget accounts for it.
 
 ## Found
 
-_Pending — defined with the found workflow doc._
+Events: see `07-found-workflow_draft_1.md` → Events.
+
+### To the custodian
+
+| Event | Channel | Copy | Rule |
+|---|---|---|---|
+| `found_case.broadcast_sent` | push | «Tu aviso ya llegó a los vecinos de la zona.» | Once per case |
+| `ownership_claim.opened` | push → WhatsApp if undelivered in 15 min | «Alguien dice ser el dueño. Ábrelo para ver lo que envió.» | **Priority.** Never coalesced, ignores quiet hours. Carries the hand-off safety copy in the detail view |
+| `match.candidates_shown` (a new lost case matched this found case) | push | «Publicaron un aviso de perdido que se parece al animal que tienes.» | Coalesce window: 1 h. Not priority |
+| `contact.opened` (`thread_created`) | push | «Tienes un mensaje sobre el animal que encontraste.» | In-app thread only; WhatsApp clicks send nothing |
+| `found_case.expired` | push + email | «Archivamos tu aviso. Puedes reactivarlo con un toque hasta el 12 de sep.» | Email because push was ignored. Includes reopen deadline |
+| `ownership_claim.stale` | — | — | Silent; badge drops |
+
+### To the claimant (registered only)
+
+| Event | Copy | Rule |
+|---|---|---|
+| `ownership_claim.confirmed` | «¡Confirmaron que es tuyo! Coordina la entrega.» | To the claimant |
+| `ownership_claim.dismissed` | — | Silent. A "no" from a stranger holding the animal is not something to push |
+
+### To a witness (registered only)
+
+| Event | Copy | Rule |
+|---|---|---|
+| `sighting.attached` | «Tu reporte ayudó: lo vincularon al aviso de Luna.» | The only feedback an orphan reporter ever gets, and the reason they report again |
+
+### Broadcast (to the neighborhood)
+
+| Event | Channel | Copy | Rule |
+|---|---|---|---|
+| `found_case.broadcast_sent` | push | «Encontraron un perro cerca de ti — ¿es tuyo?» | Same caps as lost: [O1](06-open-items.md), [O2](06-open-items.md) |
+
+### Gated (not sent until O5 is decided)
+
+| Event | Target | Copy | Gate |
+|---|---|---|---|
+| `match.candidates_shown` where the matched pet has **no active case** | the pet's owner | «¿Luna está contigo? Alguien reportó un animal parecido cerca.» | [O5](06-open-items.md) — mismatch rate below threshold |
+| `match.candidates_shown` where the matched pet has an **active found case** | the custodian | «¿Sigues con el animal que encontraste? Lo reportaron en otro lugar.» | [O5](06-open-items.md) |
 
 ## Adoption
 
