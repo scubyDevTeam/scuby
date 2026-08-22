@@ -196,7 +196,11 @@ views don't count); escalation push → WhatsApp → email on the same row; `una
 `expired`; claim check-ins never count toward the streak.
 
 `expired` is soft: gone from feed and push, reachable by link, reopenable for 30 days. After 30
-days: purge anonymous claimant contacts, keep the pet record.
+days the case is purged — and so is the **pet**, if it is still `unclaimed` with no other case and
+no other link. A stray whose custodian went silent and whose owner never surfaced within the reopen
+window cannot be found by anyone afterwards; keeping it only pollutes the matching pool. The share
+link then shows «Este aviso ya no está disponible». Expiry itself changes nothing on the link or
+custody ([01, rule 7](01-actors-and-entities.md)); purge is what removes the record.
 
 ---
 
@@ -281,9 +285,10 @@ the custodian must be reachable and accountable for a live animal.
 
 ## Hooks for the next verticals
 
-- **Adoption**: the `org` responsibility role and `custody_state = org_held` exist and are unused
-  in v1. The structured `transferred_to_org` (D4) is the bridge from a finder to a foundation's
-  adoptable listing.
+- **Adoption**: a custodian who can't keep the stray lists it on the same pet row —
+  [08](08-adoption-workflow_draft_1.md) — and `adopted_in_app` transfers the link to the adopter.
+  The `org` role and `custody_state = org_held` exist and are unused in v1; the structured
+  `transferred_to_org` (D4) is the bridge from a finder to a foundation's listing.
 - **Help** (fundraising): a custodian holding an injured stray is the most common reason a
   campaign exists for an `unclaimed` pet. The pet row is the attachment point; nothing else here
   needs to change.
@@ -297,7 +302,8 @@ the custodian must be reachable and accountable for a live animal.
 `contact.opened` (whatsapp_click | thread_created) · `checkin.sent` · `checkin.responded` ·
 `found_case.reunited` · `found_case.kept` · `found_case.transferred_to_org` ·
 `found_case.expired` · `found_case.cancelled` · `sighting.orphan_created` · `sighting.attached` ·
-`match.candidates_shown` · `match.confirmed` · `match.rejected` · `pet.merged` · `pet.unmerged`
+`match.candidates_shown` · `match.confirmed` · `match.rejected` · `pet.merged` · `pet.unmerged` ·
+`responsibility.transferred` (on `kept`, `transferred_to_org`, merge)
 
 `match.*` are the measurement hooks for O5 — without them the mismatch rate can't be computed and
 the gated nudges never unlock.

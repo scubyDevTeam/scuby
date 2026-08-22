@@ -102,4 +102,28 @@ Events: see `07-found-workflow_draft_1.md` → Events.
 
 ## Adoption
 
-_Pending._
+Events: see `08-adoption-workflow_draft_1.md` → Events. **No broadcast** — listed so nobody adds
+one; the push budget belongs to lost/found.
+
+### To the lister
+
+| Event | Channel | Copy | Rule |
+|---|---|---|---|
+| `adoption_interest.created` | push | «Alguien está interesado en Max.» | Coalesce window: 1 h («3 personas interesadas en Max»). Not priority — nothing here is urgent |
+| `contact.opened` (`thread_created`) | push | «Tienes un mensaje sobre Max.» | In-app thread only |
+| `adoption_case.expired` | push + email | «Archivamos la publicación de Max. Puedes reactivarla con un toque hasta el 12 de sep.» | Per case, orgs included |
+| `adoption_interest.withdrawn` | — | — | Silent; the list just updates |
+
+### To the adopter (always registered)
+
+| Event | Copy | Rule |
+|---|---|---|
+| `adoption_interest.chosen` | «Te eligieron para adoptar a Max. Coordina la entrega.» | |
+| `adoption_case.adopted` (by someone else) | «Max ya fue adoptado. Gracias por interesarte.» | To everyone with an open interest. Closure, and a nudge back to the feed |
+| `adoption_interest.declined` | — | Silent. A "no" is the lister's to say, in chat, if at all |
+
+### Check-ins (delivery rule only — cadence lives in 08)
+
+Per case, delivered **per lister**: an individual's listings batch into one push; an org gets one
+digest every 30 days covering all its active listings as a checklist. Same coalescing machinery as
+everything else, applied to `case_checkin` deliveries.

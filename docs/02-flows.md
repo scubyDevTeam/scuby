@@ -31,13 +31,15 @@ Owner marks **reunited** (prompted to post the happy-ending photo — the platfo
 
 ## Adoption
 
-Depth decision: **structured application, decision off-platform.**
+> Summary only. Source of truth: [08-adoption-workflow_draft_1.md](08-adoption-workflow_draft_1.md).
 
-1. **Foundation lists a pet** — org-held Pet + `adoptable` Case: photos, temperament, requirements.
-2. **Adopter applies in-app** — shared base screening form (housing, experience, household, other pets). Account required, always.
-3. **Foundation works a ranked, filterable application inbox** instead of 40 "¿todavía está disponible?" WhatsApp chats. Accept/reject/shortlist in-app. *This inbox is the reason foundations list with us.*
-4. **Real world takes over** — interviews, home visit, handoff happen off-platform, per the foundation's own process.
-5. **Foundation records the outcome** — adopted (by whom) → responsibility link transfers to the adopter → case resolves. The pet's history (found as a stray, fostered, funded) travels with it.
+Depth decision: **listing vertical, not screening vertical — individuals first.** Foundations with their own process get a listing that links out; the ranked inbox is deferred until one of them moves their process to us.
+
+1. **Anyone holding a pet lists it** — an owner rehoming, a rescuer, the found-flow custodian who can't keep the stray, or an org. Same pet row, whatever its custody state. A trust-tier badge (`verified` org / `individual`) with honest copy.
+2. **Adopter taps «Me interesa»** — account required, a 4-field intro (housing, yard, other pets, why), then the channel opens: WhatsApp with the intro prefilled, the org's own application URL, or an in-app thread. The interest row exists before any conversation.
+3. **Lister screens in chat**, sees a plain list of interests (no ranking), marks one as chosen, declines the rest silently if they want.
+4. **Real world takes over** — meeting, handoff, per the lister's own judgment. We're the intermediary.
+5. **Lister records the outcome** — adopted in-app (by whom → responsibility link transfers, pet's history travels with it) or off-platform (link closes, recorded honestly). Check-ins keep listings from going stale: per case for individuals, one monthly digest per org.
 
 ## Donations (Phase 2)
 

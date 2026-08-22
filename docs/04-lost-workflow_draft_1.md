@@ -380,7 +380,8 @@ abandoning the search.
 
 `expired` is soft: gone from feed and push, still reachable by direct link (WhatsApp shares stay
 alive), reopenable in one tap for 30 days. After 30 days: purge anonymous sighter contacts, keep the
-pet record.
+pet record — it's a claimed pet, the owner link continues, and expiry never changes who is
+responsible ([01, rule 7](01-actors-and-entities.md)).
 
 ### Notifications
 

@@ -21,7 +21,7 @@ From least to most identity required:
 | Report a sighting | None — location + time + **contact number (required, not verified)** + optional photo | The pin is the value, but a pin nobody can follow up on is nearly worthless — the owner's next question is always «¿en qué esquina?». No OTP: it would cost more real reports than it stops spam. Anti-spam via rate-limiting and owner-hides-pin, not signup |
 | "I have it" / contact owner | None — phone number (required, not verified) → a `recovery_claim` row → owner's WhatsApp (owner opts into exposing it) | Helping needs no account, but the claim must exist in the system *before* the WhatsApp handoff or the most common path to a reunion is invisible to badges, check-ins, and attribution |
 | **Publish** anything (lost, found, campaign) | Account (OAuth: Google/Apple one-tap) + phone verification | A publisher must be contactable and accountable. **Lost is published only by the owner** (ownership asserted, not verified); **Found only by someone holding the animal**. Seeing a stray is a sighting, not a publish — no account |
-| Apply to adopt | Account, always | The foundation needs a real identity to screen |
+| «Me interesa» (adoption) | Account, always — plus a 4-field intro before the channel opens | Adopting is a commitment, not a tip; the hand-off transfers responsibility to a real person. Screening itself happens in chat, between them |
 | Earn points / status | Account | Attribution requires identity |
 
 ## Core entity model: Pet + Case
@@ -37,7 +37,7 @@ Person / Organization
       │
       ├── Case: LOST         last-seen area (point + radius) + time   → reunited | expired | cancelled
       ├── Case: FOUND        found-area + time, holding_where (custody)  → reunited | kept | transferred-to-org | expired | cancelled
-      ├── Case: ADOPTABLE    requirements, applications        → adopted | withdrawn
+      ├── Case: ADOPTION     story, temperament, interests       → adopted | withdrawn | expired
       └── Case: FUNDRAISING  goal, story, evidence, payee info → closed
 ```
 
@@ -53,4 +53,5 @@ The verticals demonstrably involve the same animals: a found stray becomes adopt
    Three doors, by **perspective**: Lost is the owner ("I lost *mine*"), Found is the custodian ("I have one that isn't mine"), Sighting is everyone else ("I saw one"). A found case always means custody.
 4. **Merge is a first-class, reversible operation.** When a found-report and a lost-report are confirmed to be the same animal, the unclaimed record folds into the claimed Pet and both cases resolve as *reunited*. Wrong merges must be undoable. This is the trickiest flow in the system and the price of the model.
 5. **Dormant records cost nothing.** After a case resolves, nobody owes the platform maintenance. Rows just sit there until (if ever) their human enriches them.
-6. **"Lost" is never stored on the pet.** It is derived from an active lost case. See [04-lost-workflow_draft_1.md](04-lost-workflow_draft_1.md) (lost) and [07-found-workflow_draft_1.md](07-found-workflow_draft_1.md) (found, sightings, matching contract, merge), which are the sources of truth for their flows; where this doc and those disagree, they win.
+6. **"Lost" is never stored on the pet.** It is derived from an active lost case. See [04-lost-workflow_draft_1.md](04-lost-workflow_draft_1.md) (lost), [07-found-workflow_draft_1.md](07-found-workflow_draft_1.md) (found, sightings, matching contract, merge), and [08-adoption-workflow_draft_1.md](08-adoption-workflow_draft_1.md) (adoption), which are the sources of truth for their flows; where this doc and those disagree, they win.
+7. **Expiry never changes who is responsible.** A case expiring — lost, found, or adoption — touches neither `responsibility_link` nor `custody_state`; links change only by an explicit transfer (`adopted_in_app`, `kept`, `transferred_to_org`, merge). Expiry means "we lost contact," not "nobody is responsible." **Purge** (expired + 30 days) removes the case, and removes the pet only when it is `unclaimed` with no other case and no other link — a stray nobody vouches for anymore cannot be found by anyone, so there is no one to keep it for. Claimed pets are never purged by a case.
