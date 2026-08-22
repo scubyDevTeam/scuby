@@ -12,6 +12,8 @@ Apply to every journey unless a row says otherwise.
 | Rule | Contract |
 |---|---|
 | Trigger | Every notification is fired by a named domain event. No event, no message. Adding a notification means adding an event first |
+| Events exist only for a consumer | An event is named only if something reads it: a notification row here (**N**), a metric that cannot be derived from entity rows (**M**), or the audit trail of responsibility changes (**A**). The doc that defines the event tags its consumer. Anything derivable from rows — cases published per week, resolutions, check-in response rates — is a query over rows, not an event. Vocabulary without a consumer is how event lists rot |
+| Implementation | One append-only `events` table (`name`, `subject_id`, `actor_id`, `payload`, `created_at`), written in the same transaction as the thing it describes. Notification jobs and metric queries read it. No bus, no broker |
 | Default channel | Push. In-app inbox always receives a copy |
 | No push permission | The flow's single highest-priority message (e.g. a recovery claim) falls back to a WhatsApp template. Everything else stays in-app |
 | Quiet hours | 22:00–07:00 local. Non-priority pushes are held and delivered at 07:00, coalesced into one. Priority rows are marked and go through |
@@ -35,8 +37,9 @@ Events: see `04-lost-workflow_draft_1.md` → Events.
 | `recovery_claim.opened` | push → WhatsApp if undelivered in 15 min | «Alguien dice que tiene a Luna. Ábrelo para contactar.» | **Priority.** Never coalesced, ignores quiet hours |
 | `contact.opened` (`thread_created`) | push | «Tienes un mensaje sobre Luna.» | In-app thread only. A `whatsapp_click` sends nothing — the WhatsApp message itself is the notification |
 | `lost_case.expired` | push + email | «Archivamos el aviso de Luna. Puedes reactivarlo con un toque hasta el 12 de sep.» | Email because the owner has, by definition, ignored push. Includes the reopen deadline |
-| `recovery_claim.stale` | — | — | Silent. The owner ignored two claim check-ins on it; a third message is noise. The badge just drops |
-| `sighting.hidden` · `sighting.highlighted` · `sighting.corrected` | — | — | Silent to the owner (their own action, or a reporter fixing a pin) |
+
+Silent by design, so no event: a claim going stale (the owner ignored two check-ins; the badge just
+drops), a claim dismissed, a sighting hidden or corrected (the owner's or reporter's own action).
 
 ### To helpers (registered only)
 
@@ -72,14 +75,15 @@ Events: see `07-found-workflow_draft_1.md` → Events.
 | `match.candidates_shown` (a new lost case matched this found case) | push | «Publicaron un aviso de perdido que se parece al animal que tienes.» | Coalesce window: 1 h. Not priority |
 | `contact.opened` (`thread_created`) | push | «Tienes un mensaje sobre el animal que encontraste.» | In-app thread only; WhatsApp clicks send nothing |
 | `found_case.expired` | push + email | «Archivamos tu aviso. Puedes reactivarlo con un toque hasta el 12 de sep.» | Email because push was ignored. Includes reopen deadline |
-| `ownership_claim.stale` | — | — | Silent; badge drops |
+
+Silent by design, so no event: a claim going stale (badge drops), a claim dismissed — a "no" from a
+stranger holding the animal is not something to push.
 
 ### To the claimant (registered only)
 
 | Event | Copy | Rule |
 |---|---|---|
 | `ownership_claim.confirmed` | «¡Confirmaron que es tuyo! Coordina la entrega.» | To the claimant |
-| `ownership_claim.dismissed` | — | Silent. A "no" from a stranger holding the animal is not something to push |
 
 ### To a witness (registered only)
 
@@ -112,7 +116,9 @@ one; the push budget belongs to lost/found.
 | `adoption_interest.created` | push | «Alguien está interesado en Max.» | Coalesce window: 1 h («3 personas interesadas en Max»). Not priority — nothing here is urgent |
 | `contact.opened` (`thread_created`) | push | «Tienes un mensaje sobre Max.» | In-app thread only |
 | `adoption_case.expired` | push + email | «Archivamos la publicación de Max. Puedes reactivarla con un toque hasta el 12 de sep.» | Per case, orgs included |
-| `adoption_interest.withdrawn` | — | — | Silent; the list just updates |
+
+Silent by design, so no event: an interest withdrawn (the list just updates), an interest declined —
+a "no" is the lister's to say, in chat, if at all.
 
 ### To the adopter (always registered)
 
@@ -120,7 +126,6 @@ one; the push budget belongs to lost/found.
 |---|---|---|
 | `adoption_interest.chosen` | «Te eligieron para adoptar a Max. Coordina la entrega.» | |
 | `adoption_case.adopted` (by someone else) | «Max ya fue adoptado. Gracias por interesarte.» | To everyone with an open interest. Closure, and a nudge back to the feed |
-| `adoption_interest.declined` | — | Silent. A "no" is the lister's to say, in chat, if at all |
 
 ### Check-ins (delivery rule only — cadence lives in 08)
 

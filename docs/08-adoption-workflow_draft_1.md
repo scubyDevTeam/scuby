@@ -200,14 +200,19 @@ and the hand-off needs two real identities for the link transfer.
 
 ## Events
 
-`adoption_case.published` · `adoption_interest.created` · `adoption_interest.withdrawn` ·
-`adoption_interest.chosen` · `adoption_interest.declined` ·
-`contact.opened` (whatsapp_click | external_click | thread_created) · `checkin.sent` ·
-`checkin.responded` · `adoption_case.adopted` · `adoption_case.withdrawn` ·
-`adoption_case.expired` · `responsibility.transferred`
+Named only where something consumes them — **N** notification ([05](05-notifications.md)),
+**M** metric not derivable from rows, **A** audit. Publishes, withdrawals, declines, check-ins,
+resolutions: queries over rows.
 
-`responsibility.transferred` is shared across flows: it fires on `adopted_in_app`, `kept`,
-`transferred_to_org`, and merge — every change of who is responsible, one event to audit.
+| Event | Consumer |
+|---|---|
+| `adoption_interest.created` | N — lister, coalesced |
+| `adoption_interest.chosen` | N — the adopter |
+| `contact.opened` `{whatsapp_click \| external_click}` | M — only evidence the contact happened; for `external_url` it is the *only* record after the interest row |
+| `contact.opened` `{thread_created}` | N — lister |
+| `adoption_case.adopted` | N — everyone else with an open interest |
+| `adoption_case.expired` | N — lister, push + email |
+| `responsibility.transferred` | A — on `adopted_in_app`; shared with `kept`, `transferred_to_org`, merge. Every change of who is responsible, one event to audit |
 
 Notifications: [`05-notifications.md`](05-notifications.md) → **Adoption**.
 

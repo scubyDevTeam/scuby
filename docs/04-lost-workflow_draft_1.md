@@ -440,13 +440,23 @@ window; offer «¿es la misma mascota?», never block.
 
 ## Events
 
-For analytics, notifications, and points attribution:
+Named only where something consumes them — **N** notification ([05](05-notifications.md)),
+**M** metric not derivable from rows, **A** audit. Everything else (publishes, resolutions,
+check-ins, hides, corrections, dismissals) is a query over entity rows.
 
-`lost_case.published` · `lost_case.broadcast_sent` · `sighting.reported` · `sighting.corrected` ·
-`sighting.hidden` · `sighting.highlighted` ·
-`recovery_claim.opened` · `recovery_claim.confirmed` · `recovery_claim.dismissed` · `recovery_claim.stale` ·
-`contact.opened` (whatsapp_click | thread_created) · `checkin.sent` · `checkin.responded` ·
-`lost_case.reunited` · `lost_case.expired` · `lost_case.cancelled` · `pet.merged` · `pet.unmerged`
+| Event | Consumer |
+|---|---|
+| `lost_case.broadcast_sent` | N — owner confirmation; neighborhood push |
+| `sighting.reported` | N — owner |
+| `sighting.highlighted` | N — reporter |
+| `recovery_claim.opened` | N — owner, priority |
+| `recovery_claim.confirmed` | N — claimant |
+| `contact.opened` `{whatsapp_click}` | M — the only evidence a WhatsApp contact happened; feeds `resolution_attribution` honesty |
+| `contact.opened` `{thread_created}` | N — owner |
+| `lost_case.reunited` | N — every registered helper on the case |
+| `lost_case.expired` | N — owner, push + email |
+| `pet.merged` · `pet.unmerged` | A — with the `pet_merge` record |
+| `responsibility.transferred` | A — never fired by this flow (reunion transfers nothing); listed so the lost side knows it exists |
 
 ---
 

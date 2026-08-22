@@ -297,16 +297,23 @@ the custodian must be reachable and accountable for a live animal.
 
 ## Events
 
-`found_case.published` · `found_case.broadcast_sent` · `ownership_claim.opened` ·
-`ownership_claim.confirmed` · `ownership_claim.dismissed` · `ownership_claim.stale` ·
-`contact.opened` (whatsapp_click | thread_created) · `checkin.sent` · `checkin.responded` ·
-`found_case.reunited` · `found_case.kept` · `found_case.transferred_to_org` ·
-`found_case.expired` · `found_case.cancelled` · `sighting.orphan_created` · `sighting.attached` ·
-`match.candidates_shown` · `match.confirmed` · `match.rejected` · `pet.merged` · `pet.unmerged` ·
-`responsibility.transferred` (on `kept`, `transferred_to_org`, merge)
+Named only where something consumes them — **N** notification ([05](05-notifications.md)),
+**M** metric not derivable from rows, **A** audit. Publishes, resolutions, check-ins, dismissals,
+orphan creation: queries over rows.
 
-`match.*` are the measurement hooks for O5 — without them the mismatch rate can't be computed and
-the gated nudges never unlock.
+| Event | Consumer |
+|---|---|
+| `found_case.broadcast_sent` | N — custodian confirmation; neighborhood push |
+| `ownership_claim.opened` | N — custodian, priority |
+| `ownership_claim.confirmed` | N — claimant |
+| `contact.opened` `{whatsapp_click}` | M — only evidence a WhatsApp contact happened |
+| `contact.opened` `{thread_created}` | N — custodian |
+| `found_case.expired` | N — custodian, push + email |
+| `sighting.attached` | N — the witness; the only feedback an orphan reporter ever gets |
+| `match.candidates_shown` | N — the custodian when a lost case matches theirs; N (gated, O5) for the two nudges; M — denominator of the mismatch rate |
+| `match.confirmed` · `match.rejected` | M — the mismatch rate that unlocks O5. Not derivable: a rejection leaves no row |
+| `pet.merged` · `pet.unmerged` | A — with the `pet_merge` record |
+| `responsibility.transferred` | A — on `kept`, `transferred_to_org`, merge |
 
 Notifications for this flow: [`05-notifications.md`](05-notifications.md) → **Found**.
 
