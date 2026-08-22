@@ -132,3 +132,23 @@ a "no" is the lister's to say, in chat, if at all.
 Per case, delivered **per lister**: an individual's listings batch into one push; an org gets one
 digest every 30 days covering all its active listings as a checklist. Same coalescing machinery as
 everything else, applied to `case_checkin` deliveries.
+
+---
+
+## Help
+
+Events: see `09-help-workflow_draft_1.md` → Events. **No broadcast.**
+
+### To the beneficiary
+
+| Event | Channel | Copy | Rule |
+|---|---|---|---|
+| `help_contribution.created` | push | «Alguien ayudó en la campaña de Max.» | Coalesce window: 1 h («3 personas ayudaron»). Not priority |
+| `help_request.expired` | push + email | «Archivamos la campaña de Max. Puedes reactivarla con un toque hasta el 12 de sep.» | Includes reopen deadline |
+| `help_request.removed` | push + email | «Retiramos la campaña de Max por reportes. Responde a este correo si crees que es un error.» | Reply channel is the email |
+
+### To contributors
+
+Nothing in v1. A closure message when the request closes («Max se recuperó — gracias») is deferred
+([D8](06-open-items.md)). Contributors are **not** told about a removal — their money is already
+gone and there is nothing for them to do.

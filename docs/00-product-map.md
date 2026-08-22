@@ -33,10 +33,10 @@ Photo-similarity AI is a first-class **learning** track, not a launch dependency
 Geo-targeted push notifications, sighting map, shareable WhatsApp/IG cards, structured matching. This is the high-urgency, high-emotion, zero-money vertical that earns users and trust. See [02-flows.md](02-flows.md).
 
 ### Phase 1 — Adoption (the inventory engine)
-Foundations list pets; adopters submit structured in-app applications; decision and handoff happen off-platform. The pitch to foundations: a ranked application inbox instead of 40 WhatsApp chats.
+Anyone holding a pet lists it — individuals first, foundations link out to their own process. Adopters tap «Me interesa» with a short intro; screening happens in chat; the outcome is a responsibility transfer. The ranked inbox is deferred until a foundation moves its process to us. See [08](08-adoption-workflow_draft_1.md).
 
-### Phase 2 — Donations (unlocked once trust exists)
-Campaigns attached to a pet: goal, story, evidence, beneficiary's payment info. Trust-tier labels displayed prominently. Totals self-reported (money is off-platform).
+### Phase 2 — Help (money first; unlocked once trust exists)
+A request attached to a pet that **links out** to a campaign on a crowdfunding platform (Vaki or similar) — we never display payment details. Story, optional evidence, trust-tier label, self-reported progress kept honest by check-ins. `kind = money` now; foster/transport/supplies fit the same entity later. See [09](09-help-workflow_draft_1.md).
 
 ### Phase 3+ — parked ideas
 Helper points redemption economy · pet social features (meet & greets, gatherings) · foster-home network · transport volunteers · vet directory · microchip registry · public "happy endings" feed.

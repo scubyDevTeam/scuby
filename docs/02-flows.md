@@ -41,14 +41,16 @@ Depth decision: **listing vertical, not screening vertical — individuals first
 4. **Real world takes over** — meeting, handoff, per the lister's own judgment. We're the intermediary.
 5. **Lister records the outcome** — adopted in-app (by whom → responsibility link transfers, pet's history travels with it) or off-platform (link closes, recorded honestly). Check-ins keep listings from going stale: per case for individuals, one monthly digest per org.
 
-## Donations (Phase 2)
+## Help (Phase 2)
 
-Money **never** touches the platform.
+> Summary only. Source of truth: [09-help-workflow_draft_1.md](09-help-workflow_draft_1.md).
 
-1. Campaign attached to a Pet: goal, story, evidence (vet diagnosis/invoice), beneficiary's own payment info (Nequi/Daviplata/bank/link).
-2. Trust tier displayed prominently: **unverified** (basic identity only — clearly labeled) vs **verified** (evidence reviewed; personería jurídica for foundations).
-3. Donors pay the beneficiary directly. Raised totals are self-reported by the campaign owner.
-4. Every campaign carries a report/flag button; reports feed the moderation queue.
+Money **never** touches the platform — and neither do payment details. **Link, don't host.**
+
+1. **Beneficiary who holds the pet creates a campaign on a crowdfunding platform** (Vaki or similar) — the form's first step sends them there if they don't have one — then pastes the link. One link, one request.
+2. **Request attached to the Pet**: story, optional evidence (vet diagnosis/quote), optional goal. Trust tier displayed prominently: **unverified** (identity only, publishes immediately, clearly labeled) vs **verified** (operator reviewed evidence and link; personería jurídica for foundations).
+3. **«Quiero ayudar» is a link-out.** Donors pay on the platform. «Ya ayudé» (account required) is the only record we keep — shown as a count of people, never a sum. Progress is self-reported by the beneficiary at each check-in, labeled as theirs.
+4. **Check-ins keep it honest**: silence after the need ended is the fraud signal. Every request carries the report button; reports feed the moderation queue.
 
 ## Cross-cutting: moderation & verification (operator flows)
 
