@@ -15,7 +15,7 @@ One form: photos, species/breed/size/colors/marks, last-seen **area** (pin + a r
 ### 2. Broadcast — three channels, in order of importance
 1. **Geo push**: every opted-in user within ~2–5 km gets "🐕 Perro perdido cerca de ti" with photo. This is *the* differentiator — Facebook groups have no geo-targeting and posts drown in the feed.
 2. **Geo feed**: the post appears for anyone browsing that zone, sorted by proximity + recency. Local-first, national fallback when the local feed is empty.
-3. **Shareable card**: auto-generated image (photo, PERDIDO, zone, QR/link back) sized for WhatsApp statuses and IG stories. Virality in Colombia lives in WhatsApp — ride it; every share is an acquisition channel.
+3. **Shareable card**: per-case link previews (`og:image`, server-rendered, status-aware) so a pasted link shows the pet; plus an on-device poster (square / story / print) with a QR to the short link. The image never changes; the page does. Virality in Colombia lives in WhatsApp — ride it; every share is an acquisition channel. See [10-sharing.md](10-sharing.md).
 
 ### 3. The neighborhood responds — two distinct actions
 - **"Lo vi" (sighting)** — lightweight, no account needed: location + time + contact number (required, not verified) + optional photo. Sightings pin onto a map on the post so the owner sees the trajectory ("moving toward the park"); one reporter may file several, and nothing is deleted to make room — recency is shown, not enforced. Low commitment, high volume. Anti-spam: rate limiting + owner can hide pins, never pre-approval.
