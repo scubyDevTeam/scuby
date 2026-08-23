@@ -152,3 +152,17 @@ Events: see `09-help-workflow_draft_1.md` → Events. **No broadcast.**
 Nothing in v1. A closure message when the request closes («Max se recuperó — gracias») is deferred
 ([D8](06-open-items.md)). Contributors are **not** told about a removal — their money is already
 gone and there is nothing for them to do.
+
+---
+
+## Moderation (cross-journey)
+
+Events: see `12-reporting.md`.
+
+| Event | Target | Channel | Copy | Rule |
+|---|---|---|---|---|
+| `report.submitted` | operators | ops channel (not user push) | — | Immediate for the two auto-hide reasons and `scam_or_extortion`; batched otherwise. The queue itself is a query over `report` rows |
+| `content.hidden_by_moderation` | the publisher | push + email | «Ocultamos tu publicación por [razón]. Responde a este correo si crees que es un error.» | On action, never on report. Reporter identity never included |
+
+Reporters are not notified of outcomes in v1 — closing that loop is nice but each notification is a
+chance to triangulate who reported.

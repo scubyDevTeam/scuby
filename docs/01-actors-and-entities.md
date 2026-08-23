@@ -18,7 +18,8 @@ From least to most identity required:
 | Action | Identity required | Rationale |
 |---|---|---|
 | View posts, share cards | None | Reach must be frictionless |
-| Report a sighting | None — location + time + **contact number (required, not verified)** + optional photo | The pin is the value, but a pin nobody can follow up on is nearly worthless — the owner's next question is always «¿en qué esquina?». No OTP: it would cost more real reports than it stops spam. Anti-spam via rate-limiting and owner-hides-pin, not signup |
+| Report a sighting | None — **only the pin is required**; time, photo, note and contact are all optional | The pin is the value; the report that never gets submitted is worth less than a bare pin. Contact is asked for and its value explained, never gated. No OTP. Anti-spam via rate-limiting and owner-hides-pin, not signup |
+| Report a publication (abuse) | None — one tap + a reason ([12-reporting.md](12-reporting.md)) | Requiring an account to report abuse means abuse goes unreported |
 | "I have it" / contact owner | None — phone number (required, not verified) → a `recovery_claim` row → owner's WhatsApp (owner opts into exposing it) | Helping needs no account, but the claim must exist in the system *before* the WhatsApp handoff or the most common path to a reunion is invisible to badges, check-ins, and attribution |
 | **Publish** anything (lost, found, campaign) | Account (OAuth: Google/Apple one-tap) + phone verification | A publisher must be contactable and accountable. **Lost is published only by the owner** (ownership asserted, not verified); **Found only by someone holding the animal**. Seeing a stray is a sighting, not a publish — no account |
 | «Me interesa» (adoption) | Account, always — plus a 4-field intro before the channel opens | Adopting is a commitment, not a tip; the hand-off transfers responsibility to a real person. Screening itself happens in chat, between them |

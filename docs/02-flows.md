@@ -18,7 +18,7 @@ One form: photos, species/breed/size/colors/marks, last-seen **area** (pin + a r
 3. **Shareable card**: per-case link previews (`og:image`, server-rendered, status-aware) so a pasted link shows the pet; plus an on-device poster (square / story / print) with a QR to the short link. The image never changes; the page does. Virality in Colombia lives in WhatsApp — ride it; every share is an acquisition channel. See [10-sharing.md](10-sharing.md).
 
 ### 3. The neighborhood responds — two distinct actions
-- **"Lo vi" (sighting)** — lightweight, no account needed: location + time + contact number (required, not verified) + optional photo. Sightings pin onto a map on the post so the owner sees the trajectory ("moving toward the park"); one reporter may file several, and nothing is deleted to make room — recency is shown, not enforced. Low commitment, high volume. Anti-spam: rate limiting + owner can hide pins, never pre-approval.
+- **"Lo vi" (sighting)** — lightweight, no account needed: **only the pin required**; time defaults to now, photo/note/contact optional (asked for, explained, never gated — decision #13). Sightings pin onto a map on the post so the owner sees the trajectory ("moving toward the park"); one reporter may file several, and nothing is deleted to make room — recency is shown, not enforced. Low commitment, high volume. Anti-spam: rate limiting + owner can hide pins, never pre-approval.
 - **"Lo tengo" (found/secured)** — always creates a `recovery_claim` first (anonymous: phone required), *then* opens contact with the owner (WhatsApp deep link if exposed; in-app thread for registered users). The claim shows as a «posible hallazgo» badge and accelerates the owner's check-ins; it never resolves the case by itself — only the owner confirms.
 
 ### 4. Matching
@@ -55,4 +55,4 @@ Money **never** touches the platform — and neither do payment details. **Link,
 ## Cross-cutting: moderation & verification (operator flows)
 
 - **Verification queue**: manual review of evidence submissions (vet invoices, personería jurídica). Fine at low volume; revisit if it exceeds the side-project hour budget.
-- **Report queue**: community flags on any post/campaign/sighting. First strike: hide + contact publisher. Scams: remove + ban.
+- **Report queue**: anonymous one-tap reports on any publication, one table across verticals — rules, reasons, auto-hide exceptions and queue mechanics in [12-reporting.md](12-reporting.md). An unstaffed report button is worse than none: the SLA is set before launch (O11).

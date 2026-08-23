@@ -275,6 +275,7 @@ either a wrong match or a hand-off nobody told us about. Detect on publish, offe
 | Witness report («no lo tengo») | ✓ — photo + pin + time + contact (required, unverified) | ✓ — contact from profile |
 | «Es mío» | ✓ — phone required → `ownership_claim` → WhatsApp | ✓ — claim → WhatsApp or in-app thread |
 | Contact the custodian | ✓ — WhatsApp deep link | ✓ — either |
+| Report a publication (abuse) | ✓ — one tap, reason required ([12](12-reporting.md)) | ✓ |
 | Earn points / attribution | ✗ | ✓ |
 | Publish a found case (custody) | ✗ | ✓ — OAuth + phone verified |
 

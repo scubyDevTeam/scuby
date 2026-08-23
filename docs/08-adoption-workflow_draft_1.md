@@ -191,6 +191,7 @@ opt-in digest is deferred ([D7](06-open-items.md)).
 | «Me interesa» | ✗ | ✓ — OAuth + phone verified, short intro |
 | Contact the lister | ✗ — only through an interest | ✓ — WhatsApp, external URL, or thread |
 | Publish a listing | ✗ | ✓ — person or org that holds the pet |
+| Report a publication (abuse) | ✓ — one tap, reason required ([12](12-reporting.md)) | ✓ |
 | Earn points / attribution | ✗ | ✓ |
 
 The only vertical where nothing beyond viewing is anonymous: adopting is a commitment, not a tip,

@@ -170,7 +170,8 @@ deferred ([D9](06-open-items.md)).
 
 ## Moderation
 
-Every request carries the report button. First report → an operator looks; a pattern of reports or
+Every request carries the report button ([12-reporting.md](12-reporting.md)). `scam_or_extortion`
+here is high-priority: first credible report → an operator looks fast; a pattern of reports or
 evidence contradicting the story → `removed`, beneficiary notified with a reply channel. Same queue
 as every other vertical.
 
@@ -183,7 +184,7 @@ as every other vertical.
 | View, share, follow the link | ✓ | ✓ |
 | «Ya ayudé» | ✗ | ✓ |
 | Publish a request | ✗ | ✓ — holds the pet |
-| Report | ✓ | ✓ |
+| Report a publication (abuse) | ✓ — one tap, reason required ([12](12-reporting.md)) | ✓ |
 
 ---
 

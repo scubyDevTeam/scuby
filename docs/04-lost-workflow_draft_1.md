@@ -28,7 +28,7 @@ The neighborhood responds in **two structurally different ways**, and collapsing
 | Trust needed | Low — a wrong pin costs little | High — drives case resolution |
 | Product value | The trajectory map on the post | Opening a contact channel, fast |
 | Resolves the case? | Never | Only after **owner confirmation** |
-| Inputs | pin + time + contact + photo? | contact + pin? + photo? |
+| Inputs | pin required; time, contact, photo optional | contact required + pin? + photo? |
 
 Sightings are volume plays; recovery claims are the resolution path. Separate tables, separate rate
 limits, separate moderation treatment.
@@ -130,7 +130,7 @@ push), which is a reach decision owned by the broadcast rules. Don't derive one 
 
 ### `sighting`
 `case_id?`, `point`, `seen_at`, `created_at`, `photos[]`, `note`, `source: anonymous | registered`,
-`reporter_person_id?`, `reporter_device_key?`, `reporter_contact`,
+`reporter_person_id?`, `reporter_device_key?`, `reporter_contact?`,
 `status: visible | hidden_by_owner | removed_by_moderation`, `highlighted_by_owner: bool`,
 `editable_until`.
 
@@ -145,10 +145,17 @@ whenever someone reports late («lo vi ayer»), and everything below orders by `
 when there is no `person_id`.
 
 Default `visible` — publishing a sighting must be instant, or the map dies. The owner can hide any
-pin; moderation removes abuse. Anti-spam is **rate limiting + owner-hides-pin**, never pre-approval
-and never OTP. The anonymous reporter's phone is required but **not verified**: an OTP at the
-sighting moment loses more genuine reports than it stops spam, and a fake number costs the owner one
-unanswered call — the pin is still on the map. Applies equally to the anonymous «Lo tengo» phone.
+pin; moderation removes abuse ([12-reporting.md](12-reporting.md)). Anti-spam is **rate limiting +
+owner-hides-pin**, never pre-approval and never OTP.
+
+**Only the pin is required** (decision #13, [00](00-product-map.md)). `seen_at` defaults to now;
+photo, note, and contact are optional for everyone, anonymous included. A bare pin is worth less to
+an owner than a pin with a phone behind it — but far more than the report that never got submitted
+because the form demanded one. The form *asks* for contact and explains why («el dueño va a querer
+preguntarte en qué esquina exactamente»), and lets it be skipped. `sighting.reported` carries
+`has_contact` so the trade-off is measured, not argued: if contactless pins dominate and owners
+complain, the fix is better ask-copy, not a required field. The phone that IS required stays the
+anonymous «Lo tengo» phone — a claim's entire value is the contact channel; a sighting's is the pin.
 
 #### Sightings are never deleted to make room for new ones
 
@@ -237,9 +244,10 @@ anonymous path is the high-volume one; it cannot be the one we don't see.
 
 So the button is a one-field sheet, then the handoff:
 
-1. Anonymous: phone number (required — same reasoning as sightings: a claim nobody can reach is
-   worthless to the owner), photo optional → `recovery_claim` row with `claimant = {contact}` →
-   WhatsApp deep link opens with the owner's number and a prefilled message.
+1. Anonymous: phone number (**required** — unlike a sighting, whose value is the pin, a claim's
+   entire value is the contact channel; a claim nobody can reach is worthless), photo optional →
+   `recovery_claim` row with `claimant = {contact}` → WhatsApp deep link opens with the owner's
+   number and a prefilled message.
 2. Registered: no form — `claimant = person_id` → choose WhatsApp deep link or in-app thread.
 
 The row exists before the conversation starts. What happens inside WhatsApp we never see, and
@@ -396,17 +404,19 @@ under **Lost**, keyed by the events listed below. Adding an event here means add
 | Action | Anonymous | Registered |
 |---|---|---|
 | View, share the card | ✓ | ✓ |
-| Report a sighting | ✓ — pin + time **+ contact (required)**, photo optional | ✓ — contact from profile, photo optional |
+| Report a sighting | ✓ — **pin required**; time defaults to now; photo, note, contact optional | ✓ — contact prefilled from profile |
+| Report a publication (abuse) | ✓ — one tap, reason required ([12](12-reporting.md)) | ✓ |
 | "Lo tengo" | ✓ — phone **required** → `recovery_claim` → WhatsApp deep link | ✓ — `recovery_claim` → WhatsApp **or** in-app thread |
 | Contact the owner | ✓ — WhatsApp deep link | ✓ — WhatsApp or in-app thread |
 | Earn points / attribution | ✗ | ✓ |
 | Publish a lost case | ✗ | ✓ — OAuth + phone verified |
 
-Contact is **required** for anonymous sightings and claims: a pin nobody can follow up on is nearly
-worthless to an owner, whose immediate next question is always «¿en qué esquina exactamente?».
-Registered users supply it implicitly from their profile, so the field only ever appears to anonymous
-reporters. In both cases the row is written **before** any WhatsApp handoff — see the «Lo tengo» rule
-under `recovery_claim`.
+The only hard requirement on a sighting is the pin. Contact is *asked for*, with its value explained
+in the form — the owner's next question is always «¿en qué esquina exactamente?», and a pin nobody
+can follow up on answers it badly — but it is never a gate. Registered users supply it implicitly
+from their profile, so the field only appears to anonymous reporters, already softened as optional.
+The exception is the «Lo tengo» claim: its phone is required, and the row is written **before** any
+WhatsApp handoff — see the rule under `recovery_claim`.
 
 ---
 
@@ -447,7 +457,8 @@ check-ins, hides, corrections, dismissals) is a query over entity rows.
 | Event | Consumer |
 |---|---|
 | `lost_case.broadcast_sent` | N — owner confirmation; neighborhood push |
-| `sighting.reported` | N — owner |
+| `sighting.reported` | N — owner; M — `has_contact` (the decision-#13 measurement, not derivable once the form ships variants) |
+| `report.submitted` | N — operators ([12](12-reporting.md)) |
 | `sighting.highlighted` | N — reporter |
 | `recovery_claim.opened` | N — owner, priority |
 | `recovery_claim.confirmed` | N — claimant |
