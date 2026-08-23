@@ -23,6 +23,7 @@ From least to most identity required:
 | "I have it" / contact owner | None — phone number (required, not verified) → a `recovery_claim` row → owner's WhatsApp (owner opts into exposing it) | Helping needs no account, but the claim must exist in the system *before* the WhatsApp handoff or the most common path to a reunion is invisible to badges, check-ins, and attribution |
 | **Publish** anything (lost, found, campaign) | Account (OAuth: Google/Apple one-tap) + phone verification | A publisher must be contactable and accountable. **Lost is published only by the owner** (ownership asserted, not verified); **Found only by someone holding the animal**. Seeing a stray is a sighting, not a publish — no account |
 | «Me interesa» (adoption) | Account, always — plus a 4-field intro before the channel opens | Adopting is a commitment, not a tip; the hand-off transfers responsibility to a real person. Screening itself happens in chat, between them |
+| Claim ownership of a found pet («es mío») | Account, always — plus the evidence form ([07](07-found-workflow_draft_1.md)) | They are asking to *take* an animal, not to help |
 | «Ya ayudé» on a help request | Account | The only record a donation leaves; following the campaign link needs nothing |
 | Earn points / status | Account | Attribution requires identity |
 
@@ -38,7 +39,7 @@ Person / Organization
       │     custody_state: claimed | unclaimed | org_held
       │
       ├── Case: LOST         last-seen area (point + radius) + time   → reunited | expired | cancelled
-      ├── Case: FOUND        found-area + time, holding_where (custody)  → reunited | kept | transferred-to-org | expired | cancelled
+      ├── Case: FOUND        found-area + time, custody, two clocks   → reunited | kept | converted-to-adoptable | transferred-to-org | expired | cancelled
       ├── Case: ADOPTION     story, temperament, interests       → adopted | withdrawn | expired
       └── Case: HELP         external campaign link, story, evidence → closed | expired | removed
 ```

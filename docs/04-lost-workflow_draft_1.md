@@ -269,7 +269,8 @@ verdict, not a verdict — the claimant's contact stays attached and the owner c
 later (`stale → confirmed`).
 
 ### `case_checkin`
-`case_id`, `claim_id?`, `trigger: time_based | post_recovery_claim`, `scheduled_at`,
+`case_id`, `claim_id?`, `trigger: time_based | post_recovery_claim | hold_clock` (the third is
+found-only — [07](07-found-workflow_draft_1.md)), `scheduled_at`,
 `deliveries[] {channel: push | whatsapp | email, sent_at}`, `responded_at`, `cancelled_at`,
 `response: still_lost | reunited | delete | claim_confirmed | claim_dismissed | still_verifying`.
 

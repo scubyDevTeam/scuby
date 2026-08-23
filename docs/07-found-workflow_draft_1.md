@@ -57,15 +57,23 @@ found flow.
 |---|---|
 | `pet_id`, `created_by` | Publisher is registered (account + phone verified) |
 | `found_point`, `found_radius_m`, `found_at` | Where and when the animal was encountered. Area + time, same chips as lost. Public render floored at 200 m |
-| `holding_where` | `home \| vet \| street_temporary` — one chip, **public**. Tells an owner what urgency to expect |
+| `holding_where` | `home \| vet \| street_temporary \| no_longer_held` — one chip, **public**. Tells an owner what urgency to expect; `no_longer_held` covers "it ran off from my balcony" without forcing a resolution |
 | `holding_point` | Exact point, **internal, never rendered to anyone**. Safety and ops: a dispute, helping an org locate a pickup. The custodian shares their address in chat if and when they choose |
-| `contact_prefs` | `expose_whatsapp`, `expose_email`, `in_app_only` |
+| `held_since` | Anchors the **hold clock** (below). Defaults to `found_at`; independent of check-ins |
+| `withheld_detail` | One identifying detail the finder keeps out of the public post — the ownership shibboleth (see the evidence ladder). **Never rendered anywhere**; replayed only to the custodian on the claim screen |
+| `contact_prefs` | `expose_whatsapp`, `expose_email`, `in_app_only`. A custodian may reasonably stay `in_app_only` until a claimant earns trust — more important here than in lost |
+| `successor_case_id?` | Set on `converted`: the adoption case this became |
 | `status`, `resolution`, `resolution_attribution` | State machine below |
 | `published_at`, `resolved_at` | No schedule fields — the follow-up schedule lives in `case_checkin` rows, as in lost |
 
 Location precision follows the lost rules exactly: computation on the stored center, rendered circle
 floored at 200 m. The floor matters *more* here — the custodian's home is where the animal is
 **right now**.
+
+At publish, the form prompts for the withheld detail: «Guarda un dato que solo el dueño sabría —
+algo que no se vea en las fotos: una cicatriz, el color del collar, si está esterilizado.» Left
+alone, finders put everything in the photos and description, leaking every detail an opportunist
+needs. The prompt is what creates the shibboleth.
 
 #### Publishing: match first, then create
 
@@ -76,31 +84,54 @@ it is exactly the duplicate we don't want. Miss → the found case is created: `
 `responsibility_link` (`custodian`) + `found_case`, one transaction.
 
 ### `ownership_claim` — «Es mío»
-`case_id`, `claimant` (person or anonymous contact), `from_lost_case_id?`,
-`proof { older_photos[], chip_number?, vet_card_photo?, note }` — **all optional**,
-`status: open | confirmed | dismissed | stale`, `verifying_since?`, `stale_at`.
+`case_id`, `claimant_person_id` (**never anonymous** — see below), `from_lost_case_id?`,
+`evidence_kind[]`, `evidence_notes`, `evidence_photos[]`, `chip_number?`,
+`status: open | confirmed | dismissed | withdrawn | stale`, `verifying_since?`, `stale_at`.
 
-Mirror of `recovery_claim`, same rules, reversed trust:
+Mirror of `recovery_claim`, same answer loop, reversed trust:
 
-- The row is created **before** any contact channel opens. Anonymous: phone required, unverified.
+- **Registered only.** A deliberate asymmetry from «lo tengo», which stays anonymous-friendly:
+  there, the anonymous person is doing a favor and holds nothing. Here, they are asking to *take*
+  an animal. Asymmetric stakes, asymmetric identity requirements — and the real owner has the
+  strongest incentive of anyone to do one-tap OAuth.
+- The row is created **before** any contact channel opens.
 - It adds a «posible dueño» badge and accelerates check-ins. It never changes the case status.
 - The custodian answers: confirm («sí, es el dueño»), dismiss, or «aún verificando». Silence →
   `stale` at `stale_at` (claim + 7d, +72h per «verificando»), badge drops, case stays `active`.
-- `stale → confirmed` stays possible; the claimant's contact stays attached.
+  `withdrawn` is the claimant backing out; `stale → confirmed` stays possible.
 
-**Proof is offered, never required.** The form says «esto ayuda a quien lo tiene a reconocerte».
-A claimant can equally send things in chat. The custodian sees whatever was attached next to the
-claim and decides. We are the intermediary: we never adjudicate, and the ToS says so.
+#### The evidence ladder
 
-Why the asymmetry with lost matters: a fake «lo tengo» costs the owner a wasted trip; a fake «es
-mío» costs the **animal**. So the safety copy goes to the custodian, at the badge and on the claim
-check-in:
+A fake «lo tengo» costs the owner a wasted trip; a fake «es mío» hands a live animal to a stranger
+— the one genuinely high-stakes decision in this flow. The platform never adjudicates; what it does
+is **collect evidence on the claim form and rank it by how hard it is to fake**, so the custodian
+decides informed:
 
-> «Antes de entregarlo, pide una foto anterior del animal, el número de chip o el carnet de
-> vacunas. Entrégalo en un lugar público.»
+| # | Evidence | Strength |
+|---|---|---|
+| 1 | **A lost case for a matching animal, published *before* this found case** | Strongest, and system-verified: our own timestamps. A scammer who sees the found post today cannot publish a lost case last Tuesday. Computed from `from_lost_case_id`, never asked for |
+| 2 | Names the `withheld_detail` unprompted | Only someone who knew the animal before the photos existed can |
+| 3 | Chip number, vet records, photos of the pet **with** the claimant | Strong, human-checked |
+| 4 | Cold claim — nothing attached | Allowed, but the claim card says so: «⚠️ sin evidencia» |
 
-`from_lost_case_id` is set when the claim originates from matching on the lost side («¿Es tu
-mascota?» → yes). Confirming such a claim is the trigger for the merge (§ Merge).
+The «Es mío» form collects it in one screen, **everything optional** (proof is offered, never
+required — a claimant can equally send things in chat): «Describe algo que no salga en las fotos»
+(free text → `evidence_notes`, compared by the custodian against the withheld detail), optional
+photos / chip number / vet card, and tier 1 attaching itself when the claimant arrived via matching
+or has a matching lost case. The custodian's claim screen shows the tier label — «⭐ publicó un
+aviso de perdido antes de que lo encontraras» down to «⚠️ sin evidencia» — and replays the withheld
+detail: «Guardaste: *collar verde*. Pregúntale por eso antes de entregar.»
+
+Tier 1 is why the merge path is always preferred over a cold claim — route claimants through
+«¿es tu mascota?» first. Repeat cold-claimers across found cases surface in the moderation queue
+([12](12-reporting.md)): that pattern is the theft signal.
+
+Safety copy to the custodian, at the badge and on the claim check-in:
+
+> «Antes de entregarlo, pide el dato que guardaste, una foto anterior o el carnet de vacunas.
+> Entrégalo en un lugar público.»
+
+Confirming a claim that carries `from_lost_case_id` is the trigger for the merge (§ Merge).
 
 ### `sighting` — the lost entity, extended
 Defined in 04. This flow adds:
@@ -120,9 +151,30 @@ Orphans are **internal**: no card, no broadcast, not public. Their whole value i
 
 ### `case_checkin`
 Reused as-is from 04, including `deliveries[]`, `cancelled_at`, the derived `next_checkin_at` and
-`unanswered_streak`, and "what counts as an interaction". Responses gain the found exits:
-`still_holding | reunited | kept | transferred_to_org | delete | claim_confirmed | claim_dismissed |
-still_verifying`.
+`unanswered_streak`, and "what counts as an interaction". This flow adds a third trigger,
+`hold_clock`, and the found responses:
+`still_holding | keep_searching | reunited | kept | converted_to_adoptable | transferred_to_org |
+delete | claim_confirmed | claim_dismissed | still_verifying`.
+
+---
+
+## Two clocks
+
+The most important mechanic in this flow, and lost has no equivalent:
+
+| Clock | Anchored to | Asks | Consequence of silence |
+|---|---|---|---|
+| **Check-in clock** | `case_checkin` rows | "Is this post still true — do you still have it?" | Case `expired` |
+| **Hold clock** | `held_since` | "This animal has been in limbo N days" | The day-15 adoption offer |
+
+They are independent. A finder can be perfectly responsive (check-in clock healthy) while the
+animal sits unclaimed for a month (hold clock screaming). Conflating them would let a diligent
+finder's case drift forever. A lost case is a search; a found case is **custody in limbo with a
+deadline**, and the product's job is to resolve the limbo — ideally by reunion, otherwise by
+routing the animal somewhere better than a stranger's balcony.
+
+A stale found case is worse than no found case: an owner recognizing their dog, calling, and
+getting no answer is a specific cruelty. That's what the check-in clock exists to prevent.
 
 ---
 
@@ -134,18 +186,41 @@ stateDiagram-v2
     active --> active: ownership_claim / checkin "sigo con él"
     active --> reunited: custodian confirms hand-off
     active --> kept: custodian declares «me lo quedo»
+    active --> converted: day-15 offer accepted → adoption listing
     active --> transferred_to_org: custodian declares hand-off to an org
     active --> expired: 2 consecutive check-ins unanswered
     active --> cancelled: custodian deletes
     expired --> active: custodian reopens (≤30 days)
     reunited --> [*]
     kept --> [*]
+    converted --> [*]
     transferred_to_org --> [*]
     cancelled --> [*]
     expired --> [*]: purge after 30 days
 ```
 
-Same shape as lost with five exits instead of three — custody has more ways to end.
+Same shape as lost with six exits instead of three — custody has more ways to end, and most of
+them are honorable endings that aren't reunion.
+
+### Rule: the hold clock routes the animal somewhere
+
+At `held_since + 15 days` with no confirmed claim, the check-in changes shape — an **offer, not a
+warning** (see the framing rule below):
+
+> «Nadie ha reclamado a este peludo en 15 días. ¿Quieres publicarlo en adopción?»
+> `[ Publicar en adopción ]  [ Lo entregué a una fundación ]  [ Me lo quedo ]  [ Sigo buscando al dueño ]`
+
+The four buttons *are* the resolution enum. «Sigo buscando» re-arms the hold clock (+15 days);
+«Publicar en adopción» → **`converted`**: a new `adoption_case` on the *same pet*, pre-filled from
+it (photos, traits, «encontrado en el barrio Laureles en junio»), `successor_case_id` /
+`predecessor_case_id` linking the two. The pet stays `unclaimed`, the custodian link continues —
+listing is not a transfer ([08](08-adoption-workflow_draft_1.md)).
+
+This is the cross-vertical bridge the product map promised — "a found stray becomes adoptable" —
+and since adoption launches individuals-first, it is the **primary source of v1 adoption
+inventory**. The conversion rate at the day-15 offer is a launch metric. The 15 days has a legal
+echo (Ley 1774's 15-day abandonment window, [O6](06-open-items.md)) that makes it defensible
+rather than arbitrary; it is never cited as law in UI copy.
 
 ### Rule: only the custodian closes a case as reunited
 No claimant, no moderator, no timeout sets `reunited`. A confirmed `ownership_claim` is the
@@ -166,8 +241,8 @@ is deferred ([D4](06-open-items.md)). Recording the outcome honestly now costs n
 the process before a foundation asks for it would.
 
 ### `resolution` values
-`reunited_owner` · `kept_by_finder` · `transferred_to_org` · `found_deceased` · `not_a_stray` ·
-`ran_off_again` · `duplicate` · `no_response`
+`reunited_owner` · `kept_by_finder` · `converted_to_adoptable` · `transferred_to_org` ·
+`found_deceased` · `not_a_stray` · `ran_off_again` · `duplicate` · `no_response`
 
 `resolution_attribution: platform_claim | platform_match | platform_share | offline | unknown` —
 asked at the reunion moment, same as lost.
@@ -176,24 +251,31 @@ asked at the reunion moment, same as lost.
 
 ## The follow-up loop
 
-Same machinery and the same negative framing as lost. A silent custodian is the main way a found
-case goes stale, and the animal's situation is then unknown — expiry matters **more** here.
+Same machinery as lost, **different framing**. Lost leans on loss aversion — «se archivará en 5
+días» — because the owner has something to lose. A finder doesn't; threatening their post is an
+empty threat and reads as ungrateful. The lever here is the **animal's future**:
 
-> «Sigues con el perrito que encontraste. Si no nos confirmas, archivaremos el aviso en 5 días.»
+> «¿Sigues con el perrito que encontraste?»
 > `[ Sigo con él ]  [ Ya está con su dueño 🎉 ]  [ Me lo quedo ]  [ Lo entregué a una fundación ]  [ Eliminar ]`
+
+A silent custodian is still the main way a found case goes stale, and the animal's situation is
+then unknown — expiry matters **more** here; only the copy stops threatening.
 
 Claim check-in, to the custodian, with the safety copy:
 
 > «Alguien dice ser el dueño. Si no nos confirmas en 3 días, quitaremos el aviso de posible dueño.»
-> «Antes de entregarlo, pide una foto anterior, el chip o el carnet de vacunas. Entrégalo en un
-> lugar público.»
+> «Antes de entregarlo, pide el dato que guardaste, una foto anterior o el carnet de vacunas.
+> Entrégalo en un lugar público.»
 > `[ Sí, es el dueño 🎉 ]  [ No es ]  [ Aún verificando ]`
 
 ### Schedule
-Identical to lost: T+72h then weekly; claim check-ins at +24h/+72h with `stale_at = claim + 7d`,
-+72h per «aún verificando»; interaction resets to +7d (check-in answers and explicit actions only;
-views don't count); escalation push → WhatsApp → email on the same row; `unanswered_streak = 2` →
-`expired`; claim check-ins never count toward the streak.
+**T+48h, then every 5 days** — faster than lost's 72h/weekly, because custody facts change fast (the
+animal escapes, gets handed to a neighbor, the finder travels). Claim check-ins at +24h/+72h with
+`stale_at = claim + 7d`, +72h per «aún verificando»; the hold clock fires its offer at
+`held_since + 15d` independently of all of this; interaction resets the time-based clock to +5d
+(check-in answers and explicit actions only; views don't count); escalation push → WhatsApp → email
+on the same row; `unanswered_streak = 2` → `expired`; claim and hold-clock check-ins never count
+toward the streak.
 
 `expired` is soft: gone from feed and push, reachable by link, reopenable for 30 days. After 30
 days the case is purged — and so is the **pet**, if it is still `unclaimed` with no other case and
@@ -272,8 +354,8 @@ either a wrong match or a hand-off nobody told us about. Detect on publish, offe
 | Action | Anonymous | Registered |
 |---|---|---|
 | View, share the card | ✓ | ✓ |
-| Witness report («no lo tengo») | ✓ — photo + pin + time + contact (required, unverified) | ✓ — contact from profile |
-| «Es mío» | ✓ — phone required → `ownership_claim` → WhatsApp | ✓ — claim → WhatsApp or in-app thread |
+| Witness report («no lo tengo») | ✓ — pin + photo required (an orphan without a photo is unmatchable); time defaults to now; contact optional, asked-for (decision #13) | ✓ — contact from profile |
+| «Es mío» | ✗ — asking to *take* an animal, not to help | ✓ — always; `ownership_claim` + evidence form → WhatsApp or in-app thread |
 | Contact the custodian | ✓ — WhatsApp deep link | ✓ — either |
 | Report a publication (abuse) | ✓ — one tap, reason required ([12](12-reporting.md)) | ✓ |
 | Earn points / attribution | ✗ | ✓ |

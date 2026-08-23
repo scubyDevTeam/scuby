@@ -54,6 +54,7 @@ listings carry the `verified` badge. Nothing else. Inboxes, members, roles: not 
 | Field | Notes |
 |---|---|
 | `pet_id`, `created_by` | Lister is registered (person or org) and holds the pet |
+| `predecessor_case_id?` | Set when the listing was born from a found case's day-15 conversion ([07](07-found-workflow_draft_1.md)) — the form arrives pre-filled with the pet's photos, traits, and «encontrado en el barrio Laureles en junio». The primary source of v1 inventory |
 | `story` | Free text — the post |
 | `temperament[]` | Chips: `good_with_kids`, `good_with_cats`, `good_with_dogs`, `needs_yard`, `special_care`, `senior`, `puppy` |
 | `requirements` | Free text — what the lister asks of an adopter |

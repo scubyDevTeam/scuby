@@ -26,6 +26,9 @@ Matches **pets, not cases**: identity first, then the pet's situation says what 
 
 **v2 (parallel AI-learning track):** photo-embedding similarity added as one more score into the same pipeline. Additive, never a rewrite. Known failure mode to design for: dirty/wet/injured pets photographed badly at night look nothing like their fluffy profile photo.
 
+### 4b. The found side — custody with a deadline
+A found case runs on **two clocks**: check-ins («¿sigues con él?», T+48h then every 5 days — is the post still true?) and a **hold clock** — at day 15 unclaimed, the product offers the exit: publish in adoption (pre-filled, same pet — the primary source of P2P adoption inventory), hand to a foundation, keep it, or keep searching. «Es mío» claims are registered-only and arrive with an evidence ladder (a prior lost case, timestamp-proven, is the strongest; the finder's withheld detail is the shibboleth). We rank evidence and warn; the finder decides. See [07-found-workflow_draft_1.md](07-found-workflow_draft_1.md).
+
 ### 5. Resolve
 Owner marks **reunited** (prompted to post the happy-ending photo — the platform's best organic marketing, and the moment to ask «¿quién te ayudó?» for points attribution). Otherwise the platform check-ins keep asking, framed negatively («si no nos confirmas, archivaremos la publicación»), and two unanswered check-ins ≈ 14 days expire the case — softly, reopenable in one tap for 30 days. Only the owner ever sets reunited. After resolution the owner owes the platform nothing.
 
