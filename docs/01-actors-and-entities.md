@@ -37,6 +37,7 @@ Person / Organization
       ▼
      Pet ── species, breed-guess, size, colors, marks, photos, chip #
       │     custody_state: claimed | unclaimed | org_held
+      │     health_flags[] ── durable, survives every case (see 08)
       │
       ├── Case: LOST         last-seen area (point + radius) + time   → reunited | expired | cancelled
       ├── Case: FOUND        found-area + time, custody, two clocks   → reunited | kept | converted-to-adoptable | transferred-to-org | expired | cancelled

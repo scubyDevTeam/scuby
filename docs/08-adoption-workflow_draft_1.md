@@ -31,6 +31,13 @@ adoptable listing on the *same* pet row), an interest row before every conversat
 sees who is interested without reading forty chats, and a recorded outcome that transfers
 responsibility to a real person.
 
+**The B2P seams ship in v1** so the foundation inbox is "enum values plus one view, never a
+migration": `adoption_case.lane: light | application` (only `light` legal in v1, nothing branches
+on it yet), `adoption_interest.kind: interest | application`, a nullable `form_data` JSON column
+that stays unwritten until the screening form exists, `created_by` referencing the **actor**
+(person or org), and requirement *flags* rather than free text alone — flags can become filters
+across twenty listings; prose can't.
+
 ---
 
 ## Entities
@@ -39,6 +46,12 @@ responsibility to a real person.
 Already exists — the lister holds it. `custody_state` is whatever it was: `claimed` (owner
 rehoming), `unclaimed` (custodian with a stray), `org_held` (org). Listing changes nothing on the
 pet; only the outcome does.
+
+**`health_flags[]`** live on the pet, not the case: `chronic_condition` · `special_needs` ·
+`senior` · `fiv_felv` · `mobility_aid` · `behavioral_support`. A condition survives every adoption
+and travels with the animal; on listings the flags render prominently and act as filters —
+special-needs adopters exist, self-select, and are the best homes on the platform. Surface the
+flags, never bury them. (Also the join to the help vertical: [09](09-help-workflow_draft_1.md).)
 
 ### `responsibility_link`
 The lister's link is whatever it already is — owner, custodian, or org. **Listing does not touch
@@ -56,8 +69,11 @@ listings carry the `verified` badge. Nothing else. Inboxes, members, roles: not 
 | `pet_id`, `created_by` | Lister is registered (person or org) and holds the pet |
 | `predecessor_case_id?` | Set when the listing was born from a found case's day-15 conversion ([07](07-found-workflow_draft_1.md)) — the form arrives pre-filled with the pet's photos, traits, and «encontrado en el barrio Laureles en junio». The primary source of v1 inventory |
 | `story` | Free text — the post |
-| `temperament[]` | Chips: `good_with_kids`, `good_with_cats`, `good_with_dogs`, `needs_yard`, `special_care`, `senior`, `puppy` |
-| `requirements` | Free text — what the lister asks of an adopter |
+| `temperament[]` | Chips describing the **animal**: `good_with_kids`, `good_with_cats`, `good_with_dogs`, `senior`, `puppy` |
+| `requirement_flags[]` | Curated enum array describing the **home**: `needs_yard`, `no_small_children`, `no_other_dogs`, `indoor_only`, `experienced_home`. Extending it is adding an enum value — no migration (enum array + GIN in Postgres; a join table if the DB ends up elsewhere). **Curated, never free-form tags** — the moment anyone can invent one, they stop being filters |
+| `requirements` | Free text for everything the flags don't say |
+| `fee_cop`, `fee_covers[]` | **Disclosure is mandatory, including zero** — see the fee rule |
+| `lane` | `light \| application` — only `light` legal in v1 (B2P seam) |
 | `location_point`, `location_radius_m` | Where the animal is. Area, not pin; public render floored at 200 m — the lost/found rule |
 | `contact_prefs` | `expose_whatsapp`, `expose_email`, `in_app_only` |
 | `external_url?` | An org's own application page. Independent of WhatsApp — a lister can have both |
@@ -67,7 +83,8 @@ listings carry the `verified` badge. Nothing else. Inboxes, members, roles: not 
 ### `adoption_interest` — «Me interesa»
 `case_id`, `person_id` (**always registered**),
 `intro { housing: casa | apartamento, has_yard: bool, other_pets: text?, household: text?, why: text }`,
-`status: open | chosen | declined | withdrawn`, `created_at`.
+`kind: interest | application` (only `interest` legal in v1), `form_data?` (unwritten until B2P),
+`status: open | chosen | declined | withdrawn`, `created_at`, `first_responded_at?`.
 
 **One screen, before the channel opens.** Four fields and a free-text «¿por qué este?». Submitting
 creates the row, then opens the channel — same row-before-channel rule as every other contact
@@ -86,15 +103,31 @@ one tap («ya no me interesa»), which is what keeps the lister's list honest.
 For an `external_url` nothing can be prefilled; the interest row is the only record we keep — which
 is exactly why the row exists.
 
-Copy shown at the moment the channel opens, both sides: **pending**. The slot is here; the words
-come later.
+Copy shown at the moment the channel opens — the only screening in a P2P handoff is what these two
+people do, so the guidance is explicit, both sides:
+
+> To the adopter: «Conoce al animal en persona antes de decidir. Nunca pagues nada antes de
+> conocerlo. Pide el nombre del veterinario que lo ha visto.»
+> To the lister: «Conoce a la persona antes de entregarlo. Encuéntrense en un lugar público.»
 
 ### What the lister sees
 Not an inbox. A **list** on their listing: name, city, the four intro fields as chips, when they
-applied, and the conversation link. No ranking, no scoring. Three actions:
+applied, and the conversation link. No ranking, no scoring. Next to each name, **facts from the
+account, never a verdict**: «miembro hace 8 meses · 2 avistamientos reportados» and «tiene 6
+solicitudes de adopción abiertas». The open-requests count is the collector signal — someone
+requesting many animals in weeks is invisible to each lister and obvious in the data; we surface
+the number and say nothing else. Three actions:
 
-- **Mark as chosen** → `interest.status = chosen`; the listing shows «en proceso» publicly, stays
-  visible, still accepts interest — deals fall through.
+- **Mark as chosen** → `interest.status = chosen`; the listing shows **«En proceso»** publicly.
+  It stays open and **demotes in feed ranking** — the deliberate inverse of lost's
+  never-reduce-reach rule: an adoption case competes with *attention*, and attention on a pet
+  already spoken for is stolen from the other nineteen in the feed. The copy invites backups,
+  because reservations fall through constantly: «Nube está en proceso de adopción, pero a veces no
+  se concreta — puedes anotarte como segunda opción.» `reserved` is never a status; it's
+  `EXISTS interest WHERE status = 'chosen'`, a badge and a ranking weight.
+- **«No se concretó»** — manual, the lister's call, never automatic: clears the chosen interest
+  (back to `open` or `declined`) and restores full feed visibility. The system's only role is the
+  nudge below when a chosen interest sits without an outcome.
 - **Decline** → optional, silent to the adopter. If the lister wants to say no, they say it in chat.
 - **Record adoption** → «¿Quién lo adoptó?» picks from the list (→ `adopted_in_app`, link
   transfer) or «fuera de la app» (→ `adopted_offline`).
@@ -105,6 +138,22 @@ Anything heavier — configurable screening questions, shortlists, stages — is
 ### `case_checkin`
 Reused from 04. Responses: `still_available | adopted | no_longer_available`. **Check-ins are per
 case; delivery is per lister; cadence by lister type** (below).
+
+### Rule: fee disclosure is mandatory, including zero
+
+The **cuota de recuperación** — the adopter reimbursing sterilization, vaccines, deworming — is
+standard practice in Colombia, for orgs and individual rescuers alike, and it exists whether we
+model it or not; unmodeled, it just surprises the adopter in chat. So `fee_cop` cannot be blank:
+
+> «Cuota de recuperación: $150.000 — cubre esterilización, vacunas y desparasitación»
+> «Sin cuota»
+
+Display-only, never through the platform (money principle, unchanged). A non-zero fee **requires
+`fee_covers[]` entries**; and on individual listings — where there's no institution behind the
+number and «adopción con cuota» is the standard cover for a breeder selling puppies — a fee above
+the local norm routes to the moderation queue on publish ([12](12-reporting.md)). Never blocked,
+never silent. Structured fees also make the breeder pattern a *query* (high fee + no covers +
+unsterilized litter of one breed) instead of a human reading posts.
 
 ---
 
@@ -117,14 +166,17 @@ stateDiagram-v2
     active --> adopted: lister records the outcome
     active --> withdrawn: lister takes it down
     active --> expired: 2 consecutive check-ins unanswered
-    expired --> active: lister reopens (≤30 days)
+    expired --> active: lister reopens (≤90 days)
     adopted --> [*]
     withdrawn --> [*]
-    expired --> [*]: purge after 30 days
+    expired --> [*]: purge after 90 days
 ```
 
 No `cancelled` separate from `withdrawn`: on adoption there is no "false alarm," only "no longer
-available," and one exit with a reason covers it.
+available," and one exit with a reason covers it. Retention is **90 days**, not lost/found's 30 —
+adoption timelines are months, and a listing that expired in December is genuinely likely to be
+reopened in February. A returned adoption gets **no special handling**: if it ever happens, the
+lister creates a new case like any other.
 
 ### `resolution` values
 `adopted_in_app` · `adopted_offline` · `kept` · `deceased` · `transferred` · `no_response`
@@ -161,6 +213,13 @@ Stale listings are the plague of every adoption board, so: same negative framing
 |---|---|---|
 | Individual | T+7d, then every 14d | Per case; several listings batch into one push |
 | Org | Every 30d | **One digest per org** covering all active listings as a checklist: «Tienes 12 animales publicados en adopción. Marca los que ya no están disponibles.» Untouched entries count as «sigue disponible» |
+| Chosen interest with no outcome, 21d | «¿Cómo va la adopción de Nube?» `[ Ya fue adoptada 🎉 ] [ Sigue en proceso ] [ No se concretó ]` — the manual exit from «En proceso»; nothing un-chooses automatically |
+| Open interests unanswered > 5d | Private nudge, not a check-in: «tienes 3 solicitudes sin responder» — powered by `first_responded_at`; the public «suele responder en 2 días» label waits for B2P, where the average stops being noise |
+
+When a check-in fires on a listing with waiting people, the copy names them — «3 personas
+preguntaron por Nube esta semana. ¿Sigue disponible?» — because "three humans are hanging" moves a
+lister that «¿sigue disponible?» alone doesn't. With zero interest, the check-in suggests better
+photos instead.
 
 Slower than lost/found because nothing is urgent — but never silent: orgs are *where* stale listings
 come from (forty animals, three adopted last month, nobody took them down). Changing the unit to
@@ -171,7 +230,7 @@ When an org's whole batch expires at once, that's the right signal: the org has 
 
 Escalation push → WhatsApp → email on the same row, interaction resets (check-in answers and
 explicit actions — marking chosen, recording adoption — not views), `expired` soft and reopenable
-for 30 days: all as in 04.
+for 90 days: otherwise as in 04.
 
 ---
 
