@@ -1,50 +1,85 @@
 # Architecture — Web & Mobile
 
 > How the client side is built. Backend, database and infrastructure are deliberately out of scope
-> here; this document covers the two apps, what they share, and the rules that keep the sharing from
-> rotting.
+> here; this document covers the app, the store builds, and the rules that keep them one thing.
 > Decided 2026-08-23. Same convention as the rest: identifiers English/snake_case, Spanish strings
 > are UI copy.
 
 ## The decision in one line
 
-**Two apps, one brain.** `apps/web` in Next.js and `apps/mobile` in Expo, both sitting on shared
-packages that hold every rule from [04](04-lost-workflow_draft_1.md)–[07](07-help-workflow.md).
-Presentation is written twice on purpose. Logic is written once, on principle.
+**One codebase, three targets.** A React web app that runs on the web, and the *same* build wrapped
+by **Capacitor** into iOS and Android store apps. Screens are written once. The only per-platform
+code is a thin adapter layer for push, camera, location and the share sheet.
 
-## Why not one universal codebase
+> Reverses the Next.js + Expo split recorded earlier the same day. That approach was correct about
+> the tradeoffs and wrong about the price: two UIs forever, paid by two people at ~15 hrs/week
+> combined, to buy a native-feeling app for a product whose growth loop is entirely web.
 
-The obvious move is React Native Web through Expo Router — one codebase, three targets. It loses on a
-constraint that comes from the product, not from taste:
+## What this buys, concretely
 
-> The growth engine is a WhatsApp share opening for a **stranger** who never installs anything,
-> on a cheap Android, over 4G, and then drops a pin.
+| | Next.js + Expo | **Capacitor** |
+|---|---|---|
+| Screens written | Twice | **Once** |
+| The map | MapLibre GL JS *and* a native SDK | **MapLibre GL JS. One implementation.** |
+| Design system | shadcn on web, NativeWind on native | **shadcn everywhere** |
+| Repo | Monorepo, 2 apps, 5 packages | **One app, folders** |
+| Store apps | Genuinely native | Webview |
+| OTA updates | Free with EAS Update | Needs Capgo, or a remote shell |
 
-That path needs server-rendered HTML, correct Open Graph tags per case, and a fast first paint.
-Server rendering and link previews are exactly where React Native Web is weakest, and the surface it
-would degrade is the one the whole Phase 1 loop runs through.
+The map row is the one that changed the decision. Under the Expo split, the single most complex
+screen in the product had to be built and maintained twice, in two different libraries, with two sets
+of bugs. Under Capacitor there is one map, and it is the same MapLibre GL JS instance everywhere.
 
-The counter-argument — "but then the map is written twice" — doesn't survive contact with the detail:
+## What it costs
 
-> **The map is platform-specific in every option on the table.** MapLibre GL JS on web, a native map
-> SDK on native. That's true for Expo universal, for Capacitor, for Solito, for anything.
+**The store apps run in a webview.** Scroll physics, keyboard behaviour and navigation transitions
+read as web unless deliberately tuned. And the map — WebGL inside a webview — is the open question,
+addressed below as the first thing to build.
 
-Same for push registration, camera, and the share sheet. So "one UI codebase" was never going to
-cover the hard parts anyway. What it *would* have covered — forms, feeds, an inbox — is the cheap
-half.
+This is a real tradeoff and it is being taken with open eyes. The reasoning: our users are on
+Android, arriving from WhatsApp links, using the product in short urgent bursts. Nobody opens a
+lost-pet app to admire the scroll physics.
 
-| Rejected | Why |
-|---|---|
-| **Expo universal** (RNW for web too) | Weak SSR/OG on the surface the growth loop depends on; heavier JS on the devices our users actually have |
-| **Capacitor** (wrap the web app) | One codebase and genuinely tempting, but the map — a core screen — runs in a webview on low-end Android. Viable; see [the escape hatch](#if-the-two-uis-become-too-expensive) |
-| **Solito** (Next + Expo sharing RNW components) | One UI tree with real SSR, but two routers to keep in sync and RNW styling constraints. The tax outruns the benefit at this team size |
-| **Flutter** | Discards the React/TypeScript ecosystem and every shared-logic argument below |
+---
 
-### The cost, stated plainly
+## The two build targets
 
-Screens are written twice, forever. That is the price, it is real, and it is paid in the cheapest
-part of the codebase. What it buys is a web app with no compromises on the one surface that acquires
-users, and a mobile app with no compromises on the one screen that retains them.
+This is the one genuine integration cost of Capacitor + Next.js, and it needs to be understood before
+the first route is written.
+
+**Next.js server rendering does not run inside Capacitor.** The store build has to be static assets
+the webview loads locally. So:
+
+```
+next build                    → Vercel        → the web app
+next build (output: export)   → out/          → Capacitor → ios/ + android/
+```
+
+### Rule: the app is a static SPA; one function owns the share page
+
+The entire Next.js app is built with `output: 'export'` — a pure client-rendered SPA, identical on
+web and inside the store apps. No divergence, no conditional routes, no second build config.
+
+The one thing that genuinely needs a server is the WhatsApp link preview, and it needs it for
+exactly one route:
+
+```
+/p/[caseId]   → a Vercel serverless function
+                → renders real HTML: OG tags, the pet photo via @vercel/og, a readable summary
+                → then hands off to the SPA
+```
+
+That function is ~100 lines and it protects the entire growth loop: a stranger opening a shared link
+gets a correct preview in WhatsApp, real HTML for the crawler, and a fast first paint before any
+JavaScript runs.
+
+**Everything else is client-rendered**, including the public feed and map. Those aren't link-preview
+targets — they just need to be fast, and a cached shell plus a client fetch is fast enough.
+
+> If SPA first paint on the public feed turns out to be too slow for strangers on 4G, the escape is
+> to promote the web build to full SSR and keep the static export as a second app. Because both are
+> React DOM, **every component moves verbatim** — that migration duplicates nothing. It is nothing
+> like the Expo split it replaces.
 
 ---
 
@@ -53,65 +88,74 @@ users, and a mobile app with no compromises on the one screen that retains them.
 Four layers. Dependencies point inward, always.
 
 ```
-apps (web | mobile)      presentation — two implementations
-   └─ features           hooks, no JSX — shared
-        └─ api-client    fetch + TanStack Query — shared
-             └─ domain   pure rules — shared, zero dependencies
+app/                     routes and screens — one implementation
+   └─ src/features       hooks and components — the product
+        └─ src/api-client  fetch + TanStack Query
+             └─ src/domain  pure rules — zero dependencies
+                  ↑
+        src/platform    ← adapters: push, location, camera, share
 ```
 
-### Rule 1 — headless hooks, flat views
+### Rule 1 — `domain` imports nothing
 
-Behaviour lives in `packages/features` as hooks that return data and callbacks. Each app renders
-them. `useSightingForm()` is written once and painted twice.
+Not React, not fetch, not Zod. Plain TypeScript functions over plain data. This is what makes the
+four case lifecycles testable in milliseconds, and what makes them survive if this whole document is
+thrown away and rewritten for React Native in a year.
 
-```ts
-// packages/features/lost/use-sighting-form.ts   ← shared
-// apps/web/app/(public)/p/[caseId]/sighting-form.tsx     ← 40 lines of JSX
-// apps/mobile/app/caso/[id]/sighting-form.tsx            ← 40 lines of JSX
-```
-
-`packages/features` contains **no JSX, ever**. Not a component, not a fragment. The moment it does,
-one app starts winning and the package stops being shared.
-
-### Rule 2 — ports and injection
-
-Anything platform-specific is received, never imported:
-
-```ts
-useSightingForm({ getLocation })
-// apps/web    → navigator.geolocation
-// apps/mobile → expo-location
-```
-
-Same for camera, share sheet, push registration and secure storage. The hook is then testable with a
-stub instead of a platform mock, which is most of why the pattern earns its place.
-
-### Rule 3 — `domain` imports nothing
-
-Not React, not fetch, not even Zod. It is plain TypeScript functions over plain data. That is what
-makes it survive a framework change, and what lets it run in a test in under a millisecond.
-
-Enforced in CI with `dependency-cruiser`, because a dependency rule that lives in a README is a
+Enforced in CI with `dependency-cruiser`, because a dependency rule living in a README is a
 suggestion.
 
-| Package | May import |
+| Layer | May import |
 |---|---|
 | `domain` | nothing |
 | `contracts` | zod |
 | `api-client` | `contracts` |
-| `features` | `domain`, `contracts`, `api-client`, react |
-| `apps/*` | everything above — **never each other** |
+| `features` | `domain`, `contracts`, `api-client`, `ui`, `platform`, react |
+| `app/` | everything above |
+
+### Rule 2 — platform capabilities go through `src/platform`
+
+Nothing in `features` imports a Capacitor plugin or a browser API directly. One module per
+capability, one runtime branch inside it:
+
+```ts
+// src/platform/location.ts
+import { Capacitor } from '@capacitor/core'
+
+export async function getCurrentPosition(): Promise<Point> {
+  if (Capacitor.isNativePlatform()) {
+    const { Geolocation } = await import('@capacitor/geolocation')
+    return toPoint(await Geolocation.getCurrentPosition())
+  }
+  return toPoint(await getBrowserPosition())
+}
+```
+
+Four or five modules total — `location`, `camera`, `share`, `push`, `storage`. Everything above them
+is written once and never asks where it's running.
+
+This is also what keeps the door open: if the app is ever rebuilt in React Native, these modules are
+the only files that get replaced.
+
+### Rule 3 — the map lives behind one component
+
+`src/ui/Map/` exposes a props interface and nothing else. Markers are GL symbol layers, never DOM
+elements — a few hundred DOM pins will crawl in a desktop browser too, and blaming the webview for
+that is the classic misdiagnosis.
+
+The map is the most likely thing in this codebase to be swapped, for cost, for performance, or for a
+native rebuild. It gets a boundary from day one.
 
 ---
 
 ## State machines
 
 The four case lifecycles in [04](04-lost-workflow_draft_1.md)–[07](07-help-workflow.md) are already
-drawn as state machines. They get transcribed into `domain`, one file each, as discriminated unions
-plus a pure `transition()`:
+drawn as state machines. They get transcribed into `src/domain`, one file each, as discriminated
+unions plus a pure `transition()`:
 
 ```ts
-// packages/domain/lost/machine.ts
+// src/domain/lost/machine.ts
 type Status = 'active' | 'reunited' | 'expired' | 'cancelled'
 
 type Event =
@@ -129,13 +173,13 @@ export function transition(status: Status, event: Event): Status | null {
 }
 ```
 
-**Why this and not scattered `if`s.** Without it, "only the owner closes a case as reunited" lives in
-a button's `onClick` on web, the same button on mobile, the check-in cron, and the API handler. Four
-copies, and the moderation panel someone builds in month three will quietly violate all of them. One
-function, and the rule in the doc and the rule in the code cannot drift apart.
+**Why this and not scattered conditionals.** Without it, "only the owner closes a case as reunited"
+lives in a button's `onClick`, in the check-in job, and in the API handler. Three copies, and the
+moderation panel someone builds in month three will quietly violate all of them. One function, and
+the rule in the doc and the rule in the code cannot drift apart.
 
-**Not XState.** These machines are small, flat, and have no parallel states or actors. XState pays
-for itself when they do; here it would be ceremony. Revisit if a machine grows nested states.
+**Not XState.** These machines are small and flat, with no parallel states or actors. Revisit if one
+grows nested states.
 
 ---
 
@@ -143,93 +187,121 @@ for itself when they do; here it would be ceremony. Revisit if a machine grows n
 
 ```
 scuby/
-├── apps/
-│   ├── web/
-│   │   ├── app/
-│   │   │   ├── (public)/                 no session — the WhatsApp loop
-│   │   │   │   ├── p/[caseId]/           shareable card · SSR + OG
-│   │   │   │   ├── mapa/
-│   │   │   │   └── feed/
-│   │   │   ├── (app)/                    session required
-│   │   │   │   ├── publicar/
-│   │   │   │   ├── mis-casos/
-│   │   │   │   └── bandeja/
-│   │   │   └── api/
-│   │   ├── components/                   web-only
-│   │   └── lib/
-│   │
-│   └── mobile/
-│       ├── app/                          Expo Router
-│       │   ├── (tabs)/
-│       │   ├── caso/[id].tsx
-│       │   └── _layout.tsx
-│       ├── components/                   native-only
-│       └── app.config.ts
+├── app/                            Next.js App Router — output: export
+│   ├── (public)/                   no session
+│   │   ├── p/[caseId]/             the SPA view of a shared case
+│   │   ├── feed/
+│   │   └── mapa/
+│   ├── (app)/                      session required
+│   │   ├── publicar/
+│   │   ├── mis-casos/
+│   │   └── bandeja/
+│   └── layout.tsx
 │
-├── packages/
-│   ├── domain/
+├── src/
+│   ├── domain/                     ← pure. zero dependencies.
 │   │   ├── lost/       machine.ts · checkin.ts · rules.ts
 │   │   ├── found/      machine.ts · clocks.ts · evidence.ts
 │   │   ├── adoption/   machine.ts · reservation.ts
 │   │   ├── help/       machine.ts · ledger.ts
 │   │   └── shared/     checkin.ts · report.ts · identity.ts
-│   ├── contracts/                        Zod schemas
+│   ├── contracts/                  Zod schemas
 │   ├── api-client/
-│   │   └── queries/                      TanStack Query hooks
+│   │   └── queries/                TanStack Query hooks
 │   ├── features/
 │   │   └── lost/  found/  adoption/  help/
-│   ├── tokens/                           color · spacing · type
-│   └── config/                           tsconfig · biome · tailwind preset
+│   ├── ui/                         shadcn + Map/ + tokens
+│   └── platform/                   location · camera · share · push · storage
 │
-├── supabase/
-└── docs/                                 00–08
+├── api/
+│   └── p/[caseId].ts               Vercel function — OG meta + @vercel/og image
+│
+├── ios/                            generated by Capacitor
+├── android/                        generated by Capacitor
+├── capacitor.config.ts
+└── docs/                           00–08
 ```
 
-Feature folders, not type folders. `packages/features/lost/` beats `hooks/`, `screens/`, `utils/` the
+Feature folders, not type folders. `src/features/lost/` beats `hooks/`, `screens/`, `utils/` the
 moment there are four verticals.
+
+**No monorepo, no workspaces, no Turborepo.** There is one deployable and one app; folders are
+enough. Introduce workspaces only if the web build is ever promoted to SSR as a second app — and not
+a day earlier.
 
 ---
 
 ## Stack
 
-### Web — `apps/web`
+### App
 
 | | |
 |---|---|
-| Framework | **Next.js 15** App Router, React 19, RSC |
-| Styling | **Tailwind + shadcn/ui** |
-| Map | **MapLibre GL JS** + **Protomaps** tiles — markers as GL symbol layers, never DOM |
-| Share cards | **`@vercel/og`** — the WhatsApp preview per case |
-| PWA / push | **Serwist** — service worker, installable, Web Push on Android |
+| Framework | **Next.js 15** App Router, `output: 'export'`, React 19 |
+| Styling | **Tailwind + shadcn/ui** — the full library, no native compromise |
+| Map | **MapLibre GL JS** + **Protomaps** tiles — GL symbol layers, never DOM markers |
+| Server state | **TanStack Query** |
+| Forms | **react-hook-form + Zod** — these four flows are mostly forms |
+| Web push / PWA | **Serwist** — service worker, installable, Web Push on Android |
 | Deploy | **Vercel** |
 
-### Mobile — `apps/mobile`
+### Native shell
 
 | | |
 |---|---|
-| Framework | **Expo** + **Expo Router** |
-| Styling | **NativeWind** |
-| Map | **`@rnmapbox/maps`** — same Protomaps tiles |
-| Device | `expo-notifications` · `expo-location` · `expo-image` · `expo-camera` |
-| Ship | **EAS Build + EAS Update** — OTA fixes without store review |
+| Wrapper | **Capacitor** |
+| Plugins | `push-notifications` · `geolocation` · `camera` · `share` · `app` (deep links) · `status-bar` · `keyboard` · `preferences` |
+| Share preview | **`@vercel/og`** in the `/p/[caseId]` function |
+| Live updates | **Capgo**, or point the shell at a remote URL. Not free like EAS Update — see the risks |
 
-### Shared
+### Tooling
 
-**TypeScript** strict · **Zod** (one definition per shape) · **TanStack Query** (server state) ·
-**react-hook-form** (these flows are mostly forms) · state machines as discriminated unions.
+**TypeScript** strict · **Biome** instead of ESLint + Prettier · **`dependency-cruiser`** for the
+layer rule · **Vitest** on `domain` · **Playwright** for web e2e.
 
-### Monorepo
+---
 
-**pnpm workspaces + Turborepo**, and nothing else. **Not Nx** — its generators and config layer solve
-problems that start at ten packages, not five.
+## Risks, and what to do about each
 
-**Biome** replaces ESLint + Prettier. **`dependency-cruiser`** enforces the layer rule in CI.
-**Vitest** on `domain`, **Playwright** on web, **Maestro** on mobile.
+### 1. The map in a webview — build it first
 
-> **Do the Metro monorepo config on day one**, before there is any code. Metro's `node_modules`
-> resolution across workspace packages is the single most common source of "builds on web, breaks on
-> mobile," and discovering it in month three costs ten times more than configuring it in hour one.
-> `create-t3-turbo` is the canonical reference for exactly this pair.
+The one thing that could invalidate this decision. It gets built in week one, before anything else.
+
+**The spike:** the map screen with ~300 clustered pins, running in a Capacitor build on a
+Redmi A3-class Android — 3–4 GB RAM, over 4G. Not a simulator, not a laptop.
+
+**Pass:** smooth pinch-zoom with no visible jank, stable memory across several minutes of panning,
+cold map load under ~2s.
+
+**If it fails:** the fallback is a native map view under the webview via a Capacitor plugin (real
+z-index and overlay friction — a rescue, not a plan), or reopening the Expo decision with actual
+evidence instead of speculation.
+
+### 2. Apple Guideline 4.2 — "minimum functionality"
+
+Apple rejects apps that are a website in a shell with no native value. Worth knowing before
+submission, not after.
+
+Our defence is genuine and should be visible in the build: **native push notifications** (the
+product's differentiator), camera capture for pet photos, native geolocation, and an offline shell.
+An app that only renders remote pages is the one that gets rejected.
+
+### 3. No free OTA updates
+
+EAS Update ships JS fixes past store review for free; Capacitor doesn't. Options: **Capgo** (open
+source, paid hosting or self-host), Ionic Appflow (paid), or configure the shell to load a remote
+URL and accept the network dependency.
+
+Budget this. At 15 hrs/week, "wait five days for review to fix a typo" is a real cost.
+
+### 4. Webview polish is underestimated
+
+Safe areas, status bar colour, keyboard avoidance, the Android hardware back button, disabling
+overscroll bounce, and hiding the text-selection long-press. None is hard; together they are the
+difference between "an app" and "a website in a box", and they are invisible until you're holding a
+phone.
+
+Budget a full day, and do it early — living with the rough version for months normalizes it.
 
 ---
 
@@ -237,42 +309,39 @@ problems that start at ten packages, not five.
 
 | # | Decision | Chosen | Rejected & why |
 |---|---|---|---|
-| 1 | Cross-platform shape | Next.js + Expo, shared logic packages | Expo universal (weak SSR/OG on the growth surface); Capacitor (webview map on low-end Android); Solito (two routers, RNW styling tax); Flutter (discards the ecosystem) |
-| 2 | Repo layout | **Monorepo**, pnpm + Turborepo | Separate repos — sharing `domain` would mean publishing and versioning npm packages between two people |
-| 3 | Monorepo tooling | pnpm workspaces + Turborepo | Nx (config surface without the scale to justify it); bare npm workspaces (no task graph, no cache) |
-| 4 | Shared-logic boundary | Hooks with no JSX, in `packages/features` | Shared components via react-native-web — the thing that makes universal codebases rot |
-| 5 | Platform capabilities | Injected ports | Direct imports behind `Platform.OS` branches, which accumulate until the file is unreadable |
-| 6 | State machines | Discriminated unions + pure `transition()` | XState — no parallel states or actors to justify it; scattered conditionals — four drifting copies |
-| 7 | Map vendor | MapLibre + Protomaps | Google Maps and Mapbox both bill per load, and this map is opened constantly by strangers who never sign up |
-| 8 | Linting | Biome | ESLint + Prettier — two tools, slower, more config, no benefit at this size |
+| 1 | Cross-platform shape | **Capacitor over one React codebase** | Next.js + Expo (two UIs and two map implementations, forever, at 15 hrs/week); Expo universal (weak SSR/OG on the surface the growth loop runs through); Flutter (discards the ecosystem entirely) |
+| 2 | Build targets | Static export everywhere + one server function for `/p/[caseId]` | Dual Next configs with filtered routes (config complexity for one route's benefit); full SSR with a remote-URL shell (network dependency, more App Store scrutiny) |
+| 3 | Repo layout | **One app, folders** | Monorepo — one deployable doesn't need workspaces, and the tooling is a permanent tax |
+| 4 | Platform access | One adapter module per capability in `src/platform` | Plugin imports scattered through features, which is what makes a future framework change a rewrite |
+| 5 | State machines | Discriminated unions + pure `transition()` | XState (no parallel states or actors to justify it); scattered conditionals (copies that drift) |
+| 6 | Map vendor | MapLibre + Protomaps | Google Maps and Mapbox both bill per load, and this map is opened constantly by strangers who never sign up |
+| 7 | Linting | Biome | ESLint + Prettier — two tools, slower, more config, no benefit at this size |
 
 ---
 
 ## Decisions still open — binding
 
-These are expensive to change later. Take them before the first feature.
+Expensive to change later. Take them before the first feature.
 
 | # | Question | Why it can't wait |
 |---|---|---|
-| 1 | **Shared API, or Next.js Server Actions?** | If business logic lives in Server Actions, mobile can't call it and everything gets written twice. Recommended: one typed API that **web also consumes**; Server Actions only for web-exclusive concerns |
-| 2 | **Universal Links / App Links** | `scuby.co/p/abc` must open the app when installed. It touches the domain, `app.config.ts` and iOS entitlements — and retrofitting it means every link already shared on WhatsApp behaves differently from new ones |
-| 3 | **Session transport: cookie or token?** | Web wants httpOnly cookies, mobile wants SecureStore. One issuer, two transports, decided up front |
-| 4 | **Design system: shared tokens or universal components?** | Tokens + shadcn/NativeWind (two implementations) vs Tamagui (one). Switching to Tamagui later is a UI rewrite |
-| 5 | **Where analytics events are emitted** | The event names are already fixed in [04](04-lost-workflow_draft_1.md)–[07](07-help-workflow.md). Emit from `features`, not components — otherwise each UI emits them slightly differently and the metrics stop being comparable |
+| 1 | **Universal Links / App Links** | `scuby.co/p/abc` must open the app when installed. Touches the domain, `capacitor.config.ts`, and iOS entitlements — retrofitting means every link already shared on WhatsApp behaves differently from new ones |
+| 2 | **Session transport: cookie or token?** | The web wants httpOnly cookies; the Capacitor webview is on a different origin and wants a token in `Preferences`. One issuer, two transports, decided up front |
+| 3 | **Where analytics events are emitted** | The event names are already fixed in [04](04-lost-workflow_draft_1.md)–[07](07-help-workflow.md). Emit from `features`, never from components |
+| 4 | **Push registration: one abstraction or two?** | Web Push (VAPID) and FCM/APNs have different token shapes and lifecycles. The server needs one device table that holds both from the start |
 
 ## Decisions deferred — on purpose
 
-Offline queue for sightings (Colombian connectivity argues for it; measure before building) · pin
-clustering client-side vs server-side · image pipeline and sizes for low-end Android · API versioning
-against EAS Update, which leaves old clients alive in the wild · feature flags · test depth beyond
-`domain`.
+Offline queue for sightings (Colombian connectivity argues for it; measure first) · pin clustering
+client-side vs server-side · image pipeline and sizes for low-end Android · feature flags · test depth
+beyond `domain`.
 
-## If the two UIs become too expensive
+## The escape hatch
 
-The escape hatch is **Capacitor**: wrap `apps/web` into a store build and drop `apps/mobile`. It costs
-the native map and the native feel, and it recovers roughly half the client-side work. The signal to
-consider it is honest and specific — mobile screens consistently lagging web by more than a release,
-with no user-visible reason for the app to be native beyond push.
+If the webview ceiling is genuinely reached — the map spike fails, or push-driven retention becomes
+the main loop and the app feel starts costing users — the exit is React Native, and the cost is
+rewriting `app/`, `src/features` components and `src/ui`.
 
-Whichever way that goes, `packages/domain` and `packages/contracts` are untouched. That is the entire
-point of the boundary.
+`src/domain`, `src/contracts` and `src/api-client` are untouched. That is roughly the complexity of
+docs 04–07, written and tested once. That boundary is the whole reason it exists, and it is what
+makes today's decision reversible rather than permanent.
