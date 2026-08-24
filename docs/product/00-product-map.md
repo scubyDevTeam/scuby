@@ -26,6 +26,7 @@ Photo-similarity AI is a first-class **learning** track, not a launch dependency
 4. **One person account, contextual roles.** "Owner" and "helper" are things you *do*, not account types. Foundations (later: vets, shelters) are Organization accounts.
 5. **Helping must not require an account; recognition does.** Contact and sightings work without signup; points/reputation accrue only for attributable in-app actions.
 6. **Mission-first economics.** Free for everyone. Future revenue only from non-extractive sources (optional tips, sponsors, org tooling) — never a cut of sick-pet donations.
+7. **Colombia-first, never Colombia-only.** Country specifics — phone prefixes, currency, legal posture, launch copy — live in configuration (`supported_countries`, [eng/auth.md](../eng/auth.md)) and per-country docs, never in code or schema. v1 enables one country.
 
 ## Verticals, phased
 
@@ -61,6 +62,7 @@ App is **nationwide** from day one. Feeds are **local-first with national fallba
 | 13 | Anonymous sighting contact *(2026-08-23)* | **Optional — only the pin is required**; asked for with explanatory copy, measured via `has_contact` | Required contact (the report that never gets submitted is worth less than a bare pin). The anonymous «Lo tengo» phone stays required — a claim's value IS the contact channel |
 | 14 | Rewards on lost cases *(2026-08-23, reaffirmed)* | **No reward field, by design** — people help because it's a lost pet; free text in the description stays the owner's | Display-only field + warning copy (invites fake «lo tengo» claims, makes the platform read as a marketplace) |
 | 15 | Abuse reporting *(2026-08-23)* | Anonymous one-tap `report` across all verticals; never auto-hides an active case except `graphic_content` / `personal_data`; SLA set before launch (see [09-reporting.md](09-reporting.md)) | Account-required reporting (abuse goes unreported); report-count auto-takedowns (a spiteful neighbor could end a real search) |
+| 16 | Auth *(2026-08-23)* | **Google one-tap + email 6-digit code; no passwords ever.** Phone is not a login: collected + SMS-OTP-verified once at first publish, prefilled + «cambiar» thereafter, re-verified on change; unverified helper numbers format-validated and rendered actionable. DIY OTP over raw SMS with the safety checklist ([eng/auth.md](../eng/auth.md)) | Email+password (same email infra for resets, plus hashing, breach liability, support tax); phone-as-login (recurring SMS cost, pumping surface); Twilio Verify by default (\$0.05/verification for machinery the flows already build — named escape hatch instead); Facebook/Apple now (deferred with triggers) |
 | 9 | Legal posture | Intermediary ToS + Ley 1581 privacy policy, SAS deferred | Company-now (cost with zero revenue and minimal liability) |
 | 10 | Matching v1 | Structured + geo scored candidates; photo similarity as parallel learning track | Photo-similarity-first (weeks of work, GPU cost, early bad matches erode trust) |
 | 11 | Points | Status only for now | Designing a redemption economy before there's anything to redeem |

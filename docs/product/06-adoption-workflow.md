@@ -255,7 +255,8 @@ opt-in digest is deferred ([D7](../open-items.md)).
 | Earn points / attribution | ✗ | ✓ |
 
 The only vertical where nothing beyond viewing is anonymous: adopting is a commitment, not a tip,
-and the hand-off needs two real identities for the link transfer.
+and the hand-off needs two real identities for the link transfer. Publisher phone step per the UI
+contract in [eng/auth.md](../eng/auth.md).
 
 ---
 

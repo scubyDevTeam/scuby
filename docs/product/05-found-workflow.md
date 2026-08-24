@@ -81,7 +81,8 @@ Before a found case is written, the form runs matching against pets with an acti
 (§ Matching). A hit is shown as «¿Es este?». Yes → a `recovery_claim` is opened on that lost case
 and **no found case is created** — the animal already has an owner looking, and a second card for
 it is exactly the duplicate we don't want. Miss → the found case is created: `pet` (`unclaimed`) +
-`responsibility_link` (`custodian`) + `found_case`, one transaction.
+`responsibility_link` (`custodian`) + `found_case`, one transaction. Phone step per the UI contract in
+[eng/auth.md](../eng/auth.md).
 
 ### `ownership_claim` — «Es mío»
 `case_id`, `claimant_person_id` (**never anonymous** — see below), `from_lost_case_id?`,

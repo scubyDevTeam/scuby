@@ -107,7 +107,8 @@ Any host is accepted — an allowlist would lock out whatever platform we haven'
 `verified` tier is where an operator checks it's a real campaign.
 
 **Step 3 — story, evidence, goal** → publish. Three rows? No — one: the pet and link already
-exist. `help_request` is written alone.
+exist. `help_request` is written alone. Phone step per the UI contract in
+[eng/auth.md](../eng/auth.md).
 
 ### Trust: tiered, not gated
 - **`unverified`** — identity only. Publishes **immediately**, labeled prominently: «Sin verificar —

@@ -99,6 +99,10 @@ link or a case without a pet is a broken state, never a transitional one. Cancel
 (`false_alarm`) touches only the case — pet and link survive; the onboarding sticks even when the
 scare was nothing.
 
+The publish form includes the **phone step** — verified once, shown prefilled with «cambiar» on
+every later publish, re-verified on change: the UI contract lives in
+[eng/auth.md](../eng/auth.md) and applies to all four verticals.
+
 Two invariants enforced at publish:
 
 | Situation | Behavior |
