@@ -2,7 +2,7 @@
 
 > The ADOPCIÓN vertical. Source of truth for the adoption flow; where it disagrees with earlier
 > docs, this one wins and the others get patched. Reuses the machinery in
-> [04](04-lost-workflow_draft_1.md) and [07](07-found-workflow_draft_1.md) — `case_checkin`, the
+> [04](04-lost-workflow.md) and [07](07-found-workflow.md) — `case_checkin`, the
 > row-before-channel rule, location precision — and says so instead of restating it.
 > Domain identifiers are English/snake_case; Spanish strings are UI copy.
 
@@ -51,7 +51,7 @@ pet; only the outcome does.
 `senior` · `fiv_felv` · `mobility_aid` · `behavioral_support`. A condition survives every adoption
 and travels with the animal; on listings the flags render prominently and act as filters —
 special-needs adopters exist, self-select, and are the best homes on the platform. Surface the
-flags, never bury them. (Also the join to the help vertical: [09](09-help-workflow_draft_1.md).)
+flags, never bury them. (Also the join to the help vertical: [09](09-help-workflow.md).)
 
 ### `responsibility_link`
 The lister's link is whatever it already is — owner, custodian, or org. **Listing does not touch
@@ -67,7 +67,7 @@ listings carry the `verified` badge. Nothing else. Inboxes, members, roles: not 
 | Field | Notes |
 |---|---|
 | `pet_id`, `created_by` | Lister is registered (person or org) and holds the pet |
-| `predecessor_case_id?` | Set when the listing was born from a found case's day-15 conversion ([07](07-found-workflow_draft_1.md)) — the form arrives pre-filled with the pet's photos, traits, and «encontrado en el barrio Laureles en junio». The primary source of v1 inventory |
+| `predecessor_case_id?` | Set when the listing was born from a found case's day-15 conversion ([07](07-found-workflow.md)) — the form arrives pre-filled with the pet's photos, traits, and «encontrado en el barrio Laureles en junio». The primary source of v1 inventory |
 | `story` | Free text — the post |
 | `temperament[]` | Chips describing the **animal**: `good_with_kids`, `good_with_cats`, `good_with_dogs`, `senior`, `puppy` |
 | `requirement_flags[]` | Curated enum array describing the **home**: `needs_yard`, `no_small_children`, `no_other_dogs`, `indoor_only`, `experienced_home`. Extending it is adding an enum value — no migration (enum array + GIN in Postgres; a join table if the DB ends up elsewhere). **Curated, never free-form tags** — the moment anyone can invent one, they stop being filters |

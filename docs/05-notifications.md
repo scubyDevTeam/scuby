@@ -26,7 +26,7 @@ Apply to every journey unless a row says otherwise.
 
 ## Lost
 
-Events: see `04-lost-workflow_draft_1.md` → Events.
+Events: see `04-lost-workflow.md` → Events.
 
 ### To the owner
 
@@ -64,7 +64,7 @@ budget accounts for it.
 
 ## Found
 
-Events: see `07-found-workflow_draft_1.md` → Events.
+Events: see `07-found-workflow.md` → Events.
 
 ### To the custodian
 
@@ -106,7 +106,7 @@ stranger holding the animal is not something to push.
 
 ## Adoption
 
-Events: see `08-adoption-workflow_draft_1.md` → Events. **No broadcast** — listed so nobody adds
+Events: see `08-adoption-workflow.md` → Events. **No broadcast** — listed so nobody adds
 one; the push budget belongs to lost/found.
 
 ### To the lister
@@ -137,7 +137,7 @@ everything else, applied to `case_checkin` deliveries.
 
 ## Help
 
-Events: see `09-help-workflow_draft_1.md` → Events. **No broadcast.**
+Events: see `09-help-workflow.md` → Events. **No broadcast.**
 
 ### To the beneficiary
 

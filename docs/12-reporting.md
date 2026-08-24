@@ -56,7 +56,7 @@ required; nothing else is. Rate-limited by device/IP, exactly like sightings.
 
 4. **`scam_or_extortion` on a help request** is the third auto-acting category: it **suspends**
    the request on the first report — loudly, «en revisión», reversible — per
-   [09](09-help-workflow_draft_1.md)'s state machine, because money-collecting fraud converts
+   [09](09-help-workflow.md)'s state machine, because money-collecting fraud converts
    strangers' compassion into income every hour our amplification stays on.
 
 5. **Reporter identity is never shown to the reported party.** Not in the notification, not
@@ -76,7 +76,7 @@ required; nothing else is. Rate-limited by device/IP, exactly like sightings.
 - **Reporter weight.** A reporter whose reports are consistently dismissed counts for less —
   silently. Never a visible score.
 - **Repeat cold-claimers** (`ownership_claim` opened across multiple found cases with no evidence)
-  surface here as a pattern — that is the theft signal, per [07](07-found-workflow_draft_1.md).
+  surface here as a pattern — that is the theft signal, per [07](07-found-workflow.md).
 - **Actions available:** dismiss · hide the publication · remove it · contact the author · suspend
   the author (pattern across publications). Every action writes `reviewed_by / resolution_note`.
 

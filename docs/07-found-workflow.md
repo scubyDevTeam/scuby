@@ -2,7 +2,7 @@
 
 > The ENCONTRADO vertical. Source of truth for the found flow and for the boundary between lost,
 > found, and sightings; where it disagrees with earlier docs, this one wins and the others get
-> patched. Shares machinery with [04-lost-workflow_draft_1.md](04-lost-workflow_draft_1.md) —
+> patched. Shares machinery with [04-lost-workflow.md](04-lost-workflow.md) —
 > `case_checkin`, the claim pattern, location precision — and says so instead of restating it.
 > Domain identifiers are English/snake_case; Spanish strings are UI copy.
 
@@ -214,7 +214,7 @@ The four buttons *are* the resolution enum. «Sigo buscando» re-arms the hold c
 «Publicar en adopción» → **`converted`**: a new `adoption_case` on the *same pet*, pre-filled from
 it (photos, traits, «encontrado en el barrio Laureles en junio»), `successor_case_id` /
 `predecessor_case_id` linking the two. The pet stays `unclaimed`, the custodian link continues —
-listing is not a transfer ([08](08-adoption-workflow_draft_1.md)).
+listing is not a transfer ([08](08-adoption-workflow.md)).
 
 This is the cross-vertical bridge the product map promised — "a found stray becomes adoptable" —
 and since adoption launches individuals-first, it is the **primary source of v1 adoption
@@ -369,7 +369,7 @@ the custodian must be reachable and accountable for a live animal.
 ## Hooks for the next verticals
 
 - **Adoption**: a custodian who can't keep the stray lists it on the same pet row —
-  [08](08-adoption-workflow_draft_1.md) — and `adopted_in_app` transfers the link to the adopter.
+  [08](08-adoption-workflow.md) — and `adopted_in_app` transfers the link to the adopter.
   The `org` role and `custody_state = org_held` exist and are unused in v1; the structured
   `transferred_to_org` (D4) is the bridge from a finder to a foundation's listing.
 - **Help** (fundraising): a custodian holding an injured stray is the most common reason a

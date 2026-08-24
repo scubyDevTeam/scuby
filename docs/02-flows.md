@@ -4,8 +4,8 @@
 
 The whole game: **maximize the eyeballs that see the pet in the first 48 hours, in the neighborhood where it was lost.**
 
-> Summary only. Lost lives in [04-lost-workflow_draft_1.md](04-lost-workflow_draft_1.md); found,
-> sightings, matching contract, and merge in [07-found-workflow_draft_1.md](07-found-workflow_draft_1.md);
+> Summary only. Lost lives in [04-lost-workflow.md](04-lost-workflow.md); found,
+> sightings, matching contract, and merge in [07-found-workflow.md](07-found-workflow.md);
 > notifications in [05-notifications.md](05-notifications.md). Where this summary disagrees with
 > those, they win.
 
@@ -27,14 +27,14 @@ Matches **pets, not cases**: identity first, then the pet's situation says what 
 **v2 (parallel AI-learning track):** photo-embedding similarity added as one more score into the same pipeline. Additive, never a rewrite. Known failure mode to design for: dirty/wet/injured pets photographed badly at night look nothing like their fluffy profile photo.
 
 ### 4b. The found side — custody with a deadline
-A found case runs on **two clocks**: check-ins («¿sigues con él?», T+48h then every 5 days — is the post still true?) and a **hold clock** — at day 15 unclaimed, the product offers the exit: publish in adoption (pre-filled, same pet — the primary source of P2P adoption inventory), hand to a foundation, keep it, or keep searching. «Es mío» claims are registered-only and arrive with an evidence ladder (a prior lost case, timestamp-proven, is the strongest; the finder's withheld detail is the shibboleth). We rank evidence and warn; the finder decides. See [07-found-workflow_draft_1.md](07-found-workflow_draft_1.md).
+A found case runs on **two clocks**: check-ins («¿sigues con él?», T+48h then every 5 days — is the post still true?) and a **hold clock** — at day 15 unclaimed, the product offers the exit: publish in adoption (pre-filled, same pet — the primary source of P2P adoption inventory), hand to a foundation, keep it, or keep searching. «Es mío» claims are registered-only and arrive with an evidence ladder (a prior lost case, timestamp-proven, is the strongest; the finder's withheld detail is the shibboleth). We rank evidence and warn; the finder decides. See [07-found-workflow.md](07-found-workflow.md).
 
 ### 5. Resolve
 Owner marks **reunited** (prompted to post the happy-ending photo — the platform's best organic marketing, and the moment to ask «¿quién te ayudó?» for points attribution). Otherwise the platform check-ins keep asking, framed negatively («si no nos confirmas, archivaremos la publicación»), and two unanswered check-ins ≈ 14 days expire the case — softly, reopenable in one tap for 30 days. Only the owner ever sets reunited. After resolution the owner owes the platform nothing.
 
 ## Adoption
 
-> Summary only. Source of truth: [08-adoption-workflow_draft_1.md](08-adoption-workflow_draft_1.md).
+> Summary only. Source of truth: [08-adoption-workflow.md](08-adoption-workflow.md).
 
 Depth decision: **listing vertical, not screening vertical — individuals first.** Foundations with their own process get a listing that links out; the ranked inbox is deferred until one of them moves their process to us.
 
@@ -46,7 +46,7 @@ Depth decision: **listing vertical, not screening vertical — individuals first
 
 ## Help (Phase 2)
 
-> Summary only. Source of truth: [09-help-workflow_draft_1.md](09-help-workflow_draft_1.md).
+> Summary only. Source of truth: [09-help-workflow.md](09-help-workflow.md).
 
 Money **never** touches the platform — and neither do payment details. **Link, don't host.**
 

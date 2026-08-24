@@ -102,7 +102,7 @@ photos with its row:
 
 | Rule | Photos deleted |
 |---|---|
-| Orphan sighting at `orphan_expires_at` (30 d) — [07](07-found-workflow_draft_1.md) | The sighting's |
+| Orphan sighting at `orphan_expires_at` (30 d) — [07](07-found-workflow.md) | The sighting's |
 | Unclaimed pet purged at expired + 30 d — [01 rule 7](01-actors-and-entities.md) | The pet's, and its found case's |
 | Claim `stale` + purge window | Proof photos |
 | Help request `removed` | Evidence, after the moderation record keeps a hash reference for 90 d |

@@ -2,8 +2,8 @@
 
 > The AYUDA vertical — money first, shaped so other kinds of help slot in later. Source of truth
 > for the help flow; where it disagrees with earlier docs, this one wins and the others get patched.
-> Reuses the machinery in [04](04-lost-workflow_draft_1.md) — `case_checkin`, trust tiers from
-> [08](08-adoption-workflow_draft_1.md) — and says so instead of restating it.
+> Reuses the machinery in [04](04-lost-workflow.md) — `case_checkin`, trust tiers from
+> [08](08-adoption-workflow.md) — and says so instead of restating it.
 > Domain identifiers are English/snake_case; Spanish strings are UI copy.
 
 ## The flow, in one pass
@@ -40,7 +40,7 @@ after the need has ended.
 **A request is always a bounded ask** — it must be able to end. «Cirugía de cadera» resolves;
 «medicación por 3 meses» resolves; «apóyame cada mes para siempre» is a subscription in disguise
 and out of scope — recurring money relationships are exactly what we don't intermediate. A
-lifelong condition lives on `pet.health_flags[]` ([08](08-adoption-workflow_draft_1.md)), durable
+lifelong condition lives on `pet.health_flags[]` ([08](08-adoption-workflow.md)), durable
 and case-less; it can still open a *bounded* request whenever there's a specific ask with an end.
 
 ---

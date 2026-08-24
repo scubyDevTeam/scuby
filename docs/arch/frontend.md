@@ -62,9 +62,9 @@ and a sender, not a redesign. (Backend doc: pending — the contract above is wh
 | **Image preparation** | Downscale ≤ 1600 px, JPEG ~0.82, EXIF dropped by re-encode, HEIC decode, orientation applied first. Upload via signed URL | [11-media](../11-media.md) §1 |
 | **Poster** | Canvas render, three formats, photo framer, QR generated locally, bundled fonts, `document.fonts.ready`. The crop never leaves the device | [10-sharing](../10-sharing.md) §3 |
 | **Share** | `navigator.share({files, text})` with download + clipboard fallback; `wa.me/?text=` | [10-sharing](../10-sharing.md) §4 |
-| **Validation for feedback** | Distance/time checks on sightings run in the form; the server re-checks. Rate limits are server-only | [04](../04-lost-workflow_draft_1.md) · Validation |
-| **Form state across a trip out** | The help flow's link gate (user leaves to create a Vaki campaign) — form state kept on the device, no server draft | [09](../09-help-workflow_draft_1.md) · Publishing |
-| **Map** | Area (point + radius chips) for last-seen / found / adoption location; sighting pins with age bands and trajectory line; 200 m public floor rendered client-side from server-provided center + radius | [04](../04-lost-workflow_draft_1.md) · Location precision, Display rules |
+| **Validation for feedback** | Distance/time checks on sightings run in the form; the server re-checks. Rate limits are server-only | [04](../04-lost-workflow.md) · Validation |
+| **Form state across a trip out** | The help flow's link gate (user leaves to create a Vaki campaign) — form state kept on the device, no server draft | [09](../09-help-workflow.md) · Publishing |
+| **Map** | Area (point + radius chips) for last-seen / found / adoption location; sighting pins with age bands and trajectory line; 200 m public floor rendered client-side from server-provided center + radius | [04](../04-lost-workflow.md) · Location precision, Display rules |
 | **Offline-ish** | Service worker caches the shell and fonts; a case page opened from a link must render with a flaky connection once loaded. Writes are online-only; a failed write keeps the form |  |
 | **Geolocation** | Optional everywhere. Never a validation input (many deny it); only a convenience for centering the map and sorting the feed |  |
 

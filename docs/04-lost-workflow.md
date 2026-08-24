@@ -136,7 +136,7 @@ push), which is a reach decision owned by the broadcast rules. Don't derive one 
 
 `case_id` is nullable and may point at a lost **or** found case. A sighting with no case is an
 **orphan** — a witness report matching couldn't attach yet. Orphans, their extra fields, and how
-they get attached are defined in [07-found-workflow_draft_1.md](07-found-workflow_draft_1.md);
+they get attached are defined in [07-found-workflow.md](07-found-workflow.md);
 everything in this section assumes a sighting attached to a lost case.
 
 `seen_at` is when the reporter saw the animal; `created_at` is when they told us. They differ
@@ -270,7 +270,7 @@ later (`stale → confirmed`).
 
 ### `case_checkin`
 `case_id`, `claim_id?`, `trigger: time_based | post_recovery_claim | hold_clock` (the third is
-found-only — [07](07-found-workflow_draft_1.md)), `scheduled_at`,
+found-only — [07](07-found-workflow.md)), `scheduled_at`,
 `deliveries[] {channel: push | whatsapp | email, sent_at}`, `responded_at`, `cancelled_at`,
 `response: still_lost | reunited | delete | claim_confirmed | claim_dismissed | still_verifying`.
 
@@ -441,7 +441,7 @@ What this flow needs to know:
   resolves both cases as reunited, and is reversible.
 
 Matching contract, outcomes by pet situation, orphan sightings, and the merge mechanics:
-[07-found-workflow_draft_1.md](07-found-workflow_draft_1.md).
+[07-found-workflow.md](07-found-workflow.md).
 
 What remains of the "duplicate lost case" problem after this routing is the rare same-household
 case — two people, two accounts, same pet. Detect on publish by `last_seen_point` + species + time
