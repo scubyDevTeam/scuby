@@ -4,46 +4,58 @@
 
 The whole game: **maximize the eyeballs that see the pet in the first 48 hours, in the neighborhood where it was lost.**
 
+> Summary only. Lost lives in [04-lost-workflow.md](04-lost-workflow.md); found,
+> sightings, matching contract, and merge in [07-found-workflow.md](07-found-workflow.md);
+> notifications in [05-notifications.md](05-notifications.md). Where this summary disagrees with
+> those, they win.
+
 ### 1. Publish
-One form: photos, species/breed/size/colors/marks, last-seen location (map pin) + time, optional reward, contact preference (expose WhatsApp/email or not). Requires an account (OAuth one-tap + phone verification). Behind the scenes: claimed Pet + `lost` Case.
+One form: photos, species/breed/size/colors/marks, last-seen **area** (pin + a radius chip: ~1 cuadra / ~3 cuadras / ~1 km — the owner rarely knows the exact spot), time, contact preference (expose WhatsApp/email or not). No reward field, by design — people help because it's a lost pet. Requires an account (OAuth one-tap + phone verification). **Only the owner publishes Lost**; everyone else goes through «Encontré un animal», whose first question — «¿Lo tienes contigo?» — routes to a found case (custody) or a sighting (just saw it). Behind the scenes: claimed Pet (reused if the user already has one — «¿Cuál se perdió?») + owner link + `lost` Case, in one transaction.
 
 ### 2. Broadcast — three channels, in order of importance
 1. **Geo push**: every opted-in user within ~2–5 km gets "🐕 Perro perdido cerca de ti" with photo. This is *the* differentiator — Facebook groups have no geo-targeting and posts drown in the feed.
 2. **Geo feed**: the post appears for anyone browsing that zone, sorted by proximity + recency. Local-first, national fallback when the local feed is empty.
-3. **Shareable card**: auto-generated image (photo, PERDIDO, zone, QR/link back) sized for WhatsApp statuses and IG stories. Virality in Colombia lives in WhatsApp — ride it; every share is an acquisition channel.
+3. **Shareable card**: per-case link previews (`og:image`, server-rendered, status-aware) so a pasted link shows the pet; plus an on-device poster (square / story / print) with a QR to the short link. The image never changes; the page does. Virality in Colombia lives in WhatsApp — ride it; every share is an acquisition channel. See [10-sharing.md](10-sharing.md).
 
 ### 3. The neighborhood responds — two distinct actions
-- **"Lo vi" (sighting)** — lightweight, no account needed: location + time + optional photo + optional contact number. Sightings pin onto a map on the post so the owner sees the trajectory ("moving toward the park"). Low commitment, high volume. Anti-spam: rate limiting + owner can hide pins.
-- **"Lo tengo" (found/secured)** — opens direct contact with the owner (WhatsApp deep link if exposed; in-app message otherwise).
+- **"Lo vi" (sighting)** — lightweight, no account needed: **only the pin required**; time defaults to now, photo/note/contact optional (asked for, explained, never gated — decision #13). Sightings pin onto a map on the post so the owner sees the trajectory ("moving toward the park"); one reporter may file several, and nothing is deleted to make room — recency is shown, not enforced. Low commitment, high volume. Anti-spam: rate limiting + owner can hide pins, never pre-approval.
+- **"Lo tengo" (found/secured)** — always creates a `recovery_claim` first (anonymous: phone required), *then* opens contact with the owner (WhatsApp deep link if exposed; in-app thread for registered users). The claim shows as a «posible hallazgo» badge and accelerates the owner's check-ins; it never resolves the case by itself — only the owner confirms.
 
-### 4. Matching (background)
-Independently-posted `found` reports are compared against open `lost` cases: species, size, colors, marks, breed-guess × geo distance × time window → **scored candidate list** surfaced to *both* sides as "¿es tu mascota?". Mutual confirmation triggers the Pet merge (see entities doc).
+### 4. Matching
+Matches **pets, not cases**: identity first, then the pet's situation says what a report means. Runs at publish time on both sides and on every witness report — species, size, colors, marks, breed-guess × geo distance × time window → **candidate list with human-readable reasons**, always confirmed by a human, never auto-attached. A finder publishing custody is matched *before* a found case is created (a hit becomes a «lo tengo» claim on the lost case, no second card). A witness report that matches nothing is kept internally as an orphan sighting for 30 days and re-matched against lost cases published later. Mutual confirmation triggers the reversible Pet merge (see 07).
 
 **v2 (parallel AI-learning track):** photo-embedding similarity added as one more score into the same pipeline. Additive, never a rewrite. Known failure mode to design for: dirty/wet/injured pets photographed badly at night look nothing like their fluffy profile photo.
 
+### 4b. The found side — custody with a deadline
+A found case runs on **two clocks**: check-ins («¿sigues con él?», T+48h then every 5 days — is the post still true?) and a **hold clock** — at day 15 unclaimed, the product offers the exit: publish in adoption (pre-filled, same pet — the primary source of P2P adoption inventory), hand to a foundation, keep it, or keep searching. «Es mío» claims are registered-only and arrive with an evidence ladder (a prior lost case, timestamp-proven, is the strongest; the finder's withheld detail is the shibboleth). We rank evidence and warn; the finder decides. See [07-found-workflow.md](07-found-workflow.md).
+
 ### 5. Resolve
-Owner marks **reunited** (prompted to post the happy-ending photo — the platform's best organic marketing, and the moment to ask "who helped you?" for points attribution) or the case quietly expires. After resolution the owner owes the platform nothing.
+Owner marks **reunited** (prompted to post the happy-ending photo — the platform's best organic marketing, and the moment to ask «¿quién te ayudó?» for points attribution). Otherwise the platform check-ins keep asking, framed negatively («si no nos confirmas, archivaremos la publicación»), and two unanswered check-ins ≈ 14 days expire the case — softly, reopenable in one tap for 30 days. Only the owner ever sets reunited. After resolution the owner owes the platform nothing.
 
 ## Adoption
 
-Depth decision: **structured application, decision off-platform.**
+> Summary only. Source of truth: [08-adoption-workflow.md](08-adoption-workflow.md).
 
-1. **Foundation lists a pet** — org-held Pet + `adoptable` Case: photos, temperament, requirements.
-2. **Adopter applies in-app** — shared base screening form (housing, experience, household, other pets). Account required, always.
-3. **Foundation works a ranked, filterable application inbox** instead of 40 "¿todavía está disponible?" WhatsApp chats. Accept/reject/shortlist in-app. *This inbox is the reason foundations list with us.*
-4. **Real world takes over** — interviews, home visit, handoff happen off-platform, per the foundation's own process.
-5. **Foundation records the outcome** — adopted (by whom) → responsibility link transfers to the adopter → case resolves. The pet's history (found as a stray, fostered, funded) travels with it.
+Depth decision: **listing vertical, not screening vertical — individuals first.** Foundations with their own process get a listing that links out; the ranked inbox is deferred until one of them moves their process to us.
 
-## Donations (Phase 2)
+1. **Anyone holding a pet lists it** — an owner rehoming, a rescuer, the found-flow custodian who can't keep the stray, or an org. Same pet row, whatever its custody state. A trust-tier badge (`verified` org / `individual`) with honest copy.
+2. **Adopter taps «Me interesa»** — account required, a 4-field intro (housing, yard, other pets, why), then the channel opens: WhatsApp with the intro prefilled, the org's own application URL, or an in-app thread. The interest row exists before any conversation.
+3. **Lister screens in chat**, sees a plain list of interests (no ranking), marks one as chosen, declines the rest silently if they want.
+4. **Real world takes over** — meeting, handoff, per the lister's own judgment. We're the intermediary.
+5. **Lister records the outcome** — adopted in-app (by whom → responsibility link transfers, pet's history travels with it) or off-platform (link closes, recorded honestly). Check-ins keep listings from going stale: per case for individuals, one monthly digest per org.
 
-Money **never** touches the platform.
+## Help (Phase 2)
 
-1. Campaign attached to a Pet: goal, story, evidence (vet diagnosis/invoice), beneficiary's own payment info (Nequi/Daviplata/bank/link).
-2. Trust tier displayed prominently: **unverified** (basic identity only — clearly labeled) vs **verified** (evidence reviewed; personería jurídica for foundations).
-3. Donors pay the beneficiary directly. Raised totals are self-reported by the campaign owner.
-4. Every campaign carries a report/flag button; reports feed the moderation queue.
+> Summary only. Source of truth: [09-help-workflow.md](09-help-workflow.md).
+
+Money **never** touches the platform — and neither do payment details. **Link, don't host.**
+
+1. **Beneficiary who holds the pet creates a campaign on a crowdfunding platform** (Vaki or similar) — the form's first step sends them there if they don't have one — then pastes the link. One link, one request.
+2. **Request attached to the Pet**: story, optional evidence (vet diagnosis/quote), optional goal. Trust tier displayed prominently: **unverified** (identity only, publishes immediately, clearly labeled) vs **verified** (operator reviewed evidence and link; personería jurídica for foundations).
+3. **«Quiero ayudar» is a link-out.** Donors pay on the platform. «Ya ayudé» (account required) is the only record we keep — shown as a count of people, never a sum. Progress is self-reported by the beneficiary at each check-in, labeled as theirs.
+4. **Check-ins keep it honest**: silence after the need ended is the fraud signal. Every request carries the report button; reports feed the moderation queue.
 
 ## Cross-cutting: moderation & verification (operator flows)
 
 - **Verification queue**: manual review of evidence submissions (vet invoices, personería jurídica). Fine at low volume; revisit if it exceeds the side-project hour budget.
-- **Report queue**: community flags on any post/campaign/sighting. First strike: hide + contact publisher. Scams: remove + ban.
+- **Report queue**: anonymous one-tap reports on any publication, one table across verticals — rules, reasons, auto-hide exceptions and queue mechanics in [12-reporting.md](12-reporting.md). An unstaffed report button is worse than none: the SLA is set before launch (O11).
