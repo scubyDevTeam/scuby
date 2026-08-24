@@ -54,9 +54,10 @@ required; nothing else is. Rate-limited by device/IP, exactly like sightings.
    in bad conditions». It is also the one report type where *contacting the finder* beats hiding
    the post: hiding removes the animal from view without removing it from the balcony.
 
-4. **`scam_or_extortion` on a help request** is the other high-priority path — a credible one
-   affects feed placement per [09](09-help-workflow_draft_1.md)'s moderation section, because
-   money-collecting fraud converts strangers' compassion into income every hour it stays up.
+4. **`scam_or_extortion` on a help request** is the third auto-acting category: it **suspends**
+   the request on the first report — loudly, «en revisión», reversible — per
+   [09](09-help-workflow_draft_1.md)'s state machine, because money-collecting fraud converts
+   strangers' compassion into income every hour our amplification stays on.
 
 5. **Reporter identity is never shown to the reported party.** Not in the notification, not
    derivable from timing. Outcomes are not reported back to reporters in v1 — closing that loop is

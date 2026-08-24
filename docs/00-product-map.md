@@ -13,14 +13,14 @@ Connect people who need help with a pet to the people nearby who can give it —
 
 Success at month 12:
 - Real reunions happening weekly
-- Foundations actively listing adoptable pets
+- Adoption listings flowing person-to-person, most born from found-case conversions
 - Revenue explicitly **not** a year-1 goal
 
 Photo-similarity AI is a first-class **learning** track, not a launch dependency.
 
 ## Principles
 
-1. **Build wide, launch narrow.** The data model supports all three verticals from day one; the public push starts with Lost & Found. Foundation adoption listings are day-one inventory so the app never feels empty.
+1. **Build wide, launch narrow.** The data model supports all three verticals from day one; the public push starts with Lost & Found. Adoption inventory comes from the vertical we launch first — found cases converting to listings at the day-15 offer ([07](07-found-workflow_draft_1.md)) — so the app never feels empty without foundation onboarding.
 2. **Money never touches the platform.** Donation campaigns display the beneficiary's own Nequi/Daviplata/bank details; donors pay them directly. We are a bulletin board, not a bank.
 3. **Trust is tiered, not gated.** Basic identity (phone/email) is enough to publish. A **Verified badge** requires evidence — vet invoice for individuals, personería jurídica for foundations — manually reviewed. Community reporting is the safety net under everything.
 4. **One person account, contextual roles.** "Owner" and "helper" are things you *do*, not account types. Foundations (later: vets, shelters) are Organization accounts.

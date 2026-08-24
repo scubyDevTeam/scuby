@@ -51,7 +51,7 @@ What this means for the product:
 
 Backend contract: one `push_subscription` table, `kind: webpush | fcm | apns`, `token`,
 `person_id`, `device`, `created_at`, `last_seen_at`. Web Push from day one; stage 2 adds two kinds
-and a sender, not a redesign. See [backend.md](backend.md).
+and a sender, not a redesign. (Backend doc: pending — the contract above is what it must honor.)
 
 ---
 

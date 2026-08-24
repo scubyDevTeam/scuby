@@ -34,8 +34,14 @@ reads «encontrado en la calle → cirugía financiada → adoptado» on one row
 can grant, a count of people who helped, and check-ins that keep a campaign from collecting money
 after the need has ended.
 
-`kind = money` is the only value in v1. `foster`, `transport`, `supplies` are contact-only asks that
-fit the same entity later ([D10](06-open-items.md)).
+`kind = money` is the only value in v1; the other kinds are deferred with their design
+([D10](06-open-items.md)).
+
+**A request is always a bounded ask** — it must be able to end. «Cirugía de cadera» resolves;
+«medicación por 3 meses» resolves; «apóyame cada mes para siempre» is a subscription in disguise
+and out of scope — recurring money relationships are exactly what we don't intermediate. A
+lifelong condition lives on `pet.health_flags[]` ([08](08-adoption-workflow_draft_1.md)), durable
+and case-less; it can still open a *bounded* request whenever there's a specific ask with an end.
 
 ---
 
@@ -123,12 +129,22 @@ stateDiagram-v2
     active --> active: contribution / checkin "sigue activa" (+ progress update)
     active --> closed: beneficiary closes
     active --> expired: 2 consecutive check-ins unanswered
-    active --> removed: moderation, on reports
+    active --> suspended: scam_or_extortion report
+    suspended --> active: cleared by review
+    suspended --> removed: confirmed fraud
     expired --> active: beneficiary reopens (≤30 days)
     closed --> [*]
     removed --> [*]
     expired --> [*]: purge after 30 days
 ```
+
+`suspended` is the one deliberate inversion of the reporting rule ([12](12-reporting.md), "a
+report never hides an active case by itself"): a `scam_or_extortion` report here pauses **our
+amplification** — feed, broadcast, share ranking — immediately and loudly, pending review against
+the O11 SLA. The money side lives on Vaki behind its own KYC; what we lend a campaign is
+credibility and reach, and that is what pauses. Loud means: the card shows «en revisión» (never
+"scam"), the beneficiary is told why with a reply channel, and clearing restores everything. Same
+mechanism as 12's auto-hide categories, same guards (device rate limits, reporter weight).
 
 ### `resolution` values
 `goal_reached` · `need_ended` · `pet_recovered` · `pet_deceased` · `no_response` ·
@@ -171,9 +187,8 @@ deferred ([D9](06-open-items.md)).
 ## Moderation
 
 Every request carries the report button ([12-reporting.md](12-reporting.md)). `scam_or_extortion`
-here is high-priority: first credible report → an operator looks fast; a pattern of reports or
-evidence contradicting the story → `removed`, beneficiary notified with a reply channel. Same queue
-as every other vertical.
+suspends on the first report (state machine above); review clears it or confirms fraud →
+`removed`. Every other reason queues normally. Same queue as every other vertical.
 
 ---
 
@@ -198,6 +213,7 @@ Named only where something consumes them — **N** notification ([05](05-notific
 | `help_request.link_clicked` | M — the only evidence a donation *could* have happened; click-to-«ya ayudé» ratio is the engagement metric |
 | `help_contribution.created` | N — beneficiary, coalesced |
 | `help_request.expired` | N — beneficiary |
+| `help_request.suspended` | N — beneficiary, with the reason and a reply channel |
 | `help_request.removed` | N — beneficiary |
 
 Notifications: [`05-notifications.md`](05-notifications.md) → **Help**.

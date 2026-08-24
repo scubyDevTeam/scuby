@@ -21,7 +21,7 @@ Context: [regional overview](http://www.scielo.org.co/scielo.php?script=sci_artt
 ## What we must ship at launch
 
 1. **Terms of Service defining us as an intermediary**:
-   - Adoptions are agreements between adopter and foundation — we facilitate contact and applications, nothing more.
+   - Adoptions are agreements between the adopter and the publisher — a person in v1, a foundation later — we facilitate contact, nothing more. We never approve an adopter or adjudicate ownership.
    - Donations are transfers between donor and beneficiary — money never passes through us.
    - Verification badges mean "we reviewed a document," **not** "we guarantee this person/campaign."
 2. **Ley 1581 compliance**: privacy policy, consent at signup, data-treatment policy (política de tratamiento de datos), user rights channel (consulta/reclamo).

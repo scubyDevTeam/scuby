@@ -145,6 +145,7 @@ Events: see `09-help-workflow_draft_1.md` → Events. **No broadcast.**
 |---|---|---|---|
 | `help_contribution.created` | push | «Alguien ayudó en la campaña de Max.» | Coalesce window: 1 h («3 personas ayudaron»). Not priority |
 | `help_request.expired` | push + email | «Archivamos la campaña de Max. Puedes reactivarla con un toque hasta el 12 de sep.» | Includes reopen deadline |
+| `help_request.suspended` | push + email | «Pusimos la campaña de Max en revisión por un reporte. Responde a este correo para aclararlo.» | Loud, never silent — the card shows «en revisión» while paused |
 | `help_request.removed` | push + email | «Retiramos la campaña de Max por reportes. Responde a este correo si crees que es un error.» | Reply channel is the email |
 
 ### To contributors
