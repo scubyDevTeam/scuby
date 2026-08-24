@@ -2,7 +2,7 @@
 
 > Cross-vertical. One table, one set of rules, over every publication in every flow. Adopted from
 > the `docs/vertical-workflows` branch (teammate's design) with the events trimmed to the
-> consumer rule in [05](05-notifications.md).
+> consumer rule in [08](08-notifications.md).
 > Domain identifiers are English/snake_case; Spanish strings are UI copy.
 
 ## The organizing insight
@@ -48,7 +48,7 @@ required; nothing else is. Rate-limited by device/IP, exactly like sightings.
    every hour they stay up: **`graphic_content`** and **`personal_data`** (someone published a home
    address, a full phone number, an ID document). Auto-hidden means hidden from feed and search —
    the direct link shows «en revisión» to the author, nothing to others. Review is fast
-   ([O11](06-open-items.md): ≤ 4h) with a one-tap restore when the report was wrong.
+   ([O11](../open-items.md): ≤ 4h) with a one-tap restore when the report was wrong.
 
 3. **`animal_welfare` on a found case is the highest-priority queue** — «this animal is being held
    in bad conditions». It is also the one report type where *contacting the finder* beats hiding
@@ -56,7 +56,7 @@ required; nothing else is. Rate-limited by device/IP, exactly like sightings.
 
 4. **`scam_or_extortion` on a help request** is the third auto-acting category: it **suspends**
    the request on the first report — loudly, «en revisión», reversible — per
-   [09](09-help-workflow.md)'s state machine, because money-collecting fraud converts
+   [07](07-help-workflow.md)'s state machine, because money-collecting fraud converts
    strangers' compassion into income every hour our amplification stays on.
 
 5. **Reporter identity is never shown to the reported party.** Not in the notification, not
@@ -76,11 +76,11 @@ required; nothing else is. Rate-limited by device/IP, exactly like sightings.
 - **Reporter weight.** A reporter whose reports are consistently dismissed counts for less —
   silently. Never a visible score.
 - **Repeat cold-claimers** (`ownership_claim` opened across multiple found cases with no evidence)
-  surface here as a pattern — that is the theft signal, per [07](07-found-workflow.md).
+  surface here as a pattern — that is the theft signal, per [05](05-found-workflow.md).
 - **Actions available:** dismiss · hide the publication · remove it · contact the author · suspend
   the author (pattern across publications). Every action writes `reviewed_by / resolution_note`.
 
-**Staffing and SLA — [O11](06-open-items.md), set before launch.** Proposed: auto-hidden content
+**Staffing and SLA — [O11](../open-items.md), set before launch.** Proposed: auto-hidden content
 reviewed ≤ 4h, everything else ≤ 48h; operators are the founders. An unstaffed report button is
 worse than none, because it promises action nobody takes.
 
@@ -88,7 +88,7 @@ worse than none, because it promises action nobody takes.
 
 ## Events
 
-Named per the consumer rule in [05](05-notifications.md); the queue itself is a query over `report`
+Named per the consumer rule in [08](08-notifications.md); the queue itself is a query over `report`
 rows.
 
 | Event | Consumer |

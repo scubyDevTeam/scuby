@@ -2,7 +2,7 @@
 
 > The ADOPCIÓN vertical. Source of truth for the adoption flow; where it disagrees with earlier
 > docs, this one wins and the others get patched. Reuses the machinery in
-> [04](04-lost-workflow.md) and [07](07-found-workflow.md) — `case_checkin`, the
+> [04](04-lost-workflow.md) and [05](05-found-workflow.md) — `case_checkin`, the
 > row-before-channel rule, location precision — and says so instead of restating it.
 > Domain identifiers are English/snake_case; Spanish strings are UI copy.
 
@@ -51,7 +51,7 @@ pet; only the outcome does.
 `senior` · `fiv_felv` · `mobility_aid` · `behavioral_support`. A condition survives every adoption
 and travels with the animal; on listings the flags render prominently and act as filters —
 special-needs adopters exist, self-select, and are the best homes on the platform. Surface the
-flags, never bury them. (Also the join to the help vertical: [09](09-help-workflow.md).)
+flags, never bury them. (Also the join to the help vertical: [07](07-help-workflow.md).)
 
 ### `responsibility_link`
 The lister's link is whatever it already is — owner, custodian, or org. **Listing does not touch
@@ -67,7 +67,7 @@ listings carry the `verified` badge. Nothing else. Inboxes, members, roles: not 
 | Field | Notes |
 |---|---|
 | `pet_id`, `created_by` | Lister is registered (person or org) and holds the pet |
-| `predecessor_case_id?` | Set when the listing was born from a found case's day-15 conversion ([07](07-found-workflow.md)) — the form arrives pre-filled with the pet's photos, traits, and «encontrado en el barrio Laureles en junio». The primary source of v1 inventory |
+| `predecessor_case_id?` | Set when the listing was born from a found case's day-15 conversion ([05](05-found-workflow.md)) — the form arrives pre-filled with the pet's photos, traits, and «encontrado en el barrio Laureles en junio». The primary source of v1 inventory |
 | `story` | Free text — the post |
 | `temperament[]` | Chips describing the **animal**: `good_with_kids`, `good_with_cats`, `good_with_dogs`, `senior`, `puppy` |
 | `requirement_flags[]` | Curated enum array describing the **home**: `needs_yard`, `no_small_children`, `no_other_dogs`, `indoor_only`, `experienced_home`. Extending it is adding an enum value — no migration (enum array + GIN in Postgres; a join table if the DB ends up elsewhere). **Curated, never free-form tags** — the moment anyone can invent one, they stop being filters |
@@ -133,7 +133,7 @@ the number and say nothing else. Three actions:
   transfer) or «fuera de la app» (→ `adopted_offline`).
 
 Anything heavier — configurable screening questions, shortlists, stages — is the deferred inbox
-([D6](06-open-items.md)).
+([D6](../open-items.md)).
 
 ### `case_checkin`
 Reused from 04. Responses: `still_available | adopted | no_longer_available`. **Check-ins are per
@@ -151,7 +151,7 @@ model it or not; unmodeled, it just surprises the adopter in chat. So `fee_cop` 
 Display-only, never through the platform (money principle, unchanged). A non-zero fee **requires
 `fee_covers[]` entries**; and on individual listings — where there's no institution behind the
 number and «adopción con cuota» is the standard cover for a breeder selling puppies — a fee above
-the local norm routes to the moderation queue on publish ([12](12-reporting.md)). Never blocked,
+the local norm routes to the moderation queue on publish ([09](09-reporting.md)). Never blocked,
 never silent. Structured fees also make the breeder pattern a *query* (high fee + no covers +
 unsterilized litter of one breed) instead of a human reading posts.
 
@@ -238,8 +238,8 @@ for 90 days: otherwise as in 04.
 
 **Feed** by proximity to `location_point`, national fallback when the local feed is empty, plus the
 **shareable card** (photo, EN ADOPCIÓN, zone, link back). **No geo push** — an adoption listing is
-not an emergency, and the push budget belongs to lost/found ([O1/O2](06-open-items.md)). A weekly
-opt-in digest is deferred ([D7](06-open-items.md)).
+not an emergency, and the push budget belongs to lost/found ([O1/O2](../open-items.md)). A weekly
+opt-in digest is deferred ([D7](../open-items.md)).
 
 ---
 
@@ -251,7 +251,7 @@ opt-in digest is deferred ([D7](06-open-items.md)).
 | «Me interesa» | ✗ | ✓ — OAuth + phone verified, short intro |
 | Contact the lister | ✗ — only through an interest | ✓ — WhatsApp, external URL, or thread |
 | Publish a listing | ✗ | ✓ — person or org that holds the pet |
-| Report a publication (abuse) | ✓ — one tap, reason required ([12](12-reporting.md)) | ✓ |
+| Report a publication (abuse) | ✓ — one tap, reason required ([09](09-reporting.md)) | ✓ |
 | Earn points / attribution | ✗ | ✓ |
 
 The only vertical where nothing beyond viewing is anonymous: adopting is a commitment, not a tip,
@@ -261,7 +261,7 @@ and the hand-off needs two real identities for the link transfer.
 
 ## Events
 
-Named only where something consumes them — **N** notification ([05](05-notifications.md)),
+Named only where something consumes them — **N** notification ([08](08-notifications.md)),
 **M** metric not derivable from rows, **A** audit. Publishes, withdrawals, declines, check-ins,
 resolutions: queries over rows.
 
@@ -275,13 +275,13 @@ resolutions: queries over rows.
 | `adoption_case.expired` | N — lister, push + email |
 | `responsibility.transferred` | A — on `adopted_in_app`; shared with `kept`, `transferred_to_org`, merge. Every change of who is responsible, one event to audit |
 
-Notifications: [`05-notifications.md`](05-notifications.md) → **Adoption**.
+Notifications: [`08-notifications.md`](08-notifications.md) → **Adoption**.
 
 ---
 
 ## Open items
 
-Tracked in [`06-open-items.md`](06-open-items.md):
+Tracked in [`open-items.md`](../open-items.md):
 
 - **Open** — O8 points: which events earn them, weights, what status displays
 - **Deferred** — D6 structured adoption inbox · D7 adoption digest push

@@ -3,7 +3,7 @@
 > The AYUDA vertical — money first, shaped so other kinds of help slot in later. Source of truth
 > for the help flow; where it disagrees with earlier docs, this one wins and the others get patched.
 > Reuses the machinery in [04](04-lost-workflow.md) — `case_checkin`, trust tiers from
-> [08](08-adoption-workflow.md) — and says so instead of restating it.
+> [06](06-adoption-workflow.md) — and says so instead of restating it.
 > Domain identifiers are English/snake_case; Spanish strings are UI copy.
 
 ## The flow, in one pass
@@ -35,12 +35,12 @@ can grant, a count of people who helped, and check-ins that keep a campaign from
 after the need has ended.
 
 `kind = money` is the only value in v1; the other kinds are deferred with their design
-([D10](06-open-items.md)).
+([D10](../open-items.md)).
 
 **A request is always a bounded ask** — it must be able to end. «Cirugía de cadera» resolves;
 «medicación por 3 meses» resolves; «apóyame cada mes para siempre» is a subscription in disguise
 and out of scope — recurring money relationships are exactly what we don't intermediate. A
-lifelong condition lives on `pet.health_flags[]` ([08](08-adoption-workflow.md)), durable
+lifelong condition lives on `pet.health_flags[]` ([06](06-adoption-workflow.md)), durable
 and case-less; it can still open a *bounded* request whenever there's a specific ask with an end.
 
 ---
@@ -78,7 +78,7 @@ One per person per request. Self-reported, never verified. What it feeds, and wh
   card is the beneficiary's `raised_amount`, labeled as theirs. The two numbers stay visibly
   separate so an unverified one never reads as verified.
 - The beneficiary sees the list — who to thank.
-- Points, when designed ([O8](06-open-items.md)).
+- Points, when designed ([O8](../open-items.md)).
 
 This is the only vertical where the helper row comes *after* the channel: there is no channel,
 only a link-out, and the row is the donor's own claim.
@@ -115,7 +115,7 @@ exist. `help_request` is written alone.
 - **`verified`** — an operator reviewed the evidence against the story and the link against the
   platform, or the org's personería jurídica is already on file. Manual queue ([02 · operator
   flows](02-flows.md)). Badge copy «Evidencia revisada» — *reviewed*, never *guaranteed*
-  ([03](03-legal-colombia.md)). Criteria: [O9](06-open-items.md).
+  ([03](03-legal-colombia.md)). Criteria: [O9](../open-items.md).
 
 Upgrading is the only review step; nothing waits on it.
 
@@ -138,13 +138,13 @@ stateDiagram-v2
     expired --> [*]: purge after 30 days
 ```
 
-`suspended` is the one deliberate inversion of the reporting rule ([12](12-reporting.md), "a
+`suspended` is the one deliberate inversion of the reporting rule ([09](09-reporting.md), "a
 report never hides an active case by itself"): a `scam_or_extortion` report here pauses **our
 amplification** — feed, broadcast, share ranking — immediately and loudly, pending review against
 the O11 SLA. The money side lives on Vaki behind its own KYC; what we lend a campaign is
 credibility and reach, and that is what pauses. Loud means: the card shows «en revisión» (never
 "scam"), the beneficiary is told why with a reply channel, and clearing restores everything. Same
-mechanism as 12's auto-hide categories, same guards (device rate limits, reporter weight).
+mechanism as 09's auto-hide categories, same guards (device rate limits, reporter weight).
 
 ### `resolution` values
 `goal_reached` · `need_ended` · `pet_recovered` · `pet_deceased` · `no_response` ·
@@ -180,13 +180,13 @@ as in 04. Expiry never changes the pet or the links ([01, rule 7](01-actors-and-
 Feed + shareable card (pet photo, AYUDA, host, link). **No geo push** — money doesn't travel on
 proximity the way a lost dog does; the card on WhatsApp is the channel. A push to a pet's past
 helpers («Luna, la que ayudaste a encontrar, necesita cirugía») is the obvious next thing and is
-deferred ([D9](06-open-items.md)).
+deferred ([D9](../open-items.md)).
 
 ---
 
 ## Moderation
 
-Every request carries the report button ([12-reporting.md](12-reporting.md)). `scam_or_extortion`
+Every request carries the report button ([09-reporting.md](09-reporting.md)). `scam_or_extortion`
 suspends on the first report (state machine above); review clears it or confirms fraud →
 `removed`. Every other reason queues normally. Same queue as every other vertical.
 
@@ -199,13 +199,13 @@ suspends on the first report (state machine above); review clears it or confirms
 | View, share, follow the link | ✓ | ✓ |
 | «Ya ayudé» | ✗ | ✓ |
 | Publish a request | ✗ | ✓ — holds the pet |
-| Report a publication (abuse) | ✓ — one tap, reason required ([12](12-reporting.md)) | ✓ |
+| Report a publication (abuse) | ✓ — one tap, reason required ([09](09-reporting.md)) | ✓ |
 
 ---
 
 ## Events
 
-Named only where something consumes them — **N** notification ([05](05-notifications.md)),
+Named only where something consumes them — **N** notification ([08](08-notifications.md)),
 **M** metric not derivable from rows, **A** audit.
 
 | Event | Consumer |
@@ -216,19 +216,19 @@ Named only where something consumes them — **N** notification ([05](05-notific
 | `help_request.suspended` | N — beneficiary, with the reason and a reply channel |
 | `help_request.removed` | N — beneficiary |
 
-Notifications: [`05-notifications.md`](05-notifications.md) → **Help**.
+Notifications: [`08-notifications.md`](08-notifications.md) → **Help**.
 
 ---
 
 ## Partnership, later
 
-Two things that need the platform's cooperation, neither blocking v1 ([D11](06-open-items.md)):
+Two things that need the platform's cooperation, neither blocking v1 ([D11](../open-items.md)):
 a prefilled create-campaign deep link so Step 1 lands on a half-filled form, and a read API so
 `raised_amount` updates itself instead of through check-ins.
 
 ## Open items
 
-Tracked in [`06-open-items.md`](06-open-items.md):
+Tracked in [`open-items.md`](../open-items.md):
 
 - **Open** — O9 verification criteria for `verified`
 - **Deferred** — D8 closure message to contributors · D9 push to a pet's past helpers · D10 other

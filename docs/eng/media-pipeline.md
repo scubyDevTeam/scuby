@@ -69,9 +69,9 @@ not a migration.
 |---|---|---|
 | `thumb` | 240 px long edge | Feed rows, lists, interest lists |
 | `card` | 800 px long edge | Case page, cards, evidence |
-| `full` | 1600 px (the master) | Lightbox; **the poster canvas source** ([10](10-sharing.md)) |
-| `og` | 1200×630, cover-cropped | Composited by the `og:image` renderer ([10](10-sharing.md)) |
-| `match` | 512×512, cover-cropped, sRGB | **Matching** ([O7](06-open-items.md)) — the pipeline produces the normalized input so the algorithm doc doesn't have to |
+| `full` | 1600 px (the master) | Lightbox; **the poster canvas source** ([10](../product/10-sharing.md)) |
+| `og` | 1200×630, cover-cropped | Composited by the `og:image` renderer ([10](../product/10-sharing.md)) |
+| `match` | 512×512, cover-cropped, sRGB | **Matching** ([O7](../open-items.md)) — the pipeline produces the normalized input so the algorithm doc doesn't have to |
 
 - Format negotiated by the CDN: **AVIF → WebP → JPEG** by `Accept`.
 - URLs: `/img/{content_hash}/{variant}` — content-hashed, `Cache-Control: immutable`, one year.
@@ -102,8 +102,8 @@ photos with its row:
 
 | Rule | Photos deleted |
 |---|---|
-| Orphan sighting at `orphan_expires_at` (30 d) — [07](07-found-workflow.md) | The sighting's |
-| Unclaimed pet purged at expired + 30 d — [01 rule 7](01-actors-and-entities.md) | The pet's, and its found case's |
+| Orphan sighting at `orphan_expires_at` (30 d) — [05](../product/05-found-workflow.md) | The sighting's |
+| Unclaimed pet purged at expired + 30 d — [01 rule 7](../product/01-actors-and-entities.md) | The pet's, and its found case's |
 | Claim `stale` + purge window | Proof photos |
 | Help request `removed` | Evidence, after the moderation record keeps a hash reference for 90 d |
 | Account deletion (Ley 1581 right) | Everything referenced only by that person's rows |
@@ -124,7 +124,7 @@ sighting, cases without photos) is a query over rows.
 ## Open items
 
 - **Stack**: build vs. service for the transform layer (imgproxy / Cloudflare Images / Supabase
-  transforms / Thumbor). Same decision covers the `og:image` renderer in [10](10-sharing.md).
+  transforms / Thumbor). Same decision covers the `og:image` renderer in [10](../product/10-sharing.md).
   Everything above is identical either way — decided with the infra/architecture pass.
 - **Smart crop** for `og` and `thumb` (subject-aware) — when center crops visibly cut off animals
   in the feed. Cheap with a service, a project without one.

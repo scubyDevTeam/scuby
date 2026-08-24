@@ -136,7 +136,7 @@ push), which is a reach decision owned by the broadcast rules. Don't derive one 
 
 `case_id` is nullable and may point at a lost **or** found case. A sighting with no case is an
 **orphan** — a witness report matching couldn't attach yet. Orphans, their extra fields, and how
-they get attached are defined in [07-found-workflow.md](07-found-workflow.md);
+they get attached are defined in [05-found-workflow.md](05-found-workflow.md);
 everything in this section assumes a sighting attached to a lost case.
 
 `seen_at` is when the reporter saw the animal; `created_at` is when they told us. They differ
@@ -145,7 +145,7 @@ whenever someone reports late («lo vi ayer»), and everything below orders by `
 when there is no `person_id`.
 
 Default `visible` — publishing a sighting must be instant, or the map dies. The owner can hide any
-pin; moderation removes abuse ([12-reporting.md](12-reporting.md)). Anti-spam is **rate limiting +
+pin; moderation removes abuse ([09-reporting.md](09-reporting.md)). Anti-spam is **rate limiting +
 owner-hides-pin**, never pre-approval and never OTP.
 
 **Only the pin is required** (decision #13, [00](00-product-map.md)). `seen_at` defaults to now;
@@ -270,7 +270,7 @@ later (`stale → confirmed`).
 
 ### `case_checkin`
 `case_id`, `claim_id?`, `trigger: time_based | post_recovery_claim | hold_clock` (the third is
-found-only — [07](07-found-workflow.md)), `scheduled_at`,
+found-only — [05](05-found-workflow.md)), `scheduled_at`,
 `deliveries[] {channel: push | whatsapp | email, sent_at}`, `responded_at`, `cancelled_at`,
 `response: still_lost | reunited | delete | claim_confirmed | claim_dismissed | still_verifying`.
 
@@ -395,7 +395,7 @@ responsible ([01, rule 7](01-actors-and-entities.md)).
 ### Notifications
 
 Check-ins ask; notifications tell. Everything fire-and-forget that this flow emits to owners and
-helpers — copy, channels, coalescing, quiet hours — lives in [`05-notifications.md`](05-notifications.md)
+helpers — copy, channels, coalescing, quiet hours — lives in [`08-notifications.md`](08-notifications.md)
 under **Lost**, keyed by the events listed below. Adding an event here means adding a row there.
 
 ---
@@ -406,7 +406,7 @@ under **Lost**, keyed by the events listed below. Adding an event here means add
 |---|---|---|
 | View, share the card | ✓ | ✓ |
 | Report a sighting | ✓ — **pin required**; time defaults to now; photo, note, contact optional | ✓ — contact prefilled from profile |
-| Report a publication (abuse) | ✓ — one tap, reason required ([12](12-reporting.md)) | ✓ |
+| Report a publication (abuse) | ✓ — one tap, reason required ([09](09-reporting.md)) | ✓ |
 | "Lo tengo" | ✓ — phone **required** → `recovery_claim` → WhatsApp deep link | ✓ — `recovery_claim` → WhatsApp **or** in-app thread |
 | Contact the owner | ✓ — WhatsApp deep link | ✓ — WhatsApp or in-app thread |
 | Earn points / attribution | ✗ | ✓ |
@@ -441,7 +441,7 @@ What this flow needs to know:
   resolves both cases as reunited, and is reversible.
 
 Matching contract, outcomes by pet situation, orphan sightings, and the merge mechanics:
-[07-found-workflow.md](07-found-workflow.md).
+[05-found-workflow.md](05-found-workflow.md).
 
 What remains of the "duplicate lost case" problem after this routing is the rare same-household
 case — two people, two accounts, same pet. Detect on publish by `last_seen_point` + species + time
@@ -451,7 +451,7 @@ window; offer «¿es la misma mascota?», never block.
 
 ## Events
 
-Named only where something consumes them — **N** notification ([05](05-notifications.md)),
+Named only where something consumes them — **N** notification ([08](08-notifications.md)),
 **M** metric not derivable from rows, **A** audit. Everything else (publishes, resolutions,
 check-ins, hides, corrections, dismissals) is a query over entity rows.
 
@@ -459,7 +459,7 @@ check-ins, hides, corrections, dismissals) is a query over entity rows.
 |---|---|
 | `lost_case.broadcast_sent` | N — owner confirmation; neighborhood push |
 | `sighting.reported` | N — owner; M — `has_contact` (the decision-#13 measurement, not derivable once the form ships variants) |
-| `report.submitted` | N — operators ([12](12-reporting.md)) |
+| `report.submitted` | N — operators ([09](09-reporting.md)) |
 | `sighting.highlighted` | N — reporter |
 | `recovery_claim.opened` | N — owner, priority |
 | `recovery_claim.confirmed` | N — claimant |
@@ -474,7 +474,7 @@ check-ins, hides, corrections, dismissals) is a query over entity rows.
 
 ## Open items
 
-Tracked in [`06-open-items.md`](06-open-items.md) so they survive across docs. Relevant to this flow:
+Tracked in [`open-items.md`](../open-items.md) so they survive across docs. Relevant to this flow:
 
 - **Open** — O1 re-push on far sighting clusters · O3 «Lo tengo» on an expired case · O4 stale
   claims vs. the 30-day contact purge
