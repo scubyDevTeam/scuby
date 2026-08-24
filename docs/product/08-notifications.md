@@ -58,13 +58,13 @@ budget accounts for it.
 
 | Event | Channel | Copy | Rule |
 |---|---|---|---|
-| `lost_case.broadcast_sent` | push | «Se perdió Luna cerca de ti. ¿La has visto?» | One per case per recipient. Per-recipient daily cap: **open, [O2](06-open-items.md)**. Second broadcast when sightings move: **open, [O1](06-open-items.md)** |
+| `lost_case.broadcast_sent` | push | «Se perdió Luna cerca de ti. ¿La has visto?» | One per case per recipient. Per-recipient daily cap: **open, [O2](../open-items.md)**. Second broadcast when sightings move: **open, [O1](../open-items.md)** |
 
 ---
 
 ## Found
 
-Events: see `07-found-workflow.md` → Events.
+Events: see `05-found-workflow.md` → Events.
 
 ### To the custodian
 
@@ -95,18 +95,18 @@ stranger holding the animal is not something to push.
 
 | Event | Channel | Copy | Rule |
 |---|---|---|---|
-| `found_case.broadcast_sent` | push | «Encontraron un perro cerca de ti — ¿es tuyo?» | Same caps as lost: [O1](06-open-items.md), [O2](06-open-items.md) |
+| `found_case.broadcast_sent` | push | «Encontraron un perro cerca de ti — ¿es tuyo?» | Same caps as lost: [O1](../open-items.md), [O2](../open-items.md) |
 
 ### Gated (not sent until O5 is decided)
 
 | Event | Target | Copy | Gate |
 |---|---|---|---|
-| `match.candidates_shown` where the matched pet has **no active case** | the pet's owner | «¿Luna está contigo? Alguien reportó un animal parecido cerca.» | [O5](06-open-items.md) — mismatch rate below threshold |
-| `match.candidates_shown` where the matched pet has an **active found case** | the custodian | «¿Sigues con el animal que encontraste? Lo reportaron en otro lugar.» | [O5](06-open-items.md) |
+| `match.candidates_shown` where the matched pet has **no active case** | the pet's owner | «¿Luna está contigo? Alguien reportó un animal parecido cerca.» | [O5](../open-items.md) — mismatch rate below threshold |
+| `match.candidates_shown` where the matched pet has an **active found case** | the custodian | «¿Sigues con el animal que encontraste? Lo reportaron en otro lugar.» | [O5](../open-items.md) |
 
 ## Adoption
 
-Events: see `08-adoption-workflow.md` → Events. **No broadcast** — listed so nobody adds
+Events: see `06-adoption-workflow.md` → Events. **No broadcast** — listed so nobody adds
 one; the push budget belongs to lost/found.
 
 ### To the lister
@@ -127,7 +127,7 @@ a "no" is the lister's to say, in chat, if at all.
 | `adoption_interest.chosen` | «Te eligieron para adoptar a Max. Coordina la entrega.» | |
 | `adoption_case.adopted` (by someone else) | «Max ya fue adoptado. Gracias por interesarte.» | To everyone with an open interest. Closure, and a nudge back to the feed |
 
-### Check-ins (delivery rule only — cadence lives in 08)
+### Check-ins (delivery rule only — cadence lives in 06)
 
 Per case, delivered **per lister**: an individual's listings batch into one push; an org gets one
 digest every 30 days covering all its active listings as a checklist. Same coalescing machinery as
@@ -137,7 +137,7 @@ everything else, applied to `case_checkin` deliveries.
 
 ## Help
 
-Events: see `09-help-workflow.md` → Events. **No broadcast.**
+Events: see `07-help-workflow.md` → Events. **No broadcast.**
 
 ### To the beneficiary
 
@@ -151,14 +151,14 @@ Events: see `09-help-workflow.md` → Events. **No broadcast.**
 ### To contributors
 
 Nothing in v1. A closure message when the request closes («Max se recuperó — gracias») is deferred
-([D8](06-open-items.md)). Contributors are **not** told about a removal — their money is already
+([D8](../open-items.md)). Contributors are **not** told about a removal — their money is already
 gone and there is nothing for them to do.
 
 ---
 
 ## Moderation (cross-journey)
 
-Events: see `12-reporting.md`.
+Events: see `09-reporting.md`.
 
 | Event | Target | Channel | Copy | Rule |
 |---|---|---|---|---|

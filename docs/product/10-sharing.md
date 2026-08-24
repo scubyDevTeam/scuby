@@ -1,7 +1,7 @@
 # Sharing — Links, Previews, Posters
 
 > Cross-vertical. Every case — lost, found, adoption, help — gets the same sharing surface; this
-> doc defines it once. Depends on [11-media.md](11-media.md) for image variants.
+> doc defines it once. Depends on [media-pipeline.md](../eng/media-pipeline.md) for image variants.
 > Domain identifiers are English/snake_case; Spanish strings are UI copy.
 
 ## The organizing insight
@@ -122,7 +122,7 @@ There is no web API for stories. Two mechanisms, both get our 1080×1920 image i
   iOS; the user picks *Story*. Two or three taps. This is what «Compartir» already does.
 - **Native app (later)** — `instagram-stories://share` (iOS) / `com.instagram.share.ADD_TO_STORY`
   (Android) with a Meta app ID opens the story composer directly. One tap. Needs a native shell;
-  [D12](06-open-items.md).
+  [D12](../open-items.md).
 
 Two limits nobody gets around: a third party **cannot attach a link sticker** (the user adds it by
 hand; most won't — which is why the QR is in the image), and nothing reports whether the story was
@@ -148,5 +148,5 @@ Short-link visits are server logs, not events.
 ## Open items
 
 - **D12** native Instagram story intent (needs a native app + Meta app ID).
-- Stack: which server-side renderer for `og:image` — decided with [11](11-media.md)'s transform
+- Stack: which server-side renderer for `og:image` — decided with [11](../eng/media-pipeline.md)'s transform
   layer, same open item.

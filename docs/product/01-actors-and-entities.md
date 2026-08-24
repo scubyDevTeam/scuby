@@ -18,12 +18,12 @@ From least to most identity required:
 | Action | Identity required | Rationale |
 |---|---|---|
 | View posts, share cards | None | Reach must be frictionless |
-| Report a sighting | None — **only the pin is required**; time, photo, note and contact are all optional. Exception: a witness report with no case to attach to (orphan) requires a **photo** — unmatchable without one ([07](07-found-workflow.md)) | The pin is the value; the report that never gets submitted is worth less than a bare pin. Contact is asked for and its value explained, never gated. No OTP. Anti-spam via rate-limiting and owner-hides-pin, not signup |
-| Report a publication (abuse) | None — one tap + a reason ([12-reporting.md](12-reporting.md)) | Requiring an account to report abuse means abuse goes unreported |
+| Report a sighting | None — **only the pin is required**; time, photo, note and contact are all optional. Exception: a witness report with no case to attach to (orphan) requires a **photo** — unmatchable without one ([05](05-found-workflow.md)) | The pin is the value; the report that never gets submitted is worth less than a bare pin. Contact is asked for and its value explained, never gated. No OTP. Anti-spam via rate-limiting and owner-hides-pin, not signup |
+| Report a publication (abuse) | None — one tap + a reason ([09-reporting.md](09-reporting.md)) | Requiring an account to report abuse means abuse goes unreported |
 | "I have it" / contact owner | None — phone number (required, not verified) → a `recovery_claim` row → owner's WhatsApp (owner opts into exposing it) | Helping needs no account, but the claim must exist in the system *before* the WhatsApp handoff or the most common path to a reunion is invisible to badges, check-ins, and attribution |
 | **Publish** anything (lost, found, campaign) | Account (OAuth: Google/Apple one-tap) + phone verification | A publisher must be contactable and accountable. **Lost is published only by the owner** (ownership asserted, not verified); **Found only by someone holding the animal**. Seeing a stray is a sighting, not a publish — no account |
 | «Me interesa» (adoption) | Account, always — plus a 4-field intro before the channel opens | Adopting is a commitment, not a tip; the hand-off transfers responsibility to a real person. Screening itself happens in chat, between them |
-| Claim ownership of a found pet («es mío») | Account, always — plus the evidence form ([07](07-found-workflow.md)) | They are asking to *take* an animal, not to help |
+| Claim ownership of a found pet («es mío») | Account, always — plus the evidence form ([05](05-found-workflow.md)) | They are asking to *take* an animal, not to help |
 | «Ya ayudé» on a help request | Account | The only record a donation leaves; following the campaign link needs nothing |
 | Earn points / status | Account | Attribution requires identity |
 
@@ -37,7 +37,7 @@ Person / Organization
       ▼
      Pet ── species, breed-guess, size, colors, marks, photos, chip #
       │     custody_state: claimed | unclaimed | org_held
-      │     health_flags[] ── durable, survives every case (see 08)
+      │     health_flags[] ── durable, survives every case (see 06)
       │
       ├── Case: LOST         last-seen area (point + radius) + time   → reunited | expired | cancelled
       ├── Case: FOUND        found-area + time, custody, two clocks   → reunited | kept | converted-to-adoptable | transferred-to-org | expired | cancelled
@@ -57,5 +57,5 @@ The verticals demonstrably involve the same animals: a found stray becomes adopt
    Three doors, by **perspective**: Lost is the owner ("I lost *mine*"), Found is the custodian ("I have one that isn't mine"), Sighting is everyone else ("I saw one"). A found case always means custody.
 4. **Merge is a first-class, reversible operation.** When a found-report and a lost-report are confirmed to be the same animal, the unclaimed record folds into the claimed Pet and both cases resolve as *reunited*. Wrong merges must be undoable. This is the trickiest flow in the system and the price of the model.
 5. **Dormant records cost nothing.** After a case resolves, nobody owes the platform maintenance. Rows just sit there until (if ever) their human enriches them.
-6. **"Lost" is never stored on the pet.** It is derived from an active lost case. See [04-lost-workflow.md](04-lost-workflow.md) (lost), [07-found-workflow.md](07-found-workflow.md) (found, sightings, matching contract, merge), [08-adoption-workflow.md](08-adoption-workflow.md) (adoption), and [09-help-workflow.md](09-help-workflow.md) (help), which are the sources of truth for their flows; where this doc and those disagree, they win.
+6. **"Lost" is never stored on the pet.** It is derived from an active lost case. See [04-lost-workflow.md](04-lost-workflow.md) (lost), [05-found-workflow.md](05-found-workflow.md) (found, sightings, matching contract, merge), [06-adoption-workflow.md](06-adoption-workflow.md) (adoption), and [07-help-workflow.md](07-help-workflow.md) (help), which are the sources of truth for their flows; where this doc and those disagree, they win.
 7. **Expiry never changes who is responsible.** A case expiring — lost, found, or adoption — touches neither `responsibility_link` nor `custody_state`; links change only by an explicit transfer (`adopted_in_app`, `kept`, `transferred_to_org`, merge). Expiry means "we lost contact," not "nobody is responsible." **Purge** (expired + 30 days) removes the case, and removes the pet only when it is `unclaimed` with no other case and no other link — a stray nobody vouches for anymore cannot be found by anyone, so there is no one to keep it for. Claimed pets are never purged by a case.

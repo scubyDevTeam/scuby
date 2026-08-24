@@ -124,7 +124,7 @@ detail: «Guardaste: *collar verde*. Pregúntale por eso antes de entregar.»
 
 Tier 1 is why the merge path is always preferred over a cold claim — route claimants through
 «¿es tu mascota?» first. Repeat cold-claimers across found cases surface in the moderation queue
-([12](12-reporting.md)): that pattern is the theft signal.
+([09](09-reporting.md)): that pattern is the theft signal.
 
 Safety copy to the custodian, at the badge and on the claim check-in:
 
@@ -214,12 +214,12 @@ The four buttons *are* the resolution enum. «Sigo buscando» re-arms the hold c
 «Publicar en adopción» → **`converted`**: a new `adoption_case` on the *same pet*, pre-filled from
 it (photos, traits, «encontrado en el barrio Laureles en junio»), `successor_case_id` /
 `predecessor_case_id` linking the two. The pet stays `unclaimed`, the custodian link continues —
-listing is not a transfer ([08](08-adoption-workflow.md)).
+listing is not a transfer ([06](06-adoption-workflow.md)).
 
 This is the cross-vertical bridge the product map promised — "a found stray becomes adoptable" —
 and since adoption launches individuals-first, it is the **primary source of v1 adoption
 inventory**. The conversion rate at the day-15 offer is a launch metric. The 15 days has a legal
-echo (Ley 1774's 15-day abandonment window, [O6](06-open-items.md)) that makes it defensible
+echo (Ley 1774's 15-day abandonment window, [O6](../open-items.md)) that makes it defensible
 rather than arbitrary; it is never cited as law in UI copy.
 
 ### Rule: only the custodian closes a case as reunited
@@ -228,7 +228,7 @@ custodian's statement that the hand-off happened.
 
 ### Rule: `kept` is an assertion with a date, not a legal event
 The button is available from day one — we cannot stop anyone from keeping an animal — and the copy
-suggests waiting (period pending the lawyer question, [O6](06-open-items.md)). On `kept`: custodian
+suggests waiting (period pending the lawyer question, [O6](../open-items.md)). On `kept`: custodian
 link closes, a new link `role = owner` opens for the same person, pet `custody_state = claimed`.
 The case **stays matchable against new lost cases for 30 days** after `kept`: if the real owner
 surfaces, they open an ownership claim like anyone else and the merge path still works.
@@ -237,7 +237,7 @@ surfaces, they open an ownership claim like anyone else and the merge path still
 The custodian taps «Lo entregué a una fundación», optionally names it (free text), and the case
 resolves. Custodian link closes; pet returns to `unclaimed`; **no org link is created**. The
 structured handoff — org accepts → `org` link → `custody_state = org_held` → flows into adoption —
-is deferred ([D4](06-open-items.md)). Recording the outcome honestly now costs nothing; building
+is deferred ([D4](../open-items.md)). Recording the outcome honestly now costs nothing; building
 the process before a foundation asks for it would.
 
 ### `resolution` values
@@ -288,7 +288,7 @@ custody ([01, rule 7](01-actors-and-entities.md)); purge is what removes the rec
 
 ## Matching — the contract this flow needs
 
-The algorithm is its own doc ([O7](06-open-items.md)); this section fixes what it must provide.
+The algorithm is its own doc ([O7](../open-items.md)); this section fixes what it must provide.
 
 ```
 match(report) → candidates[] of { pet_id, confidence, why[] }
@@ -317,8 +317,8 @@ auto-creating or auto-merging anything.
 | Matched pet… | The report means | Action |
 |---|---|---|
 | has an active **lost** case | A sighting, or a recovery claim if the reporter has it | Attach / open claim — same as reporting from inside the case |
-| has an active **found** case | Contradiction: someone claims custody, yet it's seen elsewhere | **Open** ([O5](06-open-items.md)). Until decided: silent, kept as orphan |
-| has **no active case** | Wrong match, or the owner hasn't noticed yet | **Open** ([O5](06-open-items.md)). A proactive «¿Luna está contigo?» is powerful and a false alarm is how trust dies. Until decided: silent, kept as orphan |
+| has an active **found** case | Contradiction: someone claims custody, yet it's seen elsewhere | **Open** ([O5](../open-items.md)). Until decided: silent, kept as orphan |
+| has **no active case** | Wrong match, or the owner hasn't noticed yet | **Open** ([O5](../open-items.md)). A proactive «¿Luna está contigo?» is powerful and a false alarm is how trust dies. Until decided: silent, kept as orphan |
 | no match | An animal we don't know | Orphan. Re-run against lost cases published later |
 
 Both gated nudges unlock on the same measurement: false-match rate below a threshold over N
@@ -357,7 +357,7 @@ either a wrong match or a hand-off nobody told us about. Detect on publish, offe
 | Witness report («no lo tengo») | ✓ — pin + photo required (an orphan without a photo is unmatchable); time defaults to now; contact optional, asked-for (decision #13) | ✓ — contact from profile |
 | «Es mío» | ✗ — asking to *take* an animal, not to help | ✓ — always; `ownership_claim` + evidence form → WhatsApp or in-app thread |
 | Contact the custodian | ✓ — WhatsApp deep link | ✓ — either |
-| Report a publication (abuse) | ✓ — one tap, reason required ([12](12-reporting.md)) | ✓ |
+| Report a publication (abuse) | ✓ — one tap, reason required ([09](09-reporting.md)) | ✓ |
 | Earn points / attribution | ✗ | ✓ |
 | Publish a found case (custody) | ✗ | ✓ — OAuth + phone verified |
 
@@ -369,7 +369,7 @@ the custodian must be reachable and accountable for a live animal.
 ## Hooks for the next verticals
 
 - **Adoption**: a custodian who can't keep the stray lists it on the same pet row —
-  [08](08-adoption-workflow.md) — and `adopted_in_app` transfers the link to the adopter.
+  [06](06-adoption-workflow.md) — and `adopted_in_app` transfers the link to the adopter.
   The `org` role and `custody_state = org_held` exist and are unused in v1; the structured
   `transferred_to_org` (D4) is the bridge from a finder to a foundation's listing.
 - **Help** (fundraising): a custodian holding an injured stray is the most common reason a
@@ -380,7 +380,7 @@ the custodian must be reachable and accountable for a live animal.
 
 ## Events
 
-Named only where something consumes them — **N** notification ([05](05-notifications.md)),
+Named only where something consumes them — **N** notification ([08](08-notifications.md)),
 **M** metric not derivable from rows, **A** audit. Publishes, resolutions, check-ins, dismissals,
 orphan creation: queries over rows.
 
@@ -398,13 +398,13 @@ orphan creation: queries over rows.
 | `pet.merged` · `pet.unmerged` | A — with the `pet_merge` record |
 | `responsibility.transferred` | A — on `kept`, `transferred_to_org`, merge |
 
-Notifications for this flow: [`05-notifications.md`](05-notifications.md) → **Found**.
+Notifications for this flow: [`08-notifications.md`](08-notifications.md) → **Found**.
 
 ---
 
 ## Open items
 
-Tracked in [`06-open-items.md`](06-open-items.md):
+Tracked in [`open-items.md`](../open-items.md):
 
 - **Open** — O5 matching-driven nudges (owner «¿está contigo?», custodian «¿sigues con él?») ·
   O6 legal: finder keeping a found animal · O7 the matching algorithm
