@@ -41,6 +41,13 @@ minimization; nothing needs them).
 Helpers contacting a poster need no number of their own on file: the `wa.me` deep link opens
 *their* WhatsApp toward the poster's exposed number.
 
+**Why the publisher's number is OTP-verified** (examined 2026-08-27, kept deliberately): (1) a
+typo'd number fails *silently* — helpers reach nothing, the owner just experiences «nobody saw my
+dog» and can never tell why; OTP turns that into immediate feedback. (2) We broadcast the exposed
+number on a shareable card — amplifying a number the publisher doesn't control would hand
+harassers a weapon, so *we amplify it ⇒ we verify it*. (3) A phone per publisher prices fake cases.
+Narrowing to "verify only when WhatsApp is exposed" was considered and set aside for now.
+
 **Unverified numbers are trusted enough to act on.** They are format-validated at input
 (libphonenumber, country pattern, stored E.164), so the owner-side UI renders a claimant's
 collected number as buttons — `[ Abrir WhatsApp ]` (`wa.me`) · `[ Llamar ]` (`tel:`) — never as

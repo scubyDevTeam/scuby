@@ -228,7 +228,7 @@ come from (forty animals, three adopted last month, nobody took them down). Chan
 Expiry per listing: `unanswered_streak = 2` — ~28 days of silence for an individual, ~60 for an org.
 When an org's whole batch expires at once, that's the right signal: the org has left.
 
-Escalation push → WhatsApp → email on the same row, interaction resets (check-in answers and
+Escalation push → email (24h) on the same row, interaction resets (check-in answers and
 explicit actions — marking chosen, recording adoption — not views), `expired` soft and reopenable
 for 90 days: otherwise as in 04.
 

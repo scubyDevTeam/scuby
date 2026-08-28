@@ -70,3 +70,5 @@ App is **nationwide** from day one. Feeds are **local-first with national fallba
 ## Open questions
 
 None blocking. Future decisions live in Phase 3+ ideas and the points economy.
+
+| 17 | Comms stack *(2026-08-27)* | Orchestration always ours (ladders, quiet hours, coalescing — providers are dumb pipes). `wa.me`/`mailto:` primary contact; **Twilio Conversations** as the number-free fallback chat (lazy creation, close-don't-remove, first 200 MAU free); Resend-class email → SES on volume; launch ladder push → email, claims push-only with the +24h check-in net; SMS only for publisher OTP ([eng/comms.md](../eng/comms.md), [eng/costs.md](../eng/costs.md)) | DIY threads (subsystem + ghost-town risk for a fallback); SMS in ladders (recurring spend on unresponsive users); WhatsApp templates now (needs the deferred WABA) |

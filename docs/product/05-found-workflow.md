@@ -274,7 +274,7 @@ Claim check-in, to the custodian, with the safety copy:
 animal escapes, gets handed to a neighbor, the finder travels). Claim check-ins at +24h/+72h with
 `stale_at = claim + 7d`, +72h per «aún verificando»; the hold clock fires its offer at
 `held_since + 15d` independently of all of this; interaction resets the time-based clock to +5d
-(check-in answers and explicit actions only; views don't count); escalation push → WhatsApp → email
+(check-in answers and explicit actions only; views don't count); escalation push → email (24h)
 on the same row; `unanswered_streak = 2` → `expired`; claim and hold-clock check-ins never count
 toward the streak.
 

@@ -4,6 +4,7 @@
 > Check-ins (questions the owner must answer) are not here — they live with the flow that owns
 > them, as `case_checkin` rows. This doc is the contract for everything else.
 > Copy is illustrative Spanish UI text; the **Rule** column is what engineering implements.
+> Transport — channels, providers, ladders, costs: [eng/comms.md](../eng/comms.md).
 
 ## Global rules
 
@@ -15,7 +16,7 @@ Apply to every journey unless a row says otherwise.
 | Events exist only for a consumer | An event is named only if something reads it: a notification row here (**N**), a metric that cannot be derived from entity rows (**M**), or the audit trail of responsibility changes (**A**). The doc that defines the event tags its consumer. Anything derivable from rows — cases published per week, resolutions, check-in response rates — is a query over rows, not an event. Vocabulary without a consumer is how event lists rot |
 | Implementation | One append-only `events` table (`name`, `subject_id`, `actor_id`, `payload`, `created_at`), written in the same transaction as the thing it describes. Notification jobs and metric queries read it. No bus, no broker |
 | Default channel | Push. In-app inbox always receives a copy |
-| No push permission | The flow's single highest-priority message (e.g. a recovery claim) falls back to a WhatsApp template. Everything else stays in-app |
+| No push permission | In-app + email — no special channel at launch. A minutes-level priority fallback (WhatsApp template) returns with the WABA ([D15](../open-items.md)) |
 | Quiet hours | 22:00–07:00 local. Non-priority pushes are held and delivered at 07:00, coalesced into one. Priority rows are marked and go through |
 | Coalescing | Same event, same target, same case, within the row's window → one push with a count («3 avistamientos nuevos»). Never coalesce across cases |
 | Anonymous targets | We own no channel to them. Rows targeting helpers are registered-only |
@@ -34,7 +35,7 @@ Events: see `04-lost-workflow.md` → Events.
 |---|---|---|---|
 | `lost_case.broadcast_sent` | push | «Tu aviso de Luna ya llegó a los vecinos de la zona.» | Once per case. Confirms the publish did something |
 | `sighting.reported` | push | «Alguien vio a Luna hace 2 h a 400 m de donde se perdió.» | Time is `seen_at` relative, distance from `last_seen_point`. Late report («…dice que la vio ayer 18:30…») is worded as such, never as "now". Coalesce window: 10 min |
-| `recovery_claim.opened` | push → WhatsApp if undelivered in 15 min | «Alguien dice que tiene a Luna. Ábrelo para contactar.» | **Priority.** Never coalesced, ignores quiet hours |
+| `recovery_claim.opened` | push | «Alguien dice que tiene a Luna. Ábrelo para contactar.» | **Priority.** Never coalesced, ignores quiet hours. In the common path the claimant's own WhatsApp message reaches the owner directly; every edge is caught by the +24h claim check-in (push → email). WABA restores a minutes-level fallback (D15) |
 | `contact.opened` (`thread_created`) | push | «Tienes un mensaje sobre Luna.» | In-app thread only. A `whatsapp_click` sends nothing — the WhatsApp message itself is the notification |
 | `lost_case.expired` | push + email | «Archivamos el aviso de Luna. Puedes reactivarlo con un toque hasta el 12 de sep.» | Email because the owner has, by definition, ignored push. Includes the reopen deadline |
 
@@ -71,7 +72,7 @@ Events: see `05-found-workflow.md` → Events.
 | Event | Channel | Copy | Rule |
 |---|---|---|---|
 | `found_case.broadcast_sent` | push | «Tu aviso ya llegó a los vecinos de la zona.» | Once per case |
-| `ownership_claim.opened` | push → WhatsApp if undelivered in 15 min | «Alguien dice ser el dueño. Ábrelo para ver lo que envió.» | **Priority.** Never coalesced, ignores quiet hours. Carries the hand-off safety copy in the detail view |
+| `ownership_claim.opened` | push | «Alguien dice ser el dueño. Ábrelo para ver lo que envió.» | **Priority.** Never coalesced, ignores quiet hours. Claimant's own message covers the common path; the +24h claim check-in (push → email) covers the edges. Carries the hand-off safety copy in the detail view |
 | `match.candidates_shown` (a new lost case matched this found case) | push | «Publicaron un aviso de perdido que se parece al animal que tienes.» | Coalesce window: 1 h. Not priority |
 | `contact.opened` (`thread_created`) | push | «Tienes un mensaje sobre el animal que encontraste.» | In-app thread only; WhatsApp clicks send nothing |
 | `found_case.expired` | push + email | «Archivamos tu aviso. Puedes reactivarlo con un toque hasta el 12 de sep.» | Email because push was ignored. Includes reopen deadline |

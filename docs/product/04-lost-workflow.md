@@ -275,7 +275,7 @@ later (`stale → confirmed`).
 ### `case_checkin`
 `case_id`, `claim_id?`, `trigger: time_based | post_recovery_claim | hold_clock` (the third is
 found-only — [05](05-found-workflow.md)), `scheduled_at`,
-`deliveries[] {channel: push | whatsapp | email, sent_at}`, `responded_at`, `cancelled_at`,
+`deliveries[] {channel: push | email | whatsapp, sent_at}` (`whatsapp` unused at launch — a seam, [D15](../open-items.md)), `responded_at`, `cancelled_at`,
 `response: still_lost | reunited | delete | claim_confirmed | claim_dismissed | still_verifying`.
 
 A check-in is **one question**, self-contained: it knows when it is due, through which channels it
@@ -384,9 +384,9 @@ an owner who keeps answering is exactly the engagement we want.
 Claim check-ins never replace time-based ones — they run in parallel, and the case's own expiry
 clock (two unanswered time-based check-ins) is unaffected by claim activity.
 
-**Escalation:** push → WhatsApp template (24h later) → email (48h later), all on the same check-in
-row. A check-in counts as *unanswered* only once all three deliveries have gone out without a
-response.
+**Escalation:** push → email (24h later), on the same check-in row. A check-in counts as
+*unanswered* once both deliveries have gone out without a response. (The WhatsApp-template middle
+step returns with the WABA — [D15](../open-items.md); transport in [eng/comms.md](../eng/comms.md).)
 **Expiry:** `unanswered_streak = 2` on time-based check-ins ≈ 14 days of silence → `expired`.
 Claim check-ins never count toward the streak — an owner ignoring a bad claim is not an owner
 abandoning the search.
