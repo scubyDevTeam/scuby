@@ -228,7 +228,7 @@ come from (forty animals, three adopted last month, nobody took them down). Chan
 Expiry per listing: `unanswered_streak = 2` — ~28 days of silence for an individual, ~60 for an org.
 When an org's whole batch expires at once, that's the right signal: the org has left.
 
-Escalation push → WhatsApp → email on the same row, interaction resets (check-in answers and
+Escalation push → email (24h) on the same row, interaction resets (check-in answers and
 explicit actions — marking chosen, recording adoption — not views), `expired` soft and reopenable
 for 90 days: otherwise as in 04.
 
@@ -255,7 +255,8 @@ opt-in digest is deferred ([D7](../open-items.md)).
 | Earn points / attribution | ✗ | ✓ |
 
 The only vertical where nothing beyond viewing is anonymous: adopting is a commitment, not a tip,
-and the hand-off needs two real identities for the link transfer.
+and the hand-off needs two real identities for the link transfer. Publisher phone step per the UI
+contract in [eng/auth.md](../eng/auth.md).
 
 ---
 
