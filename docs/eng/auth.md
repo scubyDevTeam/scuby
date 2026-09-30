@@ -56,6 +56,15 @@ claim. One caveat for owners who chose `in_app_only`: outreach from their person
 their own number, so the claim card says «Al escribirle, esa persona verá tu número» before the
 buttons. When the WABA exists, existence validation replaces the checkbox.
 
+**Behind a flag.** OTP at publish is gated by `publisher_phone_otp` (global default **on**,
+overridable per account — [feature-flags.md](feature-flags.md)). Off-path: the number is still
+required, format-validated and stored E.164 exactly like a claimant's, the case goes live, and
+`phone_verified_at` stays null. The number stays unverified until the next publish or change with
+the flag on, which runs the OTP step then. Turning the flag off gives up the three reasons above
+for that account; it exists for testing and as the kill switch if SMS pumping outruns the alarm.
+The frontend never reads the flag. The publish form response tells it `phone_step: otp` or
+`unverified`, and it renders the code entry only for `otp`.
+
 ### UI contract — the phone step in every publish flow
 
 | Moment | Screen behavior |
