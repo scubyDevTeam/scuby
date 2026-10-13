@@ -1,33 +1,37 @@
 # Frontend — Client Architecture and Build Plan
 
-> Architecture doc. Strategy decided 2026-08-22. Framework, stack and layering decided 2026-10-02:
-> merges the `docs/vertical-workflows` architecture draft (2026-08-23, amended 2026-08-31) into
-> this doc. Backend, database and infra are out of scope; this covers the app, the store builds,
-> and the rules that keep them one thing. Decision log rows: [00 · #12, #19](../product/00-product-map.md).
+> Architecture doc. Strategy decided 2026-08-22. Framework, stack and layering decided 2026-10-02
+> (merges the `docs/vertical-workflows` architecture draft). **Amended 2026-10-05:** two scopes —
+> the web launches first; the store apps are a planned medium-term scope. Backend, database and
+> infra are out of scope; this covers the app, the store builds, and the rules that keep them one
+> thing. Decision log rows:
+> [00 · #12, #19, #20](../product/00-product-map.md).
 
 ## The decision in one line
 
-**One codebase, shipped in stages.** A React SPA (Vite + TanStack Router) that runs on the web and
-installs as a PWA. The *same* build is wrapped by **Capacitor** into Android and then iOS store apps
-when there is evidence anyone wants them. Screens are written once. The only per-platform code is
-a thin adapter layer for push, camera, location, share and storage.
+**One codebase, two scopes.** First a React SPA (Vite + TanStack Router) that runs on the web and
+installs as a PWA. Then, as a planned medium-term scope, the *same* build wrapped by **Capacitor**
+into Android and iOS store apps. Screens are written once. The only per-platform code is a thin adapter layer for push,
+camera, location, share and storage.
 
 **Why:** two engineers, ~10–15 h/week combined. One codebase is the constraint, not a preference.
 The thing that makes the product work — a WhatsApp link opens a case and a sighting is one tap
-away, no install — is a web property. Native is a distribution channel on top of it.
+away, no install — is a web property, so the web launches first and stays the primary surface.
+The store apps are the same product for people who want it installed, with native push.
 
-## Stages
+## Scopes
 
-| Stage | Target | Trigger |
+| Scope | What | When |
 |---|---|---|
-| **1. PWA** | Web + installable PWA: service worker, Web Push, camera, geolocation, share sheet, canvas poster. All browser APIs | Now. The growth loop is WhatsApp → link → browser; there is no store in it |
-| **2a. Android shell** | Same `dist/` in Capacitor. Adds FCM push, the Instagram story intent (D12), store presence | Real weekly usage, or Web Push install friction measurably costing the geo-push differentiator |
-| **2b. iOS shell** | Same, adds APNs | 2a shipped and retained. By then the guideline 4.2 argument is "this app has users and native push", not a promise |
-| **3. Native rewrite** | React Native preferred: `domain`, `contracts` and `api-client` survive untouched (see *Escape hatches*). Ships under the **same bundle ID / application ID**; the stores treat it as a version update | If and when a mobile dev makes it worth it, or the webview ceiling is reached |
+| **1. Web + PWA** | The launch. Installable, service worker, Web Push, camera, geolocation, share sheet, canvas poster — all browser APIs. Lost & Found first, then adoption and help | Now |
+| **2. Mobile** (Play Store + App Store) | The same `dist/` in Capacitor, both stores together. Adds FCM/APNs push, native Google sign-in, Sign in with Apple (guideline 4.8), the Instagram story intent (D12), store presence | Medium term: planned, not triggered by metrics. Starts once the web launch is stable; gates in [frontend-plan.md](frontend-plan.md) · Mobile scope |
+| **Native rewrite** | React Native preferred: `domain`, `contracts` and `api-client` survive untouched (see *Escape hatches*). Ships under the **same bundle ID / application ID**; the stores treat it as a version update | If and when a mobile dev makes it worth it, or the webview ceiling is reached |
 
-Web Push on installed Android PWAs covers the differentiator today, and Colombia is ~75–80%
-Android. Stages 2a/2b change no application code — they add `capacitor.config.ts` and a generated
-native folder. Everything below is written so stage 2a is a week of work, not a project.
+Scope 1 is written so scope 2 changes almost no application code: native access already goes
+through `src/platform` (Rule 4), so the mobile scope adds native branches to those modules,
+`capacitor.config.ts` and the generated native folders. When it ships, the stores **never gate
+the web**: a web release ships the moment it's merged; store binaries are cut only when native code
+or plugins change, and JS/asset fixes reach installed apps through live updates (*Stack*).
 
 ### What Capacitor costs
 
@@ -53,33 +57,43 @@ admire the scroll physics. The specific risks and their mitigations are under *R
   the loop. At this hour budget it doesn't ship.
 - **Next.js + Expo** (the 2026-08-23 draft) — two UIs and two map implementations forever. Correct
   about the tradeoffs, wrong about the price.
-- **Expo universal** — weak SSR/OG on the one surface the growth loop runs through.
+- **Expo universal** — the web that comes out of React Native is heavier and less "web" on the one
+  surface the growth loop runs through, the map splits into a native and a web implementation,
+  and its SSR is still `unstable_`.
 - **Flutter (web or native)** — discards the JS ecosystem and is the toolchain neither engineer is
   fastest in. Also the one rewrite target where none of `domain` survives.
+- **Stores at launch** (considered 2026-10-05) — two store reviews, Sign in with Apple, account
+  deletion and a webview polish pass before a single user exists; the web loop doesn't need any of it.
+- **Android first, iOS later on separate triggers** — with Capacitor both shells cost about the
+  same, and one mobile scope means one round of native work.
+- **TWA for Android** — a second wrapper next to Capacitor for iOS, and no native intents.
+- **Remote-URL shell** (`server.url` pointing at the live site) — Capacitor documents it for live
+  reload only, and Apple rejects apps that aren't self-contained.
 
 ---
 
 ## Push, by platform
 
-| Platform | Stage 1 (PWA) | Stage 2 (Capacitor) |
+| Platform | Scope 1 — web (PWA) | Scope 2 — store app |
 |---|---|---|
-| Android / Chrome | **Web Push** works fully, installed or not | FCM via plugin |
-| iOS / Safari | Web Push **only after Add to Home Screen** (iOS ≥ 16.4); a Safari tab gets nothing | APNs via plugin, like any app |
+| Android | **Web Push** works fully, installed or not | FCM via plugin |
+| iOS | Web Push **only after Add to Home Screen** (iOS ≥ 16.4); a Safari tab gets nothing | APNs via plugin, like any app |
 
 What this means for the product:
 - **Owners are who need push** (check-ins, claims, sightings). They're engaged enough for a
   one-screen instruction. At publish time on iOS, before the first check-in would fire:
   > «Para recibir avisos en iPhone: toca Compartir → Añadir a pantalla de inicio, y abre la app
   > desde ahí.»
+  Once the store apps exist, the same prompt offers the app first.
   Shown once, dismissible, repeated only if no subscription exists when a priority push is due.
 - **Helpers are mostly anonymous** and reached via WhatsApp. Push for them is a bonus.
 - Check-in answers from the notification itself (action buttons) and the iOS deep-link fallback:
   [comms.md](comms.md).
 
 Backend contract: one `push_subscription` table, `kind: webpush | fcm | apns`, `token`,
-`person_id`, `device`, `created_at`, `last_seen_at`. Web Push from day one; stage 2 adds two kinds
-and a sender, not a redesign. The client registers through `src/platform/push`, which returns
-`{ kind, token }` regardless of runtime.
+`person_id`, `device`, `created_at`, `last_seen_at`. Web Push from day one; the mobile scope adds
+two kinds and their senders, not a redesign. The client registers through `src/platform/push`, which returns `{ kind, token }`
+regardless of runtime.
 
 ---
 
@@ -191,9 +205,10 @@ export async function getCurrentPosition(): Promise<Point> {
 }
 ```
 
-Five modules — `location`, `camera`, `share`, `push`, `storage`. In stage 1 the native branches are
-unreachable; they are written anyway, because adding them later means auditing every call site.
-In a native rewrite these are the only files replaced wholesale.
+Five modules — `location`, `camera`, `share`, `push`, `storage` (plus `auth` in the mobile scope,
+for the native sign-in plugins — *Risks* §7). In scope 1 they hold only the web branch; the boundary
+is what matters, because it means the mobile scope edits these files and no call site. Everything
+above them is written once and never asks where it's running. In a native rewrite these are the only files replaced wholesale.
 
 Geolocation is **optional everywhere** — never a validation input (many deny it), only a
 convenience for centering the map and sorting the feed.
@@ -220,7 +235,7 @@ the server-provided center + radius.
 | **Poster** | Canvas render, three formats, photo framer, QR generated locally, bundled fonts, `document.fonts.ready`. The crop never leaves the device | [10](../product/10-sharing.md) §3 |
 | **Share** | `navigator.share({files, text})` with download + clipboard fallback; `wa.me/?text=` | [10](../product/10-sharing.md) §4 |
 | **Phone step** in every publish flow | Inline field, country prefilled from `supported_countries`, libphonenumber format check, OTP entry when told `otp` | [auth.md](auth.md) · UI contract |
-| **Sign-in** | Google one-tap + email 6-digit code; accounts born lazily at the first gated action; no signup screen | [auth.md](auth.md) |
+| **Sign-in** | Google one-tap + email 6-digit code (the mobile scope adds the native Google plugin and Apple); accounts born lazily at the first gated action; no signup screen | [auth.md](auth.md) |
 | **Validation for feedback** | Distance/time checks on sightings in the form; server re-checks | [04](../product/04-lost-workflow.md) · Validation |
 | **Form state across a trip out** | Help flow link gate — kept on the device, no server draft | [07](../product/07-help-workflow.md) · Publishing |
 | **Map** | Rule 5 above | [04](../product/04-lost-workflow.md) |
@@ -286,8 +301,8 @@ beats an intention.
 | Map cold load | **≤ 2.0 s** to first interactive tiles | manual on the reference device |
 | Uploaded photo | ≈ 300 KB, ≤ 1600 px, JPEG | client pipeline ([media-pipeline](media-pipeline.md)) |
 
-**Sentry from the first deploy**, with uploaded sourcemaps. Users don't file bugs, they stop coming
-back. `@sentry/capacitor` arrives with stage 2.
+**Sentry from the first deploy**, with uploaded sourcemaps — `@sentry/react`; `@sentry/capacitor`
+arrives with the mobile scope. Users don't file bugs, they stop coming back.
 
 ---
 
@@ -306,7 +321,10 @@ back. `@sentry/capacitor` arrives with stage 2.
 | PWA | **vite-plugin-pwa** (Workbox) — installable shell, Web Push |
 | Errors | **Sentry** |
 | Deploy | **Vercel** — static `dist/` + the share function |
-| Native shell (stage 2) | Capacitor (`webDir: 'dist'`); plugins `push-notifications` · `geolocation` · `camera` · `share` · `app` · `status-bar` · `keyboard` · `preferences`; live updates via Capgo or a remote-URL shell |
+| Native shell *(scope 2)* | **Capacitor** (current major; `webDir: 'dist'`); plugins `push-notifications` · `geolocation` · `camera` · `share` · `app` (deep links, back button) · `system-bars` / `status-bar` · `keyboard` · `preferences` · `splash-screen` |
+| Native sign-in *(scope 2)* | Google: Capawesome Google Sign-In or `@capgo/capacitor-social-login` (Credential Manager on Android, Google SDK on iOS). Apple: Sign in with Apple through the same plugin family. Behind `src/platform/auth` |
+| Live updates *(scope 2)* | **Capgo** or **Capawesome** — JS/asset fixes reach installed apps without review (Apple 3.3.2 allows it for JS and assets, never a change of purpose). Not Ionic Appflow: closed to new customers, shuts down 2027-12-31 |
+| Store builds *(scope 2)* | GitHub Actions — macOS runner for iOS (no Mac required), Linux for Android; signing secrets in CI, never in the repo |
 | Tooling | **Biome** (lint + format) · dependency-cruiser · size-limit · **Vitest** on `domain` · **Playwright** web e2e · Lighthouse CI on `/c/:code` |
 
 Pin the current major of each at scaffold time — this doc goes stale faster than the ecosystem.
@@ -350,8 +368,8 @@ web/
 │   ├── ui/                     shadcn + tokens + Map/ (lazy)
 │   ├── platform/               location · camera · share · push · storage
 │   └── mocks/                  MSW handlers + fixtures
-├── android/  ios/              generated at stage 2a/2b — absent until then
-└── capacitor.config.ts         ditto
+├── android/  ios/              scope 2: Capacitor native projects — absent until then
+└── capacitor.config.ts         scope 2: app id, webDir, plugin config
 ```
 
 Feature folders, not type folders: `features/lost/` beats `hooks/`, `screens/`, `utils/` the moment
@@ -361,51 +379,39 @@ there are four verticals. Route names are Spanish (they are UI); identifiers are
 
 ## Build plan
 
-Ordered by the growth loop: a stranger opens a link → reports a sighting → an owner publishes. Each
-phase ships to production behind nothing — the PWA is live from phase 0, data comes from MSW until
-the API exists.
-
-| # | Phase | Scope | Done when |
-|---|---|---|---|
-| 0 | **Scaffold** | `web/` with the stack above; layer rule, size-limit, Lighthouse CI, Biome, Vitest, Sentry, vite-plugin-pwa manifest + SW; Vercel deploy; `.well-known` files for app links (open item); MSW wired; shadcn + design tokens | Empty shell deployed, CI gates red on violation |
-| 1 | **Domain** | `domain/lost` and `domain/found` machines + tests, transcribed from 04/05 | Every transition in the docs' diagrams has a test |
-| 2 | **Case page `/c/:code`** | The lost case page from fixtures: status banner per [10](../product/10-sharing.md) §1, card, actions; the share function with real OG tags | WhatsApp preview renders from a deployed URL; budgets green |
-| 3 | **Map** | `ui/Map` with area + sighting pins + trajectory + 200 m floor; feed with local-first + national fallback | Map budget met on a Redmi-class phone in Chrome |
-| 4 | **Helper actions (anonymous)** | «Lo vi» sighting form with photo pipeline + persisted retry queue; «Lo tengo» claim; report button ([09](../product/09-reporting.md)) | A sighting survives airplane mode + a closed tab |
-| 5 | **Owner publishing** | Sign-in (Google + email code), lost publish form + phone step, poster + share actions, check-in answers, Web Push registration, iOS install prompt | Owner can publish, share and answer a check-in end-to-end on MSW |
-| 6 | **Found** | Found publish, «Es mío» with the evidence ladder, the two clocks' UI | — |
-| 7 | **Adoption, then Help** | Per product phasing ([00](../product/00-product-map.md)) | — |
-
-Phases 0–4 need nothing from the backend but the shape of its responses. Phase 5 is where the real
-API, session transport and the OpenAPI spec become blockers — the backend pass should land by then.
+Step by step, from the design hand-off to launch: [frontend-plan.md](frontend-plan.md).
 
 ---
 
 ## Risks
 
-1. **The map in a webview.** The one thing that could invalidate the Capacitor half — and the
-   **gate for stage 2a**, not stage 1 (on the web it's ordinary MapLibre). Spike: map screen with
-   ~300 clustered pins in a Capacitor build on a Redmi A3-class phone (3–4 GB RAM) over real 4G.
-   It tests sustained memory (WebGL + tile cache + WhatsApp running), cold Protomaps range requests,
-   and whether the OS reclaims the webview in the background. **Pass:** stable memory over five
-   minutes of panning, no reload after backgrounding, cold map interactive under ~2 s. **Fail:** a
-   native map view under the webview via plugin (a rescue, not a plan), or reopen the native
-   question with evidence. The web product ships unaffected either way.
+Risks 1, 3, 4, 5, 7 and 8 belong to the mobile scope; 2 and 6 apply from day one.
+
+1. **The map in a webview.** The one thing that could invalidate the Capacitor half — so it is the
+   **first step of the mobile scope**, before any native work (on the web it's ordinary MapLibre,
+   checked in web phase 3.4). Spike: map screen with ~300 clustered pins in a Capacitor build on a
+   Redmi A3-class phone (3–4 GB RAM) over real 4G. It tests sustained memory (WebGL + tile cache +
+   WhatsApp running), cold Protomaps range requests, and whether the OS reclaims the webview in the
+   background. **Pass:** stable memory over five minutes of panning, no reload after backgrounding,
+   cold map interactive under ~2 s. **Fail:** a native map view under the webview via plugin (a
+   rescue, not a plan), or reopen the native question with evidence. The web is unaffected.
 2. **Client/server rule drift.** Managed by Rule 2: generated contracts + transition-table contract
    tests before the second vertical.
-3. **Apple guideline 4.2** ("just a website"). Stage 2b only, and weak by then: native push, camera,
-   geolocation, offline shell, in an app with real usage.
-4. **No free OTA updates.** Capgo (OSS, paid hosting or self-host), Appflow (paid), or a remote-URL
-   shell. Budget it at stage 2a.
-5. **Webview polish.** Safe areas, status bar, keyboard avoidance, Android back button, overscroll,
+3. **Apple guideline 4.2** ("just a website"). Defence by construction: native push, camera, native
+   geolocation, native share, offline shell, native sign-in — and by then, an app with real usage.
+4. **Live updates are not free.** Capgo or Capawesome, ~USD 10/mo once the apps exist. Native or
+   plugin changes still need a store release.
+5. **Webview polish.** Safe areas, system bars, keyboard avoidance, Android back button, overscroll,
    long-press selection. None hard; together they are "an app" vs "a website in a box". A full day
-   at stage 2a, spent immediately.
+   inside the mobile scope, spent before the stores — living with the rough version normalizes it.
 6. **Sightings on bad connectivity.** «Lo vi» is sent outdoors, one-handed, on weak signal, by
    someone with no account and no reason to retry. It is the one mutation with a **persisted retry
    queue** from day one (TanStack Query mutation defaults + persister). General offline stays out.
 7. **Google sign-in inside a webview.** Google blocks OAuth in embedded webviews
-   (`disallowed_useragent`). Stage 2a needs native Google sign-in through a plugin behind
-   `platform/` — and the iOS stage brings Apple login with it ([D15](../open-items.md)).
+   (`disallowed_useragent`), so the store apps use a native sign-in plugin behind
+   `src/platform/auth`. Solved, but it is per-platform code to test on real devices.
+8. **Two store reviews in the loop.** Every native change waits on Apple and Google. Kept small by
+   the rule that the web never waits for the stores, and by live updates for everything else.
 
 ## Escape hatches
 
