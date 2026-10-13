@@ -59,9 +59,10 @@
   performance check in this plan runs on it, in Chrome — not on a laptop.
 
 ### P.3 Decisions to close before code
+The product name is **not** one of them: it is configuration ([00 · #21](../product/00-product-map.md)), open as [O16](../open-items.md). Design and code use the working name «Scuby».
+
 | Decision | Proposal | Lands in |
 |---|---|---|
-| Product name in the UI | `docs/pdv.html` prototypes «Patas de vuelta»; the repo says Scuby. Pick one before the design | [00](../product/00-product-map.md) decision log |
 | Tile source for the map | Protomaps hosted API to start, or a self-hosted `.pmtiles` file on object storage | [frontend.md](frontend.md) · Stack, [costs.md](costs.md) |
 
 ---
@@ -74,7 +75,8 @@ Create a **design system** and a **design** in Claude Design using the brief bel
 
 **Design brief — paste into Claude Design (UI copy is Spanish):**
 
-> Diseña la web app **Scuby** (mascotas perdidas, encontradas, adopción y ayuda en Colombia).
+> Diseña la web app **Scuby** (nombre provisional — trátalo como un texto reemplazable, no lo
+> integres en el logo ni en ilustraciones) (mascotas perdidas, encontradas, adopción y ayuda en Colombia).
 > Mobile-first a **360 px** de ancho; también debe verse bien en escritorio (una columna centrada).
 > Más adelante se empaquetará como app de tienda, así que deja espacio para las áreas seguras del
 > celular. Usuarios en Android de gama baja, con datos prepago, que llegan desde un link de WhatsApp
@@ -136,7 +138,9 @@ Token translation into code happens in step 0.4, once there is a project to put 
 ### 0.1 Project ★
 **Read:** [frontend.md](frontend.md) · Stack, Folder structure.
 **Do:** `web/` with Vite + React 19 + TypeScript strict, pnpm, path aliases per layer, the folder
-skeleton from frontend.md (empty `index.ts` per layer; no `android/`/`ios/` yet), `.nvmrc`.
+skeleton from frontend.md (empty `index.ts` per layer; no `android/`/`ios/` yet), `.nvmrc`,
+`src/brand.ts` (frontend.md · What the frontend owns — Product name), and `web/.env` with a mock
+value for every key the client will need, read only through `src/env.ts`.
 **Done when:** `pnpm dev` and `pnpm build` work; the tree matches frontend.md.
 **Prompt:** «Paso 0.1 de `docs/eng/frontend-plan.md`. Crea `web/` siguiendo Stack y Folder
 structure de `docs/eng/frontend.md` (alcance 1, sin Capacitor). Fija la versión mayor actual de

@@ -240,6 +240,7 @@ the server-provided center + radius.
 | **Form state across a trip out** | Help flow link gate — kept on the device, no server draft | [07](../product/07-help-workflow.md) · Publishing |
 | **Map** | Rule 5 above | [04](../product/04-lost-workflow.md) |
 | **Offline-ish** | Service worker caches shell and fonts; a case page opened from a link renders on a flaky connection once loaded. Writes online-only, except the sighting queue (*Risks* §6); a failed write keeps the form | — |
+| **Product name** | One file, `src/brand.ts` (name, short name, public origin), filled at build time from the `VITE_BRAND_*` and `VITE_PUBLIC_ORIGIN` env vars (every key, with mock defaults, in `web/.env`; `src/env.ts` is the only reader). UI copy, the page title, the PWA manifest, the poster and the share function's tags read it; **no user-facing string spells the name literally** (a CI grep enforces it). Notification and email copy is the backend's and needs the same setting there | [00 · #21](../product/00-product-map.md) |
 | **Case lifecycles as UI model** | One machine per vertical in `src/domain` (below) | [04](../product/04-lost-workflow.md)–[07](../product/07-help-workflow.md) · state machines |
 
 ## What the frontend does NOT own
