@@ -48,7 +48,7 @@
 ## Phase P — Prerequisites (no code)
 
 ### P.1 Accounts
-- GitHub access to the repo (`gh auth switch --user alejosuaza1022`, CLAUDE.md rule 7).
+- GitHub access to the repo (CLAUDE.md rule 7).
 - **Vercel** project (root directory `web/`) and a **Sentry** project.
 - Domain `scuby.co` with DNS access.
 - Store accounts wait for the mobile scope (M.1).

@@ -30,5 +30,5 @@ product and engineering source of truth is `docs/`; there is no application code
 5. **Country-scoped values** (phone prefixes, currency, legal) go through configuration
    (`supported_countries` — `eng/auth.md`), never hard-coded.
 6. Spanish strings are UI copy; domain identifiers are English snake_case.
-7. Git: `gh auth switch --user scubydev-rgb` before GitHub operations (work account can't see
-   this repo).
+7. Git: the repo is `scubyDevTeam/scuby`. Before GitHub operations, `gh auth switch --user <account>`
+   to an account that is a member of the `scubyDevTeam` org (work accounts can't push here).
