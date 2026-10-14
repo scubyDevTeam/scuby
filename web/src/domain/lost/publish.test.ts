@@ -74,14 +74,14 @@ describe('04 · the form reuses a pet before it creates one', () => {
       name: 'Luna',
       species: 'dog' as const,
       size: 'small' as const,
-      colors: ['Negro'],
+      colors: ['black' as const],
       marks: 'Collar rojo',
       photoUrls: ['a.jpg'],
     }
     expect(draftFromPet(emptyDraft, pet)).toMatchObject({
       petId: 'pet-1',
       name: 'Luna',
-      colors: ['Negro'],
+      colors: ['black'],
     })
   })
 })

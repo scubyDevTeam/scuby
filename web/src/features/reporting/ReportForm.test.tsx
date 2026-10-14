@@ -21,7 +21,7 @@ describe('ReportForm — 09 · anonymous, a reason and nothing else', () => {
     expect(await screen.findByText('Gracias por avisar.')).toBeTruthy()
     expect(calls.at(-1)?.body).toEqual({
       target_type: 'lost_case',
-      target_code: '7K3PQ',
+      target_id: '7K3PQ',
       reason: 'scam_or_extortion',
       note: 'Piden plata',
     })

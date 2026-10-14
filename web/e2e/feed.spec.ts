@@ -1,40 +1,58 @@
-import { expect, test } from './test.ts'
+import { expect, tags, test } from './test.ts'
 
-test('browse the feed, filter it, and open a case', async ({ page }) => {
-  await page.goto('/')
+test(
+  'browse the feed, filter it, and open a case',
+  tags('@feed', '@FEED-001'),
+  async ({ feed, casePage, page }) => {
+    await test.step('every open case near Medellín is listed', async () => {
+      await feed.open()
+      await expect(feed.title).toBeVisible()
+      await expect(feed.cards).toHaveCount(6)
+    })
 
-  await expect(page.getByRole('heading', { name: 'Cerca de ti, ahora' })).toBeVisible()
-  const cards = page.getByRole('listitem').filter({ has: page.getByRole('article') })
-  await expect(cards).toHaveCount(5)
+    await test.step('filtering narrows it to lost cats', async () => {
+      await feed.filter('Perdidos')
+      await expect(feed.cards).toHaveCount(2)
+      await expect(feed.cardsSaying('Se busca')).toHaveCount(2)
+      await feed.filter('Gatos')
+      await expect(feed.cards).toHaveCount(1)
+    })
 
-  await page.getByRole('button', { name: 'Perdidos' }).click()
-  await expect(cards).toHaveCount(2)
-  await expect(cards.filter({ hasText: 'Se busca' })).toHaveCount(2)
+    await test.step('the card opens its case', async () => {
+      await feed.openOnlyCard()
+      await expect(page).toHaveURL(/\/c\/M2TQ4$/)
+      await expect(casePage.title('Milo')).toBeVisible()
+    })
+  },
+)
 
-  await page.getByRole('button', { name: 'Gatos' }).click()
-  await expect(cards).toHaveCount(1)
-  await cards.getByRole('link').click()
+test(
+  'on a desktop the feed and its map sit side by side',
+  tags('@feed', '@FEED-002'),
+  async ({ feed }) => {
+    await test.step('open the feed on a desktop', async () => {
+      await feed.onDesktop()
+      await feed.open()
+    })
 
-  await expect(page).toHaveURL(/\/c\/M2TQ4$/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Milo' })).toBeVisible()
-})
+    await test.step('list and map show together, with the desktop chrome', async () => {
+      await expect(feed.mainNavigation).toBeHidden()
+      await expect(feed.publishLink).toBeVisible()
+      await expect(feed.articles).toHaveCount(6)
+      await expect(feed.map).toHaveAttribute('data-map-ready', 'true')
+    })
+  },
+)
 
-test('on a desktop the feed and its map sit side by side', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 })
-  await page.goto('/')
+test('on a phone the map replaces the list', tags('@feed', '@FEED-003'), async ({ feed }) => {
+  await test.step('the phone shows the list first', async () => {
+    await feed.open()
+    await expect(feed.articles).toHaveCount(6)
+  })
 
-  await expect(page.getByRole('navigation', { name: 'Principal' })).toBeHidden()
-  await expect(page.getByRole('link', { name: 'Publicar aviso' })).toBeVisible()
-  await expect(page.getByRole('article')).toHaveCount(5)
-  await expect(page.getByTestId('feed-map')).toHaveAttribute('data-map-ready', 'true')
-})
-
-test('on a phone the map replaces the list', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByRole('article')).toHaveCount(5)
-
-  await page.getByRole('button', { name: 'Mapa' }).click()
-
-  await expect(page.getByTestId('feed-map')).toHaveAttribute('data-map-ready', 'true')
-  await expect(page.getByRole('article')).toHaveCount(0)
+  await test.step('the map takes the list’s place', async () => {
+    await feed.showMap()
+    await expect(feed.map).toHaveAttribute('data-map-ready', 'true')
+    await expect(feed.articles).toHaveCount(0)
+  })
 })

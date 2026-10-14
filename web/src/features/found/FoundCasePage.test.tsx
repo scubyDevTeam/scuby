@@ -11,7 +11,8 @@ import { FoundCasePage } from './FoundCasePage'
 const now = new Date()
 
 function foundCase(code: string, overrides: Partial<FoundCase> = {}): FoundCase {
-  const parsed = parseCase(cases()[code])
+  const viewer = overrides.viewer && overrides.viewer !== 'public' ? 'responsible' : 'public'
+  const parsed = parseCase(cases(viewer)[code])
   if (parsed.vertical !== 'found') throw new Error('expected a found case')
   return { ...parsed, ...overrides }
 }

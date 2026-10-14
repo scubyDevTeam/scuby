@@ -12,7 +12,7 @@ const luna = {
   name: 'Luna',
   species: 'dog',
   size: 'small',
-  colors: ['Negro'],
+  colors: ['black'],
   marks: 'Collar rojo',
   photo_urls: [],
   active_case_code: null,
