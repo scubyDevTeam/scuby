@@ -1,7 +1,6 @@
 import type { Sighting } from '@contracts/case'
 import type { PlacedSighting } from '@domain/lost/sightings'
-import { formatDistance } from '@domain/shared/geo'
-import { formatRelative } from '@domain/shared/time'
+import { useI18n } from '@i18n/react'
 import { formatSeenAt } from './copy'
 
 /** docs/product/04 · Display rules §4: newest first — time, distance, thumbnail, reporter type. */
@@ -12,9 +11,11 @@ export function SightingTimeline({
   sightings: readonly PlacedSighting<Sighting>[]
   now: Date
 }) {
+  const i18n = useI18n()
+  const { t } = i18n
   const newestFirst = [...sightings].reverse()
   return (
-    <ol aria-label="Avistamientos" className="m-0 flex list-none flex-col gap-3 p-0">
+    <ol aria-label={t('lost.timeline.label')} className="m-0 flex list-none flex-col gap-3 p-0">
       {newestFirst.map((sighting) => (
         <li
           key={sighting.id}
@@ -31,17 +32,25 @@ export function SightingTimeline({
           </span>
           <div className="min-w-0 flex-1">
             <p className="m-0 font-bold">
-              {formatSeenAt(sighting.seenAt, now)} · {formatRelative(sighting.seenAt, now)}
+              {formatSeenAt(i18n, sighting.seenAt, now)} · {i18n.relative(sighting.seenAt, now)}
             </p>
             <p className="m-0 text-muted">
-              A {formatDistance(sighting.distanceFromLastSeenM)} ·{' '}
-              {sighting.source === 'registered' ? 'con cuenta' : 'anónimo'}
+              {t('lost.timeline.where_who', {
+                distance: i18n.distance(sighting.distanceFromLastSeenM),
+                reporter: t(
+                  sighting.source === 'registered'
+                    ? 'lost.timeline.registered'
+                    : 'lost.timeline.anonymous',
+                ),
+              })}
             </p>
-            {sighting.note ? <p className="m-0 text-muted">«{sighting.note}»</p> : null}
+            {sighting.note ? (
+              <p className="m-0 text-muted">{t('lost.timeline.note', { note: sighting.note })}</p>
+            ) : null}
           </div>
-          {sighting.photoUrl ? (
+          {sighting.photoUrls[0] ? (
             <img
-              src={sighting.photoUrl}
+              src={sighting.photoUrls[0]}
               alt=""
               loading="lazy"
               className="size-12 shrink-0 rounded-lg object-cover"

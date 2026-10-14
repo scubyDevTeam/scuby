@@ -1,3 +1,4 @@
+import { useI18n } from '@i18n/react'
 import { roundButtonClass } from '@ui/Button'
 import { Share2 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
@@ -31,6 +32,7 @@ export function CaseShell({
   aside,
   children,
 }: Props) {
+  const { t } = useI18n()
   return (
     <article className="mx-auto flex max-w-lg flex-col pb-10 lg:max-w-none">
       <div
@@ -49,7 +51,7 @@ export function CaseShell({
               {onShare ? (
                 <button
                   type="button"
-                  aria-label="Compartir"
+                  aria-label={t('common.share')}
                   onClick={onShare}
                   className={roundButtonClass}
                 >
@@ -69,6 +71,7 @@ export function CaseShell({
 }
 
 function Gallery({ urls, alt }: { urls: readonly string[]; alt: string }) {
+  const { t } = useI18n()
   const [selected, setSelected] = useState(0)
   const current = urls[selected] ?? urls[0]
   if (!current) return <div className="aspect-square w-full bg-soft lg:rounded-3xl" />
@@ -82,7 +85,7 @@ function Gallery({ urls, alt }: { urls: readonly string[]; alt: string }) {
       {/* On a phone the photo itself is the control; a desktop has room for thumbnails. */}
       <button
         type="button"
-        aria-label="Ver la siguiente foto"
+        aria-label={t('case.next_photo')}
         onClick={() => setSelected((selected + 1) % urls.length)}
         className="relative block w-full border-0 bg-transparent p-0"
       >
@@ -96,7 +99,7 @@ function Gallery({ urls, alt }: { urls: readonly string[]; alt: string }) {
           <li key={url}>
             <button
               type="button"
-              aria-label={`Ver foto ${index + 1}`}
+              aria-label={t('case.photo_n', { n: index + 1 })}
               aria-pressed={index === selected}
               onClick={() => setSelected(index)}
               className={`block w-full overflow-hidden rounded-xl border-4 p-0 ${

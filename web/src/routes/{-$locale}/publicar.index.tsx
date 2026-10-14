@@ -1,7 +1,7 @@
 import { type Door, PublishDoors } from '@features/publish/PublishDoors'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/publicar/')({ component: Doors })
+export const Route = createFileRoute('/{-$locale}/publicar/')({ component: Doors })
 
 const slug: Record<Door, string> = {
   lost: 'perdido',
@@ -15,7 +15,7 @@ function Doors() {
   return (
     <PublishDoors
       link={(door, children, className) => (
-        <Link to="/publicar/$tipo" params={{ tipo: slug[door] }} className={className}>
+        <Link to="/{-$locale}/publicar/$tipo" params={{ tipo: slug[door] }} className={className}>
           {children}
         </Link>
       )}

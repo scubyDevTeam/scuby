@@ -1,41 +1,45 @@
-// Spanish UI copy for the found case. Strings only — the rules live in src/domain/found.
+// UI copy keys for the found case. Keys only — the words live in src/i18n/locales, the rules in
+// src/domain/found.
 import type { FoundCase } from '@contracts/found'
 import type { EvidenceTier } from '@domain/found/evidence'
 import type { FoundStatus } from '@domain/found/machine'
-
-const speciesLabel = { dog: 'Perro', cat: 'Gato', other: 'Animal' } as const
-const sizeLabel = { small: 'pequeño', medium: 'mediano', large: 'grande' } as const
+import type { TextKey, Translator } from '@i18n/translate'
 
 /** «Gato negro, pequeño» — a found animal has no name, so it is titled by what it looks like. */
-export function describeFound(pet: FoundCase['pet']): string {
-  const colour = pet.colors[0]?.toLowerCase()
-  const what = [speciesLabel[pet.species], colour].filter(Boolean).join(' ')
-  return [what, pet.size && sizeLabel[pet.size]].filter(Boolean).join(', ')
+export function describeFound(i18n: Translator, pet: FoundCase['pet']): string {
+  const { t } = i18n
+  const species = t(`found.describe.species.${pet.species}`)
+  const colour = pet.colors[0]
+  const what = colour
+    ? t('found.describe.with_color', { species, color: t(`pet.colors_in_text.${colour}`) })
+    : species
+  const title = pet.size
+    ? t('found.describe.with_size', { what, size: t(`found.describe.size.${pet.size}`) })
+    : what
+  // A title starts with a capital whichever word the language puts first.
+  return title.charAt(0).toLocaleUpperCase(i18n.locale) + title.slice(1)
 }
 
 /** Public: tells an owner what urgency to expect (docs/product/05 · found_case). */
-export const holdingLabel: Record<FoundCase['holdingWhere'], string> = {
-  home: 'Está en casa de quien lo encontró',
-  vet: 'Está en una veterinaria',
-  street_temporary: 'Sigue en la calle, lo están cuidando',
-  no_longer_held: 'Ya no lo tienen: se fue de nuevo',
+export const holdingLabel: Record<FoundCase['holdingWhere'], TextKey> = {
+  home: 'found.holding.home',
+  vet: 'found.holding.vet',
+  street_temporary: 'found.holding.street_temporary',
+  no_longer_held: 'found.holding.no_longer_held',
 }
 
-export const closedBand: Record<Exclude<FoundStatus, 'active' | 'expired'>, string> = {
-  reunited: 'Ya está con su familia',
-  kept: 'Ya tiene hogar',
-  converted: 'Ahora está en adopción',
-  transferred_to_org: 'Está con una fundación',
-  cancelled: 'Aviso cerrado',
+export const closedBand: Record<Exclude<FoundStatus, 'active' | 'expired'>, TextKey> = {
+  reunited: 'found.band.reunited',
+  kept: 'found.band.kept',
+  converted: 'found.band.converted',
+  transferred_to_org: 'found.band.transferred_to_org',
+  cancelled: 'found.band.cancelled',
 }
 
 /** The label a custodian reads on a claim: how hard its evidence is to fake. */
-export const tierLabel: Record<EvidenceTier, string> = {
-  prior_lost_case: '⭐ Publicó un aviso de perdido antes de que lo encontraras',
-  described: 'Describió algo que no sale en las fotos',
-  documented: 'Adjuntó microchip o documentos',
-  none: '⚠️ Sin evidencia',
+export const tierLabel: Record<EvidenceTier, TextKey> = {
+  prior_lost_case: 'found.tier.prior_lost_case',
+  described: 'found.tier.described',
+  documented: 'found.tier.documented',
+  none: 'found.tier.none',
 }
-
-export const SAFETY_COPY =
-  'Antes de entregarlo, pide el dato que guardaste, una foto anterior o el carnet de vacunas. Entrégalo en un lugar público.'

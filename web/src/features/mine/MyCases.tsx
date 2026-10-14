@@ -1,20 +1,21 @@
 import { useMyCases } from '@api-client/owner'
 import type { MyCase } from '@contracts/owner'
-import { formatRelative } from '@domain/shared/time'
+import { useI18n } from '@i18n/react'
+import type { TextKey } from '@i18n/translate'
 import { Badge, type BadgeTone } from '@ui/Badge'
 import { Button } from '@ui/Button'
 import { Message, Skeleton } from '@ui/States'
 import { FilePlus2, WifiOff } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-const statusBadge: Record<string, { tone: BadgeTone; label: string }> = {
-  active: { tone: 'lost', label: 'Aviso activo' },
-  reunited: { tone: 'found', label: 'Ya está en casa' },
-  expired: { tone: 'info', label: 'Archivado' },
-  cancelled: { tone: 'info', label: 'Cerrado' },
-  kept: { tone: 'found', label: 'Ya tiene hogar' },
-  converted: { tone: 'adoption', label: 'En adopción' },
-  transferred_to_org: { tone: 'found', label: 'Con una fundación' },
+const statusBadge: Record<string, { tone: BadgeTone; label: TextKey }> = {
+  active: { tone: 'lost', label: 'mine.status.active' },
+  reunited: { tone: 'found', label: 'mine.status.reunited' },
+  expired: { tone: 'info', label: 'mine.status.expired' },
+  cancelled: { tone: 'info', label: 'mine.status.cancelled' },
+  kept: { tone: 'found', label: 'mine.status.kept' },
+  converted: { tone: 'adoption', label: 'mine.status.converted' },
+  transferred_to_org: { tone: 'found', label: 'mine.status.transferred_to_org' },
 }
 
 type Props = {
@@ -24,35 +25,36 @@ type Props = {
 
 /** Everything the signed-in person has published, newest first. */
 export function MyCases({ caseLink, publishLink }: Props) {
+  const { t } = useI18n()
   const cases = useMyCases()
   const now = new Date()
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-5 py-8 lg:max-w-3xl">
-      <h1 className="m-0 text-3xl font-extrabold">Mis casos</h1>
+      <h1 className="m-0 text-3xl font-extrabold">{t('mine.title')}</h1>
       {cases.isPending ? (
-        <div className="flex flex-col gap-3" role="status" aria-label="Cargando tus casos">
+        <div className="flex flex-col gap-3" role="status" aria-label={t('mine.loading')}>
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
         </div>
       ) : cases.isError ? (
         <Message
           icon={<WifiOff aria-hidden="true" className="size-10" />}
-          title="No pudimos cargar tus casos"
-          action={<Button onClick={() => cases.refetch()}>Reintentar</Button>}
+          title={t('mine.load_failed')}
+          action={<Button onClick={() => cases.refetch()}>{t('common.retry')}</Button>}
         >
-          Revisa tu conexión e inténtalo de nuevo.
+          {t('common.check_connection')}
         </Message>
       ) : cases.data.length === 0 ? (
         <Message
           icon={<FilePlus2 aria-hidden="true" className="size-10" />}
-          title="Aún no has publicado nada"
+          title={t('mine.empty_title')}
           action={publishLink(
-            'Publicar un aviso',
+            t('mine.publish'),
             'flex min-h-12 items-center justify-center rounded-2xl bg-brand px-5 font-bold text-white no-underline',
           )}
         >
-          Cuando publiques un aviso lo verás aquí.
+          {t('mine.empty_hint')}
         </Message>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
@@ -72,11 +74,16 @@ export function MyCases({ caseLink, publishLink }: Props) {
 }
 
 function Row({ item, now }: { item: MyCase; now: Date }) {
+  const i18n = useI18n()
+  const { t } = i18n
   // An active found case is not a search: it says what it is.
-  const badge =
+  const known =
     item.vertical === 'found' && item.status === 'active'
-      ? { tone: 'found' as const, label: 'Lo cuidas tú' }
-      : (statusBadge[item.status] ?? { tone: 'info' as const, label: item.status })
+      ? { tone: 'found' as const, label: 'mine.status.found_active' as const }
+      : statusBadge[item.status]
+  const badge = known
+    ? { tone: known.tone, label: t(known.label) }
+    : { tone: 'info' as const, label: item.status }
   return (
     <article className="flex items-center gap-4 rounded-2xl bg-surface p-3 shadow-md">
       {item.photoUrl ? (
@@ -89,13 +96,13 @@ function Row({ item, now }: { item: MyCase; now: Date }) {
           <Badge tone={badge.tone}>{badge.label}</Badge>
           {item.status === 'active' && item.openClaimCount > 0 ? (
             <Badge tone="info">
-              {item.vertical === 'found' ? 'Posible dueño' : 'Posible hallazgo'}
+              {t(item.vertical === 'found' ? 'mine.possible_owner' : 'mine.possible_find')}
             </Badge>
           ) : null}
         </div>
         <h2 className="m-0 text-xl font-extrabold">{item.title}</h2>
         <p className="m-0 text-muted">
-          {item.placeName} · {formatRelative(item.publishedAt, now)}
+          {item.placeName} · {i18n.relative(item.publishedAt, now)}
         </p>
       </div>
     </article>

@@ -2,8 +2,8 @@ import type { LostCase } from '@contracts/case'
 import { availableActions, hasPossibleFind, type LostAction, pageMode } from '@domain/lost/actions'
 import { placeSightings } from '@domain/lost/sightings'
 import { publicArea } from '@domain/shared/geo'
-import { formatRelative } from '@domain/shared/time'
 import { CaseShell } from '@features/case/CaseShell'
+import { useI18n } from '@i18n/react'
 import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass } from '@ui/Button'
 import { CaseMap } from '@ui/Map/CaseMap'
@@ -26,6 +26,8 @@ type Props = {
 }
 
 export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, onAction }: Props) {
+  const i18n = useI18n()
+  const { t } = i18n
   const { pet, lastSeen } = lostCase
   const state = { status: lostCase.status, resolvedAt: lostCase.resolvedAt }
   const mode = pageMode(state)
@@ -40,11 +42,11 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
 
   const band =
     mode === 'open'
-      ? { label: 'Se busca', className: 'bg-lost' }
+      ? { label: t('lost.page.band_open'), className: 'bg-lost' }
       : lostCase.status === 'reunited'
-        ? { label: 'Ya está en casa', className: 'bg-found' }
+        ? { label: t('lost.page.band_reunited'), className: 'bg-found' }
         : {
-            label: mode === 'archived' ? 'Aviso archivado' : 'Aviso cerrado',
+            label: t(mode === 'archived' ? 'lost.page.band_archived' : 'lost.page.band_closed'),
             className: 'bg-muted',
           }
 
@@ -53,14 +55,14 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
       band={band}
       shortUrl={shortUrl}
       photoUrls={pet.photoUrls}
-      photoAlt={`Foto de ${pet.name}`}
+      photoAlt={t('lost.page.photo_alt', { name: pet.name })}
       backLink={backLink}
       onShare={can('share') ? () => onAction('share') : undefined}
       aside={
         <>
           {pet.marks ? (
             <section>
-              <h2 className="m-0 text-2xl font-extrabold">Señas</h2>
+              <h2 className="m-0 text-2xl font-extrabold">{t('lost.page.marks_title')}</h2>
               <p className="m-0 mt-2 text-lg">{pet.marks}</p>
             </section>
           ) : null}
@@ -69,7 +71,7 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
             <section className="flex flex-col gap-3 rounded-2xl bg-brand-mist p-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="m-0 font-bold">{lostCase.contact.displayName}</p>
-                <p className="m-0 text-muted">Su familia</p>
+                <p className="m-0 text-muted">{t('lost.page.contact_family')}</p>
               </div>
               {lostCase.contact.whatsappUrl ? (
                 <a
@@ -79,7 +81,7 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
                   className={buttonClass('whatsapp', 'lg:w-auto')}
                 >
                   <WhatsAppIcon />
-                  Escribirle por WhatsApp
+                  {t('contact.write_on_whatsapp')}
                 </a>
               ) : null}
             </section>
@@ -90,7 +92,7 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
               {can('share') ? (
                 <Button variant="link" onClick={() => onAction('share')}>
                   <Share2 aria-hidden="true" />
-                  Compartir aviso
+                  {t('lost.page.share')}
                 </Button>
               ) : null}
               {can('report_content') ? (
@@ -100,7 +102,7 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
                   onClick={() => onAction('report_content')}
                 >
                   <Flag aria-hidden="true" className="size-4" />
-                  Reportar
+                  {t('lost.page.report')}
                 </Button>
               ) : null}
             </footer>
@@ -110,10 +112,13 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
     >
       <section>
         <h1 className="m-0 text-4xl font-extrabold lg:text-6xl">{pet.name}</h1>
-        <p className="m-0 mt-1 text-lg lg:text-xl">{describePet(pet)}</p>
+        <p className="m-0 mt-1 text-lg lg:text-xl">{describePet(i18n, pet)}</p>
         <p className="m-0 mt-1 text-muted">
-          Se perdió en {lastSeen.placeName} · {formatDayMonth(lastSeen.at)} ·{' '}
-          {formatRelative(lastSeen.at, now)}
+          {t('lost.page.lost_at', {
+            place: lastSeen.placeName,
+            date: formatDayMonth(i18n, lastSeen.at),
+            ago: i18n.relative(lastSeen.at, now),
+          })}
         </p>
       </section>
 
@@ -121,51 +126,53 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
         <Notice
           tone="success"
           icon={<PartyPopper aria-hidden="true" />}
-          title={`¡${pet.name} ya está en casa!`}
+          title={t('lost.page.reunited_title', { name: pet.name })}
         >
-          Gracias a quienes ayudaron a buscar.
+          {t('lost.page.reunited_body')}
         </Notice>
       ) : null}
       {mode === 'closed' && lostCase.status === 'cancelled' ? (
-        <Notice tone="neutral" title="Este aviso fue cerrado.">
-          Su familia lo retiró; ya no hace falta buscar.
+        <Notice tone="neutral" title={t('lost.page.cancelled_title')}>
+          {t('lost.page.cancelled_body')}
         </Notice>
       ) : null}
       {mode === 'archived' ? (
         <Notice
           tone="neutral"
           icon={<Archive aria-hidden="true" />}
-          title="Este aviso fue archivado."
+          title={t('lost.page.archived_title')}
         >
-          {can('reopen')
-            ? 'Puedes reactivarlo y conservar sus avistamientos.'
-            : 'Su familia puede reactivarlo si la búsqueda sigue.'}
+          {t(can('reopen') ? 'lost.page.archived_owner' : 'lost.page.archived_public')}
         </Notice>
       ) : null}
 
       {can('report_sighting') || can('claim_recovery') ? (
         <section className="flex flex-col gap-3 lg:flex-row">
           {can('report_sighting') ? (
-            <Button hint="Marca dónde · sin cuenta" onClick={() => onAction('report_sighting')}>
-              La vi
+            <Button hint={t('lost.page.saw_it_hint')} onClick={() => onAction('report_sighting')}>
+              {t('lost.page.saw_it')}
             </Button>
           ) : null}
           {can('claim_recovery') ? (
             <Button variant="outline" onClick={() => onAction('claim_recovery')}>
-              La tengo conmigo
+              {t('lost.page.have_it')}
             </Button>
           ) : null}
         </section>
       ) : null}
       {can('confirm_reunited') ? (
         <section className="flex flex-col gap-3">
-          <Button onClick={() => onAction('confirm_reunited')}>Ya apareció</Button>
+          <Button onClick={() => onAction('confirm_reunited')}>
+            {t('lost.page.reunited_action')}
+          </Button>
           <Button variant="link" className="text-lost-deep" onClick={() => onAction('cancel')}>
-            Eliminar aviso
+            {t('lost.page.delete')}
           </Button>
         </section>
       ) : null}
-      {can('reopen') ? <Button onClick={() => onAction('reopen')}>Reactivar aviso</Button> : null}
+      {can('reopen') ? (
+        <Button onClick={() => onAction('reopen')}>{t('lost.page.reopen')}</Button>
+      ) : null}
 
       {lostCase.viewer === 'owner' && mode === 'open' ? (
         <ClaimsList
@@ -181,37 +188,34 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
       {mode === 'open' &&
       lostCase.viewer === 'public' &&
       hasPossibleFind(lostCase.openClaimCount) ? (
-        <Notice icon={<Clock aria-hidden="true" />} title="Posible hallazgo.">
-          Alguien dice que la tiene y su familia lo está verificando. La búsqueda sigue: si la ves,
-          repórtalo.
+        <Notice icon={<Clock aria-hidden="true" />} title={t('lost.page.possible_find_title')}>
+          {t('lost.page.possible_find_body')}
         </Notice>
       ) : null}
 
       {mode === 'open' ? (
         <section className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between">
-            <h2 className="m-0 text-2xl font-extrabold">Por dónde va</h2>
-            <span className="text-muted">{sightingsCount(sightings.length)}</span>
+            <h2 className="m-0 text-2xl font-extrabold">{t('lost.page.trail_title')}</h2>
+            <span className="text-muted">{sightingsCount(i18n, sightings.length)}</span>
           </div>
           <CaseMap
             styleUrl={mapStyleUrl}
             area={area}
-            areaLabel="Zona donde se perdió (aproximada)"
+            areaLabel={t('lost.page.area_label')}
             pins={sightings.map((s) => ({
               id: s.id,
               point: s.point,
               order: s.order,
               band: s.band,
               emphasized: s.emphasized,
-              label: s.isLatest ? formatRelative(s.seenAt, now) : undefined,
+              label: s.isLatest ? i18n.relative(s.seenAt, now) : undefined,
             }))}
           />
           {sightings.length > 0 ? (
             <SightingTimeline sightings={sightings} now={now} />
           ) : (
-            <p className="m-0 text-muted">
-              Nadie la ha visto todavía. Si la ves, márcalo en el mapa.
-            </p>
+            <p className="m-0 text-muted">{t('lost.page.no_sightings')}</p>
           )}
         </section>
       ) : null}

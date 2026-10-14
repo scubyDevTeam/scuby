@@ -1,0 +1,663 @@
+{
+  "common": {
+    "retry": "Try again",
+    "check_connection": "Check your connection and try again.",
+    "try_again": "Please try again.",
+    "done": "Done",
+    "got_it": "Got it",
+    "back": "Back",
+    "back_home": "Back to home",
+    "close": "Close",
+    "share": "Share",
+    "loading": "Loading",
+    "optional": "(optional)",
+    "not_sure": "Not sure",
+    "save_failed": "We couldn't save it.",
+    "demo_mode": "Demo mode.",
+    "day": "Day",
+    "note": "Note",
+    "language": "Language"
+  },
+  "time": {
+    "just_now": "just now",
+    "minutes_ago": "{count} min ago",
+    "hours_ago": "{count} h ago",
+    "days_ago": {
+      "one": "1 day ago",
+      "other": "{count} days ago"
+    },
+    "today_at": "Today {time}",
+    "yesterday_at": "Yesterday {time}"
+  },
+  "pet": {
+    "species_label": "Species",
+    "size_label": "Size",
+    "colors_label": "Color",
+    "microchip": "Microchip number",
+    "species": {
+      "dog": "Dog",
+      "cat": "Cat",
+      "other": "Other"
+    },
+    "size": {
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large"
+    },
+    "colors": {
+      "black": "Black",
+      "white": "White",
+      "brown": "Brown",
+      "tan": "Tan",
+      "gray": "Gray",
+      "yellow": "Yellow",
+      "orange": "Orange"
+    },
+    "colors_in_text": {
+      "black": "black",
+      "white": "white",
+      "brown": "brown",
+      "tan": "tan",
+      "gray": "gray",
+      "yellow": "yellow",
+      "orange": "orange"
+    }
+  },
+  "map": {
+    "tap_to_mark": "Tap the map to mark the spot.",
+    "unavailable": "We couldn't load the map.",
+    "use_location_instead": "Use your location to mark the spot.",
+    "use_my_location": "Use my location",
+    "locating": "Finding your location…",
+    "location_failed": "We couldn't get your location. Tap the map to mark the spot.",
+    "point_marked": "Spot marked."
+  },
+  "contact": {
+    "your_phone": "Your mobile number",
+    "your_whatsapp": "Your WhatsApp",
+    "phone_invalid": "Check the mobile number",
+    "open_whatsapp": "Open WhatsApp",
+    "write_on_whatsapp": "Message on WhatsApp",
+    "no_account": "No account needed."
+  },
+  "app": {
+    "nav": {
+      "label": "Main",
+      "home": "Home",
+      "my_cases": "My cases",
+      "inbox": "Inbox",
+      "profile": "Profile",
+      "sign_in": "Sign in",
+      "publish": "Post a case",
+      "publish_label": "Post a case"
+    },
+    "not_found": {
+      "title": "This page doesn't exist",
+      "home": "Go to home"
+    },
+    "gate": {
+      "checking": "We couldn't check your session",
+      "title": "Sign in to continue"
+    },
+    "legal": "By continuing you accept the Terms and the Data Processing Policy.",
+    "inbox": {
+      "title": "Inbox",
+      "empty": "Your notifications will arrive here."
+    },
+    "unfinished_door": {
+      "title": "We're finishing this part",
+      "body": "For now you can post a lost pet. <back>Back</back>"
+    },
+    "found_door": {
+      "title": "Is the animal with you?",
+      "hint": "That way we know how best to help you.",
+      "with_me": "Yes, it's with me",
+      "only_saw": "No, I only saw it"
+    }
+  },
+  "case": {
+    "loading": "Loading case",
+    "gone": "This case is no longer available",
+    "not_found": "We couldn't find this case",
+    "not_found_hint": "Check that the link's code is complete. <home>See other cases</home>",
+    "load_failed": "We couldn't load the case",
+    "unfinished": "{place}. We're finishing this page. <home>See other cases</home>",
+    "other_cases": "See other cases",
+    "next_photo": "See the next photo",
+    "photo_n": "See photo {n}",
+    "copied": "Link copied",
+    "copied_hint": "Paste it in WhatsApp or wherever you want to share it.",
+    "report_title": "What's wrong with this post?",
+    "cancel_title": "Delete this case",
+    "reopen_title": "Reactivate the case",
+    "lost": {
+      "share_title": "Missing: {name}",
+      "share_text": "Help us find her",
+      "sighting_title": "Where did you see {name}?",
+      "claim_title": "Do you have {name}?",
+      "reunite_title": "Is {name} back?"
+    },
+    "found": {
+      "share_title": "Found: {title}",
+      "share_text": "Do you recognise it? Help us find its family",
+      "mine_title": "Is this your pet?",
+      "reunited_title": "Is it back with its owner?",
+      "kept_title": "Are you keeping it?",
+      "transferred_title": "Did you hand it to a foundation?"
+    }
+  },
+  "publish": {
+    "errors": {
+      "name_required": "Tell us its name",
+      "species_required": "Choose the species",
+      "size_required": "Choose the size",
+      "photo_required": "Add at least one photo",
+      "place_required": "Tap the map roughly where it happened",
+      "time_required": "Tell us when it happened",
+      "time_in_the_future": "The time can't be in the future",
+      "contact_required": "Leave at least one way to contact you on",
+      "whatsapp_needs_number": "To get messages on WhatsApp, the number must have WhatsApp"
+    },
+    "step": {
+      "exit": "Exit",
+      "previous": "Previous step",
+      "count": "{step} of {steps}"
+    },
+    "animal": {
+      "photos": "Photos",
+      "colors": "Colors",
+      "marks_placeholder": "Collar, markings, how it behaves…"
+    },
+    "area": {
+      "tap_roughly": "Tap roughly where.",
+      "use_location_instead": "Use your location to mark the area.",
+      "marked": "Area marked.",
+      "certainty": "How sure are you of the place?",
+      "radius_100": "~1 block",
+      "radius_300": "~3 blocks",
+      "radius_1000": "~1 km",
+      "radius_m": "{radius} m",
+      "privacy": "Others see an area, never your door."
+    },
+    "when": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "other_day": "Another day",
+      "time": "Approximate time"
+    },
+    "phone": {
+      "verified": "Your mobile · verified",
+      "change": "Change",
+      "hint": "Neighbors will contact you at this number.",
+      "has_whatsapp": "This number has WhatsApp",
+      "sms_code": "Code we sent you by SMS",
+      "sms_code_hint": "Only the first time.",
+      "wrong_code": "That code doesn't match. Check it and try again.",
+      "demo_code": "No SMS is sent: use the code {code}.",
+      "channels": "How can people reach you?",
+      "whatsapp": "WhatsApp",
+      "whatsapp_hint": "your number is shown",
+      "email": "Email",
+      "email_hint": "sent to {email}",
+      "in_app": "In-app chat",
+      "in_app_hint": "your number stays hidden"
+    },
+    "photos": {
+      "photo_n": "Photo {n}",
+      "remove_n": "Remove photo {n}",
+      "uploading": "Uploading…",
+      "add": "Add photo",
+      "failed": "We couldn't upload that photo. Try again.",
+      "first_on_poster": "The first one goes on the poster."
+    },
+    "doors": {
+      "title": "What happened?",
+      "hint": "Choose what best describes your situation.",
+      "not_urgent": "Not urgent",
+      "lost": {
+        "title": "I lost my pet",
+        "text": "We alert the neighbors in the area."
+      },
+      "found": {
+        "title": "I found an animal",
+        "text": "Whether it's with you or you only saw it."
+      },
+      "adoption": {
+        "title": "Put up for adoption",
+        "text": "An animal you have that needs a home."
+      },
+      "help": {
+        "title": "Ask for help",
+        "text": "A campaign for a one-off expense."
+      },
+      "only_saw_title": "Just saw an animal on the street?",
+      "only_saw_body": "Go through «I found an animal»: reporting it takes one tap and needs no account."
+    }
+  },
+  "feed": {
+    "badge": {
+      "lost": "Missing",
+      "found": "Found",
+      "adoption": "For adoption",
+      "help": "Needs help"
+    },
+    "possible_find": "Possible find",
+    "sightings": {
+      "one": "Seen {when} · 1 sighting",
+      "other": "Seen {when} · {count} sightings"
+    },
+    "verticals": {
+      "label": "Type of post",
+      "all": "All",
+      "lost": "Lost",
+      "found": "Found",
+      "adoption": "Adoption",
+      "help": "Help"
+    },
+    "species": {
+      "all": "All",
+      "dog": "Dogs",
+      "cat": "Cats",
+      "other": "Others"
+    },
+    "views": {
+      "label": "View",
+      "list": "List",
+      "map": "Map"
+    },
+    "title_local": "Near you, now",
+    "title_national": "Across the country",
+    "national_hint": "Your area is empty, so we're showing posts from across the country.",
+    "loading": "Loading posts",
+    "load_failed": "We couldn't load the posts",
+    "empty_title": "No posts match that filter",
+    "empty_hint": "Try another type of post or another species.",
+    "map_label": "Map of posts",
+    "map_failed": "We couldn't show the map",
+    "map_failed_hint": "You can see the same posts in the list."
+  },
+  "auth": {
+    "sign_in": {
+      "intro": "We need to know who you are so neighbors can contact you. No passwords.",
+      "signing_in": "Signing in…",
+      "google": "Continue with Google",
+      "google_failed": "We couldn't sign you in with Google. Try your email.",
+      "or_email": "or with your email",
+      "email": "Email",
+      "email_placeholder": "you@email.com",
+      "email_invalid": "Check your email: it looks incomplete",
+      "sending": "Sending…",
+      "send_code": "Send me a code",
+      "send_failed": "We couldn't send the code.",
+      "code_label": "The {length}-digit code we sent you",
+      "code_hint": "We sent it to {email}. If it doesn't arrive, check your spam folder.",
+      "wrong_code": "That code doesn't match. Check it or ask for a new one.",
+      "check_failed": "We couldn't check the code. Try again.",
+      "demo_code": "No email is sent: use the code {code}.",
+      "resend_in": "Resend code in {seconds} s",
+      "resend": "Resend code"
+    },
+    "profile": {
+      "email_label": "Email you sign in with",
+      "sign_out": "Sign out"
+    }
+  },
+  "mine": {
+    "title": "My cases",
+    "loading": "Loading your cases",
+    "load_failed": "We couldn't load your cases",
+    "empty_title": "You haven't posted anything yet",
+    "empty_hint": "When you post something, you'll see it here.",
+    "publish": "Post an alert",
+    "status": {
+      "active": "Active",
+      "reunited": "Back home",
+      "expired": "Archived",
+      "cancelled": "Closed",
+      "kept": "Has a home",
+      "converted": "For adoption",
+      "transferred_to_org": "With a shelter",
+      "found_active": "In your care"
+    },
+    "possible_owner": "Possible owner",
+    "possible_find": "Possible find"
+  },
+  "reporting": {
+    "reasons": {
+      "scam_or_extortion": "Scam or asking for money",
+      "personal_data": "Shows personal data",
+      "animal_welfare": "The animal is in bad condition",
+      "graphic_content": "Graphic or violent content",
+      "harassment": "Harassment",
+      "duplicate": "It's a duplicate",
+      "spam": "Spam",
+      "other": "Something else"
+    },
+    "effect": {
+      "queued": "A person will review it. Meanwhile the post stays visible.",
+      "hidden_pending_review": "For this reason we hide it right away while a person reviews it, within 4 hours.",
+      "suspended_pending_review": "For this reason we pause it right away while a person reviews it, within 4 hours."
+    },
+    "thanks": "Thanks for letting us know.",
+    "received": "We got your report.",
+    "intro": "It's anonymous and needs no account. The person who posted will never know who reported.",
+    "reason_legend": "Reason for the report",
+    "reason_required": "Choose a reason",
+    "note": "Tell us more",
+    "send_failed": "We couldn't send the report.",
+    "sending": "Sending…",
+    "send": "Send report"
+  },
+  "found": {
+    "sending": "Sending…",
+    "describe": {
+      "species": {
+        "dog": "dog",
+        "cat": "cat",
+        "other": "animal"
+      },
+      "size": {
+        "small": "small",
+        "medium": "medium",
+        "large": "large"
+      },
+      "with_color": "{color} {species}",
+      "with_size": "{what}, {size}"
+    },
+    "holding": {
+      "home": "At the finder's home",
+      "vet": "At a vet",
+      "street_temporary": "Still on the street, being looked after",
+      "no_longer_held": "No longer with them: it ran off again"
+    },
+    "band": {
+      "active": "Found",
+      "expired": "Archived",
+      "reunited": "Back with its family",
+      "kept": "Has a home now",
+      "converted": "Now up for adoption",
+      "transferred_to_org": "With a rescue group",
+      "cancelled": "Closed"
+    },
+    "tier": {
+      "prior_lost_case": "⭐ Posted a lost notice before you found it",
+      "described": "Described something not in the photos",
+      "documented": "Attached a microchip or documents",
+      "none": "⚠️ No evidence"
+    },
+    "safety": "Before handing it over, ask for the detail you kept, an older photo or the vaccination card. Hand it over in a public place.",
+    "actions": {
+      "reunited": "It's with its owner",
+      "keep": "I'll keep it",
+      "transfer": "I gave it to a rescue group",
+      "delete": "Delete notice"
+    },
+    "page": {
+      "photo_alt": "Photo of {title}",
+      "marks_title": "What it looks like",
+      "custodian_role": "Found it and is looking after it",
+      "share": "Share notice",
+      "report": "Report",
+      "found_line": "Found in {place} · {date} · {ago}",
+      "closed_title": "{band}.",
+      "closed_body": "Thanks to whoever looked after it.",
+      "cancelled_title": "This notice was closed.",
+      "cancelled_body": "Whoever posted it took it down.",
+      "archived_title": "This notice was archived.",
+      "archived_can_reopen": "You can reactivate it if it's still with you.",
+      "archived_owner_can_reopen": "Whoever posted it can reactivate it.",
+      "claim": "It's mine",
+      "claim_hint": "We'll ask you to sign in",
+      "reopen": "Reactivate notice",
+      "possible_owner_title": "Possible owner.",
+      "possible_owner_body": "Someone says it's theirs and whoever is looking after it is checking.",
+      "where_title": "Where it was found",
+      "area_label": "Area where it was found (approximate)"
+    },
+    "custodian": {
+      "offer_label": "Fifteen days without an owner",
+      "offer_title": "Nobody has claimed this furry friend in 15 days.",
+      "offer_body": "You decide what's next for it.",
+      "keep_searching": "I'm still looking for the owner",
+      "claims_label": "Possible owners",
+      "claims_title": "They say it's theirs",
+      "withheld_title": "You kept: “{detail}”.",
+      "withheld_body": "Ask them about it before handing it over.",
+      "microchip": "Microchip: {chip}",
+      "confirm": "Yes, it's the owner",
+      "dismiss": "It's not",
+      "answer_failed": "We couldn't save your answer."
+    },
+    "resolve": {
+      "attribution": {
+        "platform_claim": "The owner saw it here and wrote to me",
+        "platform_match": "The app told us they matched",
+        "platform_share": "They saw the shared notice",
+        "offline": "I found them another way"
+      },
+      "cancel_reason": {
+        "not_a_stray": "It wasn't lost",
+        "ran_off_again": "It ran off again",
+        "duplicate": "I posted it twice"
+      },
+      "reunited_intro": "Wonderful. Tell us how you found each other: it shows us what works.",
+      "reunited_button": "Yes, it's with its owner",
+      "kept_intro": "It's recorded from today. If you can, wait a few more days before deciding: its family may be looking for it. If they turn up, they can still write to you.",
+      "transferred_intro": "Thanks for finding it a place. The notice closes.",
+      "transferred_button": "Confirm hand-off",
+      "attribution_legend": "Who helped you?",
+      "reason_legend": "Why are you deleting it?",
+      "org_label": "Which rescue group?",
+      "choose_one": "Choose an option",
+      "saving": "Saving…"
+    },
+    "ownership_claim": {
+      "sent_title": "We told whoever is looking after it.",
+      "sent_whatsapp": "Write to them on WhatsApp to arrange things.",
+      "sent_in_app": "They'll write to you here once they've read your message.",
+      "intro": "Whoever is looking after it decides who to hand it to. The more proof you give, the easier you make it.",
+      "notes_label": "Describe something not in the photos",
+      "notes_placeholder": "A scar, the collar colour, whether it's neutered…",
+      "failed": "We couldn't send your message.",
+      "submit": "Say it's mine"
+    },
+    "candidates": {
+      "title": "Is it one of these?",
+      "intro": "Someone nearby is looking for a similar pet.",
+      "pick": "Yes, it's {name}"
+    },
+    "publish": {
+      "title_animal": "What does it look like?",
+      "title_place": "Where and when did you find it?",
+      "title_contact": "How should we reach you?",
+      "holding": {
+        "home": "At my home",
+        "vet": "At a vet",
+        "street_temporary": "Still on the street, I'm looking after it"
+      },
+      "matched_title": "It's {name}!",
+      "none_matches": "None of these, post my notice",
+      "published_title": "Notice posted!",
+      "published_notice_title": "Thanks for looking after it.",
+      "published_notice_body": "Neighbours in the area can see it now. If its family turns up, we'll let you know.",
+      "view_case": "See my notice",
+      "marks_label": "What it looks like and how it behaves",
+      "withheld_label": "Keep a detail only its owner would know",
+      "withheld_hint": "Something not visible in the photos: a scar, the collar colour, whether it's neutered. It isn't published: it helps you tell who its real owner is.",
+      "when_title": "When did you find it?",
+      "where_now": "Where is it now?",
+      "where_now_hint": "This is shown: it tells its family how urgent it is.",
+      "publish_failed": "We couldn't post the notice.",
+      "matching": "Checking whether someone is looking for it…",
+      "continue": "Continue",
+      "publishing": "Posting…",
+      "confirm_code": "Confirm code and post",
+      "submit": "Post and alert the neighbours"
+    },
+    "witness": {
+      "thanks_title": "Thanks for letting us know!",
+      "saved_title": "We saved your report.",
+      "saved_body": "If someone is looking for an animal like this, we'll tell them where you saw it.",
+      "none_matches": "None of these",
+      "save_failed": "We couldn't save your report.",
+      "title": "Where did you see it?",
+      "photo": "Photo",
+      "photo_hint": "Without a photo we can't tell whose it is.",
+      "when_title": "When?",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "note_placeholder": "Which way it was going, how it looked…",
+      "phone_hint": "In case its family wants to ask you something. Only they see it.",
+      "submit": "Send report"
+    }
+  },
+  "lost": {
+    "pet": {
+      "species_other": "Pet"
+    },
+    "page": {
+      "band_open": "Missing",
+      "band_reunited": "Back home",
+      "band_archived": "Archived",
+      "band_closed": "Closed",
+      "photo_alt": "Photo of {name}",
+      "marks_title": "Features",
+      "contact_family": "Their family",
+      "share": "Share",
+      "report": "Report",
+      "lost_at": "Lost in {place} · {date} · {ago}",
+      "reunited_title": "{name} is back home!",
+      "reunited_body": "Thanks to everyone who helped search.",
+      "cancelled_title": "This post was closed.",
+      "cancelled_body": "Their family took it down; no need to search anymore.",
+      "archived_title": "This post was archived.",
+      "archived_owner": "You can reactivate it and keep its sightings.",
+      "archived_public": "Their family can reactivate it if the search goes on.",
+      "saw_it": "I saw her",
+      "saw_it_hint": "Mark where · no account",
+      "have_it": "She's with me",
+      "reunited_action": "She's back",
+      "delete": "Delete post",
+      "reopen": "Reactivate post",
+      "possible_find_title": "Possible find.",
+      "possible_find_body": "Someone says they have her and her family is checking. The search goes on: if you see her, report it.",
+      "trail_title": "Where she's been",
+      "sightings_count": {
+        "one": "1 sighting",
+        "other": "{count} sightings"
+      },
+      "area_label": "Area where she was lost (approximate)",
+      "no_sightings": "No one has seen her yet. If you do, mark it on the map."
+    },
+    "timeline": {
+      "label": "Sightings",
+      "seen_on": "{date} {time}",
+      "where_who": "{distance} away · {reporter}",
+      "registered": "with account",
+      "anonymous": "anonymous",
+      "note": "“{note}”"
+    },
+    "sighting_form": {
+      "when": {
+        "now": "Now",
+        "earlier": "A while ago",
+        "yesterday": "Yesterday",
+        "custom": "Other time"
+      },
+      "place_required": "Mark on the map where you saw {name}",
+      "time_required": "Tell us what time it was",
+      "errors": {
+        "too_far": "That point is too far from where {name} was last seen",
+        "in_the_future": "The time can't be in the future",
+        "before_the_case": "{name} went missing after that time"
+      },
+      "thanks_title": "Thank you!",
+      "thanks_body": "Your sighting is on the map and the family has been notified.",
+      "when_title": "When?",
+      "when_label": "When did you see her?",
+      "day_and_time": "Day and time",
+      "note_placeholder": "Which way she was going, how she looked…",
+      "phone_hint": "The family will want to ask you exactly which corner. Only they see it.",
+      "failed_title": "We couldn't send your sighting.",
+      "too_soon": "You already reported a sighting a moment ago.",
+      "sending": "Sending…",
+      "submit": "Send sighting"
+    },
+    "claim_form": {
+      "phone_required": "Enter your mobile number",
+      "sent_title": "We've told the family.",
+      "sent_write": "Message them on WhatsApp to arrange things.",
+      "sent_wait": "They'll contact you at the number you left.",
+      "intro": "Leave your number and we'll open WhatsApp with the family.",
+      "phone_hint": "Required. We won't send you codes or publish it.",
+      "care": "Keep her somewhere enclosed with water. Hand her over in a public place.",
+      "failed_title": "We couldn't reach the family.",
+      "sending": "Notifying…",
+      "submit": "Notify and open WhatsApp",
+      "only_saw": "I only saw her, I don't have her",
+      "about": "About {name}"
+    },
+    "claims": {
+      "label": "Possible finds",
+      "title": "They say they have her",
+      "reveals_number": "If you message them, they'll see your number.",
+      "call": "Call",
+      "confirm": "Yes, it's {name}",
+      "dismiss": "It wasn't her",
+      "failed_title": "We couldn't save your answer."
+    },
+    "owner_forms": {
+      "attribution": {
+        "platform_sighting": "Someone saw her and reported it here",
+        "platform_claim": "Someone had her and reported it here",
+        "platform_share": "Someone saw the shared post or the poster",
+        "offline": "She turned up some other way"
+      },
+      "cancel_reason": {
+        "false_alarm": "It was a false alarm",
+        "duplicate": "I posted it twice"
+      },
+      "reunite_intro": "Wonderful. Tell us who helped you find {name}: that's how we learn what works.",
+      "who_helped": "Who helped you?",
+      "pick_option": "Choose an option",
+      "saving": "Saving…",
+      "reunite_submit": "Yes, {name} is back home",
+      "reunite_footnote": "The post closes and we stop notifying neighbours.",
+      "cancel_warning": "If she's back, don't delete it: use “She's back” so the reunion is recorded.",
+      "why_cancel": "Why are you deleting it?",
+      "pick_reason": "Choose a reason",
+      "deleting": "Deleting…",
+      "cancel_submit": "Delete post",
+      "reopen_intro": "The post for {name} is active again and keeps its sightings.",
+      "reopening": "Reactivating…",
+      "reopen_submit": "Reactivate post"
+    },
+    "publish": {
+      "step_1": "Who's missing?",
+      "step_2": "Where and when?",
+      "step_3": "How should we reach you?",
+      "published_title": "Post published!",
+      "searching": "We're already looking for {name}.",
+      "neighbours_see": "Neighbours in the area can see it and let you know.",
+      "share_it": "Share it: the more people see it, the more eyes are looking.",
+      "see_mine": "See my post",
+      "which_pet": "Which one is missing?",
+      "other_pet": "Another pet",
+      "already_active": "{name} already has an active post.",
+      "see_that": "See that post",
+      "name": "Name",
+      "marks": "Features to recognise her",
+      "chip_hint": "Only vets and shelters that scan her can see it.",
+      "when_title": "When did you last see her?",
+      "conflict_title": "This pet already has an active post.",
+      "conflict_body": "Check “My cases”.",
+      "failed_title": "We couldn't publish the post.",
+      "continue": "Continue",
+      "publishing": "Publishing…",
+      "confirm_code": "Confirm code and publish",
+      "submit": "Publish and alert neighbours",
+      "ownership": "By publishing you confirm {name} is your pet.",
+      "ownership_unnamed": "By publishing you confirm this is your pet."
+    }
+  }
+}

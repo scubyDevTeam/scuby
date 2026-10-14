@@ -27,6 +27,7 @@ export default defineConfig({
       '@domain': layer('domain'),
       '@platform': layer('platform'),
       '@ui': layer('ui'),
+      '@i18n': layer('i18n'),
       '@mocks': layer('mocks'),
     },
   },

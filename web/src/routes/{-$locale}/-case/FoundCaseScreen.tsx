@@ -4,6 +4,8 @@ import type { FoundAction } from '@domain/found/actions'
 import { CustodianPanel } from '@features/found/CustodianPanel'
 import { describeFound } from '@features/found/copy'
 import { FoundCasePage } from '@features/found/FoundCasePage'
+import { useI18n } from '@i18n/react'
+import type { TextKey } from '@i18n/translate'
 import { shareLink } from '@platform/share'
 import { Link } from '@tanstack/react-router'
 import { Button, roundButtonClass } from '@ui/Button'
@@ -11,8 +13,8 @@ import { Sheet } from '@ui/Sheet'
 import { Skeleton } from '@ui/States'
 import { ChevronLeft } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
-import { brand } from '../../brand'
-import { env } from '../../env'
+import { brand } from '../../../brand'
+import { env } from '../../../env'
 
 // Loaded when their button is tapped: reading the case must not pay for them.
 const OwnershipClaimForm = lazy(() =>
@@ -53,21 +55,23 @@ const sheetFor: Partial<Record<FoundAction, NonNullable<Open>>> = {
   reopen: 'reopen',
 }
 
-const titles: Record<NonNullable<Open>, string> = {
-  mine: '¿Es tu mascota?',
-  report: '¿Qué pasa con esta publicación?',
-  reunited: '¿Ya está con su dueño?',
-  kept: '¿Te lo quedas?',
-  transferred_to_org: '¿Lo entregaste a una fundación?',
-  cancelled: 'Eliminar este aviso',
-  reopen: 'Reactivar el aviso',
-  copied: 'Enlace copiado',
+const titles: Record<NonNullable<Open>, TextKey> = {
+  mine: 'case.found.mine_title',
+  report: 'case.report_title',
+  reunited: 'case.found.reunited_title',
+  kept: 'case.found.kept_title',
+  transferred_to_org: 'case.found.transferred_title',
+  cancelled: 'case.cancel_title',
+  reopen: 'case.reopen_title',
+  copied: 'case.copied',
 }
 
 export function FoundCaseScreen({ found }: { found: FoundCase }) {
+  const i18n = useI18n()
+  const { t } = i18n
   const [sheet, setSheet] = useState<Open>(null)
   const session = useSession()
-  const title = describeFound(found.pet)
+  const title = describeFound(i18n, found.pet)
   const close = () => setSheet(null)
 
   async function handle(action: FoundAction) {
@@ -75,8 +79,9 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
     if (next) return setSheet(next)
     if (action !== 'share') return
     const result = await shareLink({
-      title: `Se encontró: ${title}`,
-      text: '¿Lo reconoces? Ayúdanos a encontrar a su familia',
+      title: t('case.found.share_title', { title }),
+      text: t('case.found.share_text'),
+      // The short link carries no language: posters and shared links reach everyone the same way.
       url: `${brand.origin}/c/${found.code}`,
     })
     if (result === 'copied') setSheet('copied')
@@ -89,7 +94,7 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
         now={new Date()}
         shortUrl={`${new URL(brand.origin).host}/c/${found.code}`}
         backLink={
-          <Link to="/" aria-label="Volver al inicio" className={roundButtonClass}>
+          <Link to="/{-$locale}" aria-label={t('common.back_home')} className={roundButtonClass}>
             <ChevronLeft aria-hidden="true" />
           </Link>
         }
@@ -105,7 +110,7 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
           />
         }
       />
-      <Sheet open={sheet !== null} onClose={close} title={sheet ? titles[sheet] : ''}>
+      <Sheet open={sheet !== null} onClose={close} title={sheet ? t(titles[sheet]) : ''}>
         <Suspense fallback={<Skeleton className="h-40" />}>
           {sheet === 'mine' ? (
             // «Es mío» is never anonymous: it asks to take an animal. The account is born here.
@@ -115,7 +120,7 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
               <SignIn
                 googleClientId={env.googleClientId}
                 demoCode={env.apiMock ? DEMO_CODE : undefined}
-                legal="Al continuar aceptas los Términos y la Política de tratamiento de datos."
+                legal={t('app.legal')}
               />
             )
           ) : null}
@@ -144,8 +149,8 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
         </Suspense>
         {sheet === 'copied' ? (
           <>
-            <p className="m-0 text-muted">Pégalo en WhatsApp o donde quieras compartirlo.</p>
-            <Button onClick={close}>Entendido</Button>
+            <p className="m-0 text-muted">{t('case.copied_hint')}</p>
+            <Button onClick={close}>{t('common.got_it')}</Button>
           </>
         ) : null}
       </Sheet>

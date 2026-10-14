@@ -26,17 +26,6 @@ export function validateSighting(
   return errors
 }
 
-export function sightingErrorCopy(error: SightingError, petName: string): string {
-  switch (error) {
-    case 'too_far':
-      return `Ese punto está muy lejos del último lugar donde se vio a ${petName}`
-    case 'in_the_future':
-      return 'La hora no puede ser en el futuro'
-    case 'before_the_case':
-      return `${petName} se perdió después de esa hora`
-  }
-}
-
 export type SightingLike = { id: string; point: Point; seenAt: Date; highlightedByOwner: boolean }
 
 export type PlacedSighting<T extends SightingLike> = T & {

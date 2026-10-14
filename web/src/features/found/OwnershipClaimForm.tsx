@@ -1,4 +1,5 @@
 import { useClaimOwnership } from '@api-client/found'
+import { useI18n } from '@i18n/react'
 import { openExternal } from '@platform/navigation'
 import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass } from '@ui/Button'
@@ -11,6 +12,7 @@ import { type FormEvent, useState } from 'react'
  * never required. The claim is created before any channel to the custodian opens.
  */
 export function OwnershipClaimForm({ code, onDone }: { code: string; onDone: () => void }) {
+  const { t } = useI18n()
   const claim = useClaimOwnership(code)
   const [notes, setNotes] = useState('')
   const [chip, setChip] = useState('')
@@ -31,10 +33,10 @@ export function OwnershipClaimForm({ code, onDone }: { code: string; onDone: () 
     const { whatsappUrl } = claim.data
     return (
       <div className="flex flex-col gap-4">
-        <Notice tone="success" title="Le avisamos a quien lo cuida.">
+        <Notice tone="success" title={t('found.ownership_claim.sent_title')}>
           {whatsappUrl
-            ? 'Escríbele por WhatsApp para ponerse de acuerdo.'
-            : 'Te va a escribir por aquí cuando revise tu mensaje.'}
+            ? t('found.ownership_claim.sent_whatsapp')
+            : t('found.ownership_claim.sent_in_app')}
         </Notice>
         {whatsappUrl ? (
           <a
@@ -44,11 +46,11 @@ export function OwnershipClaimForm({ code, onDone }: { code: string; onDone: () 
             className={buttonClass('whatsapp')}
           >
             <WhatsAppIcon />
-            Abrir WhatsApp
+            {t('contact.open_whatsapp')}
           </a>
         ) : null}
         <Button variant="secondary" onClick={onDone}>
-          Listo
+          {t('common.done')}
         </Button>
       </div>
     )
@@ -56,30 +58,28 @@ export function OwnershipClaimForm({ code, onDone }: { code: string; onDone: () 
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
-      <p className="m-0 text-muted">
-        Quien lo cuida decide a quién entregarlo. Entre más pruebas des, más fácil se lo pones.
-      </p>
+      <p className="m-0 text-muted">{t('found.ownership_claim.intro')}</p>
       <TextArea
-        label="Describe algo que no salga en las fotos"
+        label={t('found.ownership_claim.notes_label')}
         optional
-        placeholder="Una cicatriz, el color del collar, si está esterilizado…"
+        placeholder={t('found.ownership_claim.notes_placeholder')}
         value={notes}
         onChange={(event) => setNotes(event.target.value)}
       />
       <TextField
-        label="Número de microchip"
+        label={t('pet.microchip')}
         optional
         inputMode="numeric"
         value={chip}
         onChange={(event) => setChip(event.target.value)}
       />
       {claim.isError ? (
-        <Notice tone="warning" title="No pudimos enviar tu mensaje.">
-          Revisa tu conexión e inténtalo de nuevo.
+        <Notice tone="warning" title={t('found.ownership_claim.failed')}>
+          {t('common.check_connection')}
         </Notice>
       ) : null}
       <Button type="submit" disabled={claim.isPending}>
-        {claim.isPending ? 'Enviando…' : 'Avisar que es mío'}
+        {claim.isPending ? t('found.sending') : t('found.ownership_claim.submit')}
       </Button>
     </form>
   )

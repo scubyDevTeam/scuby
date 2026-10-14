@@ -5,29 +5,34 @@ import {
   CANCEL_REASONS,
   type CancelReason,
 } from '@domain/lost/resolution'
+import { useI18n } from '@i18n/react'
+import type { TextKey } from '@i18n/translate'
 import { Button } from '@ui/Button'
 import { RadioList } from '@ui/Field'
 import { Notice } from '@ui/Notice'
 import { type FormEvent, useState } from 'react'
 
-const attributionLabel: Record<Attribution, string> = {
-  platform_sighting: 'Alguien la vio y avisó aquí',
-  platform_claim: 'Alguien la tenía y avisó aquí',
-  platform_share: 'Alguien vio el aviso compartido o el afiche',
-  offline: 'Apareció por otro lado',
-  unknown: 'No sé',
+const attributionLabel: Record<Attribution, TextKey> = {
+  platform_sighting: 'lost.owner_forms.attribution.platform_sighting',
+  platform_claim: 'lost.owner_forms.attribution.platform_claim',
+  platform_share: 'lost.owner_forms.attribution.platform_share',
+  offline: 'lost.owner_forms.attribution.offline',
+  unknown: 'common.not_sure',
 }
 
-const cancelLabel: Record<CancelReason, string> = {
-  false_alarm: 'Fue una falsa alarma',
-  duplicate: 'Lo publiqué dos veces',
+const cancelLabel: Record<CancelReason, TextKey> = {
+  false_alarm: 'lost.owner_forms.cancel_reason.false_alarm',
+  duplicate: 'lost.owner_forms.cancel_reason.duplicate',
 }
 
-const failed = (
-  <Notice tone="warning" title="No pudimos guardarlo.">
-    Revisa tu conexión e inténtalo de nuevo.
-  </Notice>
-)
+function Failed() {
+  const { t } = useI18n()
+  return (
+    <Notice tone="warning" title={t('common.save_failed')}>
+      {t('common.check_connection')}
+    </Notice>
+  )
+}
 
 /** «Ya apareció»: closes the case as reunited and asks who helped. */
 export function ReuniteForm({
@@ -41,6 +46,7 @@ export function ReuniteForm({
   suggested: Attribution | null
   onDone: () => void
 }) {
+  const { t } = useI18n()
   const reunite = useReunite(code)
   const [attribution, setAttribution] = useState<Attribution | null>(suggested)
   const [tried, setTried] = useState(false)
@@ -53,34 +59,33 @@ export function ReuniteForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-      <p className="m-0 text-muted">
-        Qué alegría. Cuéntanos quién te ayudó a encontrar a {petName}: así sabemos qué funciona.
-      </p>
+      <p className="m-0 text-muted">{t('lost.owner_forms.reunite_intro', { name: petName })}</p>
       <RadioList
-        legend="¿Quién te ayudó?"
+        legend={t('lost.owner_forms.who_helped')}
         name="attribution"
-        options={ATTRIBUTIONS.map((value) => ({ value, label: attributionLabel[value] }))}
+        options={ATTRIBUTIONS.map((value) => ({ value, label: t(attributionLabel[value]) }))}
         value={attribution}
         onChange={setAttribution}
       />
       {tried && !attribution ? (
         <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
-          Elige una opción
+          {t('lost.owner_forms.pick_option')}
         </p>
       ) : null}
-      {reunite.isError ? failed : null}
+      {reunite.isError ? <Failed /> : null}
       <Button type="submit" disabled={reunite.isPending}>
-        {reunite.isPending ? 'Guardando…' : `Sí, ${petName} ya está en casa`}
+        {reunite.isPending
+          ? t('lost.owner_forms.saving')
+          : t('lost.owner_forms.reunite_submit', { name: petName })}
       </Button>
-      <p className="m-0 text-center text-sm text-muted">
-        El aviso se cierra y dejamos de avisar a los vecinos.
-      </p>
+      <p className="m-0 text-center text-sm text-muted">{t('lost.owner_forms.reunite_footnote')}</p>
     </form>
   )
 }
 
 /** «Eliminar aviso»: cancels the case. The pet stays in the account. */
 export function CancelForm({ code, onDone }: { code: string; onDone: () => void }) {
+  const { t } = useI18n()
   const cancel = useCancelCase(code)
   const [reason, setReason] = useState<CancelReason | null>(null)
   const [tried, setTried] = useState(false)
@@ -93,24 +98,22 @@ export function CancelForm({ code, onDone }: { code: string; onDone: () => void 
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-      <Notice tone="warning">
-        Si ya apareció, no lo elimines: usa «Ya apareció» para que quede registrado el reencuentro.
-      </Notice>
+      <Notice tone="warning">{t('lost.owner_forms.cancel_warning')}</Notice>
       <RadioList
-        legend="¿Por qué lo eliminas?"
+        legend={t('lost.owner_forms.why_cancel')}
         name="reason"
-        options={CANCEL_REASONS.map((value) => ({ value, label: cancelLabel[value] }))}
+        options={CANCEL_REASONS.map((value) => ({ value, label: t(cancelLabel[value]) }))}
         value={reason}
         onChange={setReason}
       />
       {tried && !reason ? (
         <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
-          Elige un motivo
+          {t('lost.owner_forms.pick_reason')}
         </p>
       ) : null}
-      {cancel.isError ? failed : null}
+      {cancel.isError ? <Failed /> : null}
       <Button type="submit" variant="danger" disabled={cancel.isPending}>
-        {cancel.isPending ? 'Eliminando…' : 'Eliminar aviso'}
+        {t(cancel.isPending ? 'lost.owner_forms.deleting' : 'lost.owner_forms.cancel_submit')}
       </Button>
     </form>
   )
@@ -126,18 +129,17 @@ export function ReopenForm({
   petName: string
   onDone: () => void
 }) {
+  const { t } = useI18n()
   const reopen = useReopenCase(code)
   return (
     <div className="flex flex-col gap-4">
-      <p className="m-0 text-muted">
-        El aviso de {petName} vuelve a estar activo y conserva sus avistamientos.
-      </p>
-      {reopen.isError ? failed : null}
+      <p className="m-0 text-muted">{t('lost.owner_forms.reopen_intro', { name: petName })}</p>
+      {reopen.isError ? <Failed /> : null}
       <Button
         disabled={reopen.isPending}
         onClick={() => reopen.mutate(undefined, { onSuccess: onDone })}
       >
-        {reopen.isPending ? 'Reactivando…' : 'Reactivar aviso'}
+        {t(reopen.isPending ? 'lost.owner_forms.reopening' : 'lost.owner_forms.reopen_submit')}
       </Button>
     </div>
   )

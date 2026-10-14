@@ -5,36 +5,21 @@ import {
   type ReportTarget,
   reportEffect,
 } from '@domain/shared/report'
+import { useI18n } from '@i18n/react'
 import { Button } from '@ui/Button'
 import { RadioList, TextArea } from '@ui/Field'
 import { Notice } from '@ui/Notice'
 import { type FormEvent, useState } from 'react'
 
-const reasonLabel: Record<ReportReason, string> = {
-  scam_or_extortion: 'Estafa o piden dinero',
-  personal_data: 'Muestra datos personales',
-  animal_welfare: 'El animal está en malas condiciones',
-  graphic_content: 'Contenido gráfico o violento',
-  harassment: 'Acoso',
-  duplicate: 'Está repetida',
-  spam: 'Spam',
-  other: 'Otra cosa',
-}
-
-const options = REPORT_REASONS.map((value) => ({ value, label: reasonLabel[value] }))
-
-const effectCopy = {
-  queued: 'Una persona la revisará. Mientras tanto la publicación sigue visible.',
-  hidden_pending_review:
-    'Por este motivo la ocultamos de inmediato mientras una persona la revisa, en menos de 4 horas.',
-  suspended_pending_review:
-    'Por este motivo la pausamos de inmediato mientras una persona la revisa, en menos de 4 horas.',
-} as const
-
 type Props = { targetType: ReportTarget; targetCode: string; onDone: () => void }
 
 /** docs/product/09: anonymous and one tap — a reason is required, nothing else is. */
 export function ReportForm({ targetType, targetCode, onDone }: Props) {
+  const { t } = useI18n()
+  const options = REPORT_REASONS.map((value) => ({
+    value,
+    label: t(`reporting.reasons.${value}`),
+  }))
   const send = useSendReport()
   const [reason, setReason] = useState<ReportReason | null>(null)
   const [note, setNote] = useState('')
@@ -50,21 +35,19 @@ export function ReportForm({ targetType, targetCode, onDone }: Props) {
   if (send.isSuccess) {
     return (
       <div className="flex flex-col gap-4">
-        <Notice tone="success" title="Gracias por avisar.">
-          Recibimos tu reporte.
+        <Notice tone="success" title={t('reporting.thanks')}>
+          {t('reporting.received')}
         </Notice>
-        <Button onClick={onDone}>Listo</Button>
+        <Button onClick={onDone}>{t('common.done')}</Button>
       </div>
     )
   }
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-      <p className="m-0 text-muted">
-        Es anónimo y no necesitas cuenta. Quien publicó nunca sabrá quién reportó.
-      </p>
+      <p className="m-0 text-muted">{t('reporting.intro')}</p>
       <RadioList
-        legend="Motivo del reporte"
+        legend={t('reporting.reason_legend')}
         name="reason"
         options={options}
         value={reason}
@@ -72,25 +55,27 @@ export function ReportForm({ targetType, targetCode, onDone }: Props) {
       />
       {tried && !reason ? (
         <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
-          Elige un motivo
+          {t('reporting.reason_required')}
         </p>
       ) : null}
       <TextArea
-        label="Cuéntanos más"
+        label={t('reporting.note')}
         optional
         value={note}
         onChange={(event) => setNote(event.target.value)}
       />
       {reason ? (
-        <p className="m-0 text-sm text-muted">{effectCopy[reportEffect(reason, targetType)]}</p>
+        <p className="m-0 text-sm text-muted">
+          {t(`reporting.effect.${reportEffect(reason, targetType)}`)}
+        </p>
       ) : null}
       {send.isError ? (
-        <Notice tone="warning" title="No pudimos enviar el reporte.">
-          Revisa tu conexión e inténtalo de nuevo.
+        <Notice tone="warning" title={t('reporting.send_failed')}>
+          {t('common.check_connection')}
         </Notice>
       ) : null}
       <Button type="submit" disabled={send.isPending}>
-        {send.isPending ? 'Enviando…' : 'Enviar reporte'}
+        {t(send.isPending ? 'reporting.sending' : 'reporting.send')}
       </Button>
     </form>
   )

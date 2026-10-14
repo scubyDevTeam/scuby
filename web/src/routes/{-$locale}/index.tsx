@@ -1,9 +1,9 @@
 import { FeedPage } from '@features/feed/FeedPage'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { brand } from '../brand'
-import { env } from '../env'
+import { brand } from '../../brand'
+import { env } from '../../env'
 
-export const Route = createFileRoute('/')({ component: Home })
+export const Route = createFileRoute('/{-$locale}/')({ component: Home })
 
 function Home() {
   const navigate = useNavigate()
@@ -13,11 +13,15 @@ function Home() {
       brandMarkUrl={brand.markUrl}
       mapStyleUrl={env.mapStyleUrl}
       caseLink={(code, children) => (
-        <Link to="/c/$code" params={{ code }} className="block h-full text-inherit no-underline">
+        <Link
+          to="/{-$locale}/c/$code"
+          params={{ code }}
+          className="block h-full text-inherit no-underline"
+        >
           {children}
         </Link>
       )}
-      onOpenCase={(code) => navigate({ to: '/c/$code', params: { code } })}
+      onOpenCase={(code) => navigate({ to: '/{-$locale}/c/$code', params: { code } })}
     />
   )
 }

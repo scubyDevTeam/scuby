@@ -1,24 +1,28 @@
 import type { FeedItem } from '@contracts/feed'
-import { formatRelative } from '@domain/shared/time'
+import { useI18n } from '@i18n/react'
+import type { Translator } from '@i18n/translate'
 import { Badge, type BadgeTone } from '@ui/Badge'
 import type { ReactNode } from 'react'
 
-const verticalBadge: Record<FeedItem['vertical'], { tone: BadgeTone; label: string }> = {
-  lost: { tone: 'lost', label: 'Se busca' },
-  found: { tone: 'found', label: 'Se encontró' },
-  adoption: { tone: 'adoption', label: 'En adopción' },
-  help: { tone: 'help', label: 'Necesita ayuda' },
+// The badge reads `feed.badge.<vertical>`.
+const verticalTone: Record<FeedItem['vertical'], BadgeTone> = {
+  lost: 'lost',
+  found: 'found',
+  adoption: 'adoption',
+  help: 'help',
 }
 
-function secondLine(item: FeedItem, now: Date): string {
+function secondLine(i18n: Translator, item: FeedItem, now: Date): string {
   if (item.detail) return `${item.placeName} · ${item.detail}`
-  return `${item.placeName} · ${formatRelative(item.happenedAt, now)}`
+  return `${item.placeName} · ${i18n.relative(item.happenedAt, now)}`
 }
 
-function sightingLine(item: FeedItem, now: Date): string | null {
+function sightingLine(i18n: Translator, item: FeedItem, now: Date): string | null {
   if (!item.lastSightingAt || !item.sightingsCount) return null
-  const seen = `Vista ${formatRelative(item.lastSightingAt, now)}`
-  return `${seen} · ${item.sightingsCount} ${item.sightingsCount === 1 ? 'avistamiento' : 'avistamientos'}`
+  return i18n.t('feed.sightings', {
+    count: item.sightingsCount,
+    when: i18n.relative(item.lastSightingAt, now),
+  })
 }
 
 export function FeedCard({
@@ -34,8 +38,8 @@ export function FeedCard({
   /** Wraps the card in the link to its case; the router lives in `routes`. */
   link: (children: ReactNode) => ReactNode
 }) {
-  const badge = verticalBadge[item.vertical]
-  const sighting = sightingLine(item, now)
+  const i18n = useI18n()
+  const sighting = sightingLine(i18n, item, now)
   return link(
     <article
       className={`h-full overflow-hidden rounded-(--radius-card) bg-surface shadow-md ${wide ? 'flex' : ''}`}
@@ -52,12 +56,12 @@ export function FeedCard({
       )}
       <div className="flex min-w-0 flex-1 flex-col items-start gap-1 p-4">
         <div className="flex flex-wrap gap-1">
-          <Badge tone={badge.tone}>{badge.label}</Badge>
-          {item.possibleFind ? <Badge tone="info">Posible hallazgo</Badge> : null}
+          <Badge tone={verticalTone[item.vertical]}>{i18n.t(`feed.badge.${item.vertical}`)}</Badge>
+          {item.possibleFind ? <Badge tone="info">{i18n.t('feed.possible_find')}</Badge> : null}
         </div>
         <h3 className="m-0 text-xl font-extrabold">{item.title}</h3>
         {wide && item.summary ? <p className="m-0 text-muted">{item.summary}</p> : null}
-        <p className={`m-0 ${wide ? 'font-bold' : 'text-muted'}`}>{secondLine(item, now)}</p>
+        <p className={`m-0 ${wide ? 'font-bold' : 'text-muted'}`}>{secondLine(i18n, item, now)}</p>
         {wide && sighting ? <p className="m-0 text-muted">{sighting}</p> : null}
       </div>
     </article>,

@@ -3,6 +3,7 @@ import type { LostAction } from '@domain/lost/actions'
 import { suggestedAttribution } from '@domain/lost/resolution'
 import { publicArea } from '@domain/shared/geo'
 import { LostCasePage } from '@features/lost/LostCasePage'
+import { useI18n } from '@i18n/react'
 import { shareLink } from '@platform/share'
 import { Link } from '@tanstack/react-router'
 import { Button, roundButtonClass } from '@ui/Button'
@@ -10,8 +11,8 @@ import { Sheet } from '@ui/Sheet'
 import { Skeleton } from '@ui/States'
 import { ChevronLeft } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
-import { brand } from '../../brand'
-import { env } from '../../env'
+import { brand } from '../../../brand'
+import { env } from '../../../env'
 
 // The forms load when their button is tapped: reading the case must not pay for them.
 const SightingForm = lazy(() =>
@@ -31,8 +32,11 @@ const ReportForm = lazy(() =>
 type Open = 'sighting' | 'claim' | 'report' | 'reunite' | 'cancel' | 'reopen' | 'copied' | null
 
 export function LostCaseScreen({ found }: { found: LostCase }) {
+  const { t } = useI18n()
   const [sheet, setSheet] = useState<Open>(null)
+  // The short link carries no language: posters and shared links reach everyone the same way.
   const url = `${brand.origin}/c/${found.code}`
+  const name = found.pet.name
   const close = () => setSheet(null)
 
   async function handle(action: LostAction) {
@@ -44,21 +48,21 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
     if (action === 'reopen') return setSheet('reopen')
     if (action !== 'share') return
     const result = await shareLink({
-      title: `Se busca: ${found.pet.name}`,
-      text: 'Ayúdanos a encontrarla',
+      title: t('case.lost.share_title', { name }),
+      text: t('case.lost.share_text'),
       url,
     })
     if (result === 'copied') setSheet('copied')
   }
 
   const titles: Record<NonNullable<Open>, string> = {
-    sighting: `¿Dónde viste a ${found.pet.name}?`,
-    claim: `¿Tienes a ${found.pet.name}?`,
-    report: '¿Qué pasa con esta publicación?',
-    copied: 'Enlace copiado',
-    reunite: `¿${found.pet.name} ya apareció?`,
-    cancel: 'Eliminar este aviso',
-    reopen: 'Reactivar el aviso',
+    sighting: t('case.lost.sighting_title', { name }),
+    claim: t('case.lost.claim_title', { name }),
+    report: t('case.report_title'),
+    copied: t('case.copied'),
+    reunite: t('case.lost.reunite_title', { name }),
+    cancel: t('case.cancel_title'),
+    reopen: t('case.reopen_title'),
   }
 
   return (
@@ -68,7 +72,7 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
         now={new Date()}
         shortUrl={`${new URL(brand.origin).host}/c/${found.code}`}
         backLink={
-          <Link to="/" aria-label="Volver al inicio" className={roundButtonClass}>
+          <Link to="/{-$locale}" aria-label={t('common.back_home')} className={roundButtonClass}>
             <ChevronLeft aria-hidden="true" />
           </Link>
         }
@@ -122,8 +126,8 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
         </Suspense>
         {sheet === 'copied' ? (
           <>
-            <p className="m-0 text-muted">Pégalo en WhatsApp o donde quieras compartirlo.</p>
-            <Button onClick={close}>Entendido</Button>
+            <p className="m-0 text-muted">{t('case.copied_hint')}</p>
+            <Button onClick={close}>{t('common.got_it')}</Button>
           </>
         ) : null}
       </Sheet>

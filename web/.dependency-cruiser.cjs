@@ -1,6 +1,16 @@
 // The layer rule from docs/eng/frontend.md · Architecture. Dependencies point inward, always.
 const layer = (name) => `^src/${name}/`
-const OUTER = ['routes', 'features', 'api-client', 'contracts', 'domain', 'platform', 'ui', 'mocks']
+const OUTER = [
+  'routes',
+  'features',
+  'api-client',
+  'contracts',
+  'domain',
+  'platform',
+  'ui',
+  'i18n',
+  'mocks',
+]
 const others = (...allowed) => OUTER.filter((l) => !allowed.includes(l)).map((l) => layer(l))
 
 /** @type {import('dependency-cruiser').IConfiguration} */
@@ -33,10 +43,19 @@ module.exports = {
     },
     {
       name: 'ui-is-a-leaf',
-      comment: 'ui gets everything through props — it knows no rule, no API and no brand.',
+      comment:
+        'ui gets everything through props — it knows no rule, no API and no brand. Its own few words (Cerrar, opcional) come from i18n.',
       severity: 'error',
       from: { path: layer('ui') },
-      to: { path: [...others('ui'), '^src/(env|brand)\\.ts$'] },
+      to: { path: [...others('ui', 'i18n'), '^src/(env|brand)\\.ts$'] },
+    },
+    {
+      name: 'i18n-is-a-leaf',
+      comment:
+        'The language files and t(). Every layer that renders reads from it; it reads nothing.',
+      severity: 'error',
+      from: { path: layer('i18n') },
+      to: { path: [...others('i18n'), '^src/(env|brand)\\.ts$'] },
     },
     {
       name: 'features-not-routes',
