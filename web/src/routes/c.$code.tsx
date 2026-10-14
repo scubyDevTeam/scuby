@@ -1,6 +1,7 @@
 import { useCase } from '@api-client/cases'
 import { ApiError } from '@api-client/http'
 import type { LostAction } from '@domain/lost/actions'
+import { suggestedAttribution } from '@domain/lost/resolution'
 import { publicArea } from '@domain/shared/geo'
 import { LostCasePage } from '@features/lost/LostCasePage'
 import { shareLink } from '@platform/share'
@@ -22,6 +23,10 @@ const SightingForm = lazy(() =>
 const ClaimForm = lazy(() =>
   import('@features/lost/ClaimForm').then((m) => ({ default: m.ClaimForm })),
 )
+const ownerForms = () => import('@features/lost/OwnerForms')
+const ReuniteForm = lazy(() => ownerForms().then((m) => ({ default: m.ReuniteForm })))
+const CancelForm = lazy(() => ownerForms().then((m) => ({ default: m.CancelForm })))
+const ReopenForm = lazy(() => ownerForms().then((m) => ({ default: m.ReopenForm })))
 const ReportForm = lazy(() =>
   import('@features/reporting/ReportForm').then((m) => ({ default: m.ReportForm })),
 )
@@ -35,9 +40,9 @@ const homeLink = (
 function CaseScreen() {
   const { code } = Route.useParams()
   const query = useCase(code)
-  const [sheet, setSheet] = useState<'sighting' | 'claim' | 'report' | 'copied' | 'pending' | null>(
-    null,
-  )
+  const [sheet, setSheet] = useState<
+    'sighting' | 'claim' | 'report' | 'reunite' | 'cancel' | 'reopen' | 'copied' | null
+  >(null)
 
   if (query.isPending) {
     return (
@@ -97,14 +102,17 @@ function CaseScreen() {
     )
   }
 
-  type Open = 'sighting' | 'claim' | 'report' | 'copied' | 'pending' | null
+  type Open = 'sighting' | 'claim' | 'report' | 'reunite' | 'cancel' | 'reopen' | 'copied' | null
   const close = () => setSheet(null)
 
   async function handle(action: LostAction) {
     if (action === 'report_sighting') return setSheet('sighting')
     if (action === 'claim_recovery') return setSheet('claim')
     if (action === 'report_content') return setSheet('report')
-    if (action !== 'share') return setSheet('pending')
+    if (action === 'confirm_reunited') return setSheet('reunite')
+    if (action === 'cancel') return setSheet('cancel')
+    if (action === 'reopen') return setSheet('reopen')
+    if (action !== 'share') return
     const result = await shareLink({
       title: `Se busca: ${found.vertical === 'lost' ? found.pet.name : ''}`,
       text: 'Ayúdanos a encontrarla',
@@ -118,7 +126,9 @@ function CaseScreen() {
     claim: `¿Tienes a ${found.pet.name}?`,
     report: '¿Qué pasa con esta publicación?',
     copied: 'Enlace copiado',
-    pending: 'Todavía no está lista',
+    reunite: `¿${found.pet.name} ya apareció?`,
+    cancel: 'Eliminar este aviso',
+    reopen: 'Reactivar el aviso',
   }
 
   return (
@@ -161,17 +171,28 @@ function CaseScreen() {
               onOnlySaw={() => setSheet('sighting')}
             />
           ) : null}
+          {sheet === 'reunite' ? (
+            <ReuniteForm
+              code={found.code}
+              petName={found.pet.name}
+              suggested={suggestedAttribution({
+                hasConfirmedClaim: found.claims.some((claim) => claim.status === 'confirmed'),
+                hasHighlightedSighting: found.sightings.some((s) => s.highlightedByOwner),
+              })}
+              onDone={close}
+            />
+          ) : null}
+          {sheet === 'cancel' ? <CancelForm code={found.code} onDone={close} /> : null}
+          {sheet === 'reopen' ? (
+            <ReopenForm code={found.code} petName={found.pet.name} onDone={close} />
+          ) : null}
           {sheet === 'report' ? (
             <ReportForm targetType="lost_case" targetCode={found.code} onDone={close} />
           ) : null}
         </Suspense>
-        {sheet === 'copied' || sheet === 'pending' ? (
+        {sheet === 'copied' ? (
           <>
-            <p className="m-0 text-muted">
-              {sheet === 'copied'
-                ? 'Pégalo en WhatsApp o donde quieras compartirlo.'
-                : 'Estamos construyendo esta parte.'}
-            </p>
+            <p className="m-0 text-muted">Pégalo en WhatsApp o donde quieras compartirlo.</p>
             <Button onClick={close}>Entendido</Button>
           </>
         ) : null}

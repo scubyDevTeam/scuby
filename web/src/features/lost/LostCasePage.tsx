@@ -9,6 +9,7 @@ import { CaseMap } from '@ui/Map/CaseMap'
 import { Notice } from '@ui/Notice'
 import { Archive, Clock, Flag, PartyPopper, Share2 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
+import { ClaimsList } from './ClaimsList'
 import { describePet, formatDayMonth, sightingsCount } from './copy'
 import { SightingTimeline } from './SightingTimeline'
 
@@ -168,7 +169,20 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
             <Button onClick={() => onAction('reopen')}>Reactivar aviso</Button>
           ) : null}
 
-          {mode === 'open' && hasPossibleFind(lostCase.openClaimCount) ? (
+          {lostCase.viewer === 'owner' && mode === 'open' ? (
+            <ClaimsList
+              code={lostCase.code}
+              petName={pet.name}
+              claims={lostCase.claims}
+              now={now}
+              revealsOwnNumber={lostCase.contact?.whatsappUrl == null}
+              onConfirmed={() => onAction('confirm_reunited')}
+            />
+          ) : null}
+
+          {mode === 'open' &&
+          lostCase.viewer === 'public' &&
+          hasPossibleFind(lostCase.openClaimCount) ? (
             <Notice icon={<Clock aria-hidden="true" />} title="Posible hallazgo.">
               Alguien dice que la tiene y su familia lo está verificando. La búsqueda sigue: si la
               ves, repórtalo.
