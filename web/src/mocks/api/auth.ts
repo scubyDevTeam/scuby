@@ -3,7 +3,7 @@ import { api } from '../../contracts/api'
 import { db, newId, type PersonRow } from '../db'
 import { DEMO_OWNER_ID } from '../fixtures'
 import { Fail, fail, route } from '../route'
-import { nameFromEmail } from '../rules'
+import { iso, nameFromEmail } from '../rules'
 import { profileView, userView } from '../serialize'
 import { signIn, signOut } from '../session'
 
@@ -22,6 +22,7 @@ function account(email: string): PersonRow {
     city: null,
     bio: null,
     notification_prefs: { lost: true, found: true, adoption: true, help: true },
+    joined_at: iso(Date.now()),
   }
   db.persons.push(created)
   return created

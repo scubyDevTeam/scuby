@@ -310,7 +310,8 @@ before any WhatsApp handoff opens.
 cookie leaning is enough) decided, and a staging API that implements
 [openapi.json](openapi.json) ([api.md](api.md) · Plugging in the real backend). Then point the app
 at it — `VITE_API_MOCK=false` — and run the e2e suite against it. Add the transition-table contract tests
-(frontend.md · Rule 2).
+(frontend.md · Rule 2). Point Lighthouse CI at it too and turn its LCP assertion from `warn` to
+`error` (frontend.md · Budgets).
 
 ### 5.1 Sign-in ★
 **Read:** [auth.md](auth.md) · Sign-in.

@@ -16,6 +16,21 @@ const statusBadge: Record<string, { tone: BadgeTone; label: TextKey }> = {
   kept: { tone: 'found', label: 'mine.status.kept' },
   converted: { tone: 'adoption', label: 'mine.status.converted' },
   transferred_to_org: { tone: 'found', label: 'mine.status.transferred_to_org' },
+  adopted: { tone: 'found', label: 'mine.status.adopted' },
+  withdrawn: { tone: 'info', label: 'mine.status.withdrawn' },
+}
+
+/** An active found case is not a search, nor is a listing: each says what it is. */
+const activeBadge: Partial<Record<MyCase['vertical'], { tone: BadgeTone; label: TextKey }>> = {
+  found: { tone: 'found', label: 'mine.status.found_active' },
+  adoption: { tone: 'adoption', label: 'mine.status.adoption_active' },
+}
+
+const waitingBadge: Record<MyCase['vertical'], TextKey> = {
+  lost: 'mine.possible_find',
+  found: 'mine.possible_owner',
+  adoption: 'mine.interested',
+  help: 'mine.possible_find',
 }
 
 type Props = {
@@ -76,11 +91,8 @@ export function MyCases({ caseLink, publishLink }: Props) {
 function Row({ item, now }: { item: MyCase; now: Date }) {
   const i18n = useI18n()
   const { t } = i18n
-  // An active found case is not a search: it says what it is.
   const known =
-    item.vertical === 'found' && item.status === 'active'
-      ? { tone: 'found' as const, label: 'mine.status.found_active' as const }
-      : statusBadge[item.status]
+    (item.status === 'active' ? activeBadge[item.vertical] : undefined) ?? statusBadge[item.status]
   const badge = known
     ? { tone: known.tone, label: t(known.label) }
     : { tone: 'info' as const, label: item.status }
@@ -95,9 +107,7 @@ function Row({ item, now }: { item: MyCase; now: Date }) {
         <div className="flex flex-wrap gap-1">
           <Badge tone={badge.tone}>{badge.label}</Badge>
           {item.status === 'active' && item.openClaimCount > 0 ? (
-            <Badge tone="info">
-              {t(item.vertical === 'found' ? 'mine.possible_owner' : 'mine.possible_find')}
-            </Badge>
+            <Badge tone="info">{t(waitingBadge[item.vertical])}</Badge>
           ) : null}
         </div>
         <h2 className="m-0 text-xl font-extrabold">{item.title}</h2>

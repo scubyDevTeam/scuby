@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 dist-e2e
+dist-size
 *.local
 
 # Editor directories and files
@@ -34,3 +35,10 @@ design/screens/
 # Playwright
 test-results
 playwright-report
+
+# Lighthouse CI reports (pnpm lighthouse)
+.lighthouseci
+
+# The share function bundle and its shell, built at deploy time (scripts/build-share.mjs)
+api/_bundle/share.js
+api/_bundle/shell.html

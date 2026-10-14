@@ -8,7 +8,7 @@ import { withMessages } from '@i18n/locales'
 import { useI18n } from '@i18n/react'
 import type { TextKey } from '@i18n/translate'
 import { Link } from '@tanstack/react-router'
-import { roundButtonClass } from '@ui/Button'
+import { buttonClass, roundButtonClass } from '@ui/Button'
 import { Sheet } from '@ui/Sheet'
 import { Skeleton } from '@ui/States'
 import { ChevronLeft } from 'lucide-react'
@@ -110,6 +110,17 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
         }
         mapStyleUrl={env.mapStyleUrl}
         onAction={handle}
+        successorLink={
+          found.successorCaseCode ? (
+            <Link
+              to="/{-$locale}/c/$code"
+              params={{ code: found.successorCaseCode }}
+              className={buttonClass('primary')}
+            >
+              {t('found.page.see_listing')}
+            </Link>
+          ) : null
+        }
         custodianPanel={
           <CustodianPanel
             foundCase={found}
@@ -117,6 +128,15 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
             onConfirmed={() => setSheet('reunited')}
             onKeep={() => setSheet('kept')}
             onTransfer={() => setSheet('transferred_to_org')}
+            adoptionLink={
+              <Link
+                to="/{-$locale}/publicar/adopcion"
+                search={{ desde: found.code }}
+                className={buttonClass('primary')}
+              >
+                {t('found.custodian.offer_adoption')}
+              </Link>
+            }
           />
         }
       />

@@ -21,6 +21,7 @@ function show(data: FoundCase, routes: Parameters<typeof stubApi>[0] = {}) {
   const calls = stubApi(routes)
   const onAction = vi.fn()
   const spies = { onConfirmed: vi.fn(), onKeep: vi.fn(), onTransfer: vi.fn() }
+  const adoptionLink = <a href="/publicar/adopcion?desde=C4STD">Publicar en adopción</a>
   renderWithQuery(
     <FoundCasePage
       foundCase={data}
@@ -29,7 +30,9 @@ function show(data: FoundCase, routes: Parameters<typeof stubApi>[0] = {}) {
       backLink={<a href="/">Volver</a>}
       mapStyleUrl={undefined}
       onAction={onAction}
-      custodianPanel={<CustodianPanel foundCase={data} now={now} {...spies} />}
+      custodianPanel={
+        <CustodianPanel foundCase={data} now={now} adoptionLink={adoptionLink} {...spies} />
+      }
     />,
   )
   return { calls, onAction, ...spies }
@@ -123,6 +126,10 @@ describe('FoundCasePage — the custodian (05)', () => {
     fireEvent.click(offer.getByRole('button', { name: 'Lo entregué a una fundación' }))
     expect(onKeep).toHaveBeenCalled()
     expect(onTransfer).toHaveBeenCalled()
+    // «Publicar en adopción» → the listing form, pre-filled from this case (05 · 06).
+    expect(offer.getByRole('link', { name: 'Publicar en adopción' }).getAttribute('href')).toBe(
+      '/publicar/adopcion?desde=C4STD',
+    )
 
     fireEvent.click(offer.getByRole('button', { name: 'Sigo buscando al dueño' }))
     await waitFor(() => expect(calls.at(-1)?.body).toMatchObject({ outcome: 'keep_searching' }))

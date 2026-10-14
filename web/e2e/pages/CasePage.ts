@@ -255,4 +255,11 @@ export class CasePage {
       await this.page.getByRole('dialog').getByRole('button', { name: 'Me lo quedo' }).click()
     })
   }
+
+  /** The day-15 offer's «Publicar en adopción»: a listing on the same pet (05 · 06). */
+  listForAdoption() {
+    return step('List the animal for adoption from the day-15 offer', () =>
+      this.holdOffer.getByRole('link', { name: 'Publicar en adopción' }).click(),
+    )
+  }
 }

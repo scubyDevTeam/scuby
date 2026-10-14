@@ -1,8 +1,11 @@
 // What the poster and the pre-written message say (docs/product/10 §3–4). The words live in the
-// `sharing` namespace of src/i18n/locales; this turns a case into them, in the page's language.
+// `sharing` namespace of src/i18n/locales — an adoption listing's in `adoption.poster` — and this
+// turns a case into them, in the page's language.
+import type { AdoptionCase } from '@contracts/adoption'
 import type { LostCase } from '@contracts/case'
 import type { FoundCase } from '@contracts/found'
 import { type PosterFormat, posterFooter } from '@domain/shared/poster'
+import { feeLine } from '@features/adoption/copy'
 import { describeFound } from '@features/found/copy'
 import { describePet, formatDayMonth } from '@features/lost/copy'
 import type { Translator } from '@i18n/translate'
@@ -10,9 +13,9 @@ import type { Translator } from '@i18n/translate'
 /** The case's short link: the full URL the QR encodes, and how it reads printed. */
 export type ShortLink = { url: string; display: string }
 
-export type PosterCase = LostCase | FoundCase
+export type PosterCase = LostCase | FoundCase | AdoptionCase
 
-/** The owner of a lost case and the custodian of a found one frame the photo and get the tip. */
+/** The owner, custodian or lister — whoever is responsible — frames the photo and gets the tip. */
 export const isResponsible = (posterCase: PosterCase) => posterCase.viewer !== 'public'
 
 export type PosterContent = {
@@ -33,11 +36,28 @@ export type PosterContent = {
   photoUrl: string | null
 }
 
-const where = (posterCase: PosterCase) =>
-  posterCase.vertical === 'lost' ? posterCase.lastSeen : posterCase.found
+/** Where and since when: the last-seen area, the found area, or where the listing lives. */
+function where(posterCase: PosterCase): { placeName: string; at: Date } {
+  if (posterCase.vertical === 'lost') return posterCase.lastSeen
+  if (posterCase.vertical === 'found') return posterCase.found
+  return { placeName: posterCase.location.placeName, at: posterCase.publishedAt }
+}
 
 const titleOf = (i18n: Translator, posterCase: PosterCase) =>
-  posterCase.vertical === 'lost' ? posterCase.pet.name : describeFound(i18n, posterCase.pet)
+  posterCase.vertical === 'found' ? describeFound(i18n, posterCase.pet) : posterCase.pet.name
+
+/** «EN ADOPCIÓN», «SE BUSCA»: the label band, in capitals. */
+const labelOf = (i18n: Translator, posterCase: PosterCase) =>
+  (posterCase.vertical === 'adoption'
+    ? i18n.t('adoption.poster.label')
+    : i18n.t(`sharing.label.${posterCase.vertical}`)
+  ).toLocaleUpperCase(i18n.locale)
+
+/** The tip under the poster for whoever is responsible for the case. */
+export const ownerHint = (i18n: Translator, posterCase: PosterCase) =>
+  posterCase.vertical === 'adoption'
+    ? i18n.t('adoption.poster.owner_hint')
+    : i18n.t(`sharing.owner_hint.${posterCase.vertical}`)
 
 export function posterContent(
   i18n: Translator,
@@ -51,14 +71,17 @@ export function posterContent(
   return {
     vertical: posterCase.vertical,
     code: posterCase.code,
-    label: t(`sharing.label.${posterCase.vertical}`).toLocaleUpperCase(i18n.locale),
+    label: labelOf(i18n, posterCase),
     title: titleOf(i18n, posterCase),
     traits: describePet(i18n, posterCase.pet),
-    line: t(`sharing.line.${posterCase.vertical}`, {
-      place: placeName,
-      date: formatDayMonth(i18n, at),
-      ago: i18n.relative(at, now),
-    }),
+    line:
+      posterCase.vertical === 'adoption'
+        ? t('adoption.poster.line', { place: placeName, date: formatDayMonth(i18n, at) })
+        : t(`sharing.line.${posterCase.vertical}`, {
+            place: placeName,
+            date: formatDayMonth(i18n, at),
+            ago: i18n.relative(at, now),
+          }),
     noPhoto: t('sharing.no_photo'),
     scan: t('sharing.scan').toLocaleUpperCase(i18n.locale),
     link,
@@ -71,8 +94,18 @@ export function posterContent(
 /** docs/product/10 §4 · the pre-written message, always ending in the short link. */
 export function shareMessage(i18n: Translator, posterCase: PosterCase, link: ShortLink): string {
   const { placeName, at } = where(posterCase)
+  if (posterCase.vertical === 'adoption') {
+    return i18n.t('adoption.poster.message', {
+      label: labelOf(i18n, posterCase),
+      title: titleOf(i18n, posterCase),
+      place: placeName,
+      traits: describePet(i18n, posterCase.pet),
+      fee: feeLine(i18n, posterCase.fee),
+      link: link.url,
+    })
+  }
   return i18n.t(`sharing.message.${posterCase.vertical}`, {
-    label: i18n.t(`sharing.label.${posterCase.vertical}`).toLocaleUpperCase(i18n.locale),
+    label: labelOf(i18n, posterCase),
     title: titleOf(i18n, posterCase),
     place: placeName,
     traits: describePet(i18n, posterCase.pet),

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { parseClaim, parseCreated, sightingBody } from '../contracts/actions'
-import { api } from '../contracts/api'
+import * as foundEndpoints from '../contracts/endpoints/found'
+import * as helpersEndpoints from '../contracts/endpoints/helpers'
 import {
   type MatchInput,
   matchBody,
@@ -22,7 +23,11 @@ export function useClaimOwnership(code: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: OwnershipClaimInput) =>
-      call(api.claimOwnership, { params: { code }, body: ownershipClaimBody(input) }, parseClaim),
+      call(
+        foundEndpoints.claimOwnership,
+        { params: { code }, body: ownershipClaimBody(input) },
+        parseClaim,
+      ),
     onSuccess: () => client.invalidateQueries({ queryKey: ['case', code] }),
   })
 }
@@ -32,7 +37,7 @@ export function useAnswerOwnershipClaim(code: string) {
   return useMutation({
     mutationFn: (input: { claimId: string; status: 'confirmed' | 'dismissed' }) =>
       call(
-        api.answerOwnershipClaim,
+        foundEndpoints.answerOwnershipClaim,
         { params: { code, claimId: input.claimId }, body: { status: input.status } },
         parseCreated,
       ),
@@ -45,7 +50,11 @@ export function useResolveFound(code: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: ResolveInput) =>
-      call(api.resolveFound, { params: { code }, body: resolveBody(input) }, parseCreated),
+      call(
+        foundEndpoints.resolveFound,
+        { params: { code }, body: resolveBody(input) },
+        parseCreated,
+      ),
     onSuccess: () => client.invalidateQueries(),
   })
 }
@@ -54,7 +63,7 @@ export function useResolveFound(code: string) {
 export function useMatchAnimal() {
   return useMutation({
     mutationFn: (input: MatchInput) =>
-      call(api.matchAnimal, { body: matchBody(input) }, parseCandidates),
+      call(foundEndpoints.matchAnimal, { body: matchBody(input) }, parseCandidates),
   })
 }
 
@@ -62,7 +71,7 @@ export function usePublishFound() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: PublishFoundInput) =>
-      call(api.publishFound, { body: publishFoundBody(input) }, parsePublish),
+      call(foundEndpoints.publishFound, { body: publishFoundBody(input) }, parsePublish),
     onSuccess: (result) => {
       if (result.kind === 'published') client.invalidateQueries()
     },
@@ -76,7 +85,7 @@ export function useReportWitness() {
     mutationFn: ({ caseCode, ...input }: OrphanSightingInput & { caseCode: string | null }) =>
       caseCode
         ? call(
-            api.reportSighting,
+            helpersEndpoints.reportSighting,
             {
               params: { code: caseCode },
               body: sightingBody({
@@ -89,7 +98,11 @@ export function useReportWitness() {
             },
             parseCreated,
           )
-        : call(api.reportOrphanSighting, { body: orphanSightingBody(input) }, parseCreated),
+        : call(
+            foundEndpoints.reportOrphanSighting,
+            { body: orphanSightingBody(input) },
+            parseCreated,
+          ),
     onSuccess: () => client.invalidateQueries({ queryKey: ['case'] }),
   })
 }

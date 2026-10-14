@@ -138,6 +138,266 @@
     "share_title": "Share this listing",
     "share_title_named": "Share {name}"
   },
+  "adoption": {
+    "band": {
+      "active": "For adoption",
+      "reserved": "In progress",
+      "adopted": "Adopted",
+      "withdrawn": "No longer available",
+      "expired": "Listing archived"
+    },
+    "page": {
+      "photo_alt": "Photo of {name}",
+      "line": "For adoption in {place} · posted {ago}",
+      "story_title": "Their story",
+      "health_title": "Their health",
+      "health_hint": "Looking for someone who knows how to care for this.",
+      "about_title": "What they are like",
+      "home_title": "The home they need",
+      "fee_none": "No fee",
+      "fee_some": "Adoption fee: {amount}",
+      "fee_covers": "Covers {covers}.",
+      "fee_money": "Agreed between you: nothing is paid through the app.",
+      "lister": "Posted by {name}",
+      "tier_individual": "Posted by a person — checking each other is up to you.",
+      "tier_verified": "Verified foundation: we reviewed their documents.",
+      "interest": "I’m interested",
+      "interest_hint": "We’ll ask you to sign in and introduce yourself",
+      "interested_title": "You’re on the list.",
+      "interested_body": "The person who posted it can read your introduction.",
+      "open_conversation": "Write to them again",
+      "withdraw_interest": "I’m no longer interested",
+      "backup": "{name} is in the middle of an adoption, but sometimes it falls through — you can sign up as a second option.",
+      "chosen_you_title": "You were chosen.",
+      "chosen_you_body": "Arrange the hand-over with the person who posted it.",
+      "adopted_title": "{name} has a home!",
+      "adopted_body": "Thanks to everyone who shared it.",
+      "withdrawn_title": "{name} is no longer available for adoption.",
+      "archived_title": "This listing was archived.",
+      "archived_can_reopen": "You can reactivate it with one tap.",
+      "archived_lister_can_reopen": "The person who posted it can reactivate it.",
+      "reopen": "Reactivate listing",
+      "where_title": "Where they are",
+      "area_label": "Area where they are (approximate)",
+      "share": "Share listing",
+      "report": "Report"
+    },
+    "temperament": {
+      "good_with_kids": "Good with kids",
+      "good_with_cats": "Good with cats",
+      "good_with_dogs": "Good with dogs",
+      "senior": "Senior",
+      "puppy": "Young"
+    },
+    "requirement": {
+      "needs_yard": "Needs a yard",
+      "no_small_children": "No small children",
+      "no_other_dogs": "No other dogs",
+      "indoor_only": "Indoors only",
+      "experienced_home": "Experienced home"
+    },
+    "health": {
+      "chronic_condition": "Chronic condition",
+      "special_needs": "Special needs",
+      "senior": "Senior",
+      "fiv_felv": "FIV / FeLV",
+      "mobility_aid": "Needs help getting around",
+      "behavioral_support": "Needs behavioural support"
+    },
+    "covers": {
+      "sterilization": "spaying/neutering",
+      "vaccines": "vaccines",
+      "deworming": "deworming",
+      "microchip": "microchip"
+    },
+    "sheet": {
+      "interest_title": "Interested in {name}?",
+      "conversation_title": "Write to {name}",
+      "record_title": "Who adopted {name}?",
+      "withdraw_title": "Take the listing down"
+    },
+    "poster": {
+      "label": "For adoption",
+      "line": "Looking for a home in {place} · since {date}",
+      "message": "🏡 {label}: {title} — {place}. {traits}. {fee}. Meet them and write to whoever is caring for them: {link}",
+      "owner_hint": "Share it in your stories and in neighbourhood groups: many adoptions start with someone who knows someone."
+    }
+  },
+  "adoption_forms": {
+    "interest": {
+      "intro": "Before you write, introduce yourself: the person who posted it will see this next to your name.",
+      "housing_legend": "Where do you live?",
+      "housing": {
+        "house": "House",
+        "apartment": "Apartment"
+      },
+      "yard_legend": "Do you have a yard?",
+      "yard": {
+        "yes": "Yes",
+        "no": "No"
+      },
+      "other_pets_label": "Do you have other pets?",
+      "other_pets_placeholder": "A 3-year-old spayed cat…",
+      "household_label": "Who do you live with?",
+      "household_placeholder": "With my partner, no kids…",
+      "why_label": "Why {name}?",
+      "errors": {
+        "housing_required": "Tell us whether you live in a house or an apartment",
+        "yard_required": "Tell us whether you have a yard",
+        "why_required": "Tell them why"
+      },
+      "phone_hint": "The person who posted it will be able to write to this number. We verify it only once.",
+      "submit": "Send and write to them",
+      "sending": "Sending…",
+      "confirm_code": "Confirm code and send",
+      "failed": "We couldn’t send your introduction.",
+      "sent_title": "We let {name} know.",
+      "sent_whatsapp": "Write to them on WhatsApp: your introduction is already in the message.",
+      "sent_external": "Follow their adoption process on their site.",
+      "sent_in_app": "They’ll write to you here once they read it.",
+      "choose": "You can write to them or apply on their site:",
+      "write_whatsapp": "Write on WhatsApp",
+      "apply_external": "Apply on their site",
+      "safety": "Meet the animal in person before deciding. Never pay anything before meeting them. Ask for the name of the vet who has seen them.",
+      "withdraw_failed": "We couldn’t withdraw your interest.",
+      "whatsapp": {
+        "greeting": "Hi, I’d like to adopt {name}: {link}",
+        "home": "I live in {housing}, {yard}.",
+        "housing": {
+          "house": "a house",
+          "apartment": "an apartment"
+        },
+        "yard": {
+          "yes": "with a yard",
+          "no": "without a yard"
+        },
+        "other_pets": "Other pets: {text}.",
+        "household": "At home: {text}.",
+        "why": "Why: {text}"
+      }
+    },
+    "lister": {
+      "interests_label": "People interested",
+      "interests_title": {
+        "one": "{count} person interested",
+        "other": "{count} people interested"
+      },
+      "empty_title": "Nobody has said «I’m interested» yet.",
+      "empty_body": "Share the listing: that’s how it reaches more people.",
+      "member": "member {ago}",
+      "member_months": {
+        "one": "member for {count} month",
+        "other": "member for {count} months"
+      },
+      "sightings": {
+        "one": "{count} sighting reported",
+        "other": "{count} sightings reported"
+      },
+      "open_interests": {
+        "one": "has {count} open adoption request",
+        "other": "has {count} open adoption requests"
+      },
+      "chip": {
+        "house": "House",
+        "apartment": "Apartment",
+        "yard": "Has a yard",
+        "no_yard": "No yard"
+      },
+      "other_pets": "Other pets: {text}",
+      "household": "At home: {text}",
+      "status": {
+        "chosen": "In progress",
+        "declined": "Set aside"
+      },
+      "write": "Write on WhatsApp",
+      "moves": {
+        "choose": "Choose",
+        "decline": "Set aside",
+        "fell_through": "It fell through",
+        "restore": "Back to the list"
+      },
+      "safety": "Meet the person before handing them over. Meet in a public place.",
+      "answer_failed": "We couldn’t save your answer.",
+      "record": "They were adopted 🎉",
+      "withdraw": "No longer available"
+    },
+    "checkin": {
+      "label": "Still available?",
+      "title": "{name} is still listed for adoption.",
+      "body": "If you don’t confirm, we’ll archive the listing.",
+      "waiting": {
+        "one": "{count} person asked about {name}. Still available?",
+        "other": "{count} people asked about {name}. Still available?"
+      },
+      "no_interest": "Nobody has asked yet: well-lit, full-body photos help a lot.",
+      "still_available": "Still available",
+      "failed": "We couldn’t save your answer."
+    },
+    "record": {
+      "intro": "We record who is now responsible for {name}, with their history.",
+      "legend": "Who adopted them?",
+      "offline": "Someone outside the app",
+      "choose_one": "Choose an option",
+      "submit": "Confirm adoption",
+      "saving": "Saving…"
+    },
+    "withdraw": {
+      "legend": "Why is it no longer available?",
+      "reasons": {
+        "kept": "I kept them",
+        "deceased": "They died",
+        "transferred": "I gave them to someone else or a foundation"
+      },
+      "submit": "Take listing down"
+    },
+    "publish": {
+      "title_animal": "Who is looking for a home?",
+      "title_story": "Their story",
+      "title_place": "Where are they?",
+      "name_label": "What’s their name?",
+      "role_legend": "Who are they to you?",
+      "role": {
+        "owner": "My pet",
+        "custodian": "I rescued or foster them"
+      },
+      "marks_label": "Markings and personality",
+      "health_title": "Their health",
+      "health_hint": "If they have a condition, say so: some people are looking for exactly that.",
+      "story_label": "Tell us their story",
+      "story_hint": "How they came to you, what they’re like at home, what they love.",
+      "temperament_title": "How they get along",
+      "requirements_title": "The home they need",
+      "requirements_label": "Anything else an adopter should know",
+      "fee_title": "Do you ask for an adoption fee?",
+      "fee_hint": "It’s common: it covers what you already spent on them. It’s always shown, even when it’s nothing.",
+      "fee_no": "No fee",
+      "fee_yes": "Yes, a fee",
+      "fee_amount": "Amount in pesos",
+      "fee_covers": "What does it cover?",
+      "fee_money": "Nobody pays through the app: it’s agreed between you.",
+      "external_label": "Adoption form on your site",
+      "external_hint": "If you have your own process, whoever is interested can follow it there.",
+      "from_found": "From your found notice: photos and markings are already in.",
+      "from_found_story": "They were found in {place} on {date}.",
+      "errors": {
+        "role_required": "Tell us who they are to you",
+        "story_required": "Tell us a bit of their story",
+        "fee_required": "Tell us whether you ask for a fee (it can be «No fee»)",
+        "fee_amount_required": "Write the amount of the fee",
+        "fee_covers_required": "Say what the fee covers",
+        "external_url_invalid": "Check the link: it must start with https://"
+      },
+      "continue": "Continue",
+      "publishing": "Publishing…",
+      "confirm_code": "Confirm code and publish",
+      "submit": "List for adoption",
+      "publish_failed": "We couldn’t publish it.",
+      "published_title": "Listed for adoption!",
+      "published_notice_title": "It’s on the home feed.",
+      "published_notice_body": "When someone says «I’m interested» we’ll let you know, with their introduction.",
+      "view": "See the listing"
+    }
+  },
   "publish": {
     "errors": {
       "name_required": "Tell us its name",
@@ -341,10 +601,14 @@
       "kept": "Has a home",
       "converted": "For adoption",
       "transferred_to_org": "With a shelter",
-      "found_active": "In your care"
+      "found_active": "In your care",
+      "adopted": "Adopted",
+      "withdrawn": "Taken down",
+      "adoption_active": "For adoption"
     },
     "possible_owner": "Possible owner",
-    "possible_find": "Possible find"
+    "possible_find": "Possible find",
+    "interested": "People interested"
   },
   "reporting": {
     "reasons": {
@@ -371,6 +635,14 @@
     "send_failed": "We couldn't send the report.",
     "sending": "Sending…",
     "send": "Send report"
+  },
+  "errors_ui": {
+    "crash": {
+      "title": "Something went wrong",
+      "body": "It's not your fault. Reload the page; if it keeps happening, come back in a little while.",
+      "reload": "Reload",
+      "home": "Go to the home page"
+    }
   },
   "found": {
     "sending": "Sending…",
@@ -436,7 +708,8 @@
       "possible_owner_title": "Possible owner.",
       "possible_owner_body": "Someone says it's theirs and whoever is looking after it is checking.",
       "where_title": "Where it was found",
-      "area_label": "Area where it was found (approximate)"
+      "area_label": "Area where it was found (approximate)",
+      "see_listing": "See their adoption listing"
     },
     "custodian": {
       "offer_label": "Fifteen days without an owner",
@@ -450,7 +723,8 @@
       "microchip": "Microchip: {chip}",
       "confirm": "Yes, it's the owner",
       "dismiss": "It's not",
-      "answer_failed": "We couldn't save your answer."
+      "answer_failed": "We couldn't save your answer.",
+      "offer_adoption": "List for adoption"
     },
     "resolve": {
       "attribution": {
@@ -770,6 +1044,56 @@
       "ownership": "By publishing you confirm {name} is your pet.",
       "ownership_unnamed": "By publishing you confirm this is your pet."
     }
+  },
+  "preview": {
+    "label": {
+      "lost": {
+        "active": "Missing",
+        "reunited": "Back home",
+        "expired": "Archived",
+        "cancelled": "Closed"
+      },
+      "found": {
+        "active": "Found",
+        "reunited": "Back with their family",
+        "kept": "Has a home now",
+        "converted": "Now up for adoption",
+        "transferred_to_org": "With a rescue group",
+        "expired": "Archived",
+        "cancelled": "Closed"
+      },
+      "adoption": {
+        "active": "For adoption",
+        "adopted": "Adopted",
+        "withdrawn": "Closed",
+        "expired": "Archived"
+      },
+      "help": {
+        "active": "Needs help",
+        "closed": "Campaign closed"
+      },
+      "closed": "Closed"
+    },
+    "title": "{label}: {name} — {place}",
+    "description": {
+      "lost_active": "{traits} · Lost on {date}",
+      "found_active": "{traits} · Found on {date}",
+      "other_active": "Up-to-date information and direct contact.",
+      "lost_reunited": "{name} is back home! Thanks to everyone who helped search.",
+      "lost_expired": "This post was archived. The family can reopen it if the search goes on.",
+      "lost_cancelled": "The family closed this post; no need to keep searching.",
+      "found_resolved": "{status}. Thanks to whoever looked after them.",
+      "found_expired": "This post was archived.",
+      "found_cancelled": "The person who posted it closed this post.",
+      "adoption_active": "{traits} · Looking for a home",
+      "adoption_adopted": "{name} has a home now! Thanks to everyone who shared the post.",
+      "adoption_withdrawn": "The person who posted it closed this post.",
+      "adoption_expired": "This post was archived.",
+      "closed": "This post has ended."
+    },
+    "gone": "The person who posted it took it down. See other posts near you on {brand}.",
+    "not_found": "Check that the link's code is complete.",
+    "image_alt": "Photo of {name}"
   },
   "push": {
     "offer": {

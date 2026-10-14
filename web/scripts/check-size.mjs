@@ -7,7 +7,10 @@ const BUDGET_KB = 150
 // Every screen hangs from the optional language segment (docs/eng/frontend.md · Languages).
 const ROUTE = '{-$locale}/c.$code'
 
-const manifest = JSON.parse(readFileSync('dist/.vite/manifest.json', 'utf8'))
+// What production ships: `pnpm size` builds into dist-size with the emulated backend off (with it on,
+// the mock's copy of the whole contract shares chunks with the first load and the number lies).
+const DIR = process.argv[2] ?? 'dist'
+const manifest = JSON.parse(readFileSync(`${DIR}/.vite/manifest.json`, 'utf8'))
 const entries = Object.entries(manifest)
 // The route loads one vertical's screen on demand; the lost page is the one a shared link opens most.
 const SCREEN = 'routes/{-$locale}/-case/LostCaseScreen.tsx'
@@ -34,7 +37,7 @@ let total = 0
 for (const key of needed) {
   const file = manifest[key].file
   if (!file.endsWith('.js')) continue
-  const size = gzipSync(readFileSync(`dist/${file}`)).length
+  const size = gzipSync(readFileSync(`${DIR}/${file}`)).length
   total += size
   console.log(`${(size / 1024).toFixed(1).padStart(7)} kB  ${file}`)
 }

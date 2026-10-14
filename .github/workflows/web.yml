@@ -32,6 +32,15 @@ jobs:
       - run: pnpm check:copy
       - run: pnpm check:e2e-tags
       - run: pnpm build
+      - run: pnpm build:share
       - run: pnpm size
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
+      # /c/:code LCP ≤ 2.0 s on Slow 4G (docs/eng/frontend.md · Budgets), against the build above.
+      - run: pnpm lighthouse
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse
+          path: web/.lighthouseci
+          if-no-files-found: ignore

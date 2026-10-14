@@ -82,10 +82,11 @@ export class PhoneStep {
     this.page = page
   }
 
-  publishVerifying(phone: string, code = DEMO_CODE) {
+  /** `submit` is the form's own button: lost and found «avisan a los vecinos», adoption doesn't. */
+  publishVerifying(phone: string, code = DEMO_CODE, submit = 'Publicar y avisar a los vecinos') {
     return step(`Publish, verifying ${phone} by SMS`, async () => {
       await this.page.getByLabel('Tu celular').fill(phone)
-      await this.page.getByRole('button', { name: 'Publicar y avisar a los vecinos' }).click()
+      await this.page.getByRole('button', { name: submit }).click()
       await this.page.getByLabel('Código que te enviamos por SMS').fill(code)
     })
   }
@@ -105,6 +106,15 @@ export class Published {
     return step('Open the published case', async () => {
       await expect(this.title).toBeVisible()
       await this.page.getByRole('link', { name: 'Ver mi aviso' }).click()
+    })
+  }
+
+  openListing() {
+    return step('Open the published listing', async () => {
+      await expect(
+        this.page.getByRole('heading', { name: '¡Publicado en adopción!' }),
+      ).toBeVisible()
+      await this.page.getByRole('link', { name: 'Ver la publicación' }).click()
     })
   }
 }

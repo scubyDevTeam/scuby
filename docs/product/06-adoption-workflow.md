@@ -82,7 +82,7 @@ listings carry the `verified` badge. Nothing else. Inboxes, members, roles: not 
 
 ### `adoption_interest` — «Me interesa»
 `case_id`, `person_id` (**always registered**),
-`intro { housing: casa | apartamento, has_yard: bool, other_pets: text?, household: text?, why: text }`,
+`intro { housing: house | apartment, has_yard: bool, other_pets: text?, household: text?, why: text }`,
 `kind: interest | application` (only `interest` legal in v1), `form_data?` (unwritten until B2P),
 `status: open | chosen | declined | withdrawn`, `created_at`, `first_responded_at?`.
 
@@ -151,7 +151,7 @@ model it or not; unmodeled, it just surprises the adopter in chat. So `fee_cop` 
 Display-only, never through the platform (money principle, unchanged). A non-zero fee **requires
 `fee_covers[]` entries**; and on individual listings — where there's no institution behind the
 number and «adopción con cuota» is the standard cover for a breeder selling puppies — a fee above
-the local norm routes to the moderation queue on publish ([09](09-reporting.md)). Never blocked,
+the local norm — a per-country configured amount, [O18](../open-items.md) — routes to the moderation queue on publish ([09](09-reporting.md)). Never blocked,
 never silent. Structured fees also make the breeder pattern a *query* (high fee + no covers +
 unsterilized litter of one breed) instead of a human reading posts.
 

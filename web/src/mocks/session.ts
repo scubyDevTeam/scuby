@@ -19,6 +19,7 @@ export function currentUser(): PersonRow | null {
     city: null,
     bio: null,
     notification_prefs: { lost: true, found: true, adoption: true, help: true },
+    joined_at: new Date().toISOString(),
   }
   db.persons.push(reborn)
   persist()

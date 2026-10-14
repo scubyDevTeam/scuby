@@ -52,7 +52,15 @@ export const found = [
     if (typeof phone !== 'string') return phone
     // Nobody is responsible for a found animal's pet row until someone proves it is theirs.
     const petId = newId('pet-')
-    db.pets.push({ id: petId, owner_id: null, name: null, chip_number: null, ...body.pet })
+    db.pets.push({
+      id: petId,
+      owner_id: null,
+      name: null,
+      chip_number: null,
+      custody_state: 'unclaimed',
+      health_flags: [],
+      ...body.pet,
+    })
     const code = newCode()
     db.cases[code] = {
       code,
@@ -78,6 +86,7 @@ export const found = [
       hold_offer_at: iso(new Date(body.found_at).getTime() + HOLD),
       withheld_detail: body.withheld_detail,
       org_name: null,
+      successor_case_code: null,
     }
     notify(
       user.id,
@@ -161,8 +170,14 @@ export const found = [
     const confirmed = db.ownershipClaims.find(
       (c) => c.case_code === row.code && c.status === 'confirmed',
     )
-    if (pet && body.outcome === 'reunited' && confirmed) pet.owner_id = confirmed.claimant_id
-    if (pet && body.outcome === 'kept') pet.owner_id = user.id
+    if (pet && body.outcome === 'reunited' && confirmed) {
+      pet.owner_id = confirmed.claimant_id
+      pet.custody_state = 'claimed'
+    }
+    if (pet && body.outcome === 'kept') {
+      pet.owner_id = user.id
+      pet.custody_state = 'claimed'
+    }
     return { id: row.code }
   }),
 ]

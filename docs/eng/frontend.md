@@ -125,6 +125,16 @@ JS. The route is the short link from [10 · Short links](../product/10-sharing.m
 }
 ```
 
+How it is built: the logic is `web/api/_share.ts` (tags in `_preview.ts`, server env in `_env.ts`),
+reusing the contract (`api.getCase`, `caseWire`) and the language files. Vercel compiles each
+`api/` file on its own and Node cannot resolve the contract's extensionless imports, so
+`pnpm build:share` (`scripts/build-share.mjs`, Vite) bundles it into `api/_bundle/share.js` next to a
+copy of the built shell, and `api/share.ts` only re-exports it; `vercel.json`'s `buildCommand` runs
+both builds and CI runs the bundle step. The API base is `SHARE_API_URL`; unset, down, slow (2.5 s)
+or off-contract, the function returns the plain shell — the page still works, just without a
+preview. `og:image` is the case's first photo until [O10](../open-items.md) picks a renderer
+(`previewImage()` is the one seam).
+
 - **No user-agent sniffing**, no separate crawler app: everyone gets the same shell with the meta
   tags and summary filled in. Readable text before any JS runs.
 - The tags speak the URL's language (`/en/c/:code` → English; no segment → Spanish), the same
@@ -323,13 +333,26 @@ beats an intention.
 
 | What | Budget | Enforced by |
 |---|---|---|
-| `/c/:code` — JS transferred, first load | **≤ 150 KB gzip** (map excluded) | `pnpm size` in CI: sums the route's chunks from the build manifest |
-| `/c/:code` — LCP | **≤ 2.0 s** on Slow 4G, mid-tier Android | Lighthouse CI on every PR |
+| `/c/:code` — JS transferred, first load | **≤ 150 KB gzip** (map excluded) | `pnpm size` in CI: a production-shaped build (`VITE_API_MOCK=false`, so the emulated backend is not in the graph), summing the route's chunks from its manifest |
+| `/c/:code` — LCP | **≤ 2.0 s** on Slow 4G, mid-tier Android | Lighthouse CI on every PR — a **warning** until it can run against a staging API (plan 5.0), then an error |
 | Map cold load | **≤ 2.0 s** to first interactive tiles | manual on the reference device |
 | Uploaded photo | ≈ 300 KB, ≤ 1600 px, JPEG | client pipeline ([media-pipeline](media-pipeline.md)) |
 
 **Sentry from the first deploy**, with uploaded sourcemaps — `@sentry/react`; `@sentry/capacitor`
-arrives with the mobile scope. Users don't file bugs, they stop coming back.
+arrives with the mobile scope. Users don't file bugs, they stop coming back. The SDK is not in the
+first load: `src/platform/errors.ts` queues errors and fetches it once the page has settled; the
+sourcemaps go up by release and URL, not by debug ID, which stamps every chunk (≈3 KB on
+`/c/:code`). Lighthouse CI measures the preview build, so the emulated backend (MSW) is in its
+numbers: it registers a worker and runs before the first render (≈1.8 s of blocking time, LCP ≈4.0 s
+on 2026-10-14, the map already deferred). That is not what a stranger gets, so the LCP assertion
+warns rather than fails until plan 5.0 points Lighthouse at a staging API.
+
+What keeps the first load small (each was a regression once): the case map draws its schematic
+first and loads MapLibre only once the page has settled and the map is within a screen of view;
+owner-only pieces (claims, check-ins, moderation) are lazy; the contract is split so the first load
+reads `found-case.ts` / `adoption-case.ts` / `inbox.ts` and the read endpoints, never the forms —
+`http.ts` imports `contracts/endpoint`, not the `api` barrel; and the emulated backend is resolved
+to a stub (`src/mocks/off.ts`) when `VITE_API_MOCK` is off, so it never shares a chunk with the app.
 
 ---
 
@@ -409,7 +432,8 @@ web/
 ├── index.html
 ├── vercel.json                 /c/:code → share function, everything else → SPA
 ├── api/
-│   └── share.ts                injects OG meta + summary into the built shell
+│   ├── share.ts                re-exports the bundled function (pnpm build:share)
+│   └── _share.ts · _preview.ts injects OG meta + summary into the built shell
 ├── src/
 │   ├── routes/                 TanStack Router, file-based
 │   │   ├── __root.tsx

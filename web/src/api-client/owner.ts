@@ -1,31 +1,30 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { parseCreated } from '../contracts/actions'
-import { api } from '../contracts/api'
+import * as helpersEndpoints from '../contracts/endpoints/helpers'
+import * as lostEndpoints from '../contracts/endpoints/lost'
 import {
   type CheckinAnswer,
   type LostAttribution,
   type LostCancelReason,
   type PublishLostInput,
   parseMyCases,
-  parseNotifications,
   parsePets,
   parsePublish,
   parseUpload,
   publishLostBody,
 } from '../contracts/owner'
-import { parseNothing } from '../contracts/session'
 import { call } from './http'
 
 export const myPetsQuery = queryOptions({
   queryKey: ['me', 'pets'],
-  queryFn: () => call(api.listMyPets, {}, parsePets),
+  queryFn: () => call(lostEndpoints.listMyPets, {}, parsePets),
 })
 
 export const useMyPets = () => useQuery(myPetsQuery)
 
 export const myCasesQuery = queryOptions({
   queryKey: ['me', 'cases'],
-  queryFn: () => call(api.listMyCases, {}, parseMyCases),
+  queryFn: () => call(lostEndpoints.listMyCases, {}, parseMyCases),
 })
 
 export const useMyCases = () => useQuery(myCasesQuery)
@@ -33,7 +32,7 @@ export const useMyCases = () => useQuery(myCasesQuery)
 /** One prepared photo → its URL. */
 export function useUploadPhoto() {
   return useMutation({
-    mutationFn: (photo: Blob) => call(api.uploadPhoto, { body: photo }, parseUpload),
+    mutationFn: (photo: Blob) => call(helpersEndpoints.uploadPhoto, { body: photo }, parseUpload),
   })
 }
 
@@ -42,7 +41,7 @@ export function usePublishLost() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: PublishLostInput) =>
-      call(api.publishLost, { body: publishLostBody(input) }, parsePublish),
+      call(lostEndpoints.publishLost, { body: publishLostBody(input) }, parsePublish),
     onSuccess: (result) => {
       if (result.kind === 'published') client.invalidateQueries()
     },
@@ -62,7 +61,7 @@ function useOwnerAction<T>(action: (input: T) => Promise<unknown>) {
 export const useReunite = (code: string) =>
   useOwnerAction((input: { attribution: LostAttribution }) =>
     call(
-      api.reuniteCase,
+      lostEndpoints.reuniteCase,
       { params: { code }, body: { resolution_attribution: input.attribution } },
       parseCreated,
     ),
@@ -70,16 +69,20 @@ export const useReunite = (code: string) =>
 
 export const useCancelCase = (code: string) =>
   useOwnerAction((input: { reason: LostCancelReason }) =>
-    call(api.cancelCase, { params: { code }, body: { resolution: input.reason } }, parseCreated),
+    call(
+      lostEndpoints.cancelCase,
+      { params: { code }, body: { resolution: input.reason } },
+      parseCreated,
+    ),
   )
 
 export const useReopenCase = (code: string) =>
-  useOwnerAction(() => call(api.reopenCase, { params: { code } }, parseCreated))
+  useOwnerAction(() => call(lostEndpoints.reopenCase, { params: { code } }, parseCreated))
 
 export const useAnswerClaim = (code: string) =>
   useOwnerAction((input: { claimId: string; status: 'confirmed' | 'dismissed' }) =>
     call(
-      api.answerRecoveryClaim,
+      lostEndpoints.answerRecoveryClaim,
       { params: { code, claimId: input.claimId }, body: { status: input.status } },
       parseCreated,
     ),
@@ -89,7 +92,7 @@ export const useAnswerClaim = (code: string) =>
 export const useModerateSighting = (code: string) =>
   useOwnerAction((input: { sightingId: string; highlighted?: boolean; hidden?: boolean }) =>
     call(
-      api.moderateSighting,
+      lostEndpoints.moderateSighting,
       {
         params: { code, sightingId: input.sightingId },
         body: { highlighted: input.highlighted, hidden: input.hidden },
@@ -108,7 +111,7 @@ export const useAnswerCheckin = (code: string) =>
       reason?: LostCancelReason
     }) =>
       call(
-        api.answerCheckin,
+        lostEndpoints.answerCheckin,
         {
           params: { code, checkinId: input.checkinId },
           body: {
@@ -120,20 +123,3 @@ export const useAnswerCheckin = (code: string) =>
         parseCreated,
       ),
   )
-
-export const notificationsQuery = queryOptions({
-  queryKey: ['me', 'notifications'],
-  queryFn: () => call(api.listNotifications, {}, parseNotifications),
-})
-
-export const useNotifications = () => useQuery(notificationsQuery)
-
-/** The ones named, or all of them. */
-export function useReadNotifications() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (ids: string[] | null) =>
-      call(api.readNotifications, { body: { ids } }, parseNothing),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['me', 'notifications'] }),
-  })
-}

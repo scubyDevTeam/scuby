@@ -97,3 +97,7 @@ export const reportBody = (input: ReportInput): z.input<typeof reportRequest> =>
 })
 
 export const parseCreated = (raw: unknown) => createdWire.parse(raw)
+
+/** What the upload endpoint answers: the URL to send back in a form. */
+export const uploadWire = z.object({ url: photoUrl })
+export const parseUpload = (raw: unknown) => uploadWire.parse(raw).url

@@ -16,7 +16,8 @@
   --color-lost-ink: #7a1c1c;
   --color-found: #17875a;
   --color-adoption: #2192f9;
-  --color-help: #6f52d9;
+  /* Azul tinta, the dark blue of the palette, replaces the reference's purple (2026-10-14). */
+  --color-help: #12365c;
   --color-whatsapp: #157f43;
 
   --color-surface: #ffffff;

@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { parseCreated } from '../contracts/actions'
-import { api } from '../contracts/api'
+import * as accountEndpoints from '../contracts/endpoints/account'
 import {
   type ProfileUpdate,
   parseNothing,
@@ -25,7 +25,7 @@ export const sessionQuery = queryOptions<User | null>({
   queryKey: SESSION,
   queryFn: async () => {
     try {
-      return await call(api.getSession, {}, parseUser)
+      return await call(accountEndpoints.getSession, {}, parseUser)
     } catch (error) {
       if (error instanceof ApiError && error.kind === 'unauthorized') return null
       throw error
@@ -50,7 +50,8 @@ async function signedIn(client: QueryClient, user: User) {
 /** Emails the 6-digit code. */
 export function useStartEmailCode() {
   return useMutation({
-    mutationFn: (email: string) => call(api.startEmailCode, { body: { email } }, parseNothing),
+    mutationFn: (email: string) =>
+      call(accountEndpoints.startEmailCode, { body: { email } }, parseNothing),
   })
 }
 
@@ -58,7 +59,7 @@ export function useVerifyEmailCode() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (body: { email: string; code: string }) =>
-      call(api.verifyEmailCode, { body }, parseUser),
+      call(accountEndpoints.verifyEmailCode, { body }, parseUser),
     onSuccess: (user) => signedIn(client, user),
   })
 }
@@ -66,7 +67,8 @@ export function useVerifyEmailCode() {
 export function useGoogleSignIn() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (body: { credential: string }) => call(api.googleSignIn, { body }, parseUser),
+    mutationFn: (body: { credential: string }) =>
+      call(accountEndpoints.googleSignIn, { body }, parseUser),
     onSuccess: (user) => signedIn(client, user),
   })
 }
@@ -74,7 +76,7 @@ export function useGoogleSignIn() {
 export function useSignOut() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: () => call(api.signOut, {}, parseNothing),
+    mutationFn: () => call(accountEndpoints.signOut, {}, parseNothing),
     // What was fetched as that person must not outlive the session: their lists go, and every
     // case is asked for again — the same URL answers less to a stranger.
     onSuccess: () => {
@@ -87,7 +89,7 @@ export function useSignOut() {
 
 export const profileQuery = queryOptions({
   queryKey: PROFILE,
-  queryFn: () => call(api.getProfile, {}, parseProfile),
+  queryFn: () => call(accountEndpoints.getProfile, {}, parseProfile),
 })
 
 export const useProfile = () => useQuery(profileQuery)
@@ -97,7 +99,7 @@ export function useUpdateProfile() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: ProfileUpdate) =>
-      call(api.updateProfile, { body: profileUpdateBody(input) }, parseProfile),
+      call(accountEndpoints.updateProfile, { body: profileUpdateBody(input) }, parseProfile),
     onSuccess: (profile) => {
       client.setQueryData(PROFILE, profile)
       client.invalidateQueries({ queryKey: SESSION })
@@ -112,6 +114,6 @@ export function useRegisterPush() {
       kind: 'webpush' | 'fcm' | 'apns'
       token: string
       device: string | null
-    }) => call(api.registerPush, { body: input }, parseCreated),
+    }) => call(accountEndpoints.registerPush, { body: input }, parseCreated),
   })
 }

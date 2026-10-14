@@ -1,9 +1,10 @@
 import { queryClient } from '@api-client/query-client'
+import { startErrorReporting } from '@platform/errors'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { env } from './env'
+import { API_MOCK } from './env'
 import { LocaleProvider } from './routes/-i18n'
 import { routeTree } from './routeTree.gen'
 import '@ui/tokens.css'
@@ -30,7 +31,7 @@ function registerAppWorker() {
 }
 
 async function start() {
-  if (env.apiMock) {
+  if (API_MOCK) {
     const { startMocks } = await import('@mocks/browser')
     await startMocks()
   } else {
@@ -45,4 +46,6 @@ async function start() {
   )
 }
 
+// Listening before anything renders; the SDK itself arrives after the first paint (platform/errors).
+void startErrorReporting()
 start()

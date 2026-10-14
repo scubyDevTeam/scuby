@@ -1,13 +1,13 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
-import { api } from '../contracts/api'
 import { type CaseDetail, parseCase, type Species, type Vertical } from '../contracts/case'
+import * as readEndpoints from '../contracts/endpoints/read'
 import { type Feed, parseFeed } from '../contracts/feed'
 import { call } from './http'
 
 export const caseQuery = (code: string) =>
   queryOptions<CaseDetail>({
     queryKey: ['case', code],
-    queryFn: () => call(api.getCase, { params: { code } }, parseCase),
+    queryFn: () => call(readEndpoints.getCase, { params: { code } }, parseCase),
   })
 
 export function useCase(code: string) {
@@ -25,7 +25,11 @@ export const feedQuery = ({ near, ...filters }: FeedFilters) =>
   queryOptions<Feed>({
     queryKey: ['feed', filters, near ?? null],
     queryFn: () =>
-      call(api.getFeed, { query: { ...filters, lat: near?.lat, lng: near?.lng } }, parseFeed),
+      call(
+        readEndpoints.getFeed,
+        { query: { ...filters, lat: near?.lat, lng: near?.lng } },
+        parseFeed,
+      ),
   })
 
 export function useFeed(filters: FeedFilters) {

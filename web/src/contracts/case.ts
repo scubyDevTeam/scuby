@@ -1,7 +1,9 @@
 // A case as anyone reads it by its short code (docs/product/04, 05, 10 §1). Source of the contract:
 // api.ts lists the endpoints, ../../../docs/eng/openapi.json is generated from it.
 import * as z from 'zod/mini'
-import { type FoundCase, foundCaseWire, toFoundCase } from './found'
+import { type AdoptionCase, adoptionCaseWire, toAdoptionCase } from './adoption-case'
+import { checkinWire } from './checkin'
+import { type FoundCase, foundCaseWire, toFoundCase } from './found-case'
 import {
   type Color,
   colorSchema,
@@ -17,7 +19,7 @@ import {
 } from './primitives'
 
 export type { Color, PetSize, Species, Vertical }
-export { colorSchema, sizeSchema, speciesSchema, verticalSchema }
+export { checkinWire, colorSchema, sizeSchema, speciesSchema, verticalSchema }
 
 export const lostStatusSchema = z.enum(['active', 'reunited', 'expired', 'cancelled'])
 
@@ -32,15 +34,6 @@ export const sightingWire = z.object({
   /** The owner's alone: the reporter's number, and the pins the owner took off the public map. */
   contact_phone: z._default(z.nullable(phone), null),
   hidden: z._default(z.boolean(), false),
-})
-
-/** One question the owner owes an answer to (docs/product/04 · The follow-up loop). */
-export const checkinWire = z.object({
-  id: z.string(),
-  trigger: z.enum(['time_based', 'post_recovery_claim']),
-  /** Set on a claim check-in: the claim the three answers are about. */
-  claim_id: z.nullable(z.string()),
-  asked_at: timestamp,
 })
 
 export const lostCaseWire = z.object({
@@ -85,7 +78,7 @@ export const lostCaseWire = z.object({
 /** Verticals whose page is not built yet still resolve, with the card's worth of data. */
 export const otherCaseWire = z.object({
   code: z.string(),
-  vertical: z.enum(['adoption', 'help']),
+  vertical: z.literal('help'),
   status: z.string(),
   title: z.string(),
   place_name: z.string(),
@@ -95,6 +88,7 @@ export const otherCaseWire = z.object({
 export const caseWire = z.discriminatedUnion('vertical', [
   lostCaseWire,
   foundCaseWire,
+  adoptionCaseWire,
   otherCaseWire,
 ])
 
@@ -149,18 +143,19 @@ export type LostCase = {
 
 export type OtherCase = {
   code: string
-  vertical: 'adoption' | 'help'
+  vertical: 'help'
   status: string
   title: string
   placeName: string
   photoUrl: string | null
 }
 
-export type CaseDetail = LostCase | FoundCase | OtherCase
+export type CaseDetail = LostCase | FoundCase | AdoptionCase | OtherCase
 
 export function parseCase(raw: unknown): CaseDetail {
   const wire = caseWire.parse(raw)
   if (wire.vertical === 'found') return toFoundCase(wire)
+  if (wire.vertical === 'adoption') return toAdoptionCase(wire)
   if (wire.vertical !== 'lost') {
     return {
       code: wire.code,

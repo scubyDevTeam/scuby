@@ -20,6 +20,8 @@ export const FLOWS = {
   '@poster': 'POSTER',
   '@push': 'PUSH',
   '@legal': 'LEGAL',
+  '@adoption': 'ADOPT',
+  '@publish-adoption': 'PADOPT',
 } as const
 
 export type Flow = keyof typeof FLOWS
