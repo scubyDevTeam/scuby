@@ -307,6 +307,21 @@ arrives with the mobile scope. Users don't file bugs, they stop coming back.
 
 ---
 
+## Testing
+
+Every feature ships with its tests in the same change. No feature is done without both:
+
+| Level | What | Where | Tool |
+|---|---|---|---|
+| **Unit** | Every rule in `domain` (one test per arrow, bound or table row of the owning doc, named after its section); every feature's screens in their states (content, loading, empty, error) and what each viewer is offered; `contracts`, `api-client` and `platform` behaviour | next to the code, `*.test.ts(x)` | Vitest (+ Testing Library on jsdom for components) |
+| **End to end** | **One happy path per feature**: the way a real person completes it, start to finish, in a phone-sized Chromium against the mocked API | `web/e2e/*.spec.ts` | Playwright |
+
+Unhappy paths, edge cases and rules are unit tests — fast and exact. The e2e suite stays one happy
+path per feature so it stays quick and trusted; a second e2e for a feature needs a reason a unit
+test cannot cover (the offline sighting queue is one). Both suites run in CI on every PR.
+
+---
+
 ## Stack
 
 | | |
@@ -326,7 +341,7 @@ arrives with the mobile scope. Users don't file bugs, they stop coming back.
 | Native sign-in *(scope 2)* | Google: Capawesome Google Sign-In or `@capgo/capacitor-social-login` (Credential Manager on Android, Google SDK on iOS). Apple: Sign in with Apple through the same plugin family. Behind `src/platform/auth` |
 | Live updates *(scope 2)* | **Capgo** or **Capawesome** — JS/asset fixes reach installed apps without review (Apple 3.3.2 allows it for JS and assets, never a change of purpose). Not Ionic Appflow: closed to new customers, shuts down 2027-12-31 |
 | Store builds *(scope 2)* | GitHub Actions — macOS runner for iOS (no Mac required), Linux for Android; signing secrets in CI, never in the repo |
-| Tooling | **Biome** (lint + format) · dependency-cruiser · size-limit · **Vitest** on `domain` · **Playwright** web e2e · Lighthouse CI on `/c/:code` |
+| Tooling | **Biome** (lint + format) · dependency-cruiser · size-limit · **Vitest** + Testing Library · **Playwright** web e2e (see *Testing*) · Lighthouse CI on `/c/:code` |
 
 Pin the current major of each at scaffold time — this doc goes stale faster than the ecosystem.
 

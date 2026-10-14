@@ -20,7 +20,8 @@
 - **Models in Claude Code** (`/model`): Opus 5.5 by default. Fable 5.1 for steps marked ★
   (architecture, native, hard debugging). Sonnet 5.5 for steps marked ◇ (repetitive UI from an
   already-set pattern).
-- **Global definition of done** for every PR: CI green (lint, types, tests, layer rule, size
+- **Global definition of done** for every PR: the feature has its unit tests and its happy-path
+  e2e ([frontend.md](frontend.md) · Testing); CI green (lint, types, tests, e2e, layer rule, size
   budget); new screens compared side by side with the design; no doc contradicted.
 
 ## Map
