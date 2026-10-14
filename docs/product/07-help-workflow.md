@@ -1,47 +1,50 @@
 # Help Workflow — States & Domain
 
-> The AYUDA vertical — money first, shaped so other kinds of help slot in later. Source of truth
-> for the help flow; where it disagrees with earlier docs, this one wins and the others get patched.
-> Reuses the machinery in [04](04-lost-workflow.md) — `case_checkin`, trust tiers from
-> [06](06-adoption-workflow.md) — and says so instead of restating it.
+> The AYUDA vertical — **help in kind, never money** (decision #26, 2026-10-14). Source of truth for
+> the help flow; where it disagrees with earlier docs, this one wins and the others get patched.
+> Reuses the machinery in [04](04-lost-workflow.md) — `case_checkin`, area + radius — and the trust
+> tiers from [06](06-adoption-workflow.md), and says so instead of restating it.
 > Domain identifiers are English/snake_case; Spanish strings are UI copy.
 
 ## The flow, in one pass
 
 ```
-beneficiary ──«Pedir ayuda»──▶ link gate ──▶ Vaki (or similar) ──▶ paste link
-  holds the pet                                                       │
-                                                                      ▼
-                                              help_request (active) ──▶ feed · shareable card
-                                                        │
-                                                        ├── «Quiero ayudar» → link-out (no row)
-                                                        ├── «Ya ayudé»      → help_contribution (registered)
-                                                        │
-                                                        └── check-ins ──▶ beneficiary updates progress ──▶ closed
-                                                                         beneficiary silent          ──▶ expired
+beneficiary ──«Pedir ayuda»──▶ needs (hogar temporal · transporte · insumos) ──▶ help_request (active)
+  holds the pet                                                                   │
+                                                                                  ▼
+                                                              feed (nearby) · shareable card
+                                                                                  │
+                                              «Yo ayudo» ──▶ help_pledge (registered, reachable)
+                                                                                  │
+                                              beneficiary marks it received ──▶ need covered
+                                                                                  │
+                                              check-ins ──▶ all covered / need ended ──▶ closed
+                                                            beneficiary silent       ──▶ expired
 ```
 
 ## The organizing insight
 
-**Link, don't host.** A help request is our card pointing at a campaign on a platform that already
-does the hard part — cards and PSE, receipts, its own KYC and anti-fraud, a progress bar. We never
-display a bank account or a Nequi handle, which removes the one scam surface a bulletin board of
-payment rails has: a cloned card with a swapped number. «Money never touches the platform» (product
-map, [03](03-legal-colombia.md)) becomes visibly true — not even the account number is on our page.
+**Ask for hands, not money.** A help request asks the people nearby for something they can give in
+person: a home for a few weeks, a ride to the vet, a bag of food, a crate. The platform carries no
+money and no trace of it — no amounts, no goals, no campaign links, no account numbers. That
+removes the fraud a bulletin board of money asks invites, and keeps the help where this product is
+strong: **proximity**. A lost dog is found by neighbours; a foster home, a ride and a bag of food
+come from the same neighbours.
 
-What we add over a WhatsApp forward of the Vaki link: the request lives on the **pet** (the history
-reads «encontrado en la calle → cirugía financiada → adoptado» on one row), a trust tier an operator
-can grant, a count of people who helped, and check-ins that keep a campaign from collecting money
-after the need has ended.
+What we add over a WhatsApp message to the neighbourhood group: the request lives on the **pet**
+(the history reads «encontrado en la calle → hogar temporal → adoptado» on one row), each need says
+exactly what is asked, the people who offer are reachable and accountable, and only the beneficiary
+says what actually arrived.
 
-`kind = money` is the only value in v1; the other kinds are deferred with their design
-([D10](../open-items.md)).
+**A request is always a bounded ask** — it must be able to end. «Hogar temporal por 2 semanas
+mientras se recupera» resolves; «transporte a la clínica el martes» resolves; «alguien que lo
+cuide siempre» is an adoption, not help ([06](06-adoption-workflow.md)). A lifelong condition lives
+on `pet.health_flags[]` ([06](06-adoption-workflow.md)), durable and case-less; it can still open a
+*bounded* request whenever there's a specific ask with an end.
 
-**A request is always a bounded ask** — it must be able to end. «Cirugía de cadera» resolves;
-«medicación por 3 meses» resolves; «apóyame cada mes para siempre» is a subscription in disguise
-and out of scope — recurring money relationships are exactly what we don't intermediate. A
-lifelong condition lives on `pet.health_flags[]` ([06](06-adoption-workflow.md)), durable
-and case-less; it can still open a *bounded* request whenever there's a specific ask with an end.
+**A request for money is not a help request.** No field takes an amount, a link or an account; a
+request whose story asks for money is out of scope and moderation closes it
+([09](09-reporting.md), reason `other`).
 
 ---
 
@@ -57,68 +60,68 @@ Must exist for the beneficiary (owner, custodian, or org). Untouched by this flo
 | Field | Notes |
 |---|---|
 | `pet_id`, `created_by` | The beneficiary holds the pet |
-| `kind` | `money` — only value in v1 |
-| `external_url`, `external_host` | The campaign. `https` required; host shown on the card («campaña en vaki.co»). **One URL, one request** — the same link on a second request is a scam pattern; reject it |
-| `story` | What happened, what's needed |
-| `evidence[]` | Photos: vet diagnosis, quote, invoice. Optional to publish, **required to become `verified`** |
-| `goal_amount?` (COP) | Optional — the platform already shows it; here it's for the card |
-| `raised_amount?`, `raised_updated_at` | **Self-reported by the beneficiary**, updated at check-in, labeled «según el beneficiario» everywhere it appears |
+| `story` | What happened, why the help is needed |
+| `photos[]` | The pet; optional evidence (a vet note) — never of a person |
+| `location_point`, `location_radius_m` | Where the help is needed — the same area picker and 200 m public floor as 04 · Location precision. Help in kind travels on proximity |
 | `trust_tier` | `unverified` · `verified` — below |
 | `status`, `resolution`, `published_at`, `resolved_at` | Lifecycle below; no schedule fields — `case_checkin` rows |
 
-No payout fields. No metadata fetched from the link — Vaki is a SPA with no OpenGraph we can rely
-on, so our card uses the pet's photo and the beneficiary's story, and the link is the button.
+### `help_need` — one row per thing asked
+| Field | Notes |
+|---|---|
+| `request_id` | One request carries 1–3 needs |
+| `kind` | `foster` · `transport` · `supplies` — the v1 set. Other kinds deferred ([D10](../open-items.md)) |
+| `detail` | Plain text, required: «2 semanas, mientras se recupera de la cirugía» · «De Envigado a la clínica en Laureles, martes 8 a. m.» · «Concentrado para gato adulto» |
+| `unit`, `target?` | `foster` → homes, target 1; `transport` → trips; `supplies` → units of what `detail` says («3 bultos»). Optional target = «lo que puedan» |
+| `needed_by?` | A date when it matters (the vet appointment) |
+| `status` | `open` · `covered` · `closed` — `covered` when confirmed reaches the target, set by the beneficiary |
 
-### `help_contribution` — «Ya ayudé»
-`request_id`, `person_id` (**always registered**), `amount?`, `created_at`.
+### `help_pledge` — «Yo ayudo»
+`need_id`, `person_id` (**registered**), `quantity` (default 1), `note?`, `status: pledged |
+confirmed | declined | withdrawn`, `created_at`, `confirmed_at?`.
 
-One per person per request. Self-reported, never verified. What it feeds, and what it must not:
-
-- The card shows **«14 personas ayudaron»** — a count, never a sum. The only money figure on the
-  card is the beneficiary's `raised_amount`, labeled as theirs. The two numbers stay visibly
-  separate so an unverified one never reads as verified.
-- The beneficiary sees the list — who to thank.
-- Points, when designed ([O8](../open-items.md)).
-
-This is the only vertical where the helper row comes *after* the channel: there is no channel,
-only a link-out, and the row is the donor's own claim.
+- **Contact is required.** A foster we cannot reach is not a foster: pledging asks for the phone
+  ([eng/auth.md](../eng/auth.md) · the phone step), and opens the channel to the beneficiary —
+  `wa.me` per the beneficiary's contact prefs, like a claim in 04.
+- **Only the beneficiary confirms.** `pledged → confirmed` when the ride happened, the food
+  arrived, the animal is in the foster home. A pledger never marks their own help as done.
+- **Progress shows both, never one self-reported number:** *confirmado* first, *prometido* second
+  — «1 de 1 hogar confirmado» · «2 bultos confirmados · 1 prometido».
+- The beneficiary sees who pledged — who to coordinate with, who to thank. Points, when designed
+  ([O8](../open-items.md)), count **confirmed** pledges only.
 
 ### `case_checkin`
-Reused from 04. Responses: `still_active | need_ended`. «Still active» carries the
-`raised_amount` update.
+Reused from 04. Responses: `still_needed | need_ended`. «Sigue» shows the open needs so the
+beneficiary can confirm what arrived in the same tap.
 
 ---
 
 ## Publishing
 
-The trip out to create a campaign happens **first**, before anything is written, so nobody fills a
-story and then leaves.
+No trip out of the app, nothing to paste. One form, the steps every vertical shares:
 
-**Step 1 — the link gate**
-> «Para pedir ayuda necesitas una campaña donde la gente pueda donar. ¿Ya la tienes?»
-> `[ Sí, pegar el enlace ]   [ Crear una en Vaki → ]`
+1. **The pet** — one the beneficiary already holds (owner, custodian of a found case, org).
+2. **The needs** — pick 1–3 kinds; each asks its `detail`, `target?` and `needed_by?`.
+3. **Where** — area picker with radius chips (04 · Location precision).
+4. **Story and photos** → publish. Phone step per the UI contract in [eng/auth.md](../eng/auth.md).
 
-«Crear en Vaki» opens the platform in the browser. When the beneficiary comes back, the app is
-still on this step with a paste field — form state lives on the device; nothing is saved
-server-side while they're away. No `draft` status, consistent with every other flow.
-
-**Step 2 — paste and validate**: `https`, host extracted and shown, uniqueness across requests.
-Any host is accepted — an allowlist would lock out whatever platform we haven't heard of; the
-`verified` tier is where an operator checks it's a real campaign.
-
-**Step 3 — story, evidence, goal** → publish. Three rows? No — one: the pet and link already
-exist. `help_request` is written alone. Phone step per the UI contract in
-[eng/auth.md](../eng/auth.md).
+`help_request` and its `help_need` rows are written together. No `draft` status.
 
 ### Trust: tiered, not gated
-- **`unverified`** — identity only. Publishes **immediately**, labeled prominently: «Sin verificar —
-  la plataforma no ha revisado evidencia». Most requests start here.
-- **`verified`** — an operator reviewed the evidence against the story and the link against the
-  platform, or the org's personería jurídica is already on file. Manual queue ([02 · operator
-  flows](02-flows.md)). Badge copy «Evidencia revisada» — *reviewed*, never *guaranteed*
+- **`unverified`** — identity only. Publishes **immediately**, labeled: «Sin verificar — la
+  plataforma no ha revisado quién pide». Most requests start here.
+- **`verified`** — an operator reviewed who is asking: the org's personería jurídica on file, or,
+  for an individual, a vet document that matches the pet and the story. Manual queue ([02 ·
+  operator flows](02-flows.md)). Badge copy «Revisado» — *reviewed*, never *guaranteed*
   ([03](03-legal-colombia.md)). Criteria: [O9](../open-items.md).
 
 Upgrading is the only review step; nothing waits on it.
+
+### Safety copy, both sides
+Help in kind means strangers meet and an animal changes hands. The pledge sheet and the
+beneficiary's pledge list carry the same short rule: meet in a public place for handovers; a
+foster home is a temporary arrangement between people, and the beneficiary stays responsible for
+the animal (`responsibility_link` does not move — a foster is not an adoption).
 
 ---
 
@@ -127,69 +130,63 @@ Upgrading is the only review step; nothing waits on it.
 ```mermaid
 stateDiagram-v2
     [*] --> active: beneficiary publishes
-    active --> active: contribution / checkin "sigue activa" (+ progress update)
-    active --> closed: beneficiary closes
+    active --> active: pledge / confirmation / checkin "sigue"
+    active --> closed: every need covered, or beneficiary closes
     active --> expired: 2 consecutive check-ins unanswered
-    active --> suspended: scam_or_extortion report
-    suspended --> active: cleared by review
-    suspended --> removed: confirmed fraud
     expired --> active: beneficiary reopens (≤30 days)
+    active --> removed: moderation
     closed --> [*]
     removed --> [*]
     expired --> [*]: purge after 30 days
 ```
 
-`suspended` is the one deliberate inversion of the reporting rule ([09](09-reporting.md), "a
-report never hides an active case by itself"): a `scam_or_extortion` report here pauses **our
-amplification** — feed, broadcast, share ranking — immediately and loudly, pending review against
-the O11 SLA. The money side lives on Vaki behind its own KYC; what we lend a campaign is
-credibility and reach, and that is what pauses. Loud means: the card shows «en revisión» (never
-"scam"), the beneficiary is told why with a reply channel, and clearing restores everything. Same
-mechanism as 09's auto-hide categories, same guards (device rate limits, reporter weight).
+Reports follow [09](09-reporting.md)'s general rule — a report never hides an active request by
+itself, except the auto-hide categories (`graphic_content`, `personal_data`). With no money on the
+page there is no money-collecting fraud to race, so help has no special suspension.
 
 ### `resolution` values
-`goal_reached` · `need_ended` · `pet_recovered` · `pet_deceased` · `no_response` ·
-`removed_by_moderation`
+`covered` · `need_ended` · `pet_deceased` · `no_response` · `removed_by_moderation`
 
-### Rule: silence is the fraud signal
-A request still collecting money after the pet recovered or died is the abuse case for this
-vertical, and the beneficiary going quiet is how it looks from our side. So check-ins matter more
-here than anywhere, and every confirmation is also a progress update.
+### Rule: only the beneficiary closes a need
+A need is `covered` when the beneficiary's confirmations reach its target, or when they say so.
+Pledges alone never close anything — a promise is not a ride.
 
 ### Rule: removal touches only the request
-`removed` leaves the pet, the links, and the contributions as they are. Contributors are not
-notified — their money is already gone, and there is nothing for them to do.
+`removed` leaves the pet, the links and the pledges' history as they are. Pledgers with an open
+pledge are told the request is no longer active (08).
 
 ---
 
 ## The follow-up loop
 
-Same negative framing, same machinery, with the update prompt built in:
+Same negative framing, same machinery, with the confirmation built in:
 
-> «La campaña de Max sigue activa. Si no nos confirmas, la archivaremos en 5 días.»
-> `[ Sigue activa — actualizar monto ]  [ Ya no necesita ayuda ]`
+> «La solicitud de Max sigue publicada. Si no nos confirmas, la archivaremos en 5 días.»
+> `[ Sigue — marcar lo que llegó ]  [ Ya no necesita ayuda ]`
 
-«Sigue activa» opens the `raised_amount` field. «Ya no necesita ayuda» asks why → `resolution`.
+«Sigue» lists the open needs and their pledges to confirm. «Ya no necesita ayuda» asks why →
+`resolution`.
 
-**Cadence:** T+7d, then every 14d. Escalation, interaction reset, soft expiry with a 30-day reopen:
-as in 04. Expiry never changes the pet or the links ([01, rule 7](01-actors-and-entities.md)).
+**Cadence:** T+7d, then every 14d — or the day after a `needed_by` date, whichever comes first.
+Escalation, interaction reset, soft expiry with a 30-day reopen: as in 04. Expiry never changes the
+pet or the links ([01, rule 7](01-actors-and-entities.md)).
 
 ---
 
 ## Reach
 
-Feed + shareable card (pet photo, AYUDA, host, link). **No geo push** — money doesn't travel on
-proximity the way a lost dog does; the card on WhatsApp is the channel. A push to a pet's past
-helpers («Luna, la que ayudaste a encontrar, necesita cirugía») is the obvious next thing and is
-deferred ([D9](../open-items.md)).
+Feed **by proximity** to `location_point`, national fallback like every feed, plus the shareable
+card (pet photo, NECESITA AYUDA, the needs in one line). **No geo push in v1** — the push budget
+belongs to lost pets; a push to a pet's past helpers («Luna, la que ayudaste a encontrar, necesita
+un hogar temporal») is the obvious next thing and is deferred ([D9](../open-items.md)).
 
 ---
 
 ## Moderation
 
-Every request carries the report button ([09-reporting.md](09-reporting.md)). `scam_or_extortion`
-suspends on the first report (state machine above); review clears it or confirms fraud →
-`removed`. Every other reason queues normally. Same queue as every other vertical.
+Every request carries the report button ([09-reporting.md](09-reporting.md)). A request that asks
+for money is closed as out of scope. Every reason queues normally; same queue as every other
+vertical.
 
 ---
 
@@ -197,8 +194,8 @@ suspends on the first report (state machine above); review clears it or confirms
 
 | Action | Anonymous | Registered |
 |---|---|---|
-| View, share, follow the link | ✓ | ✓ |
-| «Ya ayudé» | ✗ | ✓ |
+| View, share | ✓ | ✓ |
+| «Yo ayudo» | ✗ | ✓ — with a reachable phone |
 | Publish a request | ✗ | ✓ — holds the pet |
 | Report a publication (abuse) | ✓ — one tap, reason required ([09](09-reporting.md)) | ✓ |
 
@@ -211,26 +208,19 @@ Named only where something consumes them — **N** notification ([08](08-notific
 
 | Event | Consumer |
 |---|---|
-| `help_request.link_clicked` | M — the only evidence a donation *could* have happened; click-to-«ya ayudé» ratio is the engagement metric |
-| `help_contribution.created` | N — beneficiary, coalesced |
+| `help_pledge.created` | N — beneficiary |
+| `help_pledge.confirmed` | N — the pledger («Llegó, gracias») |
+| `help_request.closed` | N — pledgers with an open pledge |
 | `help_request.expired` | N — beneficiary |
-| `help_request.suspended` | N — beneficiary, with the reason and a reply channel |
-| `help_request.removed` | N — beneficiary |
+| `help_request.removed` | N — beneficiary; pledgers with an open pledge |
+
+Pledges per need and confirmation rates are queries over rows, not events.
 
 Notifications: [`08-notifications.md`](08-notifications.md) → **Help**.
-
----
-
-## Partnership, later
-
-Two things that need the platform's cooperation, neither blocking v1 ([D11](../open-items.md)):
-a prefilled create-campaign deep link so Step 1 lands on a half-filled form, and a read API so
-`raised_amount` updates itself instead of through check-ins.
 
 ## Open items
 
 Tracked in [`open-items.md`](../open-items.md):
 
 - **Open** — O9 verification criteria for `verified`
-- **Deferred** — D8 closure message to contributors · D9 push to a pet's past helpers · D10 other
-  `kind`s · D11 platform partnership (prefill + progress API)
+- **Deferred** — D9 push to a pet's past helpers · D10 other `kind`s

@@ -46,9 +46,9 @@ describe('ReportForm — 09 · anonymous, a reason and nothing else', () => {
     expect(screen.getByText(/la ocultamos de inmediato/)).toBeTruthy()
   })
 
-  it('says a scam report pauses a help request (rule 4)', () => {
+  it('a scam report on a help request goes to the queue like any other (07, #26)', () => {
     show('help_request')
     fireEvent.click(screen.getByLabelText('Estafa o piden dinero'))
-    expect(screen.getByText(/la pausamos de inmediato/)).toBeTruthy()
+    expect(screen.queryByText(/la pausamos de inmediato/)).toBeNull()
   })
 })

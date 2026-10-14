@@ -3,33 +3,6 @@
 import type { AdoptionCase, Intro } from '@contracts/adoption'
 import type { Translator } from '@i18n/translate'
 
-/**
- * «$150.000» — pesos, no decimals: the unit `fee_cop` names (06), written the way pesos are written
- * where they are spent, in the screen's language.
- */
-export const pesos = (i18n: Translator, amount: number) =>
-  new Intl.NumberFormat(`${i18n.locale}-CO`, {
-    style: 'currency',
-    currency: 'COP',
-    currencyDisplay: 'narrowSymbol',
-    maximumFractionDigits: 0,
-  }).format(amount)
-
-/** «Sin cuota» · «Cuota de recuperación: $150.000» — disclosed always, zero included (06). */
-export function feeLine(i18n: Translator, fee: AdoptionCase['fee']): string {
-  return fee.cop === 0
-    ? i18n.t('adoption.page.fee_none')
-    : i18n.t('adoption.page.fee_some', { amount: pesos(i18n, fee.cop) })
-}
-
-/** «Cubre esterilización, vacunas y desparasitación.», or null when there is nothing to cover. */
-export function feeCoversLine(i18n: Translator, fee: AdoptionCase['fee']): string | null {
-  if (fee.cop === 0 || fee.covers.length === 0) return null
-  return i18n.t('adoption.page.fee_covers', {
-    covers: i18n.list(fee.covers.map((cover) => i18n.t(`adoption.covers.${cover}`))),
-  })
-}
-
 /** The band: status first (10 §1), «En proceso» while someone is chosen. */
 export function bandFor(i18n: Translator, listing: Pick<AdoptionCase, 'status' | 'reserved'>) {
   const { t } = i18n

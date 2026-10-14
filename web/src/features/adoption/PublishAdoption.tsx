@@ -10,8 +10,6 @@ import {
   adoptionStepErrors,
   draftFromFound,
   emptyAdoptionDraft,
-  FEE_COVERS,
-  feeAmount,
   HEALTH_FLAGS,
   type ListerRole,
   REQUIREMENT_FLAGS,
@@ -47,9 +45,6 @@ const errorKey: Record<AdoptionDraftError, TextKey> = {
   ...draftErrorKey,
   role_required: 'adoption_forms.publish.errors.role_required',
   story_required: 'adoption_forms.publish.errors.story_required',
-  fee_required: 'adoption_forms.publish.errors.fee_required',
-  fee_amount_required: 'adoption_forms.publish.errors.fee_amount_required',
-  fee_covers_required: 'adoption_forms.publish.errors.fee_covers_required',
   external_url_invalid: 'adoption_forms.publish.errors.external_url_invalid',
 }
 
@@ -86,7 +81,7 @@ type Props = {
 
 /**
  * Publishing an adoption listing (docs/product/06 · `adoption_case`) with the phone step of
- * docs/eng/auth.md. The fee is disclosed always, zero included; health flags go on the pet.
+ * docs/eng/auth.md. Health flags go on the pet.
  */
 export function PublishAdoption({
   user,
@@ -119,8 +114,7 @@ export function PublishAdoption({
 
   function send(otpCode: string | null) {
     const { species, size, center } = draft
-    const fee = feeAmount(draft)
-    if (!species || !size || !center || fee === null) return
+    if (!species || !size || !center) return
     publish.mutate({
       fromFoundCaseCode: fromFound?.code ?? null,
       listerRole: draft.listerRole ?? 'custodian',
@@ -135,8 +129,6 @@ export function PublishAdoption({
       temperament: draft.temperament,
       requirementFlags: draft.requirementFlags,
       requirements: draft.requirements.trim() || null,
-      feeCop: fee,
-      feeCovers: draft.feeCovers,
       center,
       radiusM: draft.radiusM,
       externalUrl: draft.externalUrl.trim() || null,
@@ -276,44 +268,6 @@ export function PublishAdoption({
             value={draft.requirements}
             onChange={(event) => set({ requirements: event.target.value })}
           />
-          <Section title={t('adoption_forms.publish.fee_title')} error={errorFor('fee_required')}>
-            <p className="m-0 text-sm text-muted">{t('adoption_forms.publish.fee_hint')}</p>
-            <Chips
-              label={t('adoption_forms.publish.fee_title')}
-              options={[
-                { value: 'no', label: t('adoption_forms.publish.fee_no') },
-                { value: 'yes', label: t('adoption_forms.publish.fee_yes') },
-              ]}
-              value={draft.hasFee === null ? '' : draft.hasFee ? 'yes' : 'no'}
-              onChange={(answer) => set({ hasFee: answer === 'yes' })}
-            />
-          </Section>
-          {draft.hasFee ? (
-            <>
-              <TextField
-                label={t('adoption_forms.publish.fee_amount')}
-                inputMode="numeric"
-                error={errorFor('fee_amount_required')}
-                value={draft.fee}
-                onChange={(event) => set({ fee: event.target.value })}
-              />
-              <Section
-                title={t('adoption_forms.publish.fee_covers')}
-                error={errorFor('fee_covers_required')}
-              >
-                <MultiChips
-                  label={t('adoption_forms.publish.fee_covers')}
-                  options={FEE_COVERS.map((value) => ({
-                    value,
-                    label: t(`adoption.covers.${value}`),
-                  }))}
-                  values={draft.feeCovers}
-                  onChange={(feeCovers) => set({ feeCovers })}
-                />
-              </Section>
-              <p className="m-0 text-sm text-muted">{t('adoption_forms.publish.fee_money')}</p>
-            </>
-          ) : null}
         </>
       ) : null}
 

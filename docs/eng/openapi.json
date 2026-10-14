@@ -950,7 +950,7 @@
     "/adoption-cases": {
       "post": {
         "operationId": "publishAdoption",
-        "summary": "Publishes an adoption listing, with the same phone step as every publish. With `from_found_case_code` it is the day-15 conversion of the caller’s found case: same pet, the found case `converted`. A fee above the local norm on a person’s listing is published and queued for moderation — never blocked, never silent.",
+        "summary": "Publishes an adoption listing, with the same phone step as every publish. With `from_found_case_code` it is the day-15 conversion of the caller’s found case: same pet, the found case `converted`.",
         "tags": [
           "adoption-cases"
         ],
@@ -1106,23 +1106,6 @@
                       }
                     ]
                   },
-                  "fee_cop": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 5000000
-                  },
-                  "fee_covers": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "enum": [
-                        "sterilization",
-                        "vaccines",
-                        "deworming",
-                        "microchip"
-                      ]
-                    }
-                  },
                   "location_point": {
                     "type": "object",
                     "properties": {
@@ -1212,8 +1195,6 @@
                   "temperament",
                   "requirement_flags",
                   "requirements",
-                  "fee_cop",
-                  "fee_covers",
                   "location_point",
                   "location_radius_m",
                   "external_url",
@@ -6300,33 +6281,6 @@
                             "null"
                           ]
                         },
-                        "fee": {
-                          "type": "object",
-                          "properties": {
-                            "cop": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            "covers": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "enum": [
-                                  "sterilization",
-                                  "vaccines",
-                                  "deworming",
-                                  "microchip"
-                                ]
-                              }
-                            }
-                          },
-                          "required": [
-                            "cop",
-                            "covers"
-                          ],
-                          "additionalProperties": false
-                        },
                         "location": {
                           "type": "object",
                           "properties": {
@@ -6605,7 +6559,6 @@
                         "temperament",
                         "requirement_flags",
                         "requirements",
-                        "fee",
                         "location",
                         "trust_tier",
                         "lister_name",

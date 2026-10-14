@@ -1,7 +1,7 @@
 import { expect, tags, test } from './test.ts'
 
 test(
-  'list a rescued cat for adoption: sign in, tell her story, disclose the fee, verify the phone',
+  'list a rescued cat for adoption: sign in, tell her story, verify the phone',
   tags('@publish-adoption', '@PADOPT-001'),
   async ({ publish, adoption }) => {
     await test.step('«Dar en adopción» asks for an account', async () => {
@@ -17,7 +17,7 @@ test(
       await publish.next()
     })
 
-    await test.step('her story, and the fee disclosed even when there is none', async () => {
+    await test.step('her story', async () => {
       await publish.tellStory('La encontré en una caja en Robledo. Es muy cariñosa.')
     })
 
@@ -26,7 +26,6 @@ test(
       await publish.phone.publishVerifying('300 715 2284', undefined, 'Publicar en adopción')
       await publish.published.openListing()
       await expect(adoption.title('Pelusa')).toBeVisible()
-      await expect(adoption.fee('Sin cuota')).toBeVisible()
       await expect(adoption.noInterestsYet).toBeVisible()
     })
   },

@@ -205,7 +205,6 @@ describe('link preview of a case (docs/product/10 §2)', () => {
       temperament: [],
       requirement_flags: [],
       requirements: null,
-      fee: { cop: 0, covers: [] },
       location: { center: { lat: 6.17, lng: -75.59 }, radius_m: 500, place_name: 'Envigado' },
       trust_tier: 'individual',
       lister_name: 'Fundación Patitas',

@@ -373,8 +373,8 @@ the custodian must be reachable and accountable for a live animal.
   [06](06-adoption-workflow.md) — and `adopted_in_app` transfers the link to the adopter.
   The `org` role and `custody_state = org_held` exist and are unused in v1; the structured
   `transferred_to_org` (D4) is the bridge from a finder to a foundation's listing.
-- **Help** (fundraising): a custodian holding an injured stray is the most common reason a
-  campaign exists for an `unclaimed` pet. The pet row is the attachment point; nothing else here
+- **Help** (in kind): a custodian holding an injured stray is the most common reason a
+  help request — a foster home, a ride to the vet — exists for an `unclaimed` pet. The pet row is the attachment point; nothing else here
   needs to change.
 
 ---

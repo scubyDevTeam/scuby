@@ -72,7 +72,6 @@ listings carry the `verified` badge. Nothing else. Inboxes, members, roles: not 
 | `temperament[]` | Chips describing the **animal**: `good_with_kids`, `good_with_cats`, `good_with_dogs`, `senior`, `puppy` |
 | `requirement_flags[]` | Curated enum array describing the **home**: `needs_yard`, `no_small_children`, `no_other_dogs`, `indoor_only`, `experienced_home`. Extending it is adding an enum value — no migration (enum array + GIN in Postgres; a join table if the DB ends up elsewhere). **Curated, never free-form tags** — the moment anyone can invent one, they stop being filters |
 | `requirements` | Free text for everything the flags don't say |
-| `fee_cop`, `fee_covers[]` | **Disclosure is mandatory, including zero** — see the fee rule |
 | `lane` | `light \| application` — only `light` legal in v1 (B2P seam) |
 | `location_point`, `location_radius_m` | Where the animal is. Area, not pin; public render floored at 200 m — the lost/found rule |
 | `contact_prefs` | `expose_whatsapp`, `expose_email`, `in_app_only` |
@@ -139,21 +138,11 @@ Anything heavier — configurable screening questions, shortlists, stages — is
 Reused from 04. Responses: `still_available | adopted | no_longer_available`. **Check-ins are per
 case; delivery is per lister; cadence by lister type** (below).
 
-### Rule: fee disclosure is mandatory, including zero
+### Rule: no money in a listing
 
-The **cuota de recuperación** — the adopter reimbursing sterilization, vaccines, deworming — is
-standard practice in Colombia, for orgs and individual rescuers alike, and it exists whether we
-model it or not; unmodeled, it just surprises the adopter in chat. So `fee_cop` cannot be blank:
-
-> «Cuota de recuperación: $150.000 — cubre esterilización, vacunas y desparasitación»
-> «Sin cuota»
-
-Display-only, never through the platform (money principle, unchanged). A non-zero fee **requires
-`fee_covers[]` entries**; and on individual listings — where there's no institution behind the
-number and «adopción con cuota» is the standard cover for a breeder selling puppies — a fee above
-the local norm — a per-country configured amount, [O18](../open-items.md) — routes to the moderation queue on publish ([09](09-reporting.md)). Never blocked,
-never silent. Structured fees also make the breeder pattern a *query* (high fee + no covers +
-unsterilized litter of one breed) instead of a human reading posts.
+A listing has **no fee field** and the platform says nothing about money — not a «cuota de
+recuperación», not «sin cuota» (decision #26). Whatever two people agree in chat stays between
+them, like everything else in the screening ([03](03-legal-colombia.md), intermediary posture).
 
 ---
 

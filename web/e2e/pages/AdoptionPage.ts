@@ -9,7 +9,6 @@ export class AdoptionPage {
   readonly page: Page
   readonly signIn: SignIn
   readonly sheet: Locator
-  readonly fee: (text: string) => Locator
   readonly interestedNote: Locator
   readonly adopterSafety: Locator
   readonly interests: Locator
@@ -19,7 +18,6 @@ export class AdoptionPage {
     this.page = page
     this.signIn = new SignIn(page)
     this.sheet = page.getByRole('dialog')
-    this.fee = (text) => page.getByText(text, { exact: true })
     this.interestedNote = page.getByText('Ya te anotaste.')
     this.adopterSafety = this.sheet.getByText(/Nunca pagues nada antes de conocerlo/)
     this.interests = page.getByRole('region', { name: 'Personas interesadas' })

@@ -1,4 +1,4 @@
-// docs/product/06 · `adoption_case` and the fee rule: what the listing form asks and checks.
+// docs/product/06 · `adoption_case`: what the listing form asks and checks.
 // Pre-checks for feedback; the server decides.
 import type { Point } from '../shared/geo'
 import type { PhoneRules } from '../shared/phone'
@@ -32,7 +32,6 @@ export type HealthFlag =
   | 'fiv_felv'
   | 'mobility_aid'
   | 'behavioral_support'
-export type FeeCover = 'sterilization' | 'vaccines' | 'deworming' | 'microchip'
 export type ListerRole = 'owner' | 'custodian'
 
 export const TEMPERAMENTS: readonly Temperament[] = [
@@ -57,12 +56,6 @@ export const HEALTH_FLAGS: readonly HealthFlag[] = [
   'mobility_aid',
   'behavioral_support',
 ]
-export const FEE_COVERS: readonly FeeCover[] = [
-  'sterilization',
-  'vaccines',
-  'deworming',
-  'microchip',
-]
 
 export type AdoptionDraft = AnimalDraft &
   ContactDraft & {
@@ -72,11 +65,6 @@ export type AdoptionDraft = AnimalDraft &
     temperament: Temperament[]
     requirementFlags: RequirementFlag[]
     requirements: string
-    /** «¿Pides una cuota de recuperación?» — unanswered is not «no»: disclosure is mandatory. */
-    hasFee: boolean | null
-    /** Digits as typed, in pesos. */
-    fee: string
-    feeCovers: FeeCover[]
     center: Point | null
     radiusM: number
     externalUrl: string
@@ -91,9 +79,6 @@ export const emptyAdoptionDraft: AdoptionDraft = {
   temperament: [],
   requirementFlags: [],
   requirements: '',
-  hasFee: null,
-  fee: '',
-  feeCovers: [],
   center: null,
   radiusM: DEFAULT_RADIUS_M,
   externalUrl: '',
@@ -103,34 +88,7 @@ export type AdoptionDraftError =
   | DraftError
   | 'role_required'
   | 'story_required'
-  | 'fee_required'
-  | 'fee_amount_required'
-  | 'fee_covers_required'
   | 'external_url_invalid'
-
-/** The amount in pesos: 0 for «Sin cuota», null while the answer is missing or not a number. */
-export function feeAmount(draft: Pick<AdoptionDraft, 'hasFee' | 'fee'>): number | null {
-  if (draft.hasFee === null) return null
-  if (!draft.hasFee) return 0
-  const digits = draft.fee.replace(/\D/g, '')
-  const amount = digits ? Number(digits) : 0
-  return amount > 0 ? amount : null
-}
-
-/**
- * The fee rule (06): the cuota cannot be left blank — zero is an answer, «Sin cuota» — and a
- * non-zero fee must say what it reimburses.
- */
-export function feeErrors(
-  draft: Pick<AdoptionDraft, 'hasFee' | 'fee' | 'feeCovers'>,
-): AdoptionDraftError[] {
-  if (draft.hasFee === null) return ['fee_required']
-  if (!draft.hasFee) return []
-  const errors: AdoptionDraftError[] = []
-  if (feeAmount(draft) === null) errors.push('fee_amount_required')
-  if (draft.feeCovers.length === 0) errors.push('fee_covers_required')
-  return errors
-}
 
 export const isWebUrl = (value: string) => /^https?:\/\/\S+\.\S+/.test(value.trim())
 
@@ -140,7 +98,7 @@ type Context = { phoneRules: PhoneRules | null; verifiedPhone: string | null; co
 
 /**
  * 1 · who is looking for a home (name and photo: a listing is a person's post about one animal),
- * 2 · their story, the home they need and the fee, 3 · where they are and how to reach the lister.
+ * 2 · their story and the home they need, 3 · where they are and how to reach the lister.
  */
 export function adoptionStepErrors(
   step: AdoptionStep,
@@ -154,9 +112,7 @@ export function adoptionStepErrors(
     return errors
   }
   if (step === 2) {
-    const errors: AdoptionDraftError[] = []
-    if (!draft.story.trim()) errors.push('story_required')
-    return [...errors, ...feeErrors(draft)]
+    return draft.story.trim() ? [] : ['story_required']
   }
   const errors: AdoptionDraftError[] = []
   if (!draft.center) errors.push('place_required')

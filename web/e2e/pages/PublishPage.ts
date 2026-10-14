@@ -60,12 +60,11 @@ export class PublishPage {
     })
   }
 
-  /** Step 2: the story, and the fee — disclosed always, «Sin cuota» included. */
+  /** Step 2: the story. */
   tellStory(story: string) {
-    return step('Tell their story, «Sin cuota»', async () => {
+    return step('Tell their story', async () => {
       const field = this.page.getByLabel(/Cuéntanos su historia/)
       if (story) await field.fill(story)
-      await this.page.getByRole('button', { name: 'Sin cuota' }).click()
       await this.next()
     })
   }

@@ -144,16 +144,16 @@ Events: see `07-help-workflow.md` → Events. **No broadcast.**
 
 | Event | Channel | Copy | Rule |
 |---|---|---|---|
-| `help_contribution.created` | push | «Alguien ayudó en la campaña de Max.» | Coalesce window: 1 h («3 personas ayudaron»). Not priority |
-| `help_request.expired` | push + email | «Archivamos la campaña de Max. Puedes reactivarla con un toque hasta el 12 de sep.» | Includes reopen deadline |
-| `help_request.suspended` | push + email | «Pusimos la campaña de Max en revisión por un reporte. Responde a este correo para aclararlo.» | Loud, never silent — the card shows «en revisión» while paused |
-| `help_request.removed` | push + email | «Retiramos la campaña de Max por reportes. Responde a este correo si crees que es un error.» | Reply channel is the email |
+| `help_pledge.created` | push | «Laura ofrece un hogar temporal para Max. Escríbele para coordinar.» | Not coalesced: each pledge is someone to talk to. Not priority |
+| `help_request.expired` | push + email | «Archivamos la solicitud de ayuda de Max. Puedes reactivarla con un toque hasta el 12 de sep.» | Includes reopen deadline |
+| `help_request.removed` | push + email | «Retiramos la solicitud de ayuda de Max por reportes. Responde a este correo si crees que es un error.» | Reply channel is the email |
 
-### To contributors
+### To the people who offered
 
-Nothing in v1. A closure message when the request closes («Max se recuperó — gracias») is deferred
-([D8](../open-items.md)). Contributors are **not** told about a removal — their money is already
-gone and there is nothing for them to do.
+| Event | Channel | Copy | Rule |
+|---|---|---|---|
+| `help_pledge.confirmed` | push | «Llegó lo que ofreciste para Max. Gracias.» | Not priority |
+| `help_request.closed` · `.removed` | push | «La solicitud de Max ya no está activa. Gracias por ofrecer.» | Only to pledges still `pledged` |
 
 ---
 

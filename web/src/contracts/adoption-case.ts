@@ -38,8 +38,6 @@ export const healthFlagSchema = z.enum([
   'mobility_aid',
   'behavioral_support',
 ])
-/** What a cuota de recuperación reimburses. */
-export const feeCoverSchema = z.enum(['sterilization', 'vaccines', 'deworming', 'microchip'])
 /** `verified`: an org whose documents were reviewed. `individual`: identity only. */
 export const trustTierSchema = z.enum(['verified', 'individual'])
 export const housingSchema = z.enum(['house', 'apartment'])
@@ -52,7 +50,6 @@ export type AdoptionResolution = z.infer<typeof adoptionResolutionSchema>
 export type Temperament = z.infer<typeof temperamentSchema>
 export type RequirementFlag = z.infer<typeof requirementFlagSchema>
 export type HealthFlag = z.infer<typeof healthFlagSchema>
-export type FeeCover = z.infer<typeof feeCoverSchema>
 export type TrustTier = z.infer<typeof trustTierSchema>
 export type Housing = z.infer<typeof housingSchema>
 export type ListerRole = z.infer<typeof listerRoleSchema>
@@ -116,8 +113,6 @@ export const adoptionCaseWire = z.object({
   temperament: z.array(temperamentSchema),
   requirement_flags: z.array(requirementFlagSchema),
   requirements: z.nullable(z.string()),
-  /** Disclosure is mandatory, including zero (06 · fee rule). Display only: no money moves here. */
-  fee: z.object({ cop: z.int().check(z.nonnegative()), covers: z.array(feeCoverSchema) }),
   /** Where the animal is: an area, rendered at 200 m or more in public — the lost/found rule. */
   location: z.object({
     center: point,
@@ -187,7 +182,6 @@ export type AdoptionCase = {
   temperament: Temperament[]
   requirementFlags: RequirementFlag[]
   requirements: string | null
-  fee: { cop: number; covers: FeeCover[] }
   location: { center: { lat: number; lng: number }; radiusM: number; placeName: string }
   trustTier: TrustTier
   listerName: string
@@ -232,7 +226,6 @@ export function toAdoptionCase(wire: z.infer<typeof adoptionCaseWire>): Adoption
     temperament: wire.temperament,
     requirementFlags: wire.requirement_flags,
     requirements: wire.requirements,
-    fee: wire.fee,
     location: {
       center: wire.location.center,
       radiusM: wire.location.radius_m,

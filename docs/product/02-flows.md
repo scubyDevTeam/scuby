@@ -48,12 +48,12 @@ Depth decision: **listing vertical, not screening vertical — individuals first
 
 > Summary only. Source of truth: [07-help-workflow.md](07-help-workflow.md).
 
-Money **never** touches the platform — and neither do payment details. **Link, don't host.**
+**Help in kind, never money** — no amounts, no campaign links, no account numbers.
 
-1. **Beneficiary who holds the pet creates a campaign on a crowdfunding platform** (Vaki or similar) — the form's first step sends them there if they don't have one — then pastes the link. One link, one request.
-2. **Request attached to the Pet**: story, optional evidence (vet diagnosis/quote), optional goal. Trust tier displayed prominently: **unverified** (identity only, publishes immediately, clearly labeled) vs **verified** (operator reviewed evidence and link; personería jurídica for foundations).
-3. **«Quiero ayudar» is a link-out.** Donors pay on the platform. «Ya ayudé» (account required) is the only record we keep — shown as a count of people, never a sum. Progress is self-reported by the beneficiary at each check-in, labeled as theirs.
-4. **Check-ins keep it honest**: silence after the need ended is the fraud signal. Every request carries the report button; reports feed the moderation queue.
+1. **Beneficiary who holds the pet asks for 1–3 needs**: `foster` (a temporary home), `transport` (a ride, usually to the vet), `supplies` (food, a crate, medicine bought in kind) — each with what exactly, how many, by when — plus the area and the story.
+2. **Request attached to the Pet**, shown by proximity. Trust tier displayed prominently: **unverified** (identity only, publishes immediately, clearly labeled) vs **verified** (operator reviewed who is asking; personería jurídica for foundations).
+3. **«Yo ayudo» is a pledge** (account and a reachable phone required) that opens the channel to the beneficiary. **Only the beneficiary marks it received**; progress shows *confirmado* first, *prometido* second.
+4. **Check-ins close it**: when every need is covered or the need ended. Every request carries the report button; a request asking for money is closed as out of scope.
 
 ## Cross-cutting: moderation & verification (operator flows)
 

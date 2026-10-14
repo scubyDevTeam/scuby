@@ -36,11 +36,10 @@ function show(data: AdoptionCase, routes: Parameters<typeof stubApi>[0] = {}) {
 }
 
 describe('AdoptionCasePage — seen by anyone (06 · identity ladder)', () => {
-  it('names the animal, discloses the fee — zero included — and says who published it, honestly', () => {
+  it('names the animal and says who published it, honestly', () => {
     show(listing('AD9PT'))
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Nube')
     expect(screen.getByText('En adopción')).toBeTruthy()
-    expect(screen.getByText('Sin cuota')).toBeTruthy()
     expect(
       screen.getByText('Publicado por una persona — la verificación es entre ustedes.'),
     ).toBeTruthy()
@@ -55,12 +54,11 @@ describe('AdoptionCasePage — seen by anyone (06 · identity ladder)', () => {
     expect(screen.queryByRole('region', { name: 'Personas interesadas' })).toBeNull()
   })
 
-  it('surfaces the health flags and says what a fee covers', () => {
+  it('surfaces the health flags', () => {
     show(listing('B3TOS'))
     const health = within(screen.getByRole('region', { name: 'Su salud' }))
     expect(health.getByText('Adulto mayor')).toBeTruthy()
     expect(health.getByText('Necesita ayuda para moverse')).toBeTruthy()
-    expect(screen.getByText('Cubre esterilización, vacunas y desparasitación.')).toBeTruthy()
   })
 
   it('«en proceso» invites backups instead of closing the door', () => {

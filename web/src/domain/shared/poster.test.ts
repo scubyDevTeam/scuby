@@ -30,8 +30,8 @@ describe('docs/product/10 §3 · Layout 5: one line of footer copy per vertical'
   it.each([
     ['lost', 'no_upfront_money'],
     ['found', 'no_upfront_money'],
-    ['help', 'verify_campaign'],
     ['adoption', null],
+    ['help', null],
   ] as const)('%s → %s', (vertical, footer) => {
     expect(posterFooter(vertical)).toBe(footer)
   })

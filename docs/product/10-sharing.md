@@ -77,7 +77,7 @@ Generated **on the device**, HTML canvas, no server. Same data as the preview, t
    | found · active | `SE ENCONTRÓ` |
    | adoption · active | `EN ADOPCIÓN` |
    | help · active | `NECESITA AYUDA` |
-   | any · resolved | `YA ESTÁ EN CASA` · `ADOPTADO` · `CAMPAÑA CERRADA` |
+   | any · resolved | `YA ESTÁ EN CASA` · `ADOPTADO` · `YA TIENE AYUDA` |
 
 2. **Photo, edge to edge** — on a pole, the photo *is* the message. Owner-adjustable: zoom slider +
    drag, state `{zoom, panX, panY}` kept relative so switching formats keeps the crop. Redraw
@@ -90,8 +90,7 @@ Generated **on the device**, HTML canvas, no server. Same data as the preview, t
    día y contacto directo»). QR generated locally (error-correction M; quiet zone respected; for
    `print`, the QR is at least 30 mm).
 5. **One line of footer copy** per vertical: lost/found — «Nadie que de verdad lo tenga te va a
-   pedir dinero por adelantado.»; help — «Campaña en vaki.co — verifica antes de donar.»;
-   adoption — none.
+   pedir dinero por adelantado.»; help and adoption — none.
 
 No photo → a large paw glyph and «Sin foto — mira las señas». Never a grey block.
 

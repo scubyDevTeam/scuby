@@ -9,18 +9,11 @@ describe('09 · The rules — what a first report does by itself', () => {
     },
   )
 
-  it('a scam report suspends a help request, which collects money', () => {
-    expect(reportEffect('scam_or_extortion', 'help_request')).toBe('suspended_pending_review')
-  })
-
-  it('a scam report on any other publication only queues', () => {
-    expect(reportEffect('scam_or_extortion', 'lost_case')).toBe('queued')
-  })
-
-  it('no other reason ever hides an active case by itself', () => {
-    const quiet = REPORT_REASONS.filter(
-      (r) => r !== 'graphic_content' && r !== 'personal_data' && r !== 'scam_or_extortion',
-    )
-    for (const reason of quiet) expect(reportEffect(reason, 'lost_case')).toBe('queued')
-  })
+  it.each(['lost_case', 'help_request'] as const)(
+    'no other reason ever hides an active %s by itself — help included (07, #26)',
+    (target) => {
+      const quiet = REPORT_REASONS.filter((r) => r !== 'graphic_content' && r !== 'personal_data')
+      for (const reason of quiet) expect(reportEffect(reason, target)).toBe('queued')
+    },
+  )
 })

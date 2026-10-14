@@ -96,8 +96,6 @@ function listing(
     temperament: [],
     requirement_flags: [],
     requirements: null,
-    fee_cop: 0,
-    fee_covers: [],
     lane: 'light',
     external_url: null,
     trust_tier: 'individual',
@@ -297,8 +295,8 @@ export function seed(): Tables {
       },
     }),
     listing({
-      // Born from R3SCU at the day-15 offer, with a fee that says what it covers. Someone was
-      // chosen: «En proceso», and it ranks below the listings still waiting.
+      // Born from R3SCU at the day-15 offer. Someone was chosen: «En proceso», and it ranks
+      // below the listings still waiting.
       code: 'B3TOS',
       pet_id: 'pet-canela',
       created_by: 'user-marcela',
@@ -310,8 +308,6 @@ export function seed(): Tables {
         'despacio: necesita a alguien con paciencia.',
       temperament: ['good_with_kids', 'good_with_dogs', 'senior'],
       requirement_flags: ['experienced_home'],
-      fee_cop: 120_000,
-      fee_covers: ['sterilization', 'vaccines', 'deworming'],
       location: {
         center: offset(-1700, -700),
         radius_m: 300,

@@ -22,8 +22,8 @@ Context: [regional overview](http://www.scielo.org.co/scielo.php?script=sci_artt
 
 1. **Terms of Service defining us as an intermediary**:
    - Adoptions are agreements between the adopter and the publisher — a person in v1, a foundation later — we facilitate contact, nothing more. We never approve an adopter or adjudicate ownership.
-   - Donations are transfers between donor and beneficiary — money never passes through us.
-   - Verification badges mean "we reviewed a document," **not** "we guarantee this person/campaign."
+   - No money is handled or shown: no donations, no fees ([00 · #26](00-product-map.md)). Help is in kind and arranged between people; a foster home does not move responsibility for the animal.
+   - Verification badges mean "we reviewed a document," **not** "we guarantee this person or organization."
 2. **Ley 1581 compliance**: privacy policy, consent at signup, data-treatment policy (política de tratamiento de datos), user rights channel (consulta/reclamo).
 3. **One lawyer review** of the ToS + privacy policy (~1–2M COP). The only legal spend at launch.
 
