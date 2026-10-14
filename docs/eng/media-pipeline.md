@@ -93,6 +93,10 @@ not a migration.
 Public reads go through the CDN with no auth. Restricted ones are signed URLs, short TTL, issued
 by the page that's allowed to show them. Nothing internal is ever one guessable hash away.
 
+Public variants are served with **`Access-Control-Allow-Origin`** for the app's origin: the poster
+([10](../product/10-sharing.md) §3) draws the photo on a canvas and exports it, and a canvas holding a
+cross-origin image without CORS cannot be exported.
+
 ---
 
 ## 5. Retention
