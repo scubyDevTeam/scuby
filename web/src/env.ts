@@ -29,4 +29,5 @@ export const env = {
   mapStyleUrl: optional('VITE_MAP_STYLE_URL'),
   vapidPublicKey: optional('VITE_VAPID_PUBLIC_KEY'),
   sentryDsn: optional('VITE_SENTRY_DSN'),
+  legalEmail: optional('VITE_LEGAL_EMAIL'),
 } as const

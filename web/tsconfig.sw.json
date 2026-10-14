@@ -1,0 +1,42 @@
+// The service worker: a worker, not a page — WebWorker types instead of the DOM.
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.sw.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "WebWorker"],
+    "module": "esnext",
+    "types": ["vite/client"],
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* One alias per layer — mirror changes in vite.config.ts */
+    "paths": {
+      "@routes/*": ["./src/routes/*"],
+      "@features/*": ["./src/features/*"],
+      "@api-client/*": ["./src/api-client/*"],
+      "@contracts/*": ["./src/contracts/*"],
+      "@domain/*": ["./src/domain/*"],
+      "@platform/*": ["./src/platform/*"],
+      "@ui/*": ["./src/ui/*"],
+      "@i18n/*": ["./src/i18n/*"],
+      "@mocks/*": ["./src/mocks/*"]
+    },
+
+    /* Linting */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/service-worker"]
+}

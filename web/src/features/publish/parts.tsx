@@ -22,6 +22,7 @@ import { Notice } from '@ui/Notice'
 import { ChevronLeft, LocateFixed, Lock } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { PhotoPicker } from './PhotoPicker'
+import { PushOffer } from './PushOffer'
 
 const SPECIES: readonly Species[] = ['dog', 'cat', 'other']
 const SIZES: readonly PetSize[] = ['small', 'medium', 'large']
@@ -388,5 +389,31 @@ export function ContactFields({
         <FieldError message={errorFor('contact_required') ?? errorFor('whatsapp_needs_number')} />
       </section>
     </>
+  )
+}
+
+/**
+ * The case is live (04 / 05 · Publishing): what happened, the link to it, and — now, never on first
+ * load — the offer to be notified on this phone (docs/eng/frontend.md · Push).
+ */
+export function Published({
+  title,
+  notice,
+  children,
+  link,
+}: {
+  title: string
+  notice: ReactNode
+  children?: ReactNode
+  link: ReactNode
+}) {
+  return (
+    <div className="mx-auto flex max-w-lg flex-col gap-5 px-5 py-10">
+      <h1 className="m-0 text-3xl font-extrabold">{title}</h1>
+      {notice}
+      {children}
+      <PushOffer />
+      {link}
+    </div>
   )
 }

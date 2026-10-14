@@ -8,7 +8,14 @@ import {
   useMemo,
   useSyncExternalStore,
 } from 'react'
-import { DEFAULT_LOCALE, type Locale, messagesFor, onMessagesLoaded } from './locales'
+import {
+  DEFAULT_LOCALE,
+  type Locale,
+  messagesFor,
+  messagesVersion,
+  onMessagesLoaded,
+  setActiveLocale,
+} from './locales'
 import {
   type CountParams,
   createTranslator,
@@ -86,11 +93,14 @@ export function I18nProvider({
   globals?: Params
   children: ReactNode
 }) {
-  // Re-render once the language file arrives; until then the source language fills in.
-  const messages = useSyncExternalStore(onMessagesLoaded, () => messagesFor(locale))
+  // Re-render whenever a part of a language file arrives; until then the source language fills in.
+  const version = useSyncExternalStore(onMessagesLoaded, messagesVersion)
+  setActiveLocale(locale)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version says the message objects were filled in place
   const value = useMemo(
-    () => withRich(createTranslator(locale, messages, messagesFor(DEFAULT_LOCALE), globals)),
-    [locale, messages, globals],
+    () =>
+      withRich(createTranslator(locale, messagesFor(locale), messagesFor(DEFAULT_LOCALE), globals)),
+    [locale, version, globals],
   )
   useEffect(() => {
     document.documentElement.lang = locale

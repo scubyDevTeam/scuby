@@ -17,10 +17,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+// The app's service worker (shell cache + push: src/service-worker/sw.ts) — never next to the
+// emulated backend. MSW's worker (public/mockServiceWorker.js) holds scope '/', and a scope has one
+// service worker: registering ours would replace it and the mocked API would stop answering. So
+// with VITE_API_MOCK (dev, the e2e run, demos) there is no app worker: no offline shell, and push
+// subscribes through MSW's registration, which shows nothing.
+function registerAppWorker() {
+  if (!('serviceWorker' in navigator)) return
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+  })
+}
+
 async function start() {
   if (env.apiMock) {
     const { startMocks } = await import('@mocks/browser')
     await startMocks()
+  } else {
+    registerAppWorker()
   }
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
