@@ -8,7 +8,7 @@ reasons behind it: `../docs/eng/frontend.md`. Order of work: `../docs/eng/fronte
 | | |
 |---|---|
 | `pnpm dev` | Dev server. With `VITE_API_MOCK=true` (the default in `.env`) MSW answers the API |
-| `pnpm check` | Everything CI runs: lint, types, unit tests, layer rule, brand check, copy check, e2e tags, build, size budget, e2e |
+| `pnpm check` | Everything CI runs: lint, types, unit tests, layer rule, brand check, copy check, e2e tags, build, size budget, e2e, Lighthouse (`/c/:code` LCP) |
 | `pnpm test` · `pnpm e2e` | Vitest unit tests · Playwright happy paths (uses the installed Chrome locally) |
 | `pnpm e2e --grep @owner` | One flow, or one test by its key (`--grep @OWNER-001`) |
 | `pnpm openapi` | Regenerates `../docs/eng/openapi.json` from `src/contracts/api.ts`. Run after any contract change |
