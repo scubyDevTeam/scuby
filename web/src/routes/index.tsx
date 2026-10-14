@@ -10,6 +10,7 @@ function Home() {
   return (
     <FeedPage
       brandName={brand.name}
+      brandMarkUrl={brand.markUrl}
       mapStyleUrl={env.mapStyleUrl}
       caseLink={(code, children) => (
         <Link to="/c/$code" params={{ code }} className="block h-full text-inherit no-underline">

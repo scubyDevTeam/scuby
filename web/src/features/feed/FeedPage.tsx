@@ -33,12 +33,13 @@ const views: Option<'list' | 'map'>[] = [
 
 type Props = {
   brandName: string
+  brandMarkUrl: string
   mapStyleUrl: string | undefined
   caseLink: (code: string, children: ReactNode) => ReactNode
   onOpenCase: (code: string) => void
 }
 
-export function FeedPage({ brandName, mapStyleUrl, caseLink, onOpenCase }: Props) {
+export function FeedPage({ brandName, brandMarkUrl, mapStyleUrl, caseLink, onOpenCase }: Props) {
   const [vertical, setVertical] = useState<Vertical | All>('all')
   const [species, setSpecies] = useState<Species | All>('all')
   const [view, setView] = useState<'list' | 'map'>('list')
@@ -55,7 +56,10 @@ export function FeedPage({ brandName, mapStyleUrl, caseLink, onOpenCase }: Props
   return (
     <div className="mx-auto max-w-lg lg:max-w-6xl">
       <header className="flex items-center justify-between gap-3 rounded-b-3xl bg-brand px-5 py-4 text-white lg:hidden">
-        <strong className="text-xl font-extrabold">{brandName}</strong>
+        <strong className="flex items-center gap-2 text-xl font-extrabold">
+          <img src={brandMarkUrl} alt="" className="h-8 w-auto" />
+          {brandName}
+        </strong>
         <div className="w-44">
           <Segmented label="Vista" options={views} value={view} onChange={setView} />
         </div>

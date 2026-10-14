@@ -2,12 +2,15 @@ import { test as base } from '@playwright/test'
 
 export { expect } from '@playwright/test'
 
-/** Hermetic runs: the tile server is answered locally with an empty style (no streets, no network). */
+/**
+ * Hermetic runs. Map tiles: playwright.config.ts points the app at an empty inline style. Links
+ * that leave the app (WhatsApp) are answered here, so no test depends on someone else's server.
+ */
 export const test = base.extend({
-  page: async ({ page }, use) => {
-    await page.route(/tiles\.openfreemap\.org/, (route) =>
-      route.fulfill({ json: { version: 8, sources: {}, layers: [] } }),
+  context: async ({ context }, use) => {
+    await context.route(/^https:\/\/wa\.me\//, (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<title>WhatsApp</title>' }),
     )
-    await use(page)
+    await use(context)
   },
 })

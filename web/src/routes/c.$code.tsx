@@ -1,6 +1,7 @@
 import { useCase } from '@api-client/cases'
 import { ApiError } from '@api-client/http'
 import type { LostAction } from '@domain/lost/actions'
+import { publicArea } from '@domain/shared/geo'
 import { LostCasePage } from '@features/lost/LostCasePage'
 import { shareLink } from '@platform/share'
 import { createFileRoute, Link } from '@tanstack/react-router'
@@ -8,11 +9,22 @@ import { Button, roundButtonClass } from '@ui/Button'
 import { Sheet } from '@ui/Sheet'
 import { Message, Skeleton } from '@ui/States'
 import { ChevronLeft, FileX, SearchX, WifiOff } from 'lucide-react'
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { brand } from '../brand'
 import { env } from '../env'
 
 export const Route = createFileRoute('/c/$code')({ component: CaseScreen })
+
+// The forms load when their button is tapped: reading the case must not pay for them.
+const SightingForm = lazy(() =>
+  import('@features/lost/SightingForm').then((m) => ({ default: m.SightingForm })),
+)
+const ClaimForm = lazy(() =>
+  import('@features/lost/ClaimForm').then((m) => ({ default: m.ClaimForm })),
+)
+const ReportForm = lazy(() =>
+  import('@features/reporting/ReportForm').then((m) => ({ default: m.ReportForm })),
+)
 
 const homeLink = (
   <Link to="/" className="font-bold text-brand-deep">
@@ -23,7 +35,9 @@ const homeLink = (
 function CaseScreen() {
   const { code } = Route.useParams()
   const query = useCase(code)
-  const [sheet, setSheet] = useState<'copied' | 'pending' | null>(null)
+  const [sheet, setSheet] = useState<'sighting' | 'claim' | 'report' | 'copied' | 'pending' | null>(
+    null,
+  )
 
   if (query.isPending) {
     return (
@@ -83,7 +97,13 @@ function CaseScreen() {
     )
   }
 
+  type Open = 'sighting' | 'claim' | 'report' | 'copied' | 'pending' | null
+  const close = () => setSheet(null)
+
   async function handle(action: LostAction) {
+    if (action === 'report_sighting') return setSheet('sighting')
+    if (action === 'claim_recovery') return setSheet('claim')
+    if (action === 'report_content') return setSheet('report')
     if (action !== 'share') return setSheet('pending')
     const result = await shareLink({
       title: `Se busca: ${found.vertical === 'lost' ? found.pet.name : ''}`,
@@ -91,6 +111,14 @@ function CaseScreen() {
       url,
     })
     if (result === 'copied') setSheet('copied')
+  }
+
+  const titles: Record<NonNullable<Open>, string> = {
+    sighting: `¿Dónde viste a ${found.pet.name}?`,
+    claim: `¿Tienes a ${found.pet.name}?`,
+    report: '¿Qué pasa con esta publicación?',
+    copied: 'Enlace copiado',
+    pending: 'Todavía no está lista',
   }
 
   return (
@@ -109,15 +137,44 @@ function CaseScreen() {
       />
       <Sheet
         open={sheet !== null}
-        onClose={() => setSheet(null)}
-        title={sheet === 'copied' ? 'Enlace copiado' : 'Todavía no está lista'}
+        onClose={close}
+        title={sheet ? titles[sheet] : ''}
+        size={sheet === 'sighting' ? 'full' : 'auto'}
       >
-        <p className="m-0 text-muted">
-          {sheet === 'copied'
-            ? 'Pégalo en WhatsApp o donde quieras compartirlo.'
-            : 'Estamos construyendo esta parte. Mientras tanto puedes escribirle a su familia.'}
-        </p>
-        <Button onClick={() => setSheet(null)}>Entendido</Button>
+        <Suspense fallback={<Skeleton className="h-40" />}>
+          {sheet === 'sighting' ? (
+            <SightingForm
+              code={found.code}
+              petName={found.pet.name}
+              lastSeenPoint={found.lastSeen.center}
+              lastSeenAt={found.lastSeen.at}
+              area={publicArea({ center: found.lastSeen.center, radiusM: found.lastSeen.radiusM })}
+              mapStyleUrl={env.mapStyleUrl}
+              onDone={close}
+            />
+          ) : null}
+          {sheet === 'claim' ? (
+            <ClaimForm
+              code={found.code}
+              petName={found.pet.name}
+              onDone={close}
+              onOnlySaw={() => setSheet('sighting')}
+            />
+          ) : null}
+          {sheet === 'report' ? (
+            <ReportForm targetType="lost_case" targetCode={found.code} onDone={close} />
+          ) : null}
+        </Suspense>
+        {sheet === 'copied' || sheet === 'pending' ? (
+          <>
+            <p className="m-0 text-muted">
+              {sheet === 'copied'
+                ? 'Pégalo en WhatsApp o donde quieras compartirlo.'
+                : 'Estamos construyendo esta parte.'}
+            </p>
+            <Button onClick={close}>Entendido</Button>
+          </>
+        ) : null}
       </Sheet>
     </>
   )

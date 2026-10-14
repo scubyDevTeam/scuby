@@ -14,6 +14,7 @@ function show(respond: (url: URL) => Response) {
     >
       <FeedPage
         brandName="Marca"
+        brandMarkUrl="/mark.png"
         mapStyleUrl={undefined}
         onOpenCase={() => {}}
         caseLink={(code, children) => <a href={`/c/${code}`}>{children}</a>}

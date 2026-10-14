@@ -21,7 +21,12 @@ export default defineConfig({
   webServer: {
     command: `pnpm exec vite --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
-    env: { VITE_API_MOCK: 'true' },
+    // Always its own server: it runs with test-only env, which a dev server would not have.
+    reuseExistingServer: false,
+    env: {
+      VITE_API_MOCK: 'true',
+      // An empty map style, inline: maps load and work with no streets and no network.
+      VITE_MAP_STYLE_URL: 'data:application/json,{"version":8,"sources":{},"layers":[]}',
+    },
   },
 })
