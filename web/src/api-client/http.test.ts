@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ApiError, apiGet } from './http'
+import { ApiError, apiGet, apiPost } from './http'
 
 const respond = (status: number, body: unknown = {}) =>
   vi.stubGlobal(
@@ -28,7 +28,10 @@ describe('apiGet', () => {
   })
 
   it.each([
+    [401, 'unauthorized'],
     [404, 'not_found'],
+    [422, 'rejected'],
+    [429, 'rejected'],
     [410, 'gone'],
     [500, 'server'],
   ])('maps HTTP %i to «%s»', async (status, kind) => {
@@ -47,5 +50,21 @@ describe('apiGet', () => {
       throw new Error('bad shape')
     }
     expect(await kindOf(apiGet('/feed', parse))).toBe('unexpected_response')
+  })
+
+  it('posts a JSON body', async () => {
+    respond(201, { id: 'x' })
+    await apiPost('/reports', { reason: 'spam' }, (raw) => raw)
+    const init = vi.mocked(fetch).mock.calls[0]?.[1]
+    expect(init?.method).toBe('POST')
+    expect(init?.body).toBe('{"reason":"spam"}')
+  })
+
+  it('accepts an answer with no body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 204 })),
+    )
+    expect(await apiPost('/auth/sign-out', {}, () => null)).toBeNull()
   })
 })

@@ -12,7 +12,55 @@ const lostCase = (code: unknown) => {
 
 type SightingBody = { point: { lat: number; lng: number }; seen_at: string; note: string | null }
 
+/** The code the emulated backend accepts. The app shows it while mocks are on. */
+export const DEMO_CODE = '123456'
+
+const SESSION_KEY = 'mock-session'
+const readSession = () => {
+  const stored = localStorage.getItem(SESSION_KEY)
+  return stored ? (JSON.parse(stored) as { id: string; display_name: string; email: string }) : null
+}
+const signIn = (email: string, displayName: string) => {
+  const user = { id: 'user-1', display_name: displayName, email }
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user))
+  return HttpResponse.json(user)
+}
+/** «juan.perez@correo.co» → «Juan Perez», until the profile lets people name themselves. */
+const nameFrom = (email: string) =>
+  (email.split('@')[0] ?? '')
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(' ')
+
 export const handlers = [
+  http.get(api('/session'), () => {
+    const user = readSession()
+    return user ? HttpResponse.json(user) : new HttpResponse(null, { status: 401 })
+  }),
+
+  http.post(api('/auth/email/start'), async () => {
+    await delay(250)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post(api('/auth/email/verify'), async ({ request }) => {
+    await delay(250)
+    const { email, code } = (await request.json()) as { email: string; code: string }
+    if (code !== DEMO_CODE) return new HttpResponse(null, { status: 422 })
+    return signIn(email, nameFrom(email))
+  }),
+
+  http.post(api('/auth/google'), async () => {
+    await delay(250)
+    return signIn('carolina@correo.co', 'Carolina Mejía')
+  }),
+
+  http.post(api('/auth/sign-out'), () => {
+    localStorage.removeItem(SESSION_KEY)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   http.get(api('/config'), () =>
     HttpResponse.json({
       supported_countries: [{ code: 'CO', phone_prefix: '+57', mobile_pattern: '^3\\d{9}$' }],

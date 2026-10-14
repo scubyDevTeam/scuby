@@ -2,6 +2,7 @@ import { env } from '../env'
 
 export type ApiErrorKind =
   | 'network'
+  | 'unauthorized'
   | 'not_found'
   | 'gone'
   | 'rejected' // the server refused what was sent: validation, rate limit
@@ -22,6 +23,7 @@ export class ApiError extends Error {
 }
 
 function kindFor(status: number): ApiErrorKind {
+  if (status === 401) return 'unauthorized'
   if (status === 404) return 'not_found'
   if (status === 410) return 'gone'
   if (status === 422 || status === 429) return 'rejected'
@@ -38,7 +40,7 @@ async function send<T>(url: URL, init: RequestInit, parse: (raw: unknown) => T):
   if (!response.ok) throw new ApiError(kindFor(response.status), response.status)
 
   try {
-    return parse(await response.json())
+    return parse(response.status === 204 ? null : await response.json())
   } catch {
     throw new ApiError('unexpected_response', response.status)
   }

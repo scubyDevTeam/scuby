@@ -1,3 +1,4 @@
+import { useSession } from '@api-client/session'
 import { createRootRoute, Link, Outlet, useLocation } from '@tanstack/react-router'
 import { Message } from '@ui/States'
 import { Bell, FileText, Home, Plus, SearchX, User } from 'lucide-react'
@@ -34,6 +35,7 @@ function Shell() {
 
 /** Desktop chrome. Phones get the bottom bar instead, and nothing at all on a case page. */
 function TopBar() {
+  const user = useSession().data
   const link = 'rounded-xl px-3 py-2 font-semibold text-white no-underline hover:bg-white/15'
   return (
     <header className="sticky top-0 z-10 hidden bg-brand text-white lg:block">
@@ -58,7 +60,7 @@ function TopBar() {
           Publicar aviso
         </Link>
         <Link to="/perfil" className={link}>
-          Entrar
+          {user ? user.displayName : 'Entrar'}
         </Link>
       </div>
     </header>

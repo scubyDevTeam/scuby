@@ -32,7 +32,9 @@ export function stubApi(routes: Record<string, Answer | (() => Answer)> = {}) {
       const route = all[key]
       if (!route) return new Response(null, { status: 404 })
       const answer = typeof route === 'function' ? route() : route
-      return new Response(JSON.stringify(answer.body ?? {}), { status: answer.status ?? 200 })
+      const status = answer.status ?? 200
+      // A 204 cannot carry a body, not even an empty one.
+      return new Response(status === 204 ? null : JSON.stringify(answer.body ?? {}), { status })
     }),
   )
   return calls
