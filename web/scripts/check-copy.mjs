@@ -5,7 +5,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import ts from 'typescript'
 
-const ROOTS = ['src/routes', 'src/features', 'src/ui', 'src/domain', 'src/platform']
+const ROOTS = ['src/routes', 'src/features', 'src/ui', 'src/domain', 'src/platform', 'api']
 const SKIP = /(\.test\.tsx?|\.gen\.ts)$/
 
 // Attributes that are never copy, whatever they hold.
