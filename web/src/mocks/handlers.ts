@@ -1,8 +1,12 @@
 import { delay, HttpResponse, http } from 'msw'
+import type { z } from 'zod/mini'
+import type { feedWire } from '../contracts/feed'
 import { env } from '../env'
 import { DEMO_OWNER_ID, db, foundCase, lostCase, newCode, newId } from './db'
 import { feedItems, purgedCodes } from './fixtures'
 import { currentUser, saveUser, unauthorized } from './session'
+
+type FeedItemWire = z.input<typeof feedWire>['items'][number]
 
 const api = (path: string) => new URL(path, env.apiUrl).toString()
 
@@ -130,26 +134,48 @@ const publicReads = [
     const query = new URL(request.url).searchParams
     const vertical = query.get('vertical')
     const species = query.get('species')
-    const published = db.published.flatMap((code) => {
-      const found = lostCase(code)
-      if (found?.status !== 'active') return []
-      return [
-        {
-          code,
-          vertical: 'lost' as const,
-          title: found.pet.name,
-          species: found.pet.species,
-          summary: null,
-          place_name: found.last_seen.place_name,
-          point: found.last_seen.center,
-          photo_url: found.pet.photo_urls[0] ?? null,
-          happened_at: found.last_seen.at,
-          possible_find: found.open_claim_count > 0,
-          sightings_count: found.sightings.length,
-          last_sighting_at: null,
-          detail: null,
-        },
-      ]
+    const published = db.published.flatMap((code): FeedItemWire[] => {
+      const lost = lostCase(code)
+      const found = foundCase(code)
+      if (lost?.status === 'active') {
+        return [
+          {
+            code,
+            vertical: 'lost' as const,
+            title: lost.pet.name,
+            species: lost.pet.species,
+            summary: null,
+            place_name: lost.last_seen.place_name,
+            point: lost.last_seen.center,
+            photo_url: lost.pet.photo_urls[0] ?? null,
+            happened_at: lost.last_seen.at,
+            possible_find: lost.open_claim_count > 0,
+            sightings_count: lost.sightings.length,
+            last_sighting_at: null,
+            detail: null,
+          },
+        ]
+      }
+      if (found?.status === 'active') {
+        return [
+          {
+            code,
+            vertical: 'found' as const,
+            title: foundTitle(found.pet),
+            species: found.pet.species,
+            summary: null,
+            place_name: found.found.place_name,
+            point: found.found.center,
+            photo_url: found.pet.photo_urls[0] ?? null,
+            happened_at: found.found.at,
+            possible_find: false,
+            sightings_count: null,
+            last_sighting_at: null,
+            detail: null,
+          },
+        ]
+      }
+      return []
     })
     const items = [...published, ...feedItems()].filter(
       (item) => (!vertical || item.vertical === vertical) && (!species || item.species === species),
@@ -392,7 +418,101 @@ function heldCase(code: unknown) {
   return { found }
 }
 
+const metres = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
+  Math.hypot(
+    (a.lat - b.lat) * 110_574,
+    (a.lng - b.lng) * 111_320 * Math.cos((a.lat * Math.PI) / 180),
+  )
+
+type FoundPublishBody = {
+  pet: {
+    species: 'dog' | 'cat' | 'other'
+    size: 'small' | 'medium' | 'large'
+    colors: string[]
+    marks: string | null
+    photo_urls: string[]
+  }
+  found_point: { lat: number; lng: number }
+  found_radius_m: number
+  found_at: string
+  holding_where: 'home' | 'vet' | 'street_temporary'
+  withheld_detail: string | null
+  phone: string | null
+  contact_prefs: { expose_whatsapp: boolean }
+  otp_code: string | null
+}
+
 const foundActions = [
+  // A stand-in for the matching algorithm (O7): same species, within 5 km, still being searched for.
+  http.post(api('/matches'), async ({ request }) => {
+    await delay(300)
+    const body = (await request.json()) as { species: string; point: { lat: number; lng: number } }
+    const candidates = Object.values(db.cases).flatMap((item) => {
+      if (item.vertical !== 'lost' || item.status !== 'active') return []
+      if (item.pet.species !== body.species) return []
+      const distance = metres(item.last_seen.center, body.point)
+      if (distance > 5000) return []
+      return [
+        {
+          code: item.code,
+          name: item.pet.name,
+          photo_url: item.pet.photo_urls[0] ?? null,
+          why: ['Misma especie', `A ${Math.round(distance / 100) * 100} m de donde se perdió`],
+        },
+      ]
+    })
+    return HttpResponse.json({ candidates })
+  }),
+
+  http.post(api('/sightings'), async () => {
+    await delay(250)
+    return HttpResponse.json({ id: newId('orphan-') }, { status: 201 })
+  }),
+
+  http.post(api('/found-cases'), async ({ request }) => {
+    await delay(300)
+    const user = currentUser()
+    if (!user) return unauthorized()
+    const body = (await request.json()) as FoundPublishBody
+    if (body.phone && body.phone !== user.phone) {
+      if (!body.otp_code) return HttpResponse.json({ phone_step: 'otp' })
+      if (body.otp_code !== DEMO_CODE) return new HttpResponse(null, { status: 422 })
+      saveUser({ ...user, phone: body.phone })
+    }
+    const phone = body.phone ?? user.phone
+    if (!phone) return new HttpResponse(null, { status: 422 })
+    const code = newCode()
+    db.cases[code] = {
+      code,
+      vertical: 'found',
+      status: 'active',
+      resolved_at: null,
+      viewer: 'custodian',
+      pet: body.pet,
+      found: {
+        center: body.found_point,
+        radius_m: body.found_radius_m,
+        at: body.found_at,
+        place_name: 'Laureles',
+      },
+      holding_where: body.holding_where,
+      held_since: body.found_at,
+      hold_offer_at: new Date(new Date(body.found_at).getTime() + 15 * 86_400_000).toISOString(),
+      open_claim_count: 0,
+      withheld_detail: body.withheld_detail,
+      ownership_claims: [],
+      contact: {
+        display_name: user.display_name,
+        whatsapp_url: body.contact_prefs.expose_whatsapp
+          ? `https://wa.me/${phone.replace('+', '')}`
+          : null,
+      },
+    }
+    db.owners[code] = user.id
+    db.published.unshift(code)
+    return HttpResponse.json({ code }, { status: 201 })
+  }),
+
   // «Es mío» is never anonymous: it asks to take an animal (docs/product/05).
   http.post(api('/cases/:code/ownership-claims'), async ({ params, request }) => {
     await delay(250)

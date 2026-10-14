@@ -161,3 +161,102 @@ export function resolveBody(input: ResolveInput) {
     resolution: input.outcome === 'cancelled' ? input.reason : null,
   }
 }
+
+/** What matching is asked with (docs/product/05 · Matching). */
+export type MatchInput = {
+  species: 'dog' | 'cat' | 'other'
+  size: 'small' | 'medium' | 'large' | null
+  colors: string[]
+  point: { lat: number; lng: number }
+  at: Date
+}
+
+export const matchBody = (input: MatchInput) => ({
+  species: input.species,
+  size: input.size,
+  colors: input.colors,
+  point: input.point,
+  at: input.at.toISOString(),
+})
+
+const candidatesWire = z.object({
+  candidates: z.array(
+    z.object({
+      code: z.string(),
+      name: z.string(),
+      photo_url: z.nullable(z.string()),
+      /** Human-readable reasons, so the confirmation explains itself. */
+      why: z.array(z.string()),
+    }),
+  ),
+})
+
+export type Candidate = { code: string; name: string; photoUrl: string | null; why: string[] }
+
+export function parseCandidates(raw: unknown): Candidate[] {
+  return candidatesWire.parse(raw).candidates.map((candidate) => ({
+    code: candidate.code,
+    name: candidate.name,
+    photoUrl: candidate.photo_url,
+    why: candidate.why,
+  }))
+}
+
+export type PublishFoundInput = {
+  species: 'dog' | 'cat' | 'other'
+  size: 'small' | 'medium' | 'large'
+  colors: string[]
+  marks: string | null
+  photoUrls: string[]
+  center: { lat: number; lng: number }
+  radiusM: number
+  foundAt: Date
+  holdingWhere: 'home' | 'vet' | 'street_temporary'
+  withheldDetail: string | null
+  phone: string | null
+  hasWhatsapp: boolean
+  contact: { whatsapp: boolean; email: boolean; inApp: boolean }
+  otpCode: string | null
+}
+
+export const publishFoundBody = (input: PublishFoundInput) => ({
+  pet: {
+    species: input.species,
+    size: input.size,
+    colors: input.colors,
+    marks: input.marks,
+    photo_urls: input.photoUrls,
+  },
+  found_point: input.center,
+  found_radius_m: input.radiusM,
+  found_at: input.foundAt.toISOString(),
+  holding_where: input.holdingWhere,
+  withheld_detail: input.withheldDetail,
+  phone: input.phone,
+  phone_has_whatsapp: input.hasWhatsapp,
+  contact_prefs: {
+    expose_whatsapp: input.contact.whatsapp,
+    expose_email: input.contact.email,
+    in_app_only: input.contact.inApp && !input.contact.whatsapp && !input.contact.email,
+  },
+  otp_code: input.otpCode,
+})
+
+/** A sighting with no case to attach to: kept internally and matched against later lost cases. */
+export type OrphanSightingInput = {
+  species: 'dog' | 'cat' | 'other'
+  photoUrls: string[]
+  point: { lat: number; lng: number }
+  seenAt: Date
+  note: string | null
+  contactPhone: string | null
+}
+
+export const orphanSightingBody = (input: OrphanSightingInput) => ({
+  species: input.species,
+  photo_urls: input.photoUrls,
+  point: input.point,
+  seen_at: input.seenAt.toISOString(),
+  note: input.note,
+  contact_phone: input.contactPhone,
+})

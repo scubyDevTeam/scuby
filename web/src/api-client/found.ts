@@ -1,11 +1,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { parseClaim, parseCreated } from '../contracts/actions'
+import { parseClaim, parseCreated, sightingBody } from '../contracts/actions'
 import {
+  type MatchInput,
+  matchBody,
+  type OrphanSightingInput,
   type OwnershipClaimInput,
+  orphanSightingBody,
   ownershipClaimBody,
+  type PublishFoundInput,
+  parseCandidates,
+  publishFoundBody,
   type ResolveInput,
   resolveBody,
 } from '../contracts/found'
+import { parsePublish } from '../contracts/owner'
 import { apiPost } from './http'
 
 const casePath = (code: string) => `/cases/${encodeURIComponent(code)}`
@@ -40,5 +48,44 @@ export function useResolveFound(code: string) {
     mutationFn: (input: ResolveInput) =>
       apiPost(`${casePath(code)}/resolve`, resolveBody(input), parseCreated),
     onSuccess: () => client.invalidateQueries(),
+  })
+}
+
+/** Asks for lost pets this animal could be. Candidates are always confirmed by a person. */
+export function useMatchAnimal() {
+  return useMutation({
+    mutationFn: (input: MatchInput) => apiPost('/matches', matchBody(input), parseCandidates),
+  })
+}
+
+export function usePublishFound() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: PublishFoundInput) =>
+      apiPost('/found-cases', publishFoundBody(input), parsePublish),
+    onSuccess: (result) => {
+      if (result.kind === 'published') client.invalidateQueries()
+    },
+  })
+}
+
+/** A witness report: attached to the case the witness recognised, or kept as an orphan. */
+export function useReportWitness() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ caseCode, ...input }: OrphanSightingInput & { caseCode: string | null }) =>
+      caseCode
+        ? apiPost(
+            `${casePath(caseCode)}/sightings`,
+            sightingBody({
+              point: input.point,
+              seenAt: input.seenAt,
+              note: input.note,
+              contactPhone: input.contactPhone,
+            }),
+            parseCreated,
+          )
+        : apiPost('/sightings', orphanSightingBody(input), parseCreated),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['case'] }),
   })
 }

@@ -18,6 +18,9 @@ import { Route as CCodeRouteImport } from './routes/c.$code'
 import { Route as PublicarIndexRouteImport } from './routes/publicar.index'
 import { Route as PublicarTipoRouteImport } from './routes/publicar.$tipo'
 import { Route as AuthPublicarPerdidoRouteImport } from './routes/_auth/publicar.perdido'
+import { Route as PublicarEncontradoIndexRouteImport } from './routes/publicar.encontrado.index'
+import { Route as PublicarEncontradoVistoRouteImport } from './routes/publicar.encontrado.visto'
+import { Route as AuthPublicarEncontradoAvisoRouteImport } from './routes/_auth/publicar.encontrado.aviso'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -63,6 +66,22 @@ const AuthPublicarPerdidoRoute = AuthPublicarPerdidoRouteImport.update({
   path: '/publicar/perdido',
   getParentRoute: () => AuthRoute,
 } as any)
+const PublicarEncontradoIndexRoute = PublicarEncontradoIndexRouteImport.update({
+  id: '/publicar/encontrado/',
+  path: '/publicar/encontrado/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PublicarEncontradoVistoRoute = PublicarEncontradoVistoRouteImport.update({
+  id: '/publicar/encontrado/visto',
+  path: '/publicar/encontrado/visto',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthPublicarEncontradoAvisoRoute =
+  AuthPublicarEncontradoAvisoRouteImport.update({
+    id: '/publicar/encontrado/aviso',
+    path: '/publicar/encontrado/aviso',
+    getParentRoute: () => AuthRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -73,6 +92,9 @@ export interface FileRoutesByFullPath {
   '/publicar/$tipo': typeof PublicarTipoRoute
   '/publicar/': typeof PublicarIndexRoute
   '/publicar/perdido': typeof AuthPublicarPerdidoRoute
+  '/publicar/encontrado/visto': typeof PublicarEncontradoVistoRoute
+  '/publicar/encontrado/': typeof PublicarEncontradoIndexRoute
+  '/publicar/encontrado/aviso': typeof AuthPublicarEncontradoAvisoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -83,6 +105,9 @@ export interface FileRoutesByTo {
   '/publicar/$tipo': typeof PublicarTipoRoute
   '/publicar': typeof PublicarIndexRoute
   '/publicar/perdido': typeof AuthPublicarPerdidoRoute
+  '/publicar/encontrado/visto': typeof PublicarEncontradoVistoRoute
+  '/publicar/encontrado': typeof PublicarEncontradoIndexRoute
+  '/publicar/encontrado/aviso': typeof AuthPublicarEncontradoAvisoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -95,6 +120,9 @@ export interface FileRoutesById {
   '/publicar/$tipo': typeof PublicarTipoRoute
   '/publicar/': typeof PublicarIndexRoute
   '/_auth/publicar/perdido': typeof AuthPublicarPerdidoRoute
+  '/publicar/encontrado/visto': typeof PublicarEncontradoVistoRoute
+  '/publicar/encontrado/': typeof PublicarEncontradoIndexRoute
+  '/_auth/publicar/encontrado/aviso': typeof AuthPublicarEncontradoAvisoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -107,6 +135,9 @@ export interface FileRouteTypes {
     | '/publicar/$tipo'
     | '/publicar/'
     | '/publicar/perdido'
+    | '/publicar/encontrado/visto'
+    | '/publicar/encontrado/'
+    | '/publicar/encontrado/aviso'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -117,6 +148,9 @@ export interface FileRouteTypes {
     | '/publicar/$tipo'
     | '/publicar'
     | '/publicar/perdido'
+    | '/publicar/encontrado/visto'
+    | '/publicar/encontrado'
+    | '/publicar/encontrado/aviso'
   id:
     | '__root__'
     | '/'
@@ -128,6 +162,9 @@ export interface FileRouteTypes {
     | '/publicar/$tipo'
     | '/publicar/'
     | '/_auth/publicar/perdido'
+    | '/publicar/encontrado/visto'
+    | '/publicar/encontrado/'
+    | '/_auth/publicar/encontrado/aviso'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -136,6 +173,8 @@ export interface RootRouteChildren {
   CCodeRoute: typeof CCodeRoute
   PublicarTipoRoute: typeof PublicarTipoRoute
   PublicarIndexRoute: typeof PublicarIndexRoute
+  PublicarEncontradoVistoRoute: typeof PublicarEncontradoVistoRoute
+  PublicarEncontradoIndexRoute: typeof PublicarEncontradoIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -203,6 +242,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthPublicarPerdidoRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/publicar/encontrado/': {
+      id: '/publicar/encontrado/'
+      path: '/publicar/encontrado'
+      fullPath: '/publicar/encontrado/'
+      preLoaderRoute: typeof PublicarEncontradoIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/publicar/encontrado/visto': {
+      id: '/publicar/encontrado/visto'
+      path: '/publicar/encontrado/visto'
+      fullPath: '/publicar/encontrado/visto'
+      preLoaderRoute: typeof PublicarEncontradoVistoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_auth/publicar/encontrado/aviso': {
+      id: '/_auth/publicar/encontrado/aviso'
+      path: '/publicar/encontrado/aviso'
+      fullPath: '/publicar/encontrado/aviso'
+      preLoaderRoute: typeof AuthPublicarEncontradoAvisoRouteImport
+      parentRoute: typeof AuthRoute
+    }
   }
 }
 
@@ -211,6 +271,7 @@ interface AuthRouteChildren {
   AuthMisCasosRoute: typeof AuthMisCasosRoute
   AuthPerfilRoute: typeof AuthPerfilRoute
   AuthPublicarPerdidoRoute: typeof AuthPublicarPerdidoRoute
+  AuthPublicarEncontradoAvisoRoute: typeof AuthPublicarEncontradoAvisoRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
@@ -218,6 +279,7 @@ const AuthRouteChildren: AuthRouteChildren = {
   AuthMisCasosRoute: AuthMisCasosRoute,
   AuthPerfilRoute: AuthPerfilRoute,
   AuthPublicarPerdidoRoute: AuthPublicarPerdidoRoute,
+  AuthPublicarEncontradoAvisoRoute: AuthPublicarEncontradoAvisoRoute,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
@@ -228,6 +290,8 @@ const rootRouteChildren: RootRouteChildren = {
   CCodeRoute: CCodeRoute,
   PublicarTipoRoute: PublicarTipoRoute,
   PublicarIndexRoute: PublicarIndexRoute,
+  PublicarEncontradoVistoRoute: PublicarEncontradoVistoRoute,
+  PublicarEncontradoIndexRoute: PublicarEncontradoIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
