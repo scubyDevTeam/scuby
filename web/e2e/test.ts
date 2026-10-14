@@ -1,4 +1,5 @@
 import { test as base } from '@playwright/test'
+import { AdoptionPage } from './pages/AdoptionPage.ts'
 import { CasePage } from './pages/CasePage.ts'
 import { FeedPage } from './pages/FeedPage.ts'
 import { InboxPage } from './pages/InboxPage.ts'
@@ -13,6 +14,7 @@ export { expect } from '@playwright/test'
 export { tags } from './tags.ts'
 
 type Pages = {
+  adoption: AdoptionPage
   feed: FeedPage
   casePage: CasePage
   publish: PublishPage
@@ -36,6 +38,7 @@ export const test = base.extend<Pages>({
     )
     await use(context)
   },
+  adoption: async ({ page }, use) => use(new AdoptionPage(page)),
   feed: async ({ page }, use) => use(new FeedPage(page)),
   casePage: async ({ page }, use) => use(new CasePage(page)),
   publish: async ({ page }, use) => use(new PublishPage(page)),

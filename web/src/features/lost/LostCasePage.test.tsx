@@ -87,9 +87,10 @@ describe('LostCasePage — the owner', () => {
     expect(screen.queryByRole('button', { name: /La vi/ })).toBeNull()
   })
 
-  it('sees who says they have her — with the number as buttons — instead of the public badge', () => {
+  it('sees who says they have her — with the number as buttons — instead of the public badge', async () => {
     show(lostCase('7K3PQ', { viewer: 'owner' }))
-    const claims = within(screen.getByRole('region', { name: 'Posibles hallazgos' }))
+    // Owner-only, so it arrives in its own chunk.
+    const claims = within(await screen.findByRole('region', { name: 'Posibles hallazgos' }))
     expect(claims.getByText('+573114829017')).toBeTruthy()
     expect(claims.getByRole('link', { name: 'Abrir WhatsApp' }).getAttribute('href')).toBe(
       'https://wa.me/573114829017',

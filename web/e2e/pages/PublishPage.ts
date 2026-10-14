@@ -44,6 +44,32 @@ export class PublishPage {
     )
   }
 
+  chooseAdoption() {
+    return step('Choose «Dar en adopción»', () =>
+      this.page.getByRole('link', { name: /Dar en adopción/ }).click(),
+    )
+  }
+
+  // --- Adoption (docs/product/06 · adoption_case) ---
+
+  /** Step 1's own questions: what the animal is called and who it is to the lister. */
+  nameListing(name: string, role?: 'Es mi mascota' | 'Lo rescaté o lo cuido') {
+    return step(`Name the animal ${name}${role ? `, «${role}»` : ''}`, async () => {
+      await this.page.getByLabel('¿Cómo se llama?').fill(name)
+      if (role) await this.page.getByRole('button', { name: role }).click()
+    })
+  }
+
+  /** Step 2: the story, and the fee — disclosed always, «Sin cuota» included. */
+  tellStory(story: string) {
+    return step('Tell their story, «Sin cuota»', async () => {
+      const field = this.page.getByLabel(/Cuéntanos su historia/)
+      if (story) await field.fill(story)
+      await this.page.getByRole('button', { name: 'Sin cuota' }).click()
+      await this.next()
+    })
+  }
+
   chooseFound() {
     return step('Choose «Encontré un animal»', () =>
       this.page.getByRole('link', { name: /Encontré un animal/ }).click(),

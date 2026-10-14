@@ -4,12 +4,14 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, call } from '../api-client/http'
+import { parseInterest } from '../contracts/adoption'
 import { api } from '../contracts/api'
 import { parseCase } from '../contracts/case'
 import { parseFeed } from '../contracts/feed'
 import { parseMyCases, parseNotifications, parsePets, parsePublish } from '../contracts/owner'
 import { parseProfile, parseUser } from '../contracts/session'
 import { db, type LostRow, resetDb } from './db'
+import { DEMO_OWNER_ID as DEMO_OWNER_ID_FOR_TESTS } from './fixtures'
 import { DEMO_CODE, handlers } from './handlers'
 import { routed } from './route'
 import { DAY, HOUR } from './rules'
@@ -166,7 +168,10 @@ describe('the feed (00 · Geography)', () => {
       '7K3PQ',
       'AD9PT',
       'HE7PA',
+      'M1SHI',
       'C4STD',
+      // «En proceso»: someone was chosen, so it ranks after everything still waiting (06).
+      'B3TOS',
     ])
   })
 
@@ -467,6 +472,374 @@ describe('found (05)', () => {
     )) as { candidates: { code: string; why: string[] }[] }
     expect(result.candidates.map((c) => c.code)).toEqual(['7K3PQ'])
     expect(result.candidates[0]?.why).toContain('Mismo color: negro')
+  })
+})
+
+const asAdoption = async (code: string) => {
+  const parsed = await caseOf(code)
+  if (parsed.vertical !== 'adoption') throw new Error(`${code} is not an adoption listing`)
+  return parsed
+}
+const intro = {
+  housing: 'apartment' as const,
+  has_yard: false,
+  other_pets: null,
+  household: 'Vivo sola',
+  why: 'Tengo tiempo y una casa tranquila.',
+}
+const interestIn = (code: string, extra: { phone?: string; otp_code?: string } = {}) =>
+  call(
+    api.expressInterest,
+    {
+      params: { code },
+      body: {
+        intro,
+        phone: extra.phone ?? null,
+        phone_has_whatsapp: true,
+        otp_code: extra.otp_code ?? null,
+      },
+    },
+    parseInterest,
+  )
+
+/** A newcomer with a verified number, interested in `code`. Answers the interest's id. */
+async function newcomerInterestedIn(code: string, email = 'laura.diaz@correo.co') {
+  await asNewcomer(email)
+  expect((await interestIn(code, { phone: '+573001112233' })).kind).toBe('otp')
+  const sent = await interestIn(code, { phone: '+573001112233', otp_code: DEMO_CODE })
+  if (sent.kind !== 'sent') throw new Error('expected the interest to be sent')
+  return sent
+}
+
+const listing = {
+  from_found_case_code: null,
+  lister_role: 'custodian' as const,
+  pet: {
+    name: 'Pelusa',
+    species: 'cat' as const,
+    size: 'small' as const,
+    colors: ['white' as const],
+    marks: null,
+    photo_urls: ['data:image/png;base64,AAAA'],
+    health_flags: ['fiv_felv' as const],
+  },
+  story: 'La rescaté de la calle.',
+  temperament: [],
+  requirement_flags: [],
+  requirements: null,
+  fee_cop: 0,
+  fee_covers: [],
+  location_point: { lat: 6.2447, lng: -75.5916 },
+  location_radius_m: 300,
+  external_url: null,
+  phone: null,
+  phone_has_whatsapp: true,
+  contact_prefs: { expose_whatsapp: true, expose_email: false, in_app_only: false },
+  otp_code: null,
+}
+
+describe('adoption — who sees what (06 · What the lister sees, identity ladder)', () => {
+  it('a stranger gets the listing, no interests, no channel: contact is only through an interest', async () => {
+    const parsed = await asAdoption('AD9PT')
+    expect(parsed.viewer).toBe('public')
+    expect(parsed.interests).toEqual([])
+    expect(parsed.myInterest).toBeNull()
+    expect(parsed.pendingCheckin).toBeNull()
+    expect(
+      JSON.stringify(await call(api.getCase, { params: { code: 'AD9PT' } }, asIs)),
+    ).not.toMatch(/wa\.me|573000000005/)
+  })
+
+  it('the lister gets each interest with its intro and facts from the account, never a verdict', async () => {
+    await asCarolina()
+    const misha = await asAdoption('M1SHI')
+    expect(misha.viewer).toBe('lister')
+    const andres = misha.interests.find((i) => i.person.displayName === 'Andrés R.')
+    expect(andres?.intro.otherPets).toBe('Una gata de 4 años, esterilizada')
+    expect(andres?.person.sightingsReported).toBe(1)
+    // Nube, Canela and Misha: the collector signal is a number, nothing more.
+    expect(andres?.person.openAdoptionInterests).toBe(3)
+    expect(andres?.whatsappUrl).toBe('https://wa.me/573000000001')
+    expect(misha.pendingCheckin?.trigger).toBe('time_based')
+  })
+
+  it('«en proceso» is public; who was chosen is not', async () => {
+    const canela = await asAdoption('B3TOS')
+    expect(canela.reserved).toBe(true)
+    expect(canela.interests).toEqual([])
+    expect(canela.fee).toEqual({ cop: 120_000, covers: ['sterilization', 'vaccines', 'deworming'] })
+  })
+})
+
+describe('adoption — «Me interesa» (06 · adoption_interest, Channel after the row)', () => {
+  it('needs an account', async () => {
+    expect((await failure(interestIn('AD9PT'))).code).toBe('unauthorized')
+  })
+
+  it('needs a verified number: the SMS code first, then the row, then the channel', async () => {
+    const sent = await newcomerInterestedIn('AD9PT')
+    expect(sent.whatsappUrl).toBe('https://wa.me/573000000005')
+    expect(sent.externalUrl).toBeNull()
+    expect(db.notifications.some((n) => n.event === 'adoption_interest.created')).toBe(true)
+    const mine = await asAdoption('AD9PT')
+    expect(mine.myInterest).toMatchObject({ id: sent.id, status: 'open' })
+    expect(mine.myInterest?.whatsappUrl).toBe('https://wa.me/573000000005')
+  })
+
+  it('one per person per listing: asking again answers the same row', async () => {
+    const first = await newcomerInterestedIn('AD9PT')
+    const again = await interestIn('AD9PT')
+    expect(again.kind === 'sent' && again.id).toBe(first.id)
+    expect(db.adoptionInterests.filter((i) => i.case_code === 'AD9PT')).toHaveLength(2)
+  })
+
+  it('names every channel the lister enabled; none means in-app', async () => {
+    const row = db.cases.AD9PT
+    if (row?.vertical !== 'adoption') throw new Error('adoption')
+    row.external_url = 'https://fundacion.example/adopta'
+    const both = await newcomerInterestedIn('AD9PT')
+    expect(both.whatsappUrl && both.externalUrl).toBeTruthy()
+    row.contact_prefs = { expose_whatsapp: false, expose_email: false, in_app_only: true }
+    row.external_url = null
+    const none = await newcomerInterestedIn('AD9PT', 'pedro.ruiz@correo.co')
+    expect([none.whatsappUrl, none.externalUrl]).toEqual([null, null])
+  })
+
+  it('the lister cannot be interested in their own listing, nor anyone in a closed one', async () => {
+    await asCarolina()
+    expect((await failure(interestIn('M1SHI', { phone: '+573000000000' }))).code).toBe('forbidden')
+    await asNewcomer('laura.diaz@correo.co')
+    expect((await failure(interestIn('ADPT8', { phone: '+573001112233' }))).code).toBe(
+      'invalid_transition',
+    )
+  })
+
+  it('«ya no me interesa» takes it off the list; asking again brings it back open', async () => {
+    const sent = await newcomerInterestedIn('AD9PT')
+    await call(api.withdrawInterest, { params: { code: 'AD9PT', interestId: sent.id } }, asIs)
+    expect((await asAdoption('AD9PT')).myInterest?.status).toBe('withdrawn')
+    await interestIn('AD9PT')
+    expect((await asAdoption('AD9PT')).myInterest?.status).toBe('open')
+  })
+
+  it('only its person withdraws an interest', async () => {
+    await asNewcomer('laura.diaz@correo.co')
+    const error = await failure(
+      call(
+        api.withdrawInterest,
+        { params: { code: 'M1SHI', interestId: 'int-misha-andres' } },
+        asIs,
+      ),
+    )
+    expect(error.code).toBe('forbidden')
+  })
+})
+
+describe('adoption — the lister’s moves (06 · What the lister sees)', () => {
+  const answer = (interestId: string, status: 'chosen' | 'declined' | 'open', code = 'M1SHI') =>
+    call(api.answerInterest, { params: { code, interestId }, body: { status } }, asIs)
+
+  it('choosing someone tells them, reserves the listing and demotes it; one at a time', async () => {
+    await asCarolina()
+    await answer('int-misha-andres', 'chosen')
+    expect(db.notifications.at(-1)).toMatchObject({
+      person_id: 'user-andres',
+      event: 'adoption_interest.chosen',
+    })
+    expect((await asAdoption('M1SHI')).reserved).toBe(true)
+    expect((await failure(answer('int-misha-julian', 'chosen'))).code).toBe('invalid_transition')
+    const feed = await call(api.getFeed, { query: {} }, parseFeed)
+    expect(feed.items.slice(-2).map((i) => [i.code, i.detail])).toEqual([
+      ['B3TOS', 'En proceso · Cuota $120.000'],
+      ['M1SHI', 'En proceso · Sin cuota'],
+    ])
+
+    // «No se concretó»: manual, and full visibility comes back.
+    await answer('int-misha-andres', 'open')
+    expect((await asAdoption('M1SHI')).reserved).toBe(false)
+    await answer('int-misha-julian', 'chosen')
+  })
+
+  it('a decline is silent: the adopter still reads their interest as open', async () => {
+    await asCarolina()
+    await answer('int-misha-andres', 'declined')
+    expect(db.notifications.some((n) => n.person_id === 'user-andres')).toBe(false)
+    db.persons.find((p) => p.id === 'user-andres')!.email = 'andres@correo.co'
+    signOut()
+    await asNewcomer('andres@correo.co')
+    expect((await asAdoption('M1SHI')).myInterest?.status).toBe('open')
+  })
+
+  it('only the lister answers an interest', async () => {
+    await asNewcomer('laura.diaz@correo.co')
+    expect((await failure(answer('int-misha-andres', 'chosen'))).code).toBe('forbidden')
+  })
+})
+
+describe('adoption — the endings (06 · Case state machine, `adopted` is a responsibility transfer)', () => {
+  const adopt = (interestId: string | null, code = 'M1SHI') =>
+    call(api.recordAdoption, { params: { code }, body: { interest_id: interestId } }, asIs)
+
+  it('adopted in the app: the link moves to the adopter, and everyone else waiting is told', async () => {
+    await asCarolina()
+    await adopt('int-misha-andres')
+    const misha = await asAdoption('M1SHI')
+    expect([misha.status, misha.resolution]).toEqual(['adopted', 'adopted_in_app'])
+    const pet = db.pets.find((p) => p.id === 'pet-misha')
+    expect([pet?.owner_id, pet?.custody_state]).toEqual(['user-andres', 'claimed'])
+    expect(
+      db.notifications.filter((n) => n.event === 'adoption_case.adopted').map((n) => n.person_id),
+    ).toEqual(['user-julian'])
+    expect(
+      db.checkins.filter((c) => c.case_code === 'M1SHI' && !c.cancelled_at && !c.responded_at),
+    ).toEqual([])
+    expect((await failure(adopt(null))).code).toBe('invalid_transition')
+  })
+
+  it('adopted off the platform: the link closes, and no owner is faked', async () => {
+    await asCarolina()
+    await adopt(null)
+    expect((await asAdoption('M1SHI')).resolution).toBe('adopted_offline')
+    const pet = db.pets.find((p) => p.id === 'pet-misha')
+    expect([pet?.owner_id, pet?.custody_state]).toEqual([null, 'claimed'])
+  })
+
+  it('withdrawn, with its reason: who is responsible does not change', async () => {
+    await asCarolina()
+    await call(
+      api.withdrawAdoption,
+      { params: { code: 'M1SHI' }, body: { resolution: 'kept' } },
+      asIs,
+    )
+    expect((await asAdoption('M1SHI')).status).toBe('withdrawn')
+    expect(db.pets.find((p) => p.id === 'pet-misha')?.owner_id).toBeNull()
+  })
+
+  it('only the lister ends a listing', async () => {
+    await asNewcomer('laura.diaz@correo.co')
+    expect((await failure(adopt(null))).code).toBe('forbidden')
+  })
+})
+
+describe('adoption — the follow-up loop (06 · Cadence, expiry, 90-day reopen)', () => {
+  it('«sigue disponible» answers the check-in and resets the clock 14 days out', async () => {
+    await asCarolina()
+    const misha = await asAdoption('M1SHI')
+    const checkinId = misha.pendingCheckin?.id ?? ''
+    await call(
+      api.answerCheckin,
+      { params: { code: 'M1SHI', checkinId }, body: { response: 'still_available' } },
+      asIs,
+    )
+    expect((await asAdoption('M1SHI')).pendingCheckin).toBeNull()
+    later(14 * DAY + HOUR)
+    expect((await asAdoption('M1SHI')).pendingCheckin).not.toBeNull()
+  })
+
+  it('a listing answers only `still_available`', async () => {
+    await asCarolina()
+    const error = await failure(
+      call(
+        api.answerCheckin,
+        { params: { code: 'M1SHI', checkinId: 'ck-misha-1' }, body: { response: 'still_lost' } },
+        asIs,
+      ),
+    )
+    expect(error.code).toBe('validation_failed')
+  })
+
+  it('two unanswered check-ins archive it, the lister is told, and it reopens within 90 days', async () => {
+    later(15 * DAY)
+    await asCarolina()
+    const misha = await asAdoption('M1SHI')
+    expect([misha.status, misha.resolution]).toEqual(['expired', 'no_response'])
+    expect(db.notifications.some((n) => n.event === 'adoption_case.expired')).toBe(true)
+    // Expiry never changes who is responsible (01 · rule 7).
+    expect(db.pets.find((p) => p.id === 'pet-misha')?.custody_state).toBe('unclaimed')
+    later(60 * DAY)
+    await call(api.reopenCase, { params: { code: 'M1SHI' } }, asIs)
+    expect((await asAdoption('M1SHI')).status).toBe('active')
+  })
+
+  it('not after 90 days', async () => {
+    later(15 * DAY)
+    await asCarolina()
+    later(91 * DAY)
+    expect((await failure(call(api.reopenCase, { params: { code: 'M1SHI' } }, asIs))).code).toBe(
+      'invalid_transition',
+    )
+  })
+})
+
+describe('adoption — publishing (06 · fee rule; 05 · the day-15 conversion)', () => {
+  // The demo account with its number already verified: these scenarios are not about the phone step.
+  const asVerifiedCarolina = async () => {
+    await asCarolina()
+    db.persons.find((p) => p.id === DEMO_OWNER_ID_FOR_TESTS)!.phone = '+573000000000'
+  }
+
+  it('publishes a listing with the phone step, into the feed and the lister’s lists', async () => {
+    await asNewcomer('ana.gomez@correo.co')
+    const body = { ...listing, phone: '+573007152284' }
+    expect(await call(api.publishAdoption, { body }, parsePublish)).toEqual({ kind: 'otp' })
+    const published = await call(
+      api.publishAdoption,
+      { body: { ...body, otp_code: DEMO_CODE } },
+      parsePublish,
+    )
+    if (published.kind !== 'published') throw new Error('expected a published listing')
+    const pelusa = await asAdoption(published.code)
+    expect([pelusa.viewer, pelusa.pet.healthFlags]).toEqual(['lister', ['fiv_felv']])
+    const feed = await call(api.getFeed, { query: { vertical: 'adoption' } }, parseFeed)
+    expect(feed.items[0]).toMatchObject({ code: published.code, detail: 'Sin cuota' })
+    const mine = await call(api.listMyCases, {}, parseMyCases)
+    expect(mine[0]).toMatchObject({ code: published.code, vertical: 'adoption' })
+  })
+
+  it('a fee must say what it covers', async () => {
+    await asVerifiedCarolina()
+    const body = { ...listing, fee_cop: 150_000, fee_covers: [] }
+    expect((await failure(call(api.publishAdoption, { body }, asIs))).code).toBe(
+      'validation_failed',
+    )
+  })
+
+  it('a fee above the local norm is published and queued for moderation — never blocked', async () => {
+    await asVerifiedCarolina()
+    const body = { ...listing, fee_cop: 400_000, fee_covers: ['vaccines' as const] }
+    const published = await call(api.publishAdoption, { body }, parsePublish)
+    if (published.kind !== 'published') throw new Error('expected a published listing')
+    expect(db.reports).toContainEqual(
+      expect.objectContaining({ target_id: published.code, note: 'fee_above_norm' }),
+    )
+  })
+
+  it('converts a found case at the day-15 offer: same pet, the found case `converted`', async () => {
+    await asVerifiedCarolina()
+    const body = {
+      ...listing,
+      from_found_case_code: 'C4STD',
+      pet: { ...listing.pet, name: 'Tito', species: 'dog' as const },
+    }
+    const published = await call(api.publishAdoption, { body }, parsePublish)
+    if (published.kind !== 'published') throw new Error('expected a published listing')
+    const found = await caseOf('C4STD')
+    if (found.vertical !== 'found') throw new Error('found')
+    expect([found.status, found.successorCaseCode]).toEqual(['converted', published.code])
+    const tito = await asAdoption(published.code)
+    expect(tito.pet.name).toBe('Tito')
+    expect(db.cases[published.code]).toMatchObject({ pet_id: 'pet-found-dog' })
+    // Listing is not a transfer: the stray stays unclaimed and its custodian keeps it.
+    expect(db.pets.find((p) => p.id === 'pet-found-dog')?.custody_state).toBe('unclaimed')
+  })
+
+  it('converts only the caller’s own found case, and only once the offer is due', async () => {
+    await asVerifiedCarolina()
+    const convert = (code: string) =>
+      failure(call(api.publishAdoption, { body: { ...listing, from_found_case_code: code } }, asIs))
+    expect((await convert('F8UND')).code).toBe('forbidden')
+    Object.assign(db.cases.F8UND!, { created_by: DEMO_OWNER_ID_FOR_TESTS })
+    expect((await convert('F8UND')).code).toBe('invalid_transition')
   })
 })
 

@@ -118,3 +118,24 @@ describe('posterFileName', () => {
     expect(posterFileName('7K3PQ', 'print')).toBe('7K3PQ-print.pdf')
   })
 })
+
+describe('an adoption listing on the poster (10 §3 · label band, §4 · message)', () => {
+  const nube = () => {
+    const parsed = parseCase(cases('public').AD9PT)
+    if (parsed.vertical !== 'adoption') throw new Error('expected an adoption listing')
+    return { ...parsed, publishedAt: new Date(2026, 9, 2, 10) }
+  }
+
+  it('«EN ADOPCIÓN», the name, where it lives — and no footer line', () => {
+    const content = posterContent(es, nube(), link, new Date(2026, 9, 5, 10))
+    expect(content.label).toBe('EN ADOPCIÓN')
+    expect(content.title).toBe('Nube')
+    expect(content.line).toBe('Busca hogar en Estadio · desde el 2 de octubre')
+    expect(content.footer).toBeNull()
+  })
+
+  it('the message discloses the fee and ends in the short link', () => {
+    const message = shareMessage(es, nube(), link)
+    expect(message).toMatch(/^🏡 EN ADOPCIÓN: Nube — Estadio\. .*Sin cuota\. .*\/c\/7K3PQ$/)
+  })
+})

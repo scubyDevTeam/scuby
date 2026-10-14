@@ -15,7 +15,16 @@ describe('parseCase', () => {
   })
 
   it('keeps the verticals without a page yet as a card', () => {
-    expect(parseCase(cases().AD9PT)).toMatchObject({ vertical: 'adoption', placeName: 'Estadio' })
+    expect(parseCase(cases().HE7PA)).toMatchObject({ vertical: 'help', placeName: 'Envigado' })
+  })
+
+  it('parses an adoption listing, with the lister-only fields empty for everyone else', () => {
+    const parsed = parseCase(cases().AD9PT)
+    if (parsed.vertical !== 'adoption') throw new Error('expected an adoption listing')
+    expect(parsed.publishedAt).toBeInstanceOf(Date)
+    expect(parsed.fee).toEqual({ cop: 0, covers: [] })
+    expect(parsed.interests).toEqual([])
+    expect(parsed.myInterest).toBeNull()
   })
 
   it('parses a found case, with the custodian-only fields empty for everyone else', () => {

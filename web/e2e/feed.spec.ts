@@ -7,7 +7,8 @@ test(
     await test.step('every open case near Medellín is listed', async () => {
       await feed.open()
       await expect(feed.title).toBeVisible()
-      await expect(feed.cards).toHaveCount(6)
+      // Lost, found, adoption — open and «en proceso» — and help: everything still open.
+      await expect(feed.cards).toHaveCount(8)
     })
 
     await test.step('filtering narrows it to lost cats', async () => {
@@ -38,7 +39,7 @@ test(
     await test.step('list and map show together, with the desktop chrome', async () => {
       await expect(feed.mainNavigation).toBeHidden()
       await expect(feed.publishLink).toBeVisible()
-      await expect(feed.articles).toHaveCount(6)
+      await expect(feed.articles).toHaveCount(8)
       await expect(feed.map).toHaveAttribute('data-map-ready', 'true')
     })
   },
@@ -47,7 +48,7 @@ test(
 test('on a phone the map replaces the list', tags('@feed', '@FEED-003'), async ({ feed }) => {
   await test.step('the phone shows the list first', async () => {
     await feed.open()
-    await expect(feed.articles).toHaveCount(6)
+    await expect(feed.articles).toHaveCount(8)
   })
 
   await test.step('the map takes the list’s place', async () => {
