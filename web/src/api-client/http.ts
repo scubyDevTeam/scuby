@@ -1,8 +1,17 @@
+import {
+  type BodyOf,
+  buildPath,
+  type Endpoint,
+  type ParamsOf,
+  type QueryOf,
+} from '../contracts/api'
+import { type ErrorCode, parseFailure } from '../contracts/errors'
 import { env } from '../env'
 
 export type ApiErrorKind =
   | 'network'
   | 'unauthorized'
+  | 'forbidden' // signed in, but it is someone else's
   | 'not_found'
   | 'gone'
   | 'conflict' // it clashes with something that already exists
@@ -14,17 +23,28 @@ export type ApiErrorKind =
 export class ApiError extends Error {
   readonly kind: ApiErrorKind
   readonly status: number | null
+  /** The contract's own reason, when the answer carried the error envelope. */
+  readonly code: ErrorCode | null
+  readonly details: Record<string, string>
 
-  constructor(kind: ApiErrorKind, status: number | null = null) {
-    super(`API error: ${kind}${status ? ` (${status})` : ''}`)
+  constructor(
+    kind: ApiErrorKind,
+    status: number | null = null,
+    code: ErrorCode | null = null,
+    details: Record<string, string> = {},
+  ) {
+    super(`API error: ${code ?? kind}${status ? ` (${status})` : ''}`)
     this.name = 'ApiError'
     this.kind = kind
     this.status = status
+    this.code = code
+    this.details = details
   }
 }
 
 function kindFor(status: number): ApiErrorKind {
   if (status === 401) return 'unauthorized'
+  if (status === 403) return 'forbidden'
   if (status === 404) return 'not_found'
   if (status === 409) return 'conflict'
   if (status === 410) return 'gone'
@@ -32,49 +52,68 @@ function kindFor(status: number): ApiErrorKind {
   return 'server'
 }
 
-async function send<T>(url: URL, init: RequestInit, parse: (raw: unknown) => T): Promise<T> {
+async function failure(response: Response): Promise<ApiError> {
+  // The envelope is optional on the way in: a proxy's 502 has none, and the status still says enough.
+  const body = parseFailure(await response.json().catch(() => null))
+  return new ApiError(kindFor(response.status), response.status, body?.code, body?.details)
+}
+
+type Options<E extends Endpoint> = (keyof ParamsOf<E> extends never
+  ? { params?: undefined }
+  : { params: ParamsOf<E> }) &
+  (BodyOf<E> extends undefined ? { body?: undefined } : { body: BodyOf<E> }) & {
+    query?: QueryOf<E>
+  }
+
+let language: string | null = null
+
+/**
+ * The language the screen is in. Sent as `Accept-Language` on every request, so the text the
+ * server composes for display (a place name, a summary, a notification) comes in it too.
+ */
+export function setRequestLanguage(locale: string): void {
+  language = locale
+}
+
+function init(endpoint: Endpoint, body: unknown): RequestInit {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (language) headers['Accept-Language'] = language
+  if (endpoint.body === 'multipart') {
+    // The browser sets the boundary, so no Content-Type here.
+    const form = new FormData()
+    form.append('file', body as Blob, 'photo.jpg')
+    return { method: endpoint.method, headers, body: form }
+  }
+  if (endpoint.body === null) return { method: endpoint.method, headers }
+  headers['Content-Type'] = 'application/json'
+  return { method: endpoint.method, headers, body: JSON.stringify(body) }
+}
+
+/**
+ * One request, described by its contract entry. `parse` turns the wire answer into the type the
+ * app uses; an answer it rejects is `unexpected_response`, never a half-read object.
+ */
+export async function call<E extends Endpoint, T>(
+  endpoint: E,
+  options: Options<E>,
+  parse: (raw: unknown) => T,
+): Promise<T> {
+  const url = new URL(buildPath(endpoint.path, options.params), env.apiUrl)
+  for (const [key, value] of Object.entries(options.query ?? {})) {
+    if (value !== undefined) url.searchParams.set(key, String(value))
+  }
+
   let response: Response
   try {
-    response = await fetch(url, { ...init, credentials: 'include' })
+    response = await fetch(url, { ...init(endpoint, options.body), credentials: 'include' })
   } catch {
     throw new ApiError('network')
   }
-  if (!response.ok) throw new ApiError(kindFor(response.status), response.status)
+  if (!response.ok) throw await failure(response)
 
   try {
     return parse(response.status === 204 ? null : await response.json())
   } catch {
     throw new ApiError('unexpected_response', response.status)
   }
-}
-
-export function apiGet<T>(
-  path: string,
-  parse: (raw: unknown) => T,
-  params?: Record<string, string | undefined>,
-): Promise<T> {
-  const url = new URL(path, env.apiUrl)
-  for (const [key, value] of Object.entries(params ?? {})) {
-    if (value !== undefined) url.searchParams.set(key, value)
-  }
-  return send(url, { headers: { Accept: 'application/json' } }, parse)
-}
-
-export function apiPost<T>(path: string, body: unknown, parse: (raw: unknown) => T): Promise<T> {
-  return send(
-    new URL(path, env.apiUrl),
-    {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-    parse,
-  )
-}
-
-/** Sends one file as multipart: the browser sets the boundary, so no Content-Type here. */
-export function apiUpload<T>(path: string, file: Blob, parse: (raw: unknown) => T): Promise<T> {
-  const form = new FormData()
-  form.append('file', file, 'photo.jpg')
-  return send(new URL(path, env.apiUrl), { method: 'POST', body: form }, parse)
 }

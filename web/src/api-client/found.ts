@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { parseClaim, parseCreated, sightingBody } from '../contracts/actions'
+import { api } from '../contracts/api'
 import {
   type MatchInput,
   matchBody,
@@ -14,16 +15,14 @@ import {
   resolveBody,
 } from '../contracts/found'
 import { parsePublish } from '../contracts/owner'
-import { apiPost } from './http'
-
-const casePath = (code: string) => `/cases/${encodeURIComponent(code)}`
+import { call } from './http'
 
 /** «Es mío»: the claim row first; its answer carries the channel to the custodian. */
 export function useClaimOwnership(code: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: OwnershipClaimInput) =>
-      apiPost(`${casePath(code)}/ownership-claims`, ownershipClaimBody(input), parseClaim),
+      call(api.claimOwnership, { params: { code }, body: ownershipClaimBody(input) }, parseClaim),
     onSuccess: () => client.invalidateQueries({ queryKey: ['case', code] }),
   })
 }
@@ -32,9 +31,9 @@ export function useAnswerOwnershipClaim(code: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: { claimId: string; status: 'confirmed' | 'dismissed' }) =>
-      apiPost(
-        `${casePath(code)}/ownership-claims/${encodeURIComponent(input.claimId)}`,
-        { status: input.status },
+      call(
+        api.answerOwnershipClaim,
+        { params: { code, claimId: input.claimId }, body: { status: input.status } },
         parseCreated,
       ),
     onSuccess: () => client.invalidateQueries({ queryKey: ['case', code] }),
@@ -46,7 +45,7 @@ export function useResolveFound(code: string) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: ResolveInput) =>
-      apiPost(`${casePath(code)}/resolve`, resolveBody(input), parseCreated),
+      call(api.resolveFound, { params: { code }, body: resolveBody(input) }, parseCreated),
     onSuccess: () => client.invalidateQueries(),
   })
 }
@@ -54,7 +53,8 @@ export function useResolveFound(code: string) {
 /** Asks for lost pets this animal could be. Candidates are always confirmed by a person. */
 export function useMatchAnimal() {
   return useMutation({
-    mutationFn: (input: MatchInput) => apiPost('/matches', matchBody(input), parseCandidates),
+    mutationFn: (input: MatchInput) =>
+      call(api.matchAnimal, { body: matchBody(input) }, parseCandidates),
   })
 }
 
@@ -62,7 +62,7 @@ export function usePublishFound() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: PublishFoundInput) =>
-      apiPost('/found-cases', publishFoundBody(input), parsePublish),
+      call(api.publishFound, { body: publishFoundBody(input) }, parsePublish),
     onSuccess: (result) => {
       if (result.kind === 'published') client.invalidateQueries()
     },
@@ -75,17 +75,21 @@ export function useReportWitness() {
   return useMutation({
     mutationFn: ({ caseCode, ...input }: OrphanSightingInput & { caseCode: string | null }) =>
       caseCode
-        ? apiPost(
-            `${casePath(caseCode)}/sightings`,
-            sightingBody({
-              point: input.point,
-              seenAt: input.seenAt,
-              note: input.note,
-              contactPhone: input.contactPhone,
-            }),
+        ? call(
+            api.reportSighting,
+            {
+              params: { code: caseCode },
+              body: sightingBody({
+                point: input.point,
+                seenAt: input.seenAt,
+                note: input.note,
+                photoUrls: input.photoUrls,
+                contactPhone: input.contactPhone,
+              }),
+            },
             parseCreated,
           )
-        : apiPost('/sightings', orphanSightingBody(input), parseCreated),
+        : call(api.reportOrphanSighting, { body: orphanSightingBody(input) }, parseCreated),
     onSuccess: () => client.invalidateQueries({ queryKey: ['case'] }),
   })
 }

@@ -1,23 +1,46 @@
-// hand-written until O14 — the API has no published spec yet, so this wire shape is provisional.
+// A case as anyone reads it by its short code (docs/product/04, 05, 10 §1). Source of the contract:
+// api.ts lists the endpoints, ../../../docs/eng/openapi.json is generated from it.
 import * as z from 'zod/mini'
 import { type FoundCase, foundCaseWire, toFoundCase } from './found'
+import {
+  type Color,
+  colorSchema,
+  type PetSize,
+  phone,
+  point,
+  type Species,
+  sizeSchema,
+  speciesSchema,
+  timestamp,
+  type Vertical,
+  verticalSchema,
+} from './primitives'
 
-const point = z.object({ lat: z.number(), lng: z.number() })
-const timestamp = z.iso.datetime({ offset: true })
+export type { Color, PetSize, Species, Vertical }
+export { colorSchema, sizeSchema, speciesSchema, verticalSchema }
 
-export const verticalSchema = z.enum(['lost', 'found', 'adoption', 'help'])
-export const speciesSchema = z.enum(['dog', 'cat', 'other'])
-export const sizeSchema = z.enum(['small', 'medium', 'large'])
 export const lostStatusSchema = z.enum(['active', 'reunited', 'expired', 'cancelled'])
 
-const sightingWire = z.object({
+export const sightingWire = z.object({
   id: z.string(),
   point,
   seen_at: timestamp,
   note: z.nullable(z.string()),
-  photo_url: z.nullable(z.string()),
+  photo_urls: z.array(z.string()),
   source: z.enum(['anonymous', 'registered']),
   highlighted_by_owner: z.boolean(),
+  /** The owner's alone: the reporter's number, and the pins the owner took off the public map. */
+  contact_phone: z._default(z.nullable(phone), null),
+  hidden: z._default(z.boolean(), false),
+})
+
+/** One question the owner owes an answer to (docs/product/04 · The follow-up loop). */
+export const checkinWire = z.object({
+  id: z.string(),
+  trigger: z.enum(['time_based', 'post_recovery_claim']),
+  /** Set on a claim check-in: the claim the three answers are about. */
+  claim_id: z.nullable(z.string()),
+  asked_at: timestamp,
 })
 
 export const lostCaseWire = z.object({
@@ -30,7 +53,7 @@ export const lostCaseWire = z.object({
     name: z.string(),
     species: speciesSchema,
     size: z.nullable(sizeSchema),
-    colors: z.array(z.string()),
+    colors: z.array(colorSchema),
     marks: z.nullable(z.string()),
     photo_urls: z.array(z.string()),
   }),
@@ -47,13 +70,15 @@ export const lostCaseWire = z.object({
     z.array(
       z.object({
         id: z.string(),
-        phone: z.string(),
+        phone,
         created_at: timestamp,
         status: z.enum(['open', 'confirmed', 'dismissed', 'stale']),
       }),
     ),
     [],
   ),
+  /** The oldest unanswered check-in. Only the owner receives it. */
+  pending_checkin: z._default(z.nullable(checkinWire), null),
   contact: z.nullable(z.object({ display_name: z.string(), whatsapp_url: z.nullable(z.string()) })),
 })
 
@@ -73,18 +98,23 @@ export const caseWire = z.discriminatedUnion('vertical', [
   otherCaseWire,
 ])
 
-export type Vertical = z.infer<typeof verticalSchema>
-export type Species = z.infer<typeof speciesSchema>
-export type PetSize = z.infer<typeof sizeSchema>
-
 export type Sighting = {
   id: string
   point: { lat: number; lng: number }
   seenAt: Date
   note: string | null
-  photoUrl: string | null
+  photoUrls: string[]
   source: 'anonymous' | 'registered'
   highlightedByOwner: boolean
+  contactPhone: string | null
+  hidden: boolean
+}
+
+export type Checkin = {
+  id: string
+  trigger: 'time_based' | 'post_recovery_claim'
+  claimId: string | null
+  askedAt: Date
 }
 
 export type RecoveryClaim = {
@@ -105,7 +135,7 @@ export type LostCase = {
     name: string
     species: Species
     size: PetSize | null
-    colors: string[]
+    colors: Color[]
     marks: string | null
     photoUrls: string[]
   }
@@ -113,6 +143,7 @@ export type LostCase = {
   openClaimCount: number
   sightings: Sighting[]
   claims: RecoveryClaim[]
+  pendingCheckin: Checkin | null
   contact: { displayName: string; whatsappUrl: string | null } | null
 }
 
@@ -166,9 +197,11 @@ export function parseCase(raw: unknown): CaseDetail {
       point: s.point,
       seenAt: new Date(s.seen_at),
       note: s.note,
-      photoUrl: s.photo_url,
+      photoUrls: s.photo_urls,
       source: s.source,
       highlightedByOwner: s.highlighted_by_owner,
+      contactPhone: s.contact_phone,
+      hidden: s.hidden,
     })),
     claims: wire.claims.map((claim) => ({
       id: claim.id,
@@ -176,6 +209,12 @@ export function parseCase(raw: unknown): CaseDetail {
       createdAt: new Date(claim.created_at),
       status: claim.status,
     })),
+    pendingCheckin: wire.pending_checkin && {
+      id: wire.pending_checkin.id,
+      trigger: wire.pending_checkin.trigger,
+      claimId: wire.pending_checkin.claim_id,
+      askedAt: new Date(wire.pending_checkin.asked_at),
+    },
     contact: wire.contact && {
       displayName: wire.contact.display_name,
       whatsappUrl: wire.contact.whatsapp_url,

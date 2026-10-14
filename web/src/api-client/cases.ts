@@ -1,24 +1,31 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
+import { api } from '../contracts/api'
 import { type CaseDetail, parseCase, type Species, type Vertical } from '../contracts/case'
 import { type Feed, parseFeed } from '../contracts/feed'
-import { apiGet } from './http'
+import { call } from './http'
 
 export const caseQuery = (code: string) =>
   queryOptions<CaseDetail>({
     queryKey: ['case', code],
-    queryFn: () => apiGet(`/cases/${encodeURIComponent(code)}`, parseCase),
+    queryFn: () => call(api.getCase, { params: { code } }, parseCase),
   })
 
 export function useCase(code: string) {
   return useQuery(caseQuery(code))
 }
 
-export type FeedFilters = { vertical?: Vertical; species?: Species }
+/** `near` is the viewer's position when the device gave one: the server decides what counts as near. */
+export type FeedFilters = {
+  vertical?: Vertical
+  species?: Species
+  near?: { lat: number; lng: number }
+}
 
-export const feedQuery = (filters: FeedFilters) =>
+export const feedQuery = ({ near, ...filters }: FeedFilters) =>
   queryOptions<Feed>({
-    queryKey: ['feed', filters],
-    queryFn: () => apiGet('/feed', parseFeed, filters),
+    queryKey: ['feed', filters, near ?? null],
+    queryFn: () =>
+      call(api.getFeed, { query: { ...filters, lat: near?.lat, lng: near?.lng } }, parseFeed),
   })
 
 export function useFeed(filters: FeedFilters) {
