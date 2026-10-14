@@ -329,7 +329,7 @@ test cannot cover (the offline sighting queue is one). Both suites run in CI on 
 | Build | **Vite** + React 19 + TypeScript strict |
 | Router | **TanStack Router** — file-based, type-safe params, SPA |
 | Styling | **Tailwind + shadcn/ui** |
-| Map | **MapLibre GL JS** + **Protomaps** tiles — GL symbol layers, lazy-loaded |
+| Map | **MapLibre GL JS** — GL symbol layers, lazy-loaded. Tiles: any style URL, set in `VITE_MAP_STYLE_URL`; **OpenFreeMap** (keyless, free) for development and until launch. The production source (OpenFreeMap, Protomaps hosted, or self-hosted `.pmtiles`) is decided with real traffic numbers — changing it is one env var. With no style URL, or no WebGL, the map falls back to a tile-less drawing of the same area and pins |
 | Server state | **TanStack Query** (+ persister for the sighting queue) |
 | Forms | **react-hook-form + Zod** |
 | Contracts | Zod + types generated from the backend's OpenAPI spec |
@@ -352,7 +352,7 @@ Pin the current major of each at scaffold time — this doc goes stale faster th
 | Vite + TanStack Router | **Next.js `output: 'export'`** — gives up SSR, RSC, ISR, middleware, `next/image` (every reason to run it), keeps the App Router's complexity, and cannot statically export `/c/[code]` (codes are created at runtime). **React Router 7 framework mode** — SSR-shaped, we have no server. **TanStack Start** — a server we don't need yet; it is the in-place upgrade if we ever do |
 | One function injects OG into the shell | UA-sniffing (fragile); prerendering every case (unbounded ids); no server at all (kills the WhatsApp loop) |
 | One app, folders | Monorepo / workspaces — one deployable. A TS backend sharing `domain` was the only thing that would justify it; the backend is Rails |
-| MapLibre + Protomaps | Google Maps / Mapbox — bill per load, and this map is opened constantly by strangers who never sign up |
+| MapLibre + open tiles | Google Maps / Mapbox — bill per load, and this map is opened constantly by strangers who never sign up |
 | Discriminated unions + `transition()` | XState (nothing to justify it); scattered conditionals (copies that drift) |
 | Biome | ESLint + Prettier — two tools, more config, no benefit at this size |
 | JPEG client re-encode | WebP — Safari's canvas can't reliably encode it, and the server re-encodes the master as JPEG anyway ([media-pipeline](media-pipeline.md) §1) |
@@ -407,7 +407,7 @@ Risks 1, 3, 4, 5, 7 and 8 belong to the mobile scope; 2 and 6 apply from day one
    **first step of the mobile scope**, before any native work (on the web it's ordinary MapLibre,
    checked in web phase 3.4). Spike: map screen with ~300 clustered pins in a Capacitor build on a
    Redmi A3-class phone (3–4 GB RAM) over real 4G. It tests sustained memory (WebGL + tile cache +
-   WhatsApp running), cold Protomaps range requests, and whether the OS reclaims the webview in the
+   WhatsApp running), cold tile requests, and whether the OS reclaims the webview in the
    background. **Pass:** stable memory over five minutes of panning, no reload after backgrounding,
    cold map interactive under ~2 s. **Fail:** a native map view under the webview via plugin (a
    rescue, not a plan), or reopen the native question with evidence. The web is unaffected.

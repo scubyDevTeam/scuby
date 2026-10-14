@@ -64,7 +64,7 @@ The product name is **not** one of them: it is configuration ([00 · #21](../pro
 
 | Decision | Proposal | Lands in |
 |---|---|---|
-| Tile source for the map | Protomaps hosted API to start, or a self-hosted `.pmtiles` file on object storage | [frontend.md](frontend.md) · Stack, [costs.md](costs.md) |
+| Tile source for the map — **closed for development** *(2026-10-13)*: OpenFreeMap, keyless. Still open for production | OpenFreeMap, Protomaps hosted API, or a self-hosted `.pmtiles` file on object storage — pick with real traffic | [frontend.md](frontend.md) · Stack, [costs.md](costs.md) |
 
 ---
 
