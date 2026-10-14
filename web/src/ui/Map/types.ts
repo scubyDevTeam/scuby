@@ -14,3 +14,10 @@ export type MapPin = {
   /** «hace 2 h» on the newest pin. */
   label?: string
 }
+
+/** A case on the feed map, coloured by its vertical. */
+export type MapMarker = {
+  id: string
+  point: MapPoint
+  tone: 'lost' | 'found' | 'adoption' | 'help'
+}

@@ -1,12 +1,9 @@
-// The only file that imports MapLibre (frontend.md · Rule 5). Loaded lazily by CaseMap.
-// Everything is a GL layer — no DOM markers, which crawl past a few hundred pins.
+// Loaded lazily by CaseMap. Everything is a GL layer — no DOM markers, which crawl past a few
+// hundred pins.
 import type { FeatureCollection, GeoJSON } from 'geojson'
-import { type GeoJSONSource, Map as GlMap, setWorkerUrl } from 'maplibre-gl'
-// The library resolves its worker at runtime; the bundler has to be told to build and serve it.
-import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
 import { bandOpacity, boundsOf, circleRing, pinIconName, trajectory } from './geometry'
+import { cssColor, type GeoJSONSource, GlMap } from './maplibre'
 import type { MapArea, MapPin } from './types'
 
 type Props = {
@@ -15,11 +12,6 @@ type Props = {
   pins: readonly MapPin[]
   onError: () => void
 }
-
-setWorkerUrl(workerUrl)
-
-const cssColor = (name: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
 /** Numbered pins and their labels are drawn to images, so they need no glyphs from the style. */
 function pinImage(order: number, strong: boolean): ImageData {

@@ -297,7 +297,7 @@ beats an intention.
 
 | What | Budget | Enforced by |
 |---|---|---|
-| `/c/:code` — JS transferred, first load | **≤ 150 KB gzip** (map excluded) | `size-limit` in CI |
+| `/c/:code` — JS transferred, first load | **≤ 150 KB gzip** (map excluded) | `pnpm size` in CI: sums the route's chunks from the build manifest |
 | `/c/:code` — LCP | **≤ 2.0 s** on Slow 4G, mid-tier Android | Lighthouse CI on every PR |
 | Map cold load | **≤ 2.0 s** to first interactive tiles | manual on the reference device |
 | Uploaded photo | ≈ 300 KB, ≤ 1600 px, JPEG | client pipeline ([media-pipeline](media-pipeline.md)) |
@@ -341,7 +341,7 @@ test cannot cover (the offline sighting queue is one). Both suites run in CI on 
 | Native sign-in *(scope 2)* | Google: Capawesome Google Sign-In or `@capgo/capacitor-social-login` (Credential Manager on Android, Google SDK on iOS). Apple: Sign in with Apple through the same plugin family. Behind `src/platform/auth` |
 | Live updates *(scope 2)* | **Capgo** or **Capawesome** — JS/asset fixes reach installed apps without review (Apple 3.3.2 allows it for JS and assets, never a change of purpose). Not Ionic Appflow: closed to new customers, shuts down 2027-12-31 |
 | Store builds *(scope 2)* | GitHub Actions — macOS runner for iOS (no Mac required), Linux for Android; signing secrets in CI, never in the repo |
-| Tooling | **Biome** (lint + format) · dependency-cruiser · size-limit · **Vitest** + Testing Library · **Playwright** web e2e (see *Testing*) · Lighthouse CI on `/c/:code` |
+| Tooling | **Biome** (lint + format) · dependency-cruiser · a size-budget script · **Vitest** + Testing Library · **Playwright** web e2e (see *Testing*) · Lighthouse CI on `/c/:code` |
 
 Pin the current major of each at scaffold time — this doc goes stale faster than the ecosystem.
 

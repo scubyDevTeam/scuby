@@ -1,4 +1,5 @@
-import { Component, lazy, type ReactNode, Suspense, useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
+import { OnError } from './OnError'
 import { SchematicMap } from './SchematicMap'
 import type { MapArea, MapPin } from './types'
 
@@ -36,17 +37,4 @@ export function CaseMap({ styleUrl, area, areaLabel, pins }: Props) {
       </Suspense>
     </OnError>
   )
-}
-
-/** The map chunk failing to load (offline) must not take the case page down with it. */
-class OnError extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
-  state = { failed: false }
-
-  static getDerivedStateFromError() {
-    return { failed: true }
-  }
-
-  render() {
-    return this.state.failed ? this.props.fallback : this.props.children
-  }
 }

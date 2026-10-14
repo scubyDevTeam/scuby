@@ -14,7 +14,7 @@ export function SightingTimeline({
 }) {
   const newestFirst = [...sightings].reverse()
   return (
-    <ol className="m-0 flex list-none flex-col gap-3 p-0">
+    <ol aria-label="Avistamientos" className="m-0 flex list-none flex-col gap-3 p-0">
       {newestFirst.map((sighting) => (
         <li
           key={sighting.id}

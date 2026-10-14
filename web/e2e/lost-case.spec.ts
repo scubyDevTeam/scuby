@@ -10,7 +10,7 @@ test('a shared link to an active lost case shows who, where and what to do', asy
   await expect(page.getByText('Posible hallazgo.')).toBeVisible()
 
   // The trajectory, newest first.
-  const sightings = page.getByRole('list').getByRole('listitem')
+  const sightings = page.getByRole('list', { name: 'Avistamientos' }).getByRole('listitem')
   await expect(sightings).toHaveCount(3)
   await expect(sightings.first()).toContainText('hace 2 h')
 

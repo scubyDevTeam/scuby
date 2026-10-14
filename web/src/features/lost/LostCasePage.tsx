@@ -7,7 +7,7 @@ import { Button, buttonClass, roundButtonClass } from '@ui/Button'
 import { CaseMap } from '@ui/Map/CaseMap'
 import { Notice } from '@ui/Notice'
 import { Archive, Clock, Flag, MessageCircle, PartyPopper, Share2 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { describePet, formatDayMonth, sightingsCount } from './copy'
 import { SightingTimeline } from './SightingTimeline'
 
@@ -36,179 +36,222 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
   const sightings = placeSightings(lostCase.sightings, lastSeen.center, now)
 
   return (
-    <article className="mx-auto max-w-lg pb-10">
-      <header className="relative">
-        <Photo urls={pet.photoUrls} name={pet.name} />
-        <div className="absolute inset-x-4 top-4 flex justify-between">
-          {backLink}
-          {can('share') ? (
-            <RoundButton label="Compartir" onClick={() => onAction('share')}>
-              <Share2 aria-hidden="true" />
-            </RoundButton>
+    <article className="mx-auto flex max-w-lg flex-col pb-10 lg:max-w-none">
+      <StatusBand mode={mode} status={lostCase.status} shortUrl={shortUrl} />
+
+      {/* Phone: one column — photo, band, story, details. Desktop: photo and details left, story right. */}
+      <div className="contents lg:order-2 lg:mx-auto lg:grid lg:w-full lg:max-w-6xl lg:grid-cols-[5fr_6fr] lg:items-start lg:gap-x-12 lg:px-8 lg:pt-10">
+        <div className="contents lg:col-start-1 lg:row-start-1 lg:flex lg:flex-col lg:gap-8">
+          <header className="relative order-1">
+            <Gallery urls={pet.photoUrls} name={pet.name} />
+            <div className="absolute inset-x-4 top-4 flex justify-between lg:hidden">
+              {backLink}
+              {can('share') ? (
+                <RoundButton label="Compartir" onClick={() => onAction('share')}>
+                  <Share2 aria-hidden="true" />
+                </RoundButton>
+              ) : null}
+            </div>
+          </header>
+
+          <div className="order-4 flex flex-col gap-6 px-5 pt-6 lg:px-0 lg:pt-0">
+            {pet.marks ? (
+              <section>
+                <h2 className="m-0 text-2xl font-extrabold">Señas</h2>
+                <p className="m-0 mt-2 text-lg">{pet.marks}</p>
+              </section>
+            ) : null}
+
+            {can('contact_owner') && lostCase.contact ? (
+              <section className="flex flex-col gap-3 rounded-2xl bg-brand-mist p-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="m-0 font-bold">{lostCase.contact.displayName}</p>
+                  <p className="m-0 text-muted">Su familia</p>
+                </div>
+                {lostCase.contact.whatsappUrl ? (
+                  <a
+                    href={lostCase.contact.whatsappUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={buttonClass('whatsapp', 'lg:w-auto')}
+                  >
+                    <MessageCircle aria-hidden="true" />
+                    Escribirle por WhatsApp
+                  </a>
+                ) : null}
+              </section>
+            ) : null}
+
+            {can('share') || can('report_content') ? (
+              <footer className="flex flex-wrap items-center justify-between gap-2">
+                {can('share') ? (
+                  <Button variant="link" onClick={() => onAction('share')}>
+                    <Share2 aria-hidden="true" />
+                    Compartir aviso
+                  </Button>
+                ) : null}
+                {can('report_content') ? (
+                  <Button
+                    variant="link"
+                    className="font-normal text-muted"
+                    onClick={() => onAction('report_content')}
+                  >
+                    <Flag aria-hidden="true" className="size-4" />
+                    Reportar
+                  </Button>
+                ) : null}
+              </footer>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="order-3 flex flex-col gap-6 px-5 pt-5 lg:col-start-2 lg:row-start-1 lg:px-0 lg:pt-0">
+          <section>
+            <h1 className="m-0 text-4xl font-extrabold lg:text-6xl">{pet.name}</h1>
+            <p className="m-0 mt-1 text-lg lg:text-xl">{describePet(pet)}</p>
+            <p className="m-0 mt-1 text-muted">
+              Se perdió en {lastSeen.placeName} · {formatDayMonth(lastSeen.at)} ·{' '}
+              {formatRelative(lastSeen.at, now)}
+            </p>
+          </section>
+
+          {mode === 'closed' && lostCase.status === 'reunited' ? (
+            <Notice
+              tone="success"
+              icon={<PartyPopper aria-hidden="true" />}
+              title={`¡${pet.name} ya está en casa!`}
+            >
+              Gracias a quienes ayudaron a buscar.
+            </Notice>
+          ) : null}
+          {mode === 'closed' && lostCase.status === 'cancelled' ? (
+            <Notice tone="neutral" title="Este aviso fue cerrado.">
+              Su familia lo retiró; ya no hace falta buscar.
+            </Notice>
+          ) : null}
+          {mode === 'archived' ? (
+            <Notice
+              tone="neutral"
+              icon={<Archive aria-hidden="true" />}
+              title="Este aviso fue archivado."
+            >
+              {can('reopen')
+                ? 'Puedes reactivarlo y conservar sus avistamientos.'
+                : 'Su familia puede reactivarlo si la búsqueda sigue.'}
+            </Notice>
+          ) : null}
+
+          {can('report_sighting') || can('claim_recovery') ? (
+            <section className="flex flex-col gap-3 lg:flex-row">
+              {can('report_sighting') ? (
+                <Button hint="Marca dónde · sin cuenta" onClick={() => onAction('report_sighting')}>
+                  La vi
+                </Button>
+              ) : null}
+              {can('claim_recovery') ? (
+                <Button variant="outline" onClick={() => onAction('claim_recovery')}>
+                  La tengo conmigo
+                </Button>
+              ) : null}
+            </section>
+          ) : null}
+          {can('confirm_reunited') ? (
+            <section className="flex flex-col gap-3">
+              <Button onClick={() => onAction('confirm_reunited')}>Ya apareció</Button>
+              <Button variant="link" className="text-lost-deep" onClick={() => onAction('cancel')}>
+                Eliminar aviso
+              </Button>
+            </section>
+          ) : null}
+          {can('reopen') ? (
+            <Button onClick={() => onAction('reopen')}>Reactivar aviso</Button>
+          ) : null}
+
+          {mode === 'open' && hasPossibleFind(lostCase.openClaimCount) ? (
+            <Notice icon={<Clock aria-hidden="true" />} title="Posible hallazgo.">
+              Alguien dice que la tiene y su familia lo está verificando. La búsqueda sigue: si la
+              ves, repórtalo.
+            </Notice>
+          ) : null}
+
+          {mode === 'open' ? (
+            <section className="flex flex-col gap-3">
+              <div className="flex items-baseline justify-between">
+                <h2 className="m-0 text-2xl font-extrabold">Por dónde va</h2>
+                <span className="text-muted">{sightingsCount(sightings.length)}</span>
+              </div>
+              <CaseMap
+                styleUrl={mapStyleUrl}
+                area={area}
+                areaLabel="Zona donde se perdió (aproximada)"
+                pins={sightings.map((s) => ({
+                  id: s.id,
+                  point: s.point,
+                  order: s.order,
+                  band: s.band,
+                  emphasized: s.emphasized,
+                  label: s.isLatest ? formatRelative(s.seenAt, now) : undefined,
+                }))}
+              />
+              {sightings.length > 0 ? (
+                <SightingTimeline sightings={sightings} now={now} />
+              ) : (
+                <p className="m-0 text-muted">
+                  Nadie la ha visto todavía. Si la ves, márcalo en el mapa.
+                </p>
+              )}
+            </section>
           ) : null}
         </div>
-        <StatusBand mode={mode} status={lostCase.status} shortUrl={shortUrl} />
-      </header>
-
-      <div className="flex flex-col gap-6 px-5 pt-5">
-        <section>
-          <h1 className="m-0 text-4xl font-extrabold">{pet.name}</h1>
-          <p className="m-0 mt-1 text-lg">{describePet(pet)}</p>
-          <p className="m-0 mt-1 text-muted">
-            Se perdió en {lastSeen.placeName} · {formatDayMonth(lastSeen.at)} ·{' '}
-            {formatRelative(lastSeen.at, now)}
-          </p>
-        </section>
-
-        {mode === 'closed' && lostCase.status === 'reunited' ? (
-          <Notice
-            tone="success"
-            icon={<PartyPopper aria-hidden="true" />}
-            title={`¡${pet.name} ya está en casa!`}
-          >
-            Gracias a quienes ayudaron a buscar.
-          </Notice>
-        ) : null}
-        {mode === 'closed' && lostCase.status === 'cancelled' ? (
-          <Notice tone="neutral" title="Este aviso fue cerrado.">
-            Su familia lo retiró; ya no hace falta buscar.
-          </Notice>
-        ) : null}
-        {mode === 'archived' ? (
-          <Notice
-            tone="neutral"
-            icon={<Archive aria-hidden="true" />}
-            title="Este aviso fue archivado."
-          >
-            {can('reopen')
-              ? 'Puedes reactivarlo y conservar sus avistamientos.'
-              : 'Su familia puede reactivarlo si la búsqueda sigue.'}
-          </Notice>
-        ) : null}
-
-        {can('report_sighting') || can('claim_recovery') ? (
-          <section className="flex flex-col gap-3">
-            {can('report_sighting') ? (
-              <Button hint="Marca dónde · sin cuenta" onClick={() => onAction('report_sighting')}>
-                La vi
-              </Button>
-            ) : null}
-            {can('claim_recovery') ? (
-              <Button variant="outline" onClick={() => onAction('claim_recovery')}>
-                La tengo conmigo
-              </Button>
-            ) : null}
-          </section>
-        ) : null}
-        {can('confirm_reunited') ? (
-          <section className="flex flex-col gap-3">
-            <Button onClick={() => onAction('confirm_reunited')}>Ya apareció</Button>
-            <Button variant="link" className="text-lost-deep" onClick={() => onAction('cancel')}>
-              Eliminar aviso
-            </Button>
-          </section>
-        ) : null}
-        {can('reopen') ? <Button onClick={() => onAction('reopen')}>Reactivar aviso</Button> : null}
-
-        {mode === 'open' && hasPossibleFind(lostCase.openClaimCount) ? (
-          <Notice icon={<Clock aria-hidden="true" />} title="Posible hallazgo.">
-            Alguien dice que la tiene y su familia lo está verificando. La búsqueda sigue: si la
-            ves, repórtalo.
-          </Notice>
-        ) : null}
-
-        {mode === 'open' ? (
-          <section className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between">
-              <h2 className="m-0 text-2xl font-extrabold">Por dónde va</h2>
-              <span className="text-muted">{sightingsCount(sightings.length)}</span>
-            </div>
-            <CaseMap
-              styleUrl={mapStyleUrl}
-              area={area}
-              areaLabel="Zona donde se perdió (aproximada)"
-              pins={sightings.map((s) => ({
-                id: s.id,
-                point: s.point,
-                order: s.order,
-                band: s.band,
-                emphasized: s.emphasized,
-                label: s.isLatest ? formatRelative(s.seenAt, now) : undefined,
-              }))}
-            />
-            {sightings.length > 0 ? (
-              <SightingTimeline sightings={sightings} now={now} />
-            ) : (
-              <p className="m-0 text-muted">
-                Nadie la ha visto todavía. Si la ves, márcalo en el mapa.
-              </p>
-            )}
-          </section>
-        ) : null}
-
-        {pet.marks ? (
-          <section>
-            <h2 className="m-0 text-2xl font-extrabold">Señas</h2>
-            <p className="m-0 mt-2 text-lg">{pet.marks}</p>
-          </section>
-        ) : null}
-
-        {can('contact_owner') && lostCase.contact ? (
-          <section className="flex flex-col gap-3 rounded-2xl bg-brand-mist p-4">
-            <div>
-              <p className="m-0 font-bold">{lostCase.contact.displayName}</p>
-              <p className="m-0 text-muted">Su familia</p>
-            </div>
-            {lostCase.contact.whatsappUrl ? (
-              <a
-                href={lostCase.contact.whatsappUrl}
-                target="_blank"
-                rel="noreferrer"
-                className={buttonClass('whatsapp')}
-              >
-                <MessageCircle aria-hidden="true" />
-                Escribirle por WhatsApp
-              </a>
-            ) : null}
-          </section>
-        ) : null}
-
-        {can('share') || can('report_content') ? (
-          <footer className="flex flex-wrap items-center justify-between gap-2">
-            {can('share') ? (
-              <Button variant="link" onClick={() => onAction('share')}>
-                <Share2 aria-hidden="true" />
-                Compartir aviso
-              </Button>
-            ) : null}
-            {can('report_content') ? (
-              <Button
-                variant="link"
-                className="font-normal text-muted"
-                onClick={() => onAction('report_content')}
-              >
-                <Flag aria-hidden="true" className="size-4" />
-                Reportar
-              </Button>
-            ) : null}
-          </footer>
-        ) : null}
       </div>
     </article>
   )
 }
 
-function Photo({ urls, name }: { urls: readonly string[]; name: string }) {
-  const first = urls[0]
-  if (!first) return <div className="aspect-square w-full bg-soft" />
+function Gallery({ urls, name }: { urls: readonly string[]; name: string }) {
+  const [selected, setSelected] = useState(0)
+  const current = urls[selected] ?? urls[0]
+  if (!current) return <div className="aspect-square w-full bg-soft lg:rounded-3xl" />
+  const photo = (
+    <img
+      src={current}
+      alt={`Foto de ${name}`}
+      className="aspect-square w-full object-cover lg:rounded-3xl"
+    />
+  )
+  if (urls.length === 1) return photo
+
   return (
-    <div className="relative">
-      <img src={first} alt={`Foto de ${name}`} className="aspect-square w-full object-cover" />
-      {urls.length > 1 ? (
+    <div className="flex flex-col gap-3">
+      {/* On a phone the photo itself is the control; a desktop has room for thumbnails. */}
+      <button
+        type="button"
+        aria-label="Ver la siguiente foto"
+        onClick={() => setSelected((selected + 1) % urls.length)}
+        className="relative block w-full border-0 bg-transparent p-0"
+      >
+        {photo}
         <span className="absolute right-4 bottom-4 rounded-full bg-ink/80 px-3 py-1 text-sm font-bold text-white">
-          1 / {urls.length}
+          {selected + 1} / {urls.length}
         </span>
-      ) : null}
+      </button>
+      <ul className="m-0 hidden list-none grid-cols-4 gap-2 p-0 lg:grid">
+        {urls.map((url, index) => (
+          <li key={url}>
+            <button
+              type="button"
+              aria-label={`Ver foto ${index + 1}`}
+              aria-pressed={index === selected}
+              onClick={() => setSelected(index)}
+              className={`block w-full overflow-hidden rounded-xl border-4 p-0 ${
+                index === selected ? 'border-brand' : 'border-transparent'
+              }`}
+            >
+              <img src={url} alt="" className="aspect-4/3 w-full object-cover" />
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -233,7 +276,7 @@ function StatusBand({
           }
   return (
     <div
-      className={`flex items-center justify-between gap-3 px-5 py-3 text-white ${band.className}`}
+      className={`order-2 flex items-center justify-between gap-3 px-5 py-3 text-white lg:order-1 lg:px-[max(2rem,calc((100vw-72rem)/2+2rem))] ${band.className}`}
     >
       <strong className="text-lg tracking-widest uppercase">{band.label}</strong>
       <span className="font-mono text-sm font-bold">{shortUrl}</span>

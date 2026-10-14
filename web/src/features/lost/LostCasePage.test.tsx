@@ -46,7 +46,9 @@ describe('LostCasePage — active case, seen by a helper', () => {
 
   it('lists sightings newest first, numbered from the oldest', () => {
     show(lostCase('7K3PQ'))
-    const items = within(screen.getByRole('list')).getAllByRole('listitem')
+    const items = within(screen.getByRole('list', { name: 'Avistamientos' })).getAllByRole(
+      'listitem',
+    )
     expect(items.map((item) => item.textContent?.[0])).toEqual(['3', '2', '1'])
   })
 
@@ -59,6 +61,19 @@ describe('LostCasePage — active case, seen by a helper', () => {
     show(lostCase('7K3PQ', { contact: { displayName: 'Carolina M.', whatsappUrl: null } }))
     expect(screen.getByText('Carolina M.')).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Escribirle por WhatsApp' })).toBeNull()
+  })
+})
+
+describe('LostCasePage — photos', () => {
+  it('steps through the photos and wraps around', () => {
+    show(lostCase('7K3PQ'))
+    const next = screen.getByRole('button', { name: 'Ver la siguiente foto' })
+    expect(next.textContent).toBe('1 / 4')
+    fireEvent.click(next)
+    expect(next.textContent).toBe('2 / 4')
+    fireEvent.click(screen.getByRole('button', { name: 'Ver foto 4' }))
+    fireEvent.click(next)
+    expect(next.textContent).toBe('1 / 4')
   })
 })
 

@@ -12,6 +12,8 @@ const feedItemWire = z.object({
   /** «Perra · Pequeña · Negro y canela» — already composed by the server for cards. */
   summary: z.string().nullable(),
   place_name: z.string(),
+  /** Where to draw it on the feed map: public precision, never a doorstep. */
+  point: z.object({ lat: z.number(), lng: z.number() }),
   photo_url: z.string().nullable(),
   happened_at: timestamp,
   possible_find: z.boolean(),
@@ -34,6 +36,7 @@ export type FeedItem = {
   species: z.infer<typeof speciesSchema>
   summary: string | null
   placeName: string
+  point: { lat: number; lng: number }
   photoUrl: string | null
   happenedAt: Date
   possibleFind: boolean
@@ -55,6 +58,7 @@ export function parseFeed(raw: unknown): Feed {
       species: item.species,
       summary: item.summary,
       placeName: item.place_name,
+      point: item.point,
       photoUrl: item.photo_url,
       happenedAt: new Date(item.happened_at),
       possibleFind: item.possible_find,

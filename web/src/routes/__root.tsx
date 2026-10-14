@@ -2,6 +2,7 @@ import { createRootRoute, Link, Outlet, useLocation } from '@tanstack/react-rout
 import { Message } from '@ui/States'
 import { Bell, FileText, Home, Plus, SearchX, User } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { brand } from '../brand'
 
 export const Route = createRootRoute({
   component: Shell,
@@ -22,7 +23,8 @@ function Shell() {
   const onCasePage = useLocation({ select: (location) => location.pathname.startsWith('/c/') })
   return (
     <>
-      <main className={onCasePage ? '' : 'pb-24'}>
+      <TopBar />
+      <main className={onCasePage ? '' : 'pb-24 lg:pb-0'}>
         <Outlet />
       </main>
       {onCasePage ? null : <BottomNav />}
@@ -30,11 +32,40 @@ function Shell() {
   )
 }
 
+/** Desktop chrome. Phones get the bottom bar instead, and nothing at all on a case page. */
+function TopBar() {
+  const link = 'rounded-xl px-3 py-2 font-semibold text-white no-underline hover:bg-white/15'
+  return (
+    <header className="sticky top-0 z-10 hidden bg-brand text-white lg:block">
+      <div className="mx-auto flex max-w-6xl items-center gap-2 px-8 py-4">
+        <Link to="/" className="mr-auto text-2xl font-extrabold text-white no-underline">
+          {brand.name}
+        </Link>
+        <Link to="/mis-casos" className={link}>
+          Mis casos
+        </Link>
+        <Link to="/bandeja" className={link}>
+          Bandeja
+        </Link>
+        <Link
+          to="/publicar"
+          className="mx-2 rounded-full bg-surface px-6 py-3 font-bold text-brand-deep no-underline"
+        >
+          Publicar aviso
+        </Link>
+        <Link to="/perfil" className={link}>
+          Entrar
+        </Link>
+      </div>
+    </header>
+  )
+}
+
 function BottomNav() {
   return (
     <nav
       aria-label="Principal"
-      className="fixed inset-x-0 bottom-0 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       <ul className="m-0 mx-auto flex max-w-lg list-none items-end justify-between px-3 py-2">
         <NavItem to="/" icon={<Home aria-hidden="true" />} label="Inicio" />

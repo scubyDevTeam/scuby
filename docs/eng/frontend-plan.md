@@ -149,7 +149,7 @@ cada dependencia.»
 
 ### 0.2 Quality gates
 **Do:** Biome; Vitest; **dependency-cruiser** with the layer table from frontend.md
-(`domain` imports nothing, etc.); size-limit (`/c/:code` entry ≤ 150 KB gzip, MapLibre not in the
+(`domain` imports nothing, etc.); a size-budget script (`/c/:code` entry ≤ 150 KB gzip, MapLibre not in the
 entry chunk); Playwright; Lighthouse CI config; GitHub Actions workflow running lint → typecheck →
 test → build → size → depcruise on every PR.
 **Done when:** each gate goes red on a deliberate violation (commit one, watch it fail, revert).

@@ -14,6 +14,8 @@ function show(respond: (url: URL) => Response) {
     >
       <FeedPage
         brandName="Marca"
+        mapStyleUrl={undefined}
+        onOpenCase={() => {}}
         caseLink={(code, children) => <a href={`/c/${code}`}>{children}</a>}
       />
     </QueryClientProvider>,
@@ -28,8 +30,8 @@ describe('FeedPage', () => {
   it('shows a card per case, each linking to its page', async () => {
     show(() => feed('local'))
 
-    expect(await screen.findByRole('heading', { name: 'Cerca de ti, ahora' })).toBeTruthy()
-    expect(screen.getAllByRole('article')).toHaveLength(5)
+    expect(await screen.findAllByRole('article')).toHaveLength(5)
+    expect(screen.getByRole('heading', { name: 'Cerca de ti, ahora' })).toBeTruthy()
     expect(screen.getByRole('link', { name: /Luna/ }).getAttribute('href')).toBe('/c/7K3PQ')
   })
 

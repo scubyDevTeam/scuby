@@ -10,6 +10,8 @@ const layer = (name: string) => fileURLToPath(new URL(`./src/${name}`, import.me
 export default defineConfig({
   plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
   worker: { format: 'es' },
+  // scripts/check-size.mjs reads the manifest to add up what one route really downloads.
+  build: { manifest: true },
   test: {
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
