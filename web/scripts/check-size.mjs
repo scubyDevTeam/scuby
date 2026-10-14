@@ -8,11 +8,15 @@ const ROUTE = 'c.$code'
 
 const manifest = JSON.parse(readFileSync('dist/.vite/manifest.json', 'utf8'))
 const entries = Object.entries(manifest)
+// The route loads one vertical's screen on demand; the lost page is the one a shared link opens most.
+const SCREEN = 'routes/-case/LostCaseScreen.tsx'
 const starts = entries.filter(
-  ([key, chunk]) => chunk.isEntry || key.includes(`routes/${ROUTE}.tsx`),
+  ([key, chunk]) => chunk.isEntry || key.includes(`routes/${ROUTE}.tsx`) || key.includes(SCREEN),
 )
-if (starts.length < 2) {
-  console.error(`Could not find the entry and the ${ROUTE} route in the build manifest.`)
+if (starts.length < 3) {
+  console.error(
+    `Could not find the entry, the ${ROUTE} route and its lost screen in the build manifest.`,
+  )
   process.exit(1)
 }
 

@@ -1,5 +1,6 @@
 // hand-written until O14 — the API has no published spec yet, so this wire shape is provisional.
-import { z } from 'zod'
+import * as z from 'zod/mini'
+import { type FoundCase, foundCaseWire, toFoundCase } from './found'
 
 const point = z.object({ lat: z.number(), lng: z.number() })
 const timestamp = z.iso.datetime({ offset: true })
@@ -13,8 +14,8 @@ const sightingWire = z.object({
   id: z.string(),
   point,
   seen_at: timestamp,
-  note: z.string().nullable(),
-  photo_url: z.string().nullable(),
+  note: z.nullable(z.string()),
+  photo_url: z.nullable(z.string()),
   source: z.enum(['anonymous', 'registered']),
   highlighted_by_owner: z.boolean(),
 })
@@ -23,49 +24,54 @@ export const lostCaseWire = z.object({
   code: z.string(),
   vertical: z.literal('lost'),
   status: lostStatusSchema,
-  resolved_at: timestamp.nullable(),
+  resolved_at: z.nullable(timestamp),
   viewer: z.enum(['owner', 'public']),
   pet: z.object({
     name: z.string(),
     species: speciesSchema,
-    size: sizeSchema.nullable(),
+    size: z.nullable(sizeSchema),
     colors: z.array(z.string()),
-    marks: z.string().nullable(),
+    marks: z.nullable(z.string()),
     photo_urls: z.array(z.string()),
   }),
   last_seen: z.object({
     center: point,
-    radius_m: z.number().positive(),
+    radius_m: z.number().check(z.positive()),
     at: timestamp,
     place_name: z.string(),
   }),
-  open_claim_count: z.number().int().nonnegative(),
+  open_claim_count: z.int().check(z.nonnegative()),
   sightings: z.array(sightingWire),
   /** Who says they have the animal. Only the owner receives these. */
-  claims: z
-    .array(
+  claims: z._default(
+    z.array(
       z.object({
         id: z.string(),
         phone: z.string(),
         created_at: timestamp,
         status: z.enum(['open', 'confirmed', 'dismissed', 'stale']),
       }),
-    )
-    .default([]),
-  contact: z.object({ display_name: z.string(), whatsapp_url: z.string().nullable() }).nullable(),
+    ),
+    [],
+  ),
+  contact: z.nullable(z.object({ display_name: z.string(), whatsapp_url: z.nullable(z.string()) })),
 })
 
 /** Verticals whose page is not built yet still resolve, with the card's worth of data. */
 export const otherCaseWire = z.object({
   code: z.string(),
-  vertical: z.enum(['found', 'adoption', 'help']),
+  vertical: z.enum(['adoption', 'help']),
   status: z.string(),
   title: z.string(),
   place_name: z.string(),
-  photo_url: z.string().nullable(),
+  photo_url: z.nullable(z.string()),
 })
 
-export const caseWire = z.discriminatedUnion('vertical', [lostCaseWire, otherCaseWire])
+export const caseWire = z.discriminatedUnion('vertical', [
+  lostCaseWire,
+  foundCaseWire,
+  otherCaseWire,
+])
 
 export type Vertical = z.infer<typeof verticalSchema>
 export type Species = z.infer<typeof speciesSchema>
@@ -112,17 +118,18 @@ export type LostCase = {
 
 export type OtherCase = {
   code: string
-  vertical: 'found' | 'adoption' | 'help'
+  vertical: 'adoption' | 'help'
   status: string
   title: string
   placeName: string
   photoUrl: string | null
 }
 
-export type CaseDetail = LostCase | OtherCase
+export type CaseDetail = LostCase | FoundCase | OtherCase
 
 export function parseCase(raw: unknown): CaseDetail {
   const wire = caseWire.parse(raw)
+  if (wire.vertical === 'found') return toFoundCase(wire)
   if (wire.vertical !== 'lost') {
     return {
       code: wire.code,

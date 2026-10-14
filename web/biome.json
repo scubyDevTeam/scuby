@@ -4,6 +4,7 @@
     "includes": [
       "**",
       "!dist",
+      "!dist-e2e",
       "!test-results",
       "!playwright-report",
       "!design",

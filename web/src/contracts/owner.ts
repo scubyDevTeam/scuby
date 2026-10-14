@@ -1,17 +1,17 @@
 // hand-written until O14 — provisional wire shapes for what a signed-in owner reads and sends.
-import { z } from 'zod'
+import * as z from 'zod/mini'
 import { sizeSchema, speciesSchema, verticalSchema } from './case'
 
 const petWire = z.object({
   id: z.string(),
   name: z.string(),
   species: speciesSchema,
-  size: sizeSchema.nullable(),
+  size: z.nullable(sizeSchema),
   colors: z.array(z.string()),
-  marks: z.string().nullable(),
+  marks: z.nullable(z.string()),
   photo_urls: z.array(z.string()),
   /** Set while the pet has an active lost case: a second one is blocked (04 · Publishing). */
-  active_case_code: z.string().nullable(),
+  active_case_code: z.nullable(z.string()),
 })
 
 export type Pet = {
@@ -47,9 +47,9 @@ const myCaseWire = z.object({
   status: z.string(),
   title: z.string(),
   place_name: z.string(),
-  photo_url: z.string().nullable(),
+  photo_url: z.nullable(z.string()),
   published_at: z.iso.datetime({ offset: true }),
-  open_claim_count: z.number().int().nonnegative(),
+  open_claim_count: z.int().check(z.nonnegative()),
 })
 
 export type MyCase = {

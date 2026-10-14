@@ -1,5 +1,5 @@
 // hand-written until O14 — provisional wire shapes for what a helper sends.
-import { z } from 'zod'
+import * as z from 'zod/mini'
 
 export type SightingInput = {
   point: { lat: number; lng: number }
@@ -19,7 +19,7 @@ export const sightingBody = (input: SightingInput) => ({
 /** The phone is the whole value of a claim, so it is required (docs/product/04 · recovery_claim). */
 export type ClaimInput = { phone: string }
 
-const claimWire = z.object({ id: z.string(), whatsapp_url: z.string().nullable() })
+const claimWire = z.object({ id: z.string(), whatsapp_url: z.nullable(z.string()) })
 
 export type ClaimResult = { id: string; whatsappUrl: string | null }
 

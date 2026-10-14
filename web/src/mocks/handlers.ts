@@ -1,6 +1,6 @@
 import { delay, HttpResponse, http } from 'msw'
 import { env } from '../env'
-import { DEMO_OWNER_ID, db, lostCase, newCode, newId } from './db'
+import { DEMO_OWNER_ID, db, foundCase, lostCase, newCode, newId } from './db'
 import { feedItems, purgedCodes } from './fixtures'
 import { currentUser, saveUser, unauthorized } from './session'
 
@@ -105,6 +105,16 @@ const publicReads = [
     if (purgedCodes.has(code)) return new HttpResponse(null, { status: 410 })
     const found = db.cases[code]
     if (!found) return new HttpResponse(null, { status: 404 })
+    if (found.vertical === 'found') {
+      // The withheld detail and the claims go to the custodian and to nobody else.
+      const custodian = isOwner(code)
+      return HttpResponse.json({
+        ...found,
+        viewer: custodian ? 'custodian' : 'public',
+        withheld_detail: custodian ? found.withheld_detail : null,
+        ownership_claims: custodian ? found.ownership_claims : [],
+      })
+    }
     if (found.vertical !== 'lost') return HttpResponse.json(found)
     // Who is asking decides what they get: claims and their phones are the owner's alone.
     const owner = isOwner(code)
@@ -214,21 +224,37 @@ const ownerActions = [
     const mine = Object.entries(db.owners)
       .filter(([, owner]) => owner === user.id)
       .flatMap(([code]) => {
-        const found = lostCase(code)
-        return found ? [found] : []
+        const lost = lostCase(code)
+        if (lost) {
+          return [
+            {
+              code,
+              vertical: 'lost',
+              status: lost.status,
+              title: lost.pet.name,
+              place_name: lost.last_seen.place_name,
+              photo_url: lost.pet.photo_urls[0] ?? null,
+              published_at: lost.last_seen.at,
+              open_claim_count: lost.open_claim_count,
+            },
+          ]
+        }
+        const found = foundCase(code)
+        if (!found) return []
+        return [
+          {
+            code,
+            vertical: 'found',
+            status: found.status,
+            title: foundTitle(found.pet),
+            place_name: found.found.place_name,
+            photo_url: found.pet.photo_urls[0] ?? null,
+            published_at: found.found.at,
+            open_claim_count: found.open_claim_count,
+          },
+        ]
       })
-    return HttpResponse.json(
-      mine.map((found) => ({
-        code: found.code,
-        vertical: 'lost',
-        status: found.status,
-        title: found.pet.name,
-        place_name: found.last_seen.place_name,
-        photo_url: found.pet.photo_urls[0] ?? null,
-        published_at: found.last_seen.at,
-        open_claim_count: found.open_claim_count,
-      })),
-    )
+    return HttpResponse.json(mine)
   }),
 
   http.post(api('/uploads'), async ({ request }) => {
@@ -320,12 +346,14 @@ const ownerActions = [
 
   http.post(api('/cases/:code/reopen'), async ({ params }) => {
     await delay(250)
-    const { found, error } = ownedCase(params.code)
-    if (!found) return error
+    const code = String(params.code).toUpperCase()
+    const found = lostCase(code) ?? foundCase(code)
+    if (!found) return new HttpResponse(null, { status: 404 })
+    if (!isOwner(code)) return new HttpResponse(null, { status: 403 })
     if (found.status !== 'expired') return new HttpResponse(null, { status: 409 })
     found.status = 'active'
     found.resolved_at = null
-    return HttpResponse.json({ id: found.code })
+    return HttpResponse.json({ id: code })
   }),
 
   http.post(api('/cases/:code/claims/:claimId'), async ({ params, request }) => {
@@ -341,4 +369,101 @@ const ownerActions = [
   }),
 ]
 
-export const handlers = [...auth, ...publicReads, ...helperActions, ...ownerActions]
+const SPECIES = { dog: 'Perro', cat: 'Gato', other: 'Animal' } as const
+const SIZE = { small: 'pequeño', medium: 'mediano', large: 'grande' } as const
+
+/** «Gato negro, pequeño» — a found animal has no name, so its card is titled by what it looks like. */
+function foundTitle(pet: {
+  species: keyof typeof SPECIES
+  size: keyof typeof SIZE | null
+  colors: string[]
+}) {
+  const colour = pet.colors[0]?.toLowerCase()
+  return [[SPECIES[pet.species], colour].filter(Boolean).join(' '), pet.size && SIZE[pet.size]]
+    .filter(Boolean)
+    .join(', ')
+}
+
+/** The custodian's own found case, or the response that says why not. */
+function heldCase(code: unknown) {
+  const found = foundCase(code)
+  if (!found) return { error: new HttpResponse(null, { status: 404 }) }
+  if (!isOwner(found.code)) return { error: new HttpResponse(null, { status: 403 }) }
+  return { found }
+}
+
+const foundActions = [
+  // «Es mío» is never anonymous: it asks to take an animal (docs/product/05).
+  http.post(api('/cases/:code/ownership-claims'), async ({ params, request }) => {
+    await delay(250)
+    const user = currentUser()
+    if (!user) return unauthorized()
+    const found = foundCase(params.code)
+    if (!found) return new HttpResponse(null, { status: 404 })
+    const body = (await request.json()) as {
+      evidence_notes: string | null
+      chip_number: string | null
+    }
+    const id = newId('own-')
+    found.ownership_claims = [
+      ...(found.ownership_claims ?? []),
+      {
+        id,
+        claimant_name: user.display_name,
+        created_at: new Date().toISOString(),
+        status: 'open',
+        evidence_notes: body.evidence_notes,
+        chip_number: body.chip_number,
+        photo_count: 0,
+        from_lost_case_code: null,
+        whatsapp_url: user.phone ? `https://wa.me/${user.phone.replace('+', '')}` : null,
+      },
+    ]
+    found.open_claim_count += 1
+    // The row exists before any channel opens.
+    return HttpResponse.json(
+      { id, whatsapp_url: found.contact?.whatsapp_url ?? null },
+      { status: 201 },
+    )
+  }),
+
+  http.post(api('/cases/:code/ownership-claims/:claimId'), async ({ params, request }) => {
+    await delay(250)
+    const { found, error } = heldCase(params.code)
+    if (!found) return error
+    const claim = found.ownership_claims?.find((c) => c.id === params.claimId)
+    if (!claim) return new HttpResponse(null, { status: 404 })
+    const { status } = (await request.json()) as { status: 'confirmed' | 'dismissed' }
+    claim.status = status
+    found.open_claim_count = (found.ownership_claims ?? []).filter(
+      (c) => c.status === 'open',
+    ).length
+    return HttpResponse.json({ id: claim.id })
+  }),
+
+  http.post(api('/cases/:code/resolve'), async ({ params, request }) => {
+    await delay(250)
+    const { found, error } = heldCase(params.code)
+    if (!found) return error
+    if (found.status !== 'active') return new HttpResponse(null, { status: 409 })
+    const { outcome } = (await request.json()) as {
+      outcome: 'reunited' | 'kept' | 'transferred_to_org' | 'cancelled' | 'keep_searching'
+    }
+    if (outcome === 'keep_searching') {
+      found.hold_offer_at = new Date(Date.now() + 15 * 86_400_000).toISOString()
+      return HttpResponse.json({ id: found.code })
+    }
+    found.status = outcome
+    found.resolved_at = new Date().toISOString()
+    found.open_claim_count = 0
+    return HttpResponse.json({ id: found.code })
+  }),
+]
+
+export const handlers = [
+  ...foundActions,
+  ...auth,
+  ...publicReads,
+  ...helperActions,
+  ...ownerActions,
+]

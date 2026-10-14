@@ -1,5 +1,5 @@
 // hand-written until O14 — provisional wire shape.
-import { z } from 'zod'
+import * as z from 'zod/mini'
 
 const countryWire = z.object({
   code: z.string(),
@@ -9,7 +9,9 @@ const countryWire = z.object({
   default_center: z.object({ lat: z.number(), lng: z.number() }),
 })
 
-export const configWire = z.object({ supported_countries: z.array(countryWire).min(1) })
+export const configWire = z.object({
+  supported_countries: z.array(countryWire).check(z.minLength(1)),
+})
 
 export type Country = {
   code: string

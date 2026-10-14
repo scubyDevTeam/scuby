@@ -3,10 +3,12 @@
 import type { z } from 'zod'
 import type { caseWire, lostCaseWire } from '../contracts/case'
 import type { feedWire } from '../contracts/feed'
+import type { foundCaseWire } from '../contracts/found'
 import { mockPhoto } from './photo'
 
 type CaseWire = z.input<typeof caseWire>
 type LostCaseWire = z.input<typeof lostCaseWire>
+type FoundCaseWire = z.input<typeof foundCaseWire>
 type FeedItemWire = z.input<typeof feedWire>['items'][number]
 
 const HOUR = 3_600_000
@@ -79,6 +81,32 @@ function luna(): LostCaseWire {
   }
 }
 
+function foundCat(): FoundCaseWire {
+  return {
+    code: 'F8UND',
+    vertical: 'found',
+    status: 'active',
+    resolved_at: null,
+    viewer: 'public',
+    pet: {
+      species: 'cat',
+      size: 'small',
+      colors: ['Negro'],
+      marks: 'Ojos azules. Se deja cargar.',
+      photo_urls: [mockPhoto('#22252b')],
+    },
+    // 100 m as drawn: the page must floor it at 200 m — the custodian's home is where it is now.
+    found: { center: offset(-1900, -900), radius_m: 100, at: ago(5 * HOUR), place_name: 'Belén' },
+    holding_where: 'home',
+    held_since: ago(5 * HOUR),
+    hold_offer_at: ago(5 * HOUR - 15 * DAY),
+    open_claim_count: 0,
+    withheld_detail: 'Mancha blanca en la pata trasera izquierda',
+    ownership_claims: [],
+    contact: { display_name: 'Marcela T.', whatsapp_url: 'https://wa.me/573000000002' },
+  }
+}
+
 function closedLost(
   code: string,
   name: string,
@@ -119,13 +147,41 @@ export function cases(): Record<string, CaseWire> {
     closedLost('H4PPY', 'Toby', 'reunited', 3 * DAY),
     closedLost('ARCH2', 'Kira', 'expired', 5 * DAY),
     closedLost('CANC3', 'Rocky', 'cancelled', DAY),
+    foundCat(),
     {
-      code: 'F8UND',
-      vertical: 'found',
-      status: 'active',
-      title: 'Gato negro, pequeño',
-      place_name: 'Belén',
-      photo_url: mockPhoto('#22252b'),
+      // Held 16 days with nobody confirmed: the day-15 offer shows. Its custodian is the demo account.
+      ...foundCat(),
+      code: 'C4STD',
+      pet: {
+        species: 'dog',
+        size: 'medium',
+        colors: ['Café'],
+        marks: 'Muy manso, sabe sentarse.',
+        photo_urls: [mockPhoto('#8a6a4a')],
+      },
+      found: {
+        center: offset(1400, -600),
+        radius_m: 300,
+        at: ago(16 * DAY),
+        place_name: 'Estadio',
+      },
+      held_since: ago(16 * DAY),
+      hold_offer_at: ago(DAY),
+      open_claim_count: 1,
+      withheld_detail: 'Collar verde con una campana',
+      ownership_claims: [
+        {
+          id: 'own-1',
+          claimant_name: 'Andrés R.',
+          created_at: ago(5 * HOUR),
+          status: 'open',
+          evidence_notes: 'Tiene un collar verde con campanita',
+          chip_number: null,
+          photo_count: 0,
+          from_lost_case_code: null,
+          whatsapp_url: 'https://wa.me/573000000001',
+        },
+      ],
     },
     {
       code: 'AD9PT',

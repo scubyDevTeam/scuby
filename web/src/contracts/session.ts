@@ -1,12 +1,12 @@
 // hand-written until O14 — provisional wire shape.
-import { z } from 'zod'
+import * as z from 'zod/mini'
 
 const userWire = z.object({
   id: z.string(),
   display_name: z.string(),
   email: z.string(),
   /** The publisher's verified number, E.164. Null until a first publish verifies one. */
-  phone: z.string().nullable(),
+  phone: z.nullable(z.string()),
 })
 
 export type User = { id: string; displayName: string; email: string; phone: string | null }
