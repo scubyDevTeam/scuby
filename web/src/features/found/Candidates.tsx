@@ -1,4 +1,5 @@
 import type { Candidate } from '@contracts/found'
+import { useI18n } from '@i18n/react'
 import { Button } from '@ui/Button'
 
 /**
@@ -16,9 +17,10 @@ export function Candidates({
   onNone: () => void
   noneLabel: string
 }) {
+  const { t } = useI18n()
   return (
     <div className="flex flex-col gap-4">
-      <p className="m-0 text-muted">Alguien cerca está buscando una mascota parecida.</p>
+      <p className="m-0 text-muted">{t('found.candidates.intro')}</p>
       <ul className="m-0 flex list-none flex-col gap-3 p-0">
         {candidates.map((candidate) => (
           <li
@@ -38,7 +40,7 @@ export function Candidates({
               <h2 className="m-0 text-xl font-extrabold">{candidate.name}</h2>
               <p className="m-0 text-sm text-muted">{candidate.why.join(' · ')}</p>
               <Button className="w-auto" onClick={() => onPick(candidate)}>
-                Sí, es {candidate.name}
+                {t('found.candidates.pick', { name: candidate.name })}
               </Button>
             </div>
           </li>

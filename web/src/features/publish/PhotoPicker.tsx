@@ -1,5 +1,6 @@
 import { useUploadPhoto } from '@api-client/owner'
 import { fitWithin, PHOTO_JPEG_QUALITY } from '@domain/shared/image'
+import { useI18n } from '@i18n/react'
 import { prepareImage } from '@platform/image'
 import { Plus, X } from 'lucide-react'
 import { useId, useState } from 'react'
@@ -14,6 +15,7 @@ export function PhotoPicker({
   urls: readonly string[]
   onChange: (urls: string[]) => void
 }) {
+  const { t } = useI18n()
   const id = useId()
   const upload = useUploadPhoto()
   const [failed, setFailed] = useState(false)
@@ -38,12 +40,12 @@ export function PhotoPicker({
           <li key={url} className="relative">
             <img
               src={url}
-              alt={`Foto ${index + 1}`}
+              alt={t('publish.photos.photo_n', { n: index + 1 })}
               className={`aspect-square w-full rounded-xl object-cover ${index === 0 ? 'ring-4 ring-lost' : ''}`}
             />
             <button
               type="button"
-              aria-label={`Quitar foto ${index + 1}`}
+              aria-label={t('publish.photos.remove_n', { n: index + 1 })}
               onClick={() => onChange(urls.filter((u) => u !== url))}
               className="absolute -top-2 -right-2 flex size-8 items-center justify-center rounded-full bg-ink text-white"
             >
@@ -58,7 +60,7 @@ export function PhotoPicker({
               className="flex aspect-square w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-field text-sm text-muted"
             >
               <Plus aria-hidden="true" />
-              {upload.isPending ? 'Subiendo…' : 'Agregar foto'}
+              {t(upload.isPending ? 'publish.photos.uploading' : 'publish.photos.add')}
             </label>
             <input
               id={id}
@@ -76,10 +78,10 @@ export function PhotoPicker({
       </ul>
       {failed ? (
         <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
-          No pudimos subir esa foto. Inténtalo de nuevo.
+          {t('publish.photos.failed')}
         </p>
       ) : (
-        <p className="m-0 text-sm text-muted">La primera va en el afiche.</p>
+        <p className="m-0 text-sm text-muted">{t('publish.photos.first_on_poster')}</p>
       )}
     </div>
   )

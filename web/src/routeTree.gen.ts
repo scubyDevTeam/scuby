@@ -9,289 +9,343 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthRouteImport } from './routes/_auth'
-import { Route as AuthBandejaRouteImport } from './routes/_auth/bandeja'
-import { Route as AuthMisCasosRouteImport } from './routes/_auth/mis-casos'
-import { Route as AuthPerfilRouteImport } from './routes/_auth/perfil'
-import { Route as CCodeRouteImport } from './routes/c.$code'
-import { Route as PublicarIndexRouteImport } from './routes/publicar.index'
-import { Route as PublicarTipoRouteImport } from './routes/publicar.$tipo'
-import { Route as AuthPublicarPerdidoRouteImport } from './routes/_auth/publicar.perdido'
-import { Route as PublicarEncontradoIndexRouteImport } from './routes/publicar.encontrado.index'
-import { Route as PublicarEncontradoVistoRouteImport } from './routes/publicar.encontrado.visto'
-import { Route as AuthPublicarEncontradoAvisoRouteImport } from './routes/_auth/publicar.encontrado.aviso'
+import { Route as Char123LocaleChar125RouteRouteImport } from './routes/{-$locale}/route'
+import { Route as Char123LocaleChar125IndexRouteImport } from './routes/{-$locale}/index'
+import { Route as Char123LocaleChar125AuthRouteImport } from './routes/{-$locale}/_auth'
+import { Route as Char123LocaleChar125AuthBandejaRouteImport } from './routes/{-$locale}/_auth/bandeja'
+import { Route as Char123LocaleChar125AuthMisCasosRouteImport } from './routes/{-$locale}/_auth/mis-casos'
+import { Route as Char123LocaleChar125AuthPerfilRouteImport } from './routes/{-$locale}/_auth/perfil'
+import { Route as Char123LocaleChar125CCodeRouteImport } from './routes/{-$locale}/c.$code'
+import { Route as Char123LocaleChar125PublicarIndexRouteImport } from './routes/{-$locale}/publicar.index'
+import { Route as Char123LocaleChar125PublicarTipoRouteImport } from './routes/{-$locale}/publicar.$tipo'
+import { Route as Char123LocaleChar125AuthPublicarPerdidoRouteImport } from './routes/{-$locale}/_auth/publicar.perdido'
+import { Route as Char123LocaleChar125PublicarEncontradoIndexRouteImport } from './routes/{-$locale}/publicar.encontrado.index'
+import { Route as Char123LocaleChar125PublicarEncontradoVistoRouteImport } from './routes/{-$locale}/publicar.encontrado.visto'
+import { Route as Char123LocaleChar125AuthPublicarEncontradoAvisoRouteImport } from './routes/{-$locale}/_auth/publicar.encontrado.aviso'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/_auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthBandejaRoute = AuthBandejaRouteImport.update({
-  id: '/bandeja',
-  path: '/bandeja',
-  getParentRoute: () => AuthRoute,
-} as any)
-const AuthMisCasosRoute = AuthMisCasosRouteImport.update({
-  id: '/mis-casos',
-  path: '/mis-casos',
-  getParentRoute: () => AuthRoute,
-} as any)
-const AuthPerfilRoute = AuthPerfilRouteImport.update({
-  id: '/perfil',
-  path: '/perfil',
-  getParentRoute: () => AuthRoute,
-} as any)
-const CCodeRoute = CCodeRouteImport.update({
-  id: '/c/$code',
-  path: '/c/$code',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PublicarIndexRoute = PublicarIndexRouteImport.update({
-  id: '/publicar/',
-  path: '/publicar/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PublicarTipoRoute = PublicarTipoRouteImport.update({
-  id: '/publicar/$tipo',
-  path: '/publicar/$tipo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthPublicarPerdidoRoute = AuthPublicarPerdidoRouteImport.update({
-  id: '/publicar/perdido',
-  path: '/publicar/perdido',
-  getParentRoute: () => AuthRoute,
-} as any)
-const PublicarEncontradoIndexRoute = PublicarEncontradoIndexRouteImport.update({
-  id: '/publicar/encontrado/',
-  path: '/publicar/encontrado/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PublicarEncontradoVistoRoute = PublicarEncontradoVistoRouteImport.update({
-  id: '/publicar/encontrado/visto',
-  path: '/publicar/encontrado/visto',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthPublicarEncontradoAvisoRoute =
-  AuthPublicarEncontradoAvisoRouteImport.update({
+const Char123LocaleChar125RouteRoute =
+  Char123LocaleChar125RouteRouteImport.update({
+    id: '/{-$locale}',
+    path: '/{-$locale}',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char123LocaleChar125IndexRoute =
+  Char123LocaleChar125IndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
+const Char123LocaleChar125AuthRoute =
+  Char123LocaleChar125AuthRouteImport.update({
+    id: '/_auth',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
+const Char123LocaleChar125AuthBandejaRoute =
+  Char123LocaleChar125AuthBandejaRouteImport.update({
+    id: '/bandeja',
+    path: '/bandeja',
+    getParentRoute: () => Char123LocaleChar125AuthRoute,
+  } as any)
+const Char123LocaleChar125AuthMisCasosRoute =
+  Char123LocaleChar125AuthMisCasosRouteImport.update({
+    id: '/mis-casos',
+    path: '/mis-casos',
+    getParentRoute: () => Char123LocaleChar125AuthRoute,
+  } as any)
+const Char123LocaleChar125AuthPerfilRoute =
+  Char123LocaleChar125AuthPerfilRouteImport.update({
+    id: '/perfil',
+    path: '/perfil',
+    getParentRoute: () => Char123LocaleChar125AuthRoute,
+  } as any)
+const Char123LocaleChar125CCodeRoute =
+  Char123LocaleChar125CCodeRouteImport.update({
+    id: '/c/$code',
+    path: '/c/$code',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
+const Char123LocaleChar125PublicarIndexRoute =
+  Char123LocaleChar125PublicarIndexRouteImport.update({
+    id: '/publicar/',
+    path: '/publicar/',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
+const Char123LocaleChar125PublicarTipoRoute =
+  Char123LocaleChar125PublicarTipoRouteImport.update({
+    id: '/publicar/$tipo',
+    path: '/publicar/$tipo',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
+const Char123LocaleChar125AuthPublicarPerdidoRoute =
+  Char123LocaleChar125AuthPublicarPerdidoRouteImport.update({
+    id: '/publicar/perdido',
+    path: '/publicar/perdido',
+    getParentRoute: () => Char123LocaleChar125AuthRoute,
+  } as any)
+const Char123LocaleChar125PublicarEncontradoIndexRoute =
+  Char123LocaleChar125PublicarEncontradoIndexRouteImport.update({
+    id: '/publicar/encontrado/',
+    path: '/publicar/encontrado/',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
+const Char123LocaleChar125PublicarEncontradoVistoRoute =
+  Char123LocaleChar125PublicarEncontradoVistoRouteImport.update({
+    id: '/publicar/encontrado/visto',
+    path: '/publicar/encontrado/visto',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
+const Char123LocaleChar125AuthPublicarEncontradoAvisoRoute =
+  Char123LocaleChar125AuthPublicarEncontradoAvisoRouteImport.update({
     id: '/publicar/encontrado/aviso',
     path: '/publicar/encontrado/aviso',
-    getParentRoute: () => AuthRoute,
+    getParentRoute: () => Char123LocaleChar125AuthRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/bandeja': typeof AuthBandejaRoute
-  '/mis-casos': typeof AuthMisCasosRoute
-  '/perfil': typeof AuthPerfilRoute
-  '/c/$code': typeof CCodeRoute
-  '/publicar/$tipo': typeof PublicarTipoRoute
-  '/publicar/': typeof PublicarIndexRoute
-  '/publicar/perdido': typeof AuthPublicarPerdidoRoute
-  '/publicar/encontrado/visto': typeof PublicarEncontradoVistoRoute
-  '/publicar/encontrado/': typeof PublicarEncontradoIndexRoute
-  '/publicar/encontrado/aviso': typeof AuthPublicarEncontradoAvisoRoute
+  '/{-$locale}': typeof Char123LocaleChar125RouteRouteWithChildren
+  '/{-$locale}/': typeof Char123LocaleChar125IndexRoute
+  '/{-$locale}/bandeja': typeof Char123LocaleChar125AuthBandejaRoute
+  '/{-$locale}/mis-casos': typeof Char123LocaleChar125AuthMisCasosRoute
+  '/{-$locale}/perfil': typeof Char123LocaleChar125AuthPerfilRoute
+  '/{-$locale}/c/$code': typeof Char123LocaleChar125CCodeRoute
+  '/{-$locale}/publicar/$tipo': typeof Char123LocaleChar125PublicarTipoRoute
+  '/{-$locale}/publicar/': typeof Char123LocaleChar125PublicarIndexRoute
+  '/{-$locale}/publicar/perdido': typeof Char123LocaleChar125AuthPublicarPerdidoRoute
+  '/{-$locale}/publicar/encontrado/visto': typeof Char123LocaleChar125PublicarEncontradoVistoRoute
+  '/{-$locale}/publicar/encontrado/': typeof Char123LocaleChar125PublicarEncontradoIndexRoute
+  '/{-$locale}/publicar/encontrado/aviso': typeof Char123LocaleChar125AuthPublicarEncontradoAvisoRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/bandeja': typeof AuthBandejaRoute
-  '/mis-casos': typeof AuthMisCasosRoute
-  '/perfil': typeof AuthPerfilRoute
-  '/c/$code': typeof CCodeRoute
-  '/publicar/$tipo': typeof PublicarTipoRoute
-  '/publicar': typeof PublicarIndexRoute
-  '/publicar/perdido': typeof AuthPublicarPerdidoRoute
-  '/publicar/encontrado/visto': typeof PublicarEncontradoVistoRoute
-  '/publicar/encontrado': typeof PublicarEncontradoIndexRoute
-  '/publicar/encontrado/aviso': typeof AuthPublicarEncontradoAvisoRoute
+  '/{-$locale}': typeof Char123LocaleChar125IndexRoute
+  '/{-$locale}/bandeja': typeof Char123LocaleChar125AuthBandejaRoute
+  '/{-$locale}/mis-casos': typeof Char123LocaleChar125AuthMisCasosRoute
+  '/{-$locale}/perfil': typeof Char123LocaleChar125AuthPerfilRoute
+  '/{-$locale}/c/$code': typeof Char123LocaleChar125CCodeRoute
+  '/{-$locale}/publicar/$tipo': typeof Char123LocaleChar125PublicarTipoRoute
+  '/{-$locale}/publicar': typeof Char123LocaleChar125PublicarIndexRoute
+  '/{-$locale}/publicar/perdido': typeof Char123LocaleChar125AuthPublicarPerdidoRoute
+  '/{-$locale}/publicar/encontrado/visto': typeof Char123LocaleChar125PublicarEncontradoVistoRoute
+  '/{-$locale}/publicar/encontrado': typeof Char123LocaleChar125PublicarEncontradoIndexRoute
+  '/{-$locale}/publicar/encontrado/aviso': typeof Char123LocaleChar125AuthPublicarEncontradoAvisoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/_auth': typeof AuthRouteWithChildren
-  '/_auth/bandeja': typeof AuthBandejaRoute
-  '/_auth/mis-casos': typeof AuthMisCasosRoute
-  '/_auth/perfil': typeof AuthPerfilRoute
-  '/c/$code': typeof CCodeRoute
-  '/publicar/$tipo': typeof PublicarTipoRoute
-  '/publicar/': typeof PublicarIndexRoute
-  '/_auth/publicar/perdido': typeof AuthPublicarPerdidoRoute
-  '/publicar/encontrado/visto': typeof PublicarEncontradoVistoRoute
-  '/publicar/encontrado/': typeof PublicarEncontradoIndexRoute
-  '/_auth/publicar/encontrado/aviso': typeof AuthPublicarEncontradoAvisoRoute
+  '/{-$locale}': typeof Char123LocaleChar125RouteRouteWithChildren
+  '/{-$locale}/_auth': typeof Char123LocaleChar125AuthRouteWithChildren
+  '/{-$locale}/': typeof Char123LocaleChar125IndexRoute
+  '/{-$locale}/_auth/bandeja': typeof Char123LocaleChar125AuthBandejaRoute
+  '/{-$locale}/_auth/mis-casos': typeof Char123LocaleChar125AuthMisCasosRoute
+  '/{-$locale}/_auth/perfil': typeof Char123LocaleChar125AuthPerfilRoute
+  '/{-$locale}/c/$code': typeof Char123LocaleChar125CCodeRoute
+  '/{-$locale}/publicar/$tipo': typeof Char123LocaleChar125PublicarTipoRoute
+  '/{-$locale}/publicar/': typeof Char123LocaleChar125PublicarIndexRoute
+  '/{-$locale}/_auth/publicar/perdido': typeof Char123LocaleChar125AuthPublicarPerdidoRoute
+  '/{-$locale}/publicar/encontrado/visto': typeof Char123LocaleChar125PublicarEncontradoVistoRoute
+  '/{-$locale}/publicar/encontrado/': typeof Char123LocaleChar125PublicarEncontradoIndexRoute
+  '/{-$locale}/_auth/publicar/encontrado/aviso': typeof Char123LocaleChar125AuthPublicarEncontradoAvisoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/bandeja'
-    | '/mis-casos'
-    | '/perfil'
-    | '/c/$code'
-    | '/publicar/$tipo'
-    | '/publicar/'
-    | '/publicar/perdido'
-    | '/publicar/encontrado/visto'
-    | '/publicar/encontrado/'
-    | '/publicar/encontrado/aviso'
+    | '/{-$locale}'
+    | '/{-$locale}/'
+    | '/{-$locale}/bandeja'
+    | '/{-$locale}/mis-casos'
+    | '/{-$locale}/perfil'
+    | '/{-$locale}/c/$code'
+    | '/{-$locale}/publicar/$tipo'
+    | '/{-$locale}/publicar/'
+    | '/{-$locale}/publicar/perdido'
+    | '/{-$locale}/publicar/encontrado/visto'
+    | '/{-$locale}/publicar/encontrado/'
+    | '/{-$locale}/publicar/encontrado/aviso'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
-    | '/bandeja'
-    | '/mis-casos'
-    | '/perfil'
-    | '/c/$code'
-    | '/publicar/$tipo'
-    | '/publicar'
-    | '/publicar/perdido'
-    | '/publicar/encontrado/visto'
-    | '/publicar/encontrado'
-    | '/publicar/encontrado/aviso'
+    | '/{-$locale}'
+    | '/{-$locale}/bandeja'
+    | '/{-$locale}/mis-casos'
+    | '/{-$locale}/perfil'
+    | '/{-$locale}/c/$code'
+    | '/{-$locale}/publicar/$tipo'
+    | '/{-$locale}/publicar'
+    | '/{-$locale}/publicar/perdido'
+    | '/{-$locale}/publicar/encontrado/visto'
+    | '/{-$locale}/publicar/encontrado'
+    | '/{-$locale}/publicar/encontrado/aviso'
   id:
     | '__root__'
-    | '/'
-    | '/_auth'
-    | '/_auth/bandeja'
-    | '/_auth/mis-casos'
-    | '/_auth/perfil'
-    | '/c/$code'
-    | '/publicar/$tipo'
-    | '/publicar/'
-    | '/_auth/publicar/perdido'
-    | '/publicar/encontrado/visto'
-    | '/publicar/encontrado/'
-    | '/_auth/publicar/encontrado/aviso'
+    | '/{-$locale}'
+    | '/{-$locale}/_auth'
+    | '/{-$locale}/'
+    | '/{-$locale}/_auth/bandeja'
+    | '/{-$locale}/_auth/mis-casos'
+    | '/{-$locale}/_auth/perfil'
+    | '/{-$locale}/c/$code'
+    | '/{-$locale}/publicar/$tipo'
+    | '/{-$locale}/publicar/'
+    | '/{-$locale}/_auth/publicar/perdido'
+    | '/{-$locale}/publicar/encontrado/visto'
+    | '/{-$locale}/publicar/encontrado/'
+    | '/{-$locale}/_auth/publicar/encontrado/aviso'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AuthRoute: typeof AuthRouteWithChildren
-  CCodeRoute: typeof CCodeRoute
-  PublicarTipoRoute: typeof PublicarTipoRoute
-  PublicarIndexRoute: typeof PublicarIndexRoute
-  PublicarEncontradoVistoRoute: typeof PublicarEncontradoVistoRoute
-  PublicarEncontradoIndexRoute: typeof PublicarEncontradoIndexRoute
+  Char123LocaleChar125RouteRoute: typeof Char123LocaleChar125RouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/{-$locale}': {
+      id: '/{-$locale}'
+      path: '/{-$locale}'
+      fullPath: '/{-$locale}'
+      preLoaderRoute: typeof Char123LocaleChar125RouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/{-$locale}/': {
+      id: '/{-$locale}/'
       path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/{-$locale}/'
+      preLoaderRoute: typeof Char123LocaleChar125IndexRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
     }
-    '/_auth': {
-      id: '/_auth'
+    '/{-$locale}/_auth': {
+      id: '/{-$locale}/_auth'
       path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/{-$locale}'
+      preLoaderRoute: typeof Char123LocaleChar125AuthRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
     }
-    '/_auth/bandeja': {
-      id: '/_auth/bandeja'
+    '/{-$locale}/_auth/bandeja': {
+      id: '/{-$locale}/_auth/bandeja'
       path: '/bandeja'
-      fullPath: '/bandeja'
-      preLoaderRoute: typeof AuthBandejaRouteImport
-      parentRoute: typeof AuthRoute
+      fullPath: '/{-$locale}/bandeja'
+      preLoaderRoute: typeof Char123LocaleChar125AuthBandejaRouteImport
+      parentRoute: typeof Char123LocaleChar125AuthRoute
     }
-    '/_auth/mis-casos': {
-      id: '/_auth/mis-casos'
+    '/{-$locale}/_auth/mis-casos': {
+      id: '/{-$locale}/_auth/mis-casos'
       path: '/mis-casos'
-      fullPath: '/mis-casos'
-      preLoaderRoute: typeof AuthMisCasosRouteImport
-      parentRoute: typeof AuthRoute
+      fullPath: '/{-$locale}/mis-casos'
+      preLoaderRoute: typeof Char123LocaleChar125AuthMisCasosRouteImport
+      parentRoute: typeof Char123LocaleChar125AuthRoute
     }
-    '/_auth/perfil': {
-      id: '/_auth/perfil'
+    '/{-$locale}/_auth/perfil': {
+      id: '/{-$locale}/_auth/perfil'
       path: '/perfil'
-      fullPath: '/perfil'
-      preLoaderRoute: typeof AuthPerfilRouteImport
-      parentRoute: typeof AuthRoute
+      fullPath: '/{-$locale}/perfil'
+      preLoaderRoute: typeof Char123LocaleChar125AuthPerfilRouteImport
+      parentRoute: typeof Char123LocaleChar125AuthRoute
     }
-    '/c/$code': {
-      id: '/c/$code'
+    '/{-$locale}/c/$code': {
+      id: '/{-$locale}/c/$code'
       path: '/c/$code'
-      fullPath: '/c/$code'
-      preLoaderRoute: typeof CCodeRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/{-$locale}/c/$code'
+      preLoaderRoute: typeof Char123LocaleChar125CCodeRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
     }
-    '/publicar/': {
-      id: '/publicar/'
+    '/{-$locale}/publicar/': {
+      id: '/{-$locale}/publicar/'
       path: '/publicar'
-      fullPath: '/publicar/'
-      preLoaderRoute: typeof PublicarIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/{-$locale}/publicar/'
+      preLoaderRoute: typeof Char123LocaleChar125PublicarIndexRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
     }
-    '/publicar/$tipo': {
-      id: '/publicar/$tipo'
+    '/{-$locale}/publicar/$tipo': {
+      id: '/{-$locale}/publicar/$tipo'
       path: '/publicar/$tipo'
-      fullPath: '/publicar/$tipo'
-      preLoaderRoute: typeof PublicarTipoRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/{-$locale}/publicar/$tipo'
+      preLoaderRoute: typeof Char123LocaleChar125PublicarTipoRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
     }
-    '/_auth/publicar/perdido': {
-      id: '/_auth/publicar/perdido'
+    '/{-$locale}/_auth/publicar/perdido': {
+      id: '/{-$locale}/_auth/publicar/perdido'
       path: '/publicar/perdido'
-      fullPath: '/publicar/perdido'
-      preLoaderRoute: typeof AuthPublicarPerdidoRouteImport
-      parentRoute: typeof AuthRoute
+      fullPath: '/{-$locale}/publicar/perdido'
+      preLoaderRoute: typeof Char123LocaleChar125AuthPublicarPerdidoRouteImport
+      parentRoute: typeof Char123LocaleChar125AuthRoute
     }
-    '/publicar/encontrado/': {
-      id: '/publicar/encontrado/'
+    '/{-$locale}/publicar/encontrado/': {
+      id: '/{-$locale}/publicar/encontrado/'
       path: '/publicar/encontrado'
-      fullPath: '/publicar/encontrado/'
-      preLoaderRoute: typeof PublicarEncontradoIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/{-$locale}/publicar/encontrado/'
+      preLoaderRoute: typeof Char123LocaleChar125PublicarEncontradoIndexRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
     }
-    '/publicar/encontrado/visto': {
-      id: '/publicar/encontrado/visto'
+    '/{-$locale}/publicar/encontrado/visto': {
+      id: '/{-$locale}/publicar/encontrado/visto'
       path: '/publicar/encontrado/visto'
-      fullPath: '/publicar/encontrado/visto'
-      preLoaderRoute: typeof PublicarEncontradoVistoRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/{-$locale}/publicar/encontrado/visto'
+      preLoaderRoute: typeof Char123LocaleChar125PublicarEncontradoVistoRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
     }
-    '/_auth/publicar/encontrado/aviso': {
-      id: '/_auth/publicar/encontrado/aviso'
+    '/{-$locale}/_auth/publicar/encontrado/aviso': {
+      id: '/{-$locale}/_auth/publicar/encontrado/aviso'
       path: '/publicar/encontrado/aviso'
-      fullPath: '/publicar/encontrado/aviso'
-      preLoaderRoute: typeof AuthPublicarEncontradoAvisoRouteImport
-      parentRoute: typeof AuthRoute
+      fullPath: '/{-$locale}/publicar/encontrado/aviso'
+      preLoaderRoute: typeof Char123LocaleChar125AuthPublicarEncontradoAvisoRouteImport
+      parentRoute: typeof Char123LocaleChar125AuthRoute
     }
   }
 }
 
-interface AuthRouteChildren {
-  AuthBandejaRoute: typeof AuthBandejaRoute
-  AuthMisCasosRoute: typeof AuthMisCasosRoute
-  AuthPerfilRoute: typeof AuthPerfilRoute
-  AuthPublicarPerdidoRoute: typeof AuthPublicarPerdidoRoute
-  AuthPublicarEncontradoAvisoRoute: typeof AuthPublicarEncontradoAvisoRoute
+interface Char123LocaleChar125AuthRouteChildren {
+  Char123LocaleChar125AuthBandejaRoute: typeof Char123LocaleChar125AuthBandejaRoute
+  Char123LocaleChar125AuthMisCasosRoute: typeof Char123LocaleChar125AuthMisCasosRoute
+  Char123LocaleChar125AuthPerfilRoute: typeof Char123LocaleChar125AuthPerfilRoute
+  Char123LocaleChar125AuthPublicarPerdidoRoute: typeof Char123LocaleChar125AuthPublicarPerdidoRoute
+  Char123LocaleChar125AuthPublicarEncontradoAvisoRoute: typeof Char123LocaleChar125AuthPublicarEncontradoAvisoRoute
 }
 
-const AuthRouteChildren: AuthRouteChildren = {
-  AuthBandejaRoute: AuthBandejaRoute,
-  AuthMisCasosRoute: AuthMisCasosRoute,
-  AuthPerfilRoute: AuthPerfilRoute,
-  AuthPublicarPerdidoRoute: AuthPublicarPerdidoRoute,
-  AuthPublicarEncontradoAvisoRoute: AuthPublicarEncontradoAvisoRoute,
+const Char123LocaleChar125AuthRouteChildren: Char123LocaleChar125AuthRouteChildren =
+  {
+    Char123LocaleChar125AuthBandejaRoute: Char123LocaleChar125AuthBandejaRoute,
+    Char123LocaleChar125AuthMisCasosRoute:
+      Char123LocaleChar125AuthMisCasosRoute,
+    Char123LocaleChar125AuthPerfilRoute: Char123LocaleChar125AuthPerfilRoute,
+    Char123LocaleChar125AuthPublicarPerdidoRoute:
+      Char123LocaleChar125AuthPublicarPerdidoRoute,
+    Char123LocaleChar125AuthPublicarEncontradoAvisoRoute:
+      Char123LocaleChar125AuthPublicarEncontradoAvisoRoute,
+  }
+
+const Char123LocaleChar125AuthRouteWithChildren =
+  Char123LocaleChar125AuthRoute._addFileChildren(
+    Char123LocaleChar125AuthRouteChildren,
+  )
+
+interface Char123LocaleChar125RouteRouteChildren {
+  Char123LocaleChar125AuthRoute: typeof Char123LocaleChar125AuthRouteWithChildren
+  Char123LocaleChar125IndexRoute: typeof Char123LocaleChar125IndexRoute
+  Char123LocaleChar125CCodeRoute: typeof Char123LocaleChar125CCodeRoute
+  Char123LocaleChar125PublicarTipoRoute: typeof Char123LocaleChar125PublicarTipoRoute
+  Char123LocaleChar125PublicarIndexRoute: typeof Char123LocaleChar125PublicarIndexRoute
+  Char123LocaleChar125PublicarEncontradoVistoRoute: typeof Char123LocaleChar125PublicarEncontradoVistoRoute
+  Char123LocaleChar125PublicarEncontradoIndexRoute: typeof Char123LocaleChar125PublicarEncontradoIndexRoute
 }
 
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+const Char123LocaleChar125RouteRouteChildren: Char123LocaleChar125RouteRouteChildren =
+  {
+    Char123LocaleChar125AuthRoute: Char123LocaleChar125AuthRouteWithChildren,
+    Char123LocaleChar125IndexRoute: Char123LocaleChar125IndexRoute,
+    Char123LocaleChar125CCodeRoute: Char123LocaleChar125CCodeRoute,
+    Char123LocaleChar125PublicarTipoRoute:
+      Char123LocaleChar125PublicarTipoRoute,
+    Char123LocaleChar125PublicarIndexRoute:
+      Char123LocaleChar125PublicarIndexRoute,
+    Char123LocaleChar125PublicarEncontradoVistoRoute:
+      Char123LocaleChar125PublicarEncontradoVistoRoute,
+    Char123LocaleChar125PublicarEncontradoIndexRoute:
+      Char123LocaleChar125PublicarEncontradoIndexRoute,
+  }
+
+const Char123LocaleChar125RouteRouteWithChildren =
+  Char123LocaleChar125RouteRoute._addFileChildren(
+    Char123LocaleChar125RouteRouteChildren,
+  )
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  AuthRoute: AuthRouteWithChildren,
-  CCodeRoute: CCodeRoute,
-  PublicarTipoRoute: PublicarTipoRoute,
-  PublicarIndexRoute: PublicarIndexRoute,
-  PublicarEncontradoVistoRoute: PublicarEncontradoVistoRoute,
-  PublicarEncontradoIndexRoute: PublicarEncontradoIndexRoute,
+  Char123LocaleChar125RouteRoute: Char123LocaleChar125RouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

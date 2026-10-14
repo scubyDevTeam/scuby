@@ -4,12 +4,13 @@ import { readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
 const BUDGET_KB = 150
-const ROUTE = 'c.$code'
+// Every screen hangs from the optional language segment (docs/eng/frontend.md · Languages).
+const ROUTE = '{-$locale}/c.$code'
 
 const manifest = JSON.parse(readFileSync('dist/.vite/manifest.json', 'utf8'))
 const entries = Object.entries(manifest)
 // The route loads one vertical's screen on demand; the lost page is the one a shared link opens most.
-const SCREEN = 'routes/-case/LostCaseScreen.tsx'
+const SCREEN = 'routes/{-$locale}/-case/LostCaseScreen.tsx'
 const starts = entries.filter(
   ([key, chunk]) => chunk.isEntry || key.includes(`routes/${ROUTE}.tsx`) || key.includes(SCREEN),
 )

@@ -14,13 +14,3 @@ export function ageBand(seenAt: Date, now: Date): AgeBand {
   if (age < 3 * DAY) return 'under_3d'
   return 'older'
 }
-
-/** «hace 2 h» · «hace 3 días» — relative time for UI copy. */
-export function formatRelative(then: Date, now: Date): string {
-  const age = Math.max(0, now.getTime() - then.getTime())
-  if (age < MINUTE) return 'hace un momento'
-  if (age < HOUR) return `hace ${Math.floor(age / MINUTE)} min`
-  if (age < DAY) return `hace ${Math.floor(age / HOUR)} h`
-  const days = Math.floor(age / DAY)
-  return days === 1 ? 'hace 1 día' : `hace ${days} días`
-}

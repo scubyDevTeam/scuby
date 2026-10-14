@@ -1,8 +1,16 @@
-// hand-written until O14 — provisional wire shape of a found case (docs/product/05).
+// A found case and what its custodian and claimants do with it (docs/product/05).
 import * as z from 'zod/mini'
-
-const point = z.object({ lat: z.number(), lng: z.number() })
-const timestamp = z.iso.datetime({ offset: true })
+import { publisherPhone } from './owner'
+import {
+  type Color,
+  colorSchema,
+  phone,
+  photoUrl,
+  point,
+  sizeSchema,
+  speciesSchema,
+  timestamp,
+} from './primitives'
 
 export const foundStatusSchema = z.enum([
   'active',
@@ -35,9 +43,9 @@ export const foundCaseWire = z.object({
   resolved_at: z.nullable(timestamp),
   viewer: z.enum(['custodian', 'public']),
   pet: z.object({
-    species: z.enum(['dog', 'cat', 'other']),
-    size: z.nullable(z.enum(['small', 'medium', 'large'])),
-    colors: z.array(z.string()),
+    species: speciesSchema,
+    size: z.nullable(sizeSchema),
+    colors: z.array(colorSchema),
     marks: z.nullable(z.string()),
     photo_urls: z.array(z.string()),
   }),
@@ -79,7 +87,7 @@ export type FoundCase = {
   pet: {
     species: 'dog' | 'cat' | 'other'
     size: 'small' | 'medium' | 'large' | null
-    colors: string[]
+    colors: Color[]
     marks: string | null
     photoUrls: string[]
   }
@@ -139,21 +147,49 @@ export function toFoundCase(wire: z.infer<typeof foundCaseWire>): FoundCase {
 /** «Es mío»: everything optional — proof is offered, never required. */
 export type OwnershipClaimInput = { evidenceNotes: string | null; chipNumber: string | null }
 
-export const ownershipClaimBody = (input: OwnershipClaimInput) => ({
+export const ownershipClaimRequest = z.object({
+  evidence_notes: z.nullable(z.string().check(z.maxLength(1000))),
+  chip_number: z.nullable(z.string().check(z.maxLength(40))),
+  photo_urls: z._default(z.array(photoUrl).check(z.maxLength(5)), []),
+})
+
+export const ownershipClaimBody = (
+  input: OwnershipClaimInput,
+): z.input<typeof ownershipClaimRequest> => ({
   evidence_notes: input.evidenceNotes,
   chip_number: input.chipNumber,
 })
 
 /** How a custodian ends a found case. */
 export type ResolveInput =
-  | { outcome: 'reunited'; attribution: string }
+  | { outcome: 'reunited'; attribution: z.infer<typeof foundAttributionSchema> }
   | { outcome: 'kept' }
   | { outcome: 'transferred_to_org'; orgName: string | null }
-  | { outcome: 'cancelled'; reason: string }
+  | { outcome: 'cancelled'; reason: z.infer<typeof foundCancelReasonSchema> }
   /** Not an ending: «sigo buscando al dueño» re-arms the hold clock. */
   | { outcome: 'keep_searching' }
 
-export function resolveBody(input: ResolveInput) {
+export const foundAttributionSchema = z.enum([
+  'platform_claim',
+  'platform_match',
+  'platform_share',
+  'offline',
+  'unknown',
+])
+export const foundCancelReasonSchema = z.enum(['not_a_stray', 'ran_off_again', 'duplicate'])
+
+/** `keep_searching` is not an ending: it re-arms the hold clock for another 15 days. */
+export const resolveFoundRequest = z.object({
+  outcome: z.enum(['reunited', 'kept', 'transferred_to_org', 'cancelled', 'keep_searching']),
+  /** With `reunited`. */
+  resolution_attribution: z.nullable(foundAttributionSchema),
+  /** With `transferred_to_org`: a declared outcome, free text (docs/product/05). */
+  org_name: z.nullable(z.string().check(z.maxLength(120))),
+  /** With `cancelled`. */
+  resolution: z.nullable(foundCancelReasonSchema),
+})
+
+export function resolveBody(input: ResolveInput): z.input<typeof resolveFoundRequest> {
   return {
     outcome: input.outcome,
     resolution_attribution: input.outcome === 'reunited' ? input.attribution : null,
@@ -166,12 +202,20 @@ export function resolveBody(input: ResolveInput) {
 export type MatchInput = {
   species: 'dog' | 'cat' | 'other'
   size: 'small' | 'medium' | 'large' | null
-  colors: string[]
+  colors: Color[]
   point: { lat: number; lng: number }
   at: Date
 }
 
-export const matchBody = (input: MatchInput) => ({
+export const matchRequest = z.object({
+  species: speciesSchema,
+  size: z.nullable(sizeSchema),
+  colors: z.array(colorSchema),
+  point,
+  at: timestamp,
+})
+
+export const matchBody = (input: MatchInput): z.input<typeof matchRequest> => ({
   species: input.species,
   size: input.size,
   colors: input.colors,
@@ -179,7 +223,7 @@ export const matchBody = (input: MatchInput) => ({
   at: input.at.toISOString(),
 })
 
-const candidatesWire = z.object({
+export const candidatesWire = z.object({
   candidates: z.array(
     z.object({
       code: z.string(),
@@ -205,7 +249,7 @@ export function parseCandidates(raw: unknown): Candidate[] {
 export type PublishFoundInput = {
   species: 'dog' | 'cat' | 'other'
   size: 'small' | 'medium' | 'large'
-  colors: string[]
+  colors: Color[]
   marks: string | null
   photoUrls: string[]
   center: { lat: number; lng: number }
@@ -219,7 +263,27 @@ export type PublishFoundInput = {
   otpCode: string | null
 }
 
-export const publishFoundBody = (input: PublishFoundInput) => ({
+/** A found animal has no name: its `pet` row is unclaimed until someone proves it is theirs. */
+export const publishFoundRequest = z.object({
+  pet: z.object({
+    species: speciesSchema,
+    size: sizeSchema,
+    colors: z.array(colorSchema),
+    marks: z.nullable(z.string().check(z.maxLength(500))),
+    photo_urls: z.array(photoUrl).check(z.maxLength(6)),
+  }),
+  found_point: point,
+  found_radius_m: z.number().check(z.positive(), z.lte(5000)),
+  found_at: timestamp,
+  holding_where: z.enum(['home', 'vet', 'street_temporary']),
+  /** The custodian's secret: what a real owner would know and the photos do not show. */
+  withheld_detail: z.nullable(z.string().check(z.maxLength(300))),
+  ...publisherPhone,
+})
+
+export const publishFoundBody = (
+  input: PublishFoundInput,
+): z.input<typeof publishFoundRequest> => ({
   pet: {
     species: input.species,
     size: input.size,
@@ -252,7 +316,18 @@ export type OrphanSightingInput = {
   contactPhone: string | null
 }
 
-export const orphanSightingBody = (input: OrphanSightingInput) => ({
+export const orphanSightingRequest = z.object({
+  species: speciesSchema,
+  photo_urls: z.array(photoUrl).check(z.maxLength(3)),
+  point,
+  seen_at: timestamp,
+  note: z.nullable(z.string().check(z.maxLength(500))),
+  contact_phone: z.nullable(phone),
+})
+
+export const orphanSightingBody = (
+  input: OrphanSightingInput,
+): z.input<typeof orphanSightingRequest> => ({
   species: input.species,
   photo_urls: input.photoUrls,
   point: input.point,

@@ -1,8 +1,14 @@
-// hand-written until O14 — provisional wire shape.
+// The feed: open cases, nearest first, national when nothing is near (docs/product/00 · Geography).
 import * as z from 'zod/mini'
-import { speciesSchema, verticalSchema } from './case'
+import { point, speciesSchema, timestamp, verticalSchema } from './primitives'
 
-const timestamp = z.iso.datetime({ offset: true })
+/** All optional. Without `lat`/`lng` the server cannot tell what is near and answers nationally. */
+export const feedQuerySchema = z.object({
+  vertical: z.optional(verticalSchema),
+  species: z.optional(speciesSchema),
+  lat: z.optional(z.coerce.number().check(z.gte(-90), z.lte(90))),
+  lng: z.optional(z.coerce.number().check(z.gte(-180), z.lte(180))),
+})
 
 const feedItemWire = z.object({
   code: z.string(),
@@ -13,7 +19,7 @@ const feedItemWire = z.object({
   summary: z.nullable(z.string()),
   place_name: z.string(),
   /** Where to draw it on the feed map: public precision, never a doorstep. */
-  point: z.object({ lat: z.number(), lng: z.number() }),
+  point,
   photo_url: z.nullable(z.string()),
   happened_at: timestamp,
   possible_find: z.boolean(),

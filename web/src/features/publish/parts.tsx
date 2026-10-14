@@ -3,6 +3,7 @@ import type { User } from '@contracts/session'
 import type { Point } from '@domain/shared/geo'
 import {
   type AnimalDraft,
+  type Color,
   type ContactDraft,
   type DraftError,
   type PetSize,
@@ -10,6 +11,8 @@ import {
   type Species,
 } from '@domain/shared/publish'
 import { CODE_LENGTH } from '@domain/shared/signin'
+import { useI18n } from '@i18n/react'
+import type { TextKey, Translator } from '@i18n/translate'
 import { getCurrentPosition } from '@platform/location'
 import { Button } from '@ui/Button'
 import { Chips, MultiChips, type Option } from '@ui/Choice'
@@ -20,30 +23,22 @@ import { ChevronLeft, LocateFixed, Lock } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { PhotoPicker } from './PhotoPicker'
 
-const speciesOptions: Option<Species>[] = [
-  { value: 'dog', label: 'Perro' },
-  { value: 'cat', label: 'Gato' },
-  { value: 'other', label: 'Otro' },
-]
-const sizeOptions: Option<PetSize>[] = [
-  { value: 'small', label: 'Pequeño' },
-  { value: 'medium', label: 'Mediano' },
-  { value: 'large', label: 'Grande' },
-]
-const colorOptions: Option<string>[] = [
-  'Negro',
-  'Blanco',
-  'Café',
-  'Canela',
-  'Gris',
-  'Amarillo',
-  'Naranja',
-].map((color) => ({ value: color, label: color }))
-const radiusLabel: Record<number, string> = { 100: '~1 cuadra', 300: '~3 cuadras', 1000: '~1 km' }
-const radiusOptions: Option<string>[] = RADIUS_OPTIONS_M.map((radius) => ({
-  value: String(radius),
-  label: radiusLabel[radius] ?? `${radius} m`,
-}))
+const SPECIES: readonly Species[] = ['dog', 'cat', 'other']
+const SIZES: readonly PetSize[] = ['small', 'medium', 'large']
+const COLORS: readonly Color[] = ['black', 'white', 'brown', 'tan', 'gray', 'yellow', 'orange']
+const radiusKey: Record<number, TextKey> = {
+  100: 'publish.area.radius_100',
+  300: 'publish.area.radius_300',
+  1000: 'publish.area.radius_1000',
+}
+const radiusOptions = ({ t }: Translator): Option<string>[] =>
+  RADIUS_OPTIONS_M.map((radius) => {
+    const key = radiusKey[radius]
+    return {
+      value: String(radius),
+      label: key ? t(key) : t('publish.area.radius_m', { radius }),
+    }
+  })
 
 type ErrorFor = (error: DraftError) => string | null
 
@@ -58,21 +53,20 @@ export function StepHeader({
   steps: number
   onBack: () => void
 }) {
+  const { t } = useI18n()
   return (
     <header className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
         <button
           type="button"
-          aria-label={step === 1 ? 'Salir' : 'Paso anterior'}
+          aria-label={t(step === 1 ? 'publish.step.exit' : 'publish.step.previous')}
           onClick={onBack}
           className="flex size-11 items-center justify-center rounded-full bg-soft"
         >
           <ChevronLeft aria-hidden="true" />
         </button>
         <h1 className="m-0 flex-1 text-2xl font-extrabold">{title}</h1>
-        <span className="text-sm text-muted">
-          {step} de {steps}
-        </span>
+        <span className="text-sm text-muted">{t('publish.step.count', { step, steps })}</span>
       </div>
       <div className="flex gap-2" aria-hidden="true">
         {Array.from({ length: steps }, (_, index) => index + 1).map((n) => (
@@ -124,31 +118,32 @@ export function AnimalFields({
   errorFor: ErrorFor
   marksLabel: string
 }) {
+  const { t } = useI18n()
   return (
     <>
-      <Section title="Fotos" error={errorFor('photo_required')}>
+      <Section title={t('publish.animal.photos')} error={errorFor('photo_required')}>
         <PhotoPicker urls={animal.photoUrls} onChange={(photoUrls) => onChange({ photoUrls })} />
       </Section>
-      <Section title="Especie" error={errorFor('species_required')}>
+      <Section title={t('pet.species_label')} error={errorFor('species_required')}>
         <Chips
-          label="Especie"
-          options={speciesOptions}
+          label={t('pet.species_label')}
+          options={SPECIES.map((value) => ({ value, label: t(`pet.species.${value}`) }))}
           value={animal.species ?? ('' as Species)}
           onChange={(species) => onChange({ species })}
         />
       </Section>
-      <Section title="Tamaño" error={errorFor('size_required')}>
+      <Section title={t('pet.size_label')} error={errorFor('size_required')}>
         <Chips
-          label="Tamaño"
-          options={sizeOptions}
+          label={t('pet.size_label')}
+          options={SIZES.map((value) => ({ value, label: t(`pet.size.${value}`) }))}
           value={animal.size ?? ('' as PetSize)}
           onChange={(size) => onChange({ size })}
         />
       </Section>
-      <Section title="Colores">
+      <Section title={t('publish.animal.colors')}>
         <MultiChips
-          label="Colores"
-          options={colorOptions}
+          label={t('publish.animal.colors')}
+          options={COLORS.map((value) => ({ value, label: t(`pet.colors.${value}`) }))}
           values={animal.colors}
           onChange={(colors) => onChange({ colors })}
         />
@@ -156,7 +151,7 @@ export function AnimalFields({
       <TextArea
         label={marksLabel}
         optional
-        placeholder="Collar, manchas, cómo se comporta…"
+        placeholder={t('publish.animal.marks_placeholder')}
         value={animal.marks}
         onChange={(event) => onChange({ marks: event.target.value })}
       />
@@ -165,10 +160,10 @@ export function AnimalFields({
 }
 
 export type Day = 'today' | 'yesterday' | 'other'
-const dayOptions: Option<Day>[] = [
-  { value: 'today', label: 'Hoy' },
-  { value: 'yesterday', label: 'Ayer' },
-  { value: 'other', label: 'Otro día' },
+const dayOptions = ({ t }: Translator): Option<Day>[] => [
+  { value: 'today', label: t('publish.when.today') },
+  { value: 'yesterday', label: t('publish.when.yesterday') },
+  { value: 'other', label: t('publish.when.other_day') },
 ]
 
 const pad = (value: number) => String(value).padStart(2, '0')
@@ -213,6 +208,8 @@ export function AreaFields({
   errorFor: ErrorFor
   whenTitle: string
 }) {
+  const i18n = useI18n()
+  const { t } = i18n
   async function useMyLocation() {
     const position = await getCurrentPosition()
     if (position) onChange({ center: position })
@@ -221,7 +218,7 @@ export function AreaFields({
   return (
     <>
       <section className="flex flex-col gap-2">
-        <p className="m-0 text-muted">Toca más o menos dónde.</p>
+        <p className="m-0 text-muted">{t('publish.area.tap_roughly')}</p>
         <PickerMap
           styleUrl={mapStyleUrl}
           area={{ center: center ?? defaultCenter, radiusM: center ? 800 : 4000 }}
@@ -230,38 +227,45 @@ export function AreaFields({
           radiusM={radiusM}
           onChange={(point) => onChange({ center: point })}
           unavailable={
-            <Notice tone="neutral" title="No pudimos cargar el mapa.">
-              Usa tu ubicación para marcar la zona.
+            <Notice tone="neutral" title={t('map.unavailable')}>
+              {t('publish.area.use_location_instead')}
             </Notice>
           }
         />
         <Button variant="secondary" onClick={useMyLocation}>
           <LocateFixed aria-hidden="true" />
-          Usar mi ubicación
+          {t('map.use_my_location')}
         </Button>
-        {center ? <p className="m-0 text-sm font-semibold text-found">Zona marcada.</p> : null}
+        {center ? (
+          <p className="m-0 text-sm font-semibold text-found">{t('publish.area.marked')}</p>
+        ) : null}
         <FieldError message={errorFor('place_required')} />
       </section>
-      <Section title="¿Qué tan seguro estás del lugar?">
+      <Section title={t('publish.area.certainty')}>
         <Chips
-          label="¿Qué tan seguro estás del lugar?"
-          options={radiusOptions}
+          label={t('publish.area.certainty')}
+          options={radiusOptions(i18n)}
           value={String(radiusM)}
           onChange={(radius) => onChange({ radiusM: Number(radius) })}
         />
         <p className="m-0 flex items-center gap-2 text-sm text-muted">
           <Lock aria-hidden="true" className="size-4" />
-          Los demás ven una zona, nunca tu puerta.
+          {t('publish.area.privacy')}
         </p>
       </Section>
       <Section
         title={whenTitle}
         error={errorFor('time_required') ?? errorFor('time_in_the_future')}
       >
-        <Chips label="Día" options={dayOptions} value={when.day} onChange={when.setDay} />
+        <Chips
+          label={t('common.day')}
+          options={dayOptions(i18n)}
+          value={when.day}
+          onChange={when.setDay}
+        />
         {when.day === 'other' ? (
           <TextField
-            label="Día"
+            label={t('common.day')}
             type="date"
             max={when.maxDate}
             value={when.otherDate}
@@ -269,7 +273,7 @@ export function AreaFields({
           />
         ) : null}
         <TextField
-          label="Hora aproximada"
+          label={t('publish.when.time')}
           type="time"
           value={when.time}
           onChange={(event) => when.setTime(event.target.value)}
@@ -306,6 +310,7 @@ export function ContactFields({
   otp: { value: string; onType: (input: string) => void; wrong: boolean } | null
   demoCode: string | undefined
 }) {
+  const { t } = useI18n()
   const setContact = (patch: Partial<ContactDraft['contact']>) =>
     onChange({ contact: { ...draft.contact, ...patch } })
   return (
@@ -313,18 +318,18 @@ export function ContactFields({
       {verifiedPhone ? (
         <section className="flex items-center justify-between gap-3 rounded-2xl bg-brand-mist p-4">
           <div>
-            <p className="m-0 text-sm text-muted">Tu celular · verificado</p>
+            <p className="m-0 text-sm text-muted">{t('publish.phone.verified')}</p>
             <p className="m-0 font-bold">{verifiedPhone}</p>
           </div>
           <Button variant="link" onClick={onChangePhone}>
-            Cambiar
+            {t('publish.phone.change')}
           </Button>
         </section>
       ) : (
         <PhoneField
-          label="Tu celular"
+          label={t('contact.your_phone')}
           prefix={phonePrefix}
-          hint="Los vecinos te contactarán a este número."
+          hint={t('publish.phone.hint')}
           error={errorFor('phone_invalid')}
           disabled={otp !== null}
           value={draft.phone}
@@ -332,7 +337,7 @@ export function ContactFields({
         />
       )}
       <Checkbox
-        label="Este número tiene WhatsApp"
+        label={t('publish.phone.has_whatsapp')}
         checked={draft.hasWhatsapp}
         onChange={(hasWhatsapp) => onChange({ hasWhatsapp })}
       />
@@ -340,42 +345,42 @@ export function ContactFields({
       {otp ? (
         <section className="flex flex-col gap-3">
           <TextField
-            label="Código que te enviamos por SMS"
+            label={t('publish.phone.sms_code')}
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={CODE_LENGTH}
             className="min-h-14 w-full rounded-2xl border-2 border-field bg-surface px-4 text-center font-mono text-2xl font-bold tracking-[0.5em] aria-invalid:border-lost"
-            hint="Solo la primera vez."
-            error={otp.wrong ? 'Ese código no coincide. Revísalo e inténtalo de nuevo.' : null}
+            hint={t('publish.phone.sms_code_hint')}
+            error={otp.wrong ? t('publish.phone.wrong_code') : null}
             value={otp.value}
             onChange={(event) => otp.onType(event.target.value)}
           />
           {demoCode ? (
-            <Notice tone="neutral" title="Modo demostración.">
-              No se envía ningún SMS: usa el código {demoCode}.
+            <Notice tone="neutral" title={t('common.demo_mode')}>
+              {t('publish.phone.demo_code', { code: demoCode })}
             </Notice>
           ) : null}
         </section>
       ) : null}
 
       <section className="flex flex-col">
-        <h2 className="m-0 text-lg font-bold">¿Por dónde te pueden escribir?</h2>
+        <h2 className="m-0 text-lg font-bold">{t('publish.phone.channels')}</h2>
         <div className="divide-y divide-line">
           <Switch
-            label="WhatsApp"
-            hint="se muestra tu número"
+            label={t('publish.phone.whatsapp')}
+            hint={t('publish.phone.whatsapp_hint')}
             checked={draft.contact.whatsapp}
             onChange={(whatsapp) => setContact({ whatsapp })}
           />
           <Switch
-            label="Correo"
-            hint={`te llega a ${user.email}`}
+            label={t('publish.phone.email')}
+            hint={t('publish.phone.email_hint', { email: user.email })}
             checked={draft.contact.email}
             onChange={(email) => setContact({ email })}
           />
           <Switch
-            label="Chat dentro de la app"
-            hint="tu número queda oculto"
+            label={t('publish.phone.in_app')}
+            hint={t('publish.phone.in_app_hint')}
             checked={draft.contact.inApp}
             onChange={(inApp) => setContact({ inApp })}
           />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { durations } from '../shared/time'
-import { placeSightings, sightingErrorCopy, validateSighting } from './sightings'
+import { placeSightings, validateSighting } from './sightings'
 
 const now = new Date('2026-10-04T12:00:00Z')
 const ago = (ms: number) => new Date(now.getTime() - ms)
@@ -30,14 +30,6 @@ describe('04 · Validation — sighting pre-checks', () => {
     const tooEarly = { point: near, seenAt: ago(3 * durations.DAY + durations.HOUR) }
     expect(validateSighting(justInside, context, now)).toEqual([])
     expect(validateSighting(tooEarly, context, now)).toEqual(['before_the_case'])
-  })
-
-  it('uses the copy fixed by the doc', () => {
-    expect(sightingErrorCopy('too_far', 'Luna')).toBe(
-      'Ese punto está muy lejos del último lugar donde se vio a Luna',
-    )
-    expect(sightingErrorCopy('in_the_future', 'Luna')).toBe('La hora no puede ser en el futuro')
-    expect(sightingErrorCopy('before_the_case', 'Luna')).toBe('Luna se perdió después de esa hora')
   })
 })
 

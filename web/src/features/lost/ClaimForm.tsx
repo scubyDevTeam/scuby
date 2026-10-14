@@ -1,5 +1,6 @@
 import { useClaimRecovery, useConfig } from '@api-client/actions'
 import { toE164 } from '@domain/shared/phone'
+import { useI18n } from '@i18n/react'
 import { openExternal } from '@platform/navigation'
 import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass } from '@ui/Button'
@@ -20,6 +21,7 @@ type Props = {
  * does the channel to the family open — never a bare WhatsApp link.
  */
 export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
+  const { t } = useI18n()
   const country = useConfig().data?.countries[0]
   const claim = useClaimRecovery(code)
   const [phone, setPhone] = useState('')
@@ -31,9 +33,7 @@ export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
   const phoneError =
     !tried || e164
       ? null
-      : phone.trim()
-        ? 'Revisa el número de celular'
-        : 'Escribe tu número de celular'
+      : t(phone.trim() ? 'contact.phone_invalid' : 'lost.claim_form.phone_required')
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -53,10 +53,8 @@ export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
     const { whatsappUrl } = claim.data
     return (
       <div className="flex flex-col gap-4">
-        <Notice tone="success" title="Ya le avisamos a su familia.">
-          {whatsappUrl
-            ? 'Escríbeles por WhatsApp para ponerse de acuerdo.'
-            : 'Te van a contactar al número que dejaste.'}
+        <Notice tone="success" title={t('lost.claim_form.sent_title')}>
+          {t(whatsappUrl ? 'lost.claim_form.sent_write' : 'lost.claim_form.sent_wait')}
         </Notice>
         {whatsappUrl ? (
           <a
@@ -66,11 +64,11 @@ export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
             className={buttonClass('whatsapp')}
           >
             <WhatsAppIcon />
-            Abrir WhatsApp
+            {t('contact.open_whatsapp')}
           </a>
         ) : null}
         <Button variant="secondary" onClick={onDone}>
-          Listo
+          {t('common.done')}
         </Button>
       </div>
     )
@@ -78,29 +76,29 @@ export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
-      <p className="m-0 text-muted">Déjanos tu número y te abrimos WhatsApp con su familia.</p>
+      <p className="m-0 text-muted">{t('lost.claim_form.intro')}</p>
       <PhoneField
-        label="Tu celular"
+        label={t('contact.your_phone')}
         prefix={country?.phonePrefix ?? ''}
-        hint="Obligatorio. No te enviamos códigos ni lo publicamos."
+        hint={t('lost.claim_form.phone_hint')}
         error={phoneError}
         value={phone}
         onChange={(event) => setPhone(event.target.value)}
       />
-      <Notice>Mantenla en un lugar cerrado y con agua. Entrégala en un sitio público.</Notice>
+      <Notice>{t('lost.claim_form.care')}</Notice>
       {claim.isError ? (
-        <Notice tone="warning" title="No pudimos avisar a su familia.">
-          Revisa tu conexión e inténtalo de nuevo.
+        <Notice tone="warning" title={t('lost.claim_form.failed_title')}>
+          {t('common.check_connection')}
         </Notice>
       ) : null}
       <Button type="submit" variant="whatsapp" disabled={claim.isPending}>
         <WhatsAppIcon />
-        {claim.isPending ? 'Avisando…' : 'Avisar y abrir WhatsApp'}
+        {t(claim.isPending ? 'lost.claim_form.sending' : 'lost.claim_form.submit')}
       </Button>
       <Button variant="link" className="self-center" onClick={onOnlySaw}>
-        Solo la vi, no la tengo
+        {t('lost.claim_form.only_saw')}
       </Button>
-      <p className="sr-only">Sobre {petName}</p>
+      <p className="sr-only">{t('lost.claim_form.about', { name: petName })}</p>
     </form>
   )
 }

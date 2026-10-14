@@ -1,37 +1,48 @@
-import { expect, test } from './test.ts'
+import { expect, tags, test } from './test.ts'
 
-test('the owner answers a claim and closes the case as reunited', async ({ page }) => {
-  // The demo Google account owns Luna.
-  await page.goto('/mis-casos')
-  await page.getByRole('button', { name: 'Continuar con Google' }).click()
-  await page.getByRole('heading', { name: 'Luna' }).click()
+test(
+  'the owner answers a claim and closes the case as reunited',
+  tags('@owner', '@OWNER-001'),
+  async ({ myCases, casePage }) => {
+    await myCases.openAsDemoOwner()
+    await myCases.openCase('Luna')
 
-  const claims = page.getByRole('region', { name: 'Posibles hallazgos' })
-  await expect(claims.getByRole('link', { name: 'Abrir WhatsApp' })).toHaveAttribute(
-    'href',
-    'https://wa.me/573114829017',
-  )
-  await claims.getByRole('button', { name: 'Sí, es Luna' }).click()
+    await test.step('the claimant’s number is a WhatsApp button, not text', async () => {
+      await expect(casePage.claims.getByRole('link', { name: 'Abrir WhatsApp' })).toHaveAttribute(
+        'href',
+        'https://wa.me/573114829017',
+      )
+    })
 
-  // Confirming the claim leads to the close, with the answer already suggested.
-  await expect(page.getByLabel('Alguien la tenía y avisó aquí')).toBeChecked()
-  await page.getByRole('button', { name: 'Sí, Luna ya está en casa' }).click()
+    await test.step('confirming the claim leads to the close, its answer suggested', async () => {
+      await casePage.confirmClaim('Luna')
+      await expect(casePage.choice('Alguien la tenía y avisó aquí')).toBeChecked()
+    })
 
-  await expect(page.getByText('¡Luna ya está en casa!')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Ya apareció' })).toHaveCount(0)
+    await test.step('the case closes as reunited', async () => {
+      await casePage.closeAsReunited('Luna')
+      await expect(casePage.text('¡Luna ya está en casa!')).toBeVisible()
+      await expect(casePage.reunitedButton).toHaveCount(0)
+    })
 
-  await page.goto('/mis-casos')
-  await expect(page.getByText('Ya está en casa')).toBeVisible()
-})
+    await test.step('«Mis casos» says so', async () => {
+      await myCases.open()
+      await expect(myCases.status('Ya está en casa')).toBeVisible()
+    })
+  },
+)
 
-test('the owner deletes a false alarm', async ({ page }) => {
-  await page.goto('/mis-casos')
-  await page.getByRole('button', { name: 'Continuar con Google' }).click()
-  await page.getByRole('heading', { name: 'Luna' }).click()
+test(
+  'the owner deletes a false alarm',
+  tags('@owner', '@OWNER-002'),
+  async ({ myCases, casePage }) => {
+    await myCases.openAsDemoOwner()
+    await myCases.openCase('Luna')
 
-  await page.getByRole('button', { name: 'Eliminar aviso' }).click()
-  await page.getByLabel('Fue una falsa alarma').check()
-  await page.getByRole('dialog').getByRole('button', { name: 'Eliminar aviso' }).click()
+    await casePage.deleteAs('Fue una falsa alarma')
 
-  await expect(page.getByText('Este aviso fue cerrado.')).toBeVisible()
-})
+    await test.step('the case is closed', async () => {
+      await expect(casePage.text('Este aviso fue cerrado.')).toBeVisible()
+    })
+  },
+)

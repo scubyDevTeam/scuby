@@ -1,0 +1,663 @@
+{
+  "common": {
+    "retry": "Reintentar",
+    "check_connection": "Revisa tu conexión e inténtalo de nuevo.",
+    "try_again": "Inténtalo de nuevo.",
+    "done": "Listo",
+    "got_it": "Entendido",
+    "back": "Volver",
+    "back_home": "Volver al inicio",
+    "close": "Cerrar",
+    "share": "Compartir",
+    "loading": "Cargando",
+    "optional": "(opcional)",
+    "not_sure": "No sé",
+    "save_failed": "No pudimos guardarlo.",
+    "demo_mode": "Modo demostración.",
+    "day": "Día",
+    "note": "Nota",
+    "language": "Idioma"
+  },
+  "time": {
+    "just_now": "hace un momento",
+    "minutes_ago": "hace {count} min",
+    "hours_ago": "hace {count} h",
+    "days_ago": {
+      "one": "hace 1 día",
+      "other": "hace {count} días"
+    },
+    "today_at": "Hoy {time}",
+    "yesterday_at": "Ayer {time}"
+  },
+  "pet": {
+    "species_label": "Especie",
+    "size_label": "Tamaño",
+    "colors_label": "Color",
+    "microchip": "Número de microchip",
+    "species": {
+      "dog": "Perro",
+      "cat": "Gato",
+      "other": "Otro"
+    },
+    "size": {
+      "small": "Pequeño",
+      "medium": "Mediano",
+      "large": "Grande"
+    },
+    "colors": {
+      "black": "Negro",
+      "white": "Blanco",
+      "brown": "Café",
+      "tan": "Canela",
+      "gray": "Gris",
+      "yellow": "Amarillo",
+      "orange": "Naranja"
+    },
+    "colors_in_text": {
+      "black": "negro",
+      "white": "blanco",
+      "brown": "café",
+      "tan": "canela",
+      "gray": "gris",
+      "yellow": "amarillo",
+      "orange": "naranja"
+    }
+  },
+  "map": {
+    "tap_to_mark": "Toca el mapa para marcar el punto.",
+    "unavailable": "No pudimos cargar el mapa.",
+    "use_location_instead": "Usa tu ubicación para marcar el punto.",
+    "use_my_location": "Usar mi ubicación",
+    "locating": "Buscando tu ubicación…",
+    "location_failed": "No pudimos obtener tu ubicación. Toca el mapa para marcar el punto.",
+    "point_marked": "Punto marcado."
+  },
+  "contact": {
+    "your_phone": "Tu celular",
+    "your_whatsapp": "Tu WhatsApp",
+    "phone_invalid": "Revisa el número de celular",
+    "open_whatsapp": "Abrir WhatsApp",
+    "write_on_whatsapp": "Escribirle por WhatsApp",
+    "no_account": "Sin cuenta."
+  },
+  "app": {
+    "nav": {
+      "label": "Principal",
+      "home": "Inicio",
+      "my_cases": "Mis casos",
+      "inbox": "Bandeja",
+      "profile": "Perfil",
+      "sign_in": "Entrar",
+      "publish": "Publicar aviso",
+      "publish_label": "Publicar un aviso"
+    },
+    "not_found": {
+      "title": "Esta página no existe",
+      "home": "Ir al inicio"
+    },
+    "gate": {
+      "checking": "No pudimos comprobar tu sesión",
+      "title": "Entra para continuar"
+    },
+    "legal": "Al continuar aceptas los Términos y la Política de tratamiento de datos.",
+    "inbox": {
+      "title": "Bandeja",
+      "empty": "Aquí llegarán tus avisos."
+    },
+    "unfinished_door": {
+      "title": "Estamos terminando esta parte",
+      "body": "Por ahora puedes publicar un aviso de mascota perdida. <back>Volver</back>"
+    },
+    "found_door": {
+      "title": "¿Lo tienes contigo?",
+      "hint": "Así sabemos cómo ayudarte mejor.",
+      "with_me": "Sí, lo tengo conmigo",
+      "only_saw": "No, solo lo vi"
+    }
+  },
+  "case": {
+    "loading": "Cargando aviso",
+    "gone": "Este aviso ya no está disponible",
+    "not_found": "No encontramos este aviso",
+    "not_found_hint": "Revisa que el código del enlace esté completo. <home>Ver otros avisos</home>",
+    "load_failed": "No pudimos cargar el aviso",
+    "unfinished": "{place}. Estamos terminando esta página. <home>Ver otros avisos</home>",
+    "other_cases": "Ver otros avisos",
+    "next_photo": "Ver la siguiente foto",
+    "photo_n": "Ver foto {n}",
+    "copied": "Enlace copiado",
+    "copied_hint": "Pégalo en WhatsApp o donde quieras compartirlo.",
+    "report_title": "¿Qué pasa con esta publicación?",
+    "cancel_title": "Eliminar este aviso",
+    "reopen_title": "Reactivar el aviso",
+    "lost": {
+      "share_title": "Se busca: {name}",
+      "share_text": "Ayúdanos a encontrarla",
+      "sighting_title": "¿Dónde viste a {name}?",
+      "claim_title": "¿Tienes a {name}?",
+      "reunite_title": "¿{name} ya apareció?"
+    },
+    "found": {
+      "share_title": "Se encontró: {title}",
+      "share_text": "¿Lo reconoces? Ayúdanos a encontrar a su familia",
+      "mine_title": "¿Es tu mascota?",
+      "reunited_title": "¿Ya está con su dueño?",
+      "kept_title": "¿Te lo quedas?",
+      "transferred_title": "¿Lo entregaste a una fundación?"
+    }
+  },
+  "publish": {
+    "errors": {
+      "name_required": "Dinos cómo se llama",
+      "species_required": "Elige la especie",
+      "size_required": "Elige el tamaño",
+      "photo_required": "Agrega al menos una foto",
+      "place_required": "Toca el mapa más o menos dónde fue",
+      "time_required": "Dinos cuándo fue",
+      "time_in_the_future": "La hora no puede ser en el futuro",
+      "contact_required": "Deja al menos una forma de contacto activa",
+      "whatsapp_needs_number": "Para recibir mensajes por WhatsApp, el número debe tener WhatsApp"
+    },
+    "step": {
+      "exit": "Salir",
+      "previous": "Paso anterior",
+      "count": "{step} de {steps}"
+    },
+    "animal": {
+      "photos": "Fotos",
+      "colors": "Colores",
+      "marks_placeholder": "Collar, manchas, cómo se comporta…"
+    },
+    "area": {
+      "tap_roughly": "Toca más o menos dónde.",
+      "use_location_instead": "Usa tu ubicación para marcar la zona.",
+      "marked": "Zona marcada.",
+      "certainty": "¿Qué tan seguro estás del lugar?",
+      "radius_100": "~1 cuadra",
+      "radius_300": "~3 cuadras",
+      "radius_1000": "~1 km",
+      "radius_m": "{radius} m",
+      "privacy": "Los demás ven una zona, nunca tu puerta."
+    },
+    "when": {
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "other_day": "Otro día",
+      "time": "Hora aproximada"
+    },
+    "phone": {
+      "verified": "Tu celular · verificado",
+      "change": "Cambiar",
+      "hint": "Los vecinos te contactarán a este número.",
+      "has_whatsapp": "Este número tiene WhatsApp",
+      "sms_code": "Código que te enviamos por SMS",
+      "sms_code_hint": "Solo la primera vez.",
+      "wrong_code": "Ese código no coincide. Revísalo e inténtalo de nuevo.",
+      "demo_code": "No se envía ningún SMS: usa el código {code}.",
+      "channels": "¿Por dónde te pueden escribir?",
+      "whatsapp": "WhatsApp",
+      "whatsapp_hint": "se muestra tu número",
+      "email": "Correo",
+      "email_hint": "te llega a {email}",
+      "in_app": "Chat dentro de la app",
+      "in_app_hint": "tu número queda oculto"
+    },
+    "photos": {
+      "photo_n": "Foto {n}",
+      "remove_n": "Quitar foto {n}",
+      "uploading": "Subiendo…",
+      "add": "Agregar foto",
+      "failed": "No pudimos subir esa foto. Inténtalo de nuevo.",
+      "first_on_poster": "La primera va en el afiche."
+    },
+    "doors": {
+      "title": "¿Qué pasó?",
+      "hint": "Elige lo que mejor describe tu situación.",
+      "not_urgent": "Sin urgencia",
+      "lost": {
+        "title": "Perdí a mi mascota",
+        "text": "Avisamos a los vecinos de la zona."
+      },
+      "found": {
+        "title": "Encontré un animal",
+        "text": "Lo tengas contigo o solo lo hayas visto."
+      },
+      "adoption": {
+        "title": "Dar en adopción",
+        "text": "Un animal que tienes y busca hogar."
+      },
+      "help": {
+        "title": "Pedir ayuda",
+        "text": "Una campaña para un gasto puntual."
+      },
+      "only_saw_title": "¿Solo viste un animal en la calle?",
+      "only_saw_body": "Entra por «Encontré un animal»: reportarlo toma un toque y no necesitas cuenta."
+    }
+  },
+  "feed": {
+    "badge": {
+      "lost": "Se busca",
+      "found": "Se encontró",
+      "adoption": "En adopción",
+      "help": "Necesita ayuda"
+    },
+    "possible_find": "Posible hallazgo",
+    "sightings": {
+      "one": "Vista {when} · 1 avistamiento",
+      "other": "Vista {when} · {count} avistamientos"
+    },
+    "verticals": {
+      "label": "Tipo de aviso",
+      "all": "Todos",
+      "lost": "Perdidos",
+      "found": "Encontrados",
+      "adoption": "Adopción",
+      "help": "Ayuda"
+    },
+    "species": {
+      "all": "Todas",
+      "dog": "Perros",
+      "cat": "Gatos",
+      "other": "Otros"
+    },
+    "views": {
+      "label": "Vista",
+      "list": "Lista",
+      "map": "Mapa"
+    },
+    "title_local": "Cerca de ti, ahora",
+    "title_national": "En todo el país",
+    "national_hint": "Tu zona está vacía, así que te mostramos avisos de todo el país.",
+    "loading": "Cargando avisos",
+    "load_failed": "No pudimos cargar los avisos",
+    "empty_title": "No hay avisos con ese filtro",
+    "empty_hint": "Prueba con otro tipo de aviso u otra especie.",
+    "map_label": "Mapa de avisos",
+    "map_failed": "No pudimos mostrar el mapa",
+    "map_failed_hint": "Puedes ver los mismos avisos en la lista."
+  },
+  "auth": {
+    "sign_in": {
+      "intro": "Necesitamos saber quién eres para que los vecinos puedan contactarte. Sin contraseñas.",
+      "signing_in": "Entrando…",
+      "google": "Continuar con Google",
+      "google_failed": "No pudimos entrar con Google. Prueba con tu correo.",
+      "or_email": "o con tu correo",
+      "email": "Correo electrónico",
+      "email_placeholder": "tu@correo.com",
+      "email_invalid": "Revisa tu correo: parece incompleto",
+      "sending": "Enviando…",
+      "send_code": "Enviarme un código",
+      "send_failed": "No pudimos enviar el código.",
+      "code_label": "Código de {length} dígitos que te enviamos",
+      "code_hint": "Lo enviamos a {email}. Si no llega, revisa la carpeta de spam.",
+      "wrong_code": "Ese código no coincide. Revísalo o pide uno nuevo.",
+      "check_failed": "No pudimos comprobar el código. Inténtalo de nuevo.",
+      "demo_code": "No se envía ningún correo: usa el código {code}.",
+      "resend_in": "Reenviar código en {seconds} s",
+      "resend": "Reenviar código"
+    },
+    "profile": {
+      "email_label": "Correo con el que entras",
+      "sign_out": "Cerrar sesión"
+    }
+  },
+  "mine": {
+    "title": "Mis casos",
+    "loading": "Cargando tus casos",
+    "load_failed": "No pudimos cargar tus casos",
+    "empty_title": "Aún no has publicado nada",
+    "empty_hint": "Cuando publiques un aviso lo verás aquí.",
+    "publish": "Publicar un aviso",
+    "status": {
+      "active": "Aviso activo",
+      "reunited": "Ya está en casa",
+      "expired": "Archivado",
+      "cancelled": "Cerrado",
+      "kept": "Ya tiene hogar",
+      "converted": "En adopción",
+      "transferred_to_org": "Con una fundación",
+      "found_active": "Lo cuidas tú"
+    },
+    "possible_owner": "Posible dueño",
+    "possible_find": "Posible hallazgo"
+  },
+  "reporting": {
+    "reasons": {
+      "scam_or_extortion": "Estafa o piden dinero",
+      "personal_data": "Muestra datos personales",
+      "animal_welfare": "El animal está en malas condiciones",
+      "graphic_content": "Contenido gráfico o violento",
+      "harassment": "Acoso",
+      "duplicate": "Está repetida",
+      "spam": "Spam",
+      "other": "Otra cosa"
+    },
+    "effect": {
+      "queued": "Una persona la revisará. Mientras tanto la publicación sigue visible.",
+      "hidden_pending_review": "Por este motivo la ocultamos de inmediato mientras una persona la revisa, en menos de 4 horas.",
+      "suspended_pending_review": "Por este motivo la pausamos de inmediato mientras una persona la revisa, en menos de 4 horas."
+    },
+    "thanks": "Gracias por avisar.",
+    "received": "Recibimos tu reporte.",
+    "intro": "Es anónimo y no necesitas cuenta. Quien publicó nunca sabrá quién reportó.",
+    "reason_legend": "Motivo del reporte",
+    "reason_required": "Elige un motivo",
+    "note": "Cuéntanos más",
+    "send_failed": "No pudimos enviar el reporte.",
+    "sending": "Enviando…",
+    "send": "Enviar reporte"
+  },
+  "found": {
+    "sending": "Enviando…",
+    "describe": {
+      "species": {
+        "dog": "Perro",
+        "cat": "Gato",
+        "other": "Animal"
+      },
+      "size": {
+        "small": "pequeño",
+        "medium": "mediano",
+        "large": "grande"
+      },
+      "with_color": "{species} {color}",
+      "with_size": "{what}, {size}"
+    },
+    "holding": {
+      "home": "Está en casa de quien lo encontró",
+      "vet": "Está en una veterinaria",
+      "street_temporary": "Sigue en la calle, lo están cuidando",
+      "no_longer_held": "Ya no lo tienen: se fue de nuevo"
+    },
+    "band": {
+      "active": "Se encontró",
+      "expired": "Aviso archivado",
+      "reunited": "Ya está con su familia",
+      "kept": "Ya tiene hogar",
+      "converted": "Ahora está en adopción",
+      "transferred_to_org": "Está con una fundación",
+      "cancelled": "Aviso cerrado"
+    },
+    "tier": {
+      "prior_lost_case": "⭐ Publicó un aviso de perdido antes de que lo encontraras",
+      "described": "Describió algo que no sale en las fotos",
+      "documented": "Adjuntó microchip o documentos",
+      "none": "⚠️ Sin evidencia"
+    },
+    "safety": "Antes de entregarlo, pide el dato que guardaste, una foto anterior o el carnet de vacunas. Entrégalo en un lugar público.",
+    "actions": {
+      "reunited": "Ya está con su dueño",
+      "keep": "Me lo quedo",
+      "transfer": "Lo entregué a una fundación",
+      "delete": "Eliminar aviso"
+    },
+    "page": {
+      "photo_alt": "Foto de {title}",
+      "marks_title": "Cómo es",
+      "custodian_role": "Lo encontró y lo cuida",
+      "share": "Compartir aviso",
+      "report": "Reportar",
+      "found_line": "Se encontró en {place} · {date} · {ago}",
+      "closed_title": "{band}.",
+      "closed_body": "Gracias a quien lo cuidó.",
+      "cancelled_title": "Este aviso fue cerrado.",
+      "cancelled_body": "Quien lo publicó lo retiró.",
+      "archived_title": "Este aviso fue archivado.",
+      "archived_can_reopen": "Puedes reactivarlo si sigues con él.",
+      "archived_owner_can_reopen": "Quien lo publicó puede reactivarlo.",
+      "claim": "Es mío",
+      "claim_hint": "Te pediremos entrar con tu cuenta",
+      "reopen": "Reactivar aviso",
+      "possible_owner_title": "Posible dueño.",
+      "possible_owner_body": "Alguien dice que es suyo y quien lo cuida lo está verificando.",
+      "where_title": "Dónde se encontró",
+      "area_label": "Zona donde se encontró (aproximada)"
+    },
+    "custodian": {
+      "offer_label": "Quince días sin dueño",
+      "offer_title": "Nadie ha reclamado a este peludo en 15 días.",
+      "offer_body": "Tú decides qué sigue para él.",
+      "keep_searching": "Sigo buscando al dueño",
+      "claims_label": "Posibles dueños",
+      "claims_title": "Dicen que es suyo",
+      "withheld_title": "Guardaste: «{detail}».",
+      "withheld_body": "Pregúntale por eso antes de entregar.",
+      "microchip": "Microchip: {chip}",
+      "confirm": "Sí, es el dueño",
+      "dismiss": "No es",
+      "answer_failed": "No pudimos guardar tu respuesta."
+    },
+    "resolve": {
+      "attribution": {
+        "platform_claim": "Su dueño lo vio aquí y me escribió",
+        "platform_match": "La app nos avisó que coincidían",
+        "platform_share": "Vieron el aviso compartido",
+        "offline": "Lo encontré por otro lado"
+      },
+      "cancel_reason": {
+        "not_a_stray": "No estaba perdido",
+        "ran_off_again": "Se fue de nuevo",
+        "duplicate": "Lo publiqué dos veces"
+      },
+      "reunited_intro": "Qué alegría. Cuéntanos cómo se encontraron: así sabemos qué funciona.",
+      "reunited_button": "Sí, ya está con su dueño",
+      "kept_intro": "Queda registrado desde hoy. Si puedes, espera unos días más antes de decidir: su familia puede estar buscándolo. Si aparece, todavía podrá escribirte.",
+      "transferred_intro": "Gracias por buscarle un lugar. El aviso se cierra.",
+      "transferred_button": "Confirmar entrega",
+      "attribution_legend": "¿Quién te ayudó?",
+      "reason_legend": "¿Por qué lo eliminas?",
+      "org_label": "¿A cuál fundación?",
+      "choose_one": "Elige una opción",
+      "saving": "Guardando…"
+    },
+    "ownership_claim": {
+      "sent_title": "Le avisamos a quien lo cuida.",
+      "sent_whatsapp": "Escríbele por WhatsApp para ponerse de acuerdo.",
+      "sent_in_app": "Te va a escribir por aquí cuando revise tu mensaje.",
+      "intro": "Quien lo cuida decide a quién entregarlo. Entre más pruebas des, más fácil se lo pones.",
+      "notes_label": "Describe algo que no salga en las fotos",
+      "notes_placeholder": "Una cicatriz, el color del collar, si está esterilizado…",
+      "failed": "No pudimos enviar tu mensaje.",
+      "submit": "Avisar que es mío"
+    },
+    "candidates": {
+      "title": "¿Es alguno de estos?",
+      "intro": "Alguien cerca está buscando una mascota parecida.",
+      "pick": "Sí, es {name}"
+    },
+    "publish": {
+      "title_animal": "¿Cómo es?",
+      "title_place": "¿Dónde y cuándo lo encontraste?",
+      "title_contact": "¿Cómo te avisan?",
+      "holding": {
+        "home": "En mi casa",
+        "vet": "En una veterinaria",
+        "street_temporary": "Sigue en la calle, lo cuido"
+      },
+      "matched_title": "¡Es {name}!",
+      "none_matches": "No es ninguno, publicar mi aviso",
+      "published_title": "¡Aviso publicado!",
+      "published_notice_title": "Gracias por cuidarlo.",
+      "published_notice_body": "Los vecinos de la zona ya pueden verlo. Si aparece su familia, te avisamos.",
+      "view_case": "Ver mi aviso",
+      "marks_label": "Cómo es y cómo se porta",
+      "withheld_label": "Guarda un dato que solo su dueño sabría",
+      "withheld_hint": "Algo que no se vea en las fotos: una cicatriz, el color del collar, si está esterilizado. No se publica: te sirve para saber quién es de verdad su dueño.",
+      "when_title": "¿Cuándo lo encontraste?",
+      "where_now": "¿Dónde está ahora?",
+      "where_now_hint": "Esto sí se muestra: le dice a su familia qué tan urgente es.",
+      "publish_failed": "No pudimos publicar el aviso.",
+      "matching": "Buscando si alguien lo busca…",
+      "continue": "Continuar",
+      "publishing": "Publicando…",
+      "confirm_code": "Confirmar código y publicar",
+      "submit": "Publicar y avisar a los vecinos"
+    },
+    "witness": {
+      "thanks_title": "¡Gracias por avisar!",
+      "saved_title": "Guardamos tu reporte.",
+      "saved_body": "Si alguien busca a un animal así, le avisamos dónde lo viste.",
+      "none_matches": "No es ninguno",
+      "save_failed": "No pudimos guardar tu reporte.",
+      "title": "¿Dónde lo viste?",
+      "photo": "Foto",
+      "photo_hint": "Sin foto no podemos saber de quién es.",
+      "when_title": "¿Cuándo?",
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "note_placeholder": "Hacia dónde iba, cómo se veía…",
+      "phone_hint": "Por si su familia quiere preguntarte algo. Solo ella lo ve.",
+      "submit": "Enviar reporte"
+    }
+  },
+  "lost": {
+    "pet": {
+      "species_other": "Mascota"
+    },
+    "page": {
+      "band_open": "Se busca",
+      "band_reunited": "Ya está en casa",
+      "band_archived": "Aviso archivado",
+      "band_closed": "Aviso cerrado",
+      "photo_alt": "Foto de {name}",
+      "marks_title": "Señas",
+      "contact_family": "Su familia",
+      "share": "Compartir aviso",
+      "report": "Reportar",
+      "lost_at": "Se perdió en {place} · {date} · {ago}",
+      "reunited_title": "¡{name} ya está en casa!",
+      "reunited_body": "Gracias a quienes ayudaron a buscar.",
+      "cancelled_title": "Este aviso fue cerrado.",
+      "cancelled_body": "Su familia lo retiró; ya no hace falta buscar.",
+      "archived_title": "Este aviso fue archivado.",
+      "archived_owner": "Puedes reactivarlo y conservar sus avistamientos.",
+      "archived_public": "Su familia puede reactivarlo si la búsqueda sigue.",
+      "saw_it": "La vi",
+      "saw_it_hint": "Marca dónde · sin cuenta",
+      "have_it": "La tengo conmigo",
+      "reunited_action": "Ya apareció",
+      "delete": "Eliminar aviso",
+      "reopen": "Reactivar aviso",
+      "possible_find_title": "Posible hallazgo.",
+      "possible_find_body": "Alguien dice que la tiene y su familia lo está verificando. La búsqueda sigue: si la ves, repórtalo.",
+      "trail_title": "Por dónde va",
+      "sightings_count": {
+        "one": "1 avistamiento",
+        "other": "{count} avistamientos"
+      },
+      "area_label": "Zona donde se perdió (aproximada)",
+      "no_sightings": "Nadie la ha visto todavía. Si la ves, márcalo en el mapa."
+    },
+    "timeline": {
+      "label": "Avistamientos",
+      "seen_on": "{date} {time}",
+      "where_who": "A {distance} · {reporter}",
+      "registered": "con cuenta",
+      "anonymous": "anónimo",
+      "note": "«{note}»"
+    },
+    "sighting_form": {
+      "when": {
+        "now": "Ahora",
+        "earlier": "Hace un rato",
+        "yesterday": "Ayer",
+        "custom": "Otra hora"
+      },
+      "place_required": "Marca en el mapa dónde viste a {name}",
+      "time_required": "Dinos a qué hora fue",
+      "errors": {
+        "too_far": "Ese punto está muy lejos del último lugar donde se vio a {name}",
+        "in_the_future": "La hora no puede ser en el futuro",
+        "before_the_case": "{name} se perdió después de esa hora"
+      },
+      "thanks_title": "¡Gracias!",
+      "thanks_body": "Tu avistamiento ya está en el mapa y su familia fue avisada.",
+      "when_title": "¿Cuándo?",
+      "when_label": "¿Cuándo la viste?",
+      "day_and_time": "Día y hora",
+      "note_placeholder": "Hacia dónde iba, cómo se veía…",
+      "phone_hint": "Su familia va a querer preguntarte en qué esquina exactamente. Solo ella lo ve.",
+      "failed_title": "No pudimos enviar tu avistamiento.",
+      "too_soon": "Ya registraste un avistamiento hace poco.",
+      "sending": "Enviando…",
+      "submit": "Enviar avistamiento"
+    },
+    "claim_form": {
+      "phone_required": "Escribe tu número de celular",
+      "sent_title": "Ya le avisamos a su familia.",
+      "sent_write": "Escríbeles por WhatsApp para ponerse de acuerdo.",
+      "sent_wait": "Te van a contactar al número que dejaste.",
+      "intro": "Déjanos tu número y te abrimos WhatsApp con su familia.",
+      "phone_hint": "Obligatorio. No te enviamos códigos ni lo publicamos.",
+      "care": "Mantenla en un lugar cerrado y con agua. Entrégala en un sitio público.",
+      "failed_title": "No pudimos avisar a su familia.",
+      "sending": "Avisando…",
+      "submit": "Avisar y abrir WhatsApp",
+      "only_saw": "Solo la vi, no la tengo",
+      "about": "Sobre {name}"
+    },
+    "claims": {
+      "label": "Posibles hallazgos",
+      "title": "Dicen que la tienen",
+      "reveals_number": "Al escribirle, esa persona verá tu número.",
+      "call": "Llamar",
+      "confirm": "Sí, es {name}",
+      "dismiss": "No era",
+      "failed_title": "No pudimos guardar tu respuesta."
+    },
+    "owner_forms": {
+      "attribution": {
+        "platform_sighting": "Alguien la vio y avisó aquí",
+        "platform_claim": "Alguien la tenía y avisó aquí",
+        "platform_share": "Alguien vio el aviso compartido o el afiche",
+        "offline": "Apareció por otro lado"
+      },
+      "cancel_reason": {
+        "false_alarm": "Fue una falsa alarma",
+        "duplicate": "Lo publiqué dos veces"
+      },
+      "reunite_intro": "Qué alegría. Cuéntanos quién te ayudó a encontrar a {name}: así sabemos qué funciona.",
+      "who_helped": "¿Quién te ayudó?",
+      "pick_option": "Elige una opción",
+      "saving": "Guardando…",
+      "reunite_submit": "Sí, {name} ya está en casa",
+      "reunite_footnote": "El aviso se cierra y dejamos de avisar a los vecinos.",
+      "cancel_warning": "Si ya apareció, no lo elimines: usa «Ya apareció» para que quede registrado el reencuentro.",
+      "why_cancel": "¿Por qué lo eliminas?",
+      "pick_reason": "Elige un motivo",
+      "deleting": "Eliminando…",
+      "cancel_submit": "Eliminar aviso",
+      "reopen_intro": "El aviso de {name} vuelve a estar activo y conserva sus avistamientos.",
+      "reopening": "Reactivando…",
+      "reopen_submit": "Reactivar aviso"
+    },
+    "publish": {
+      "step_1": "¿Quién se perdió?",
+      "step_2": "¿Dónde y cuándo?",
+      "step_3": "¿Cómo te avisan?",
+      "published_title": "¡Aviso publicado!",
+      "searching": "Ya estamos buscando a {name}.",
+      "neighbours_see": "Los vecinos de la zona pueden verlo y avisarte.",
+      "share_it": "Compártelo: entre más gente lo vea, más ojos la buscan.",
+      "see_mine": "Ver mi aviso",
+      "which_pet": "¿Cuál se perdió?",
+      "other_pet": "Otra mascota",
+      "already_active": "{name} ya tiene un aviso activo.",
+      "see_that": "Ver ese aviso",
+      "name": "Nombre",
+      "marks": "Señas para reconocerla",
+      "chip_hint": "Lo ven solo las veterinarias y refugios que la escaneen.",
+      "when_title": "¿Cuándo la viste por última vez?",
+      "conflict_title": "Esta mascota ya tiene un aviso activo.",
+      "conflict_body": "Revisa «Mis casos».",
+      "failed_title": "No pudimos publicar el aviso.",
+      "continue": "Continuar",
+      "publishing": "Publicando…",
+      "confirm_code": "Confirmar código y publicar",
+      "submit": "Publicar y avisar a los vecinos",
+      "ownership": "Al publicar confirmas que {name} es tu mascota.",
+      "ownership_unnamed": "Al publicar confirmas que esta es tu mascota."
+    }
+  }
+}

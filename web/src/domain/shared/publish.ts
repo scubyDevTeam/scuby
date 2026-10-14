@@ -6,6 +6,7 @@ import { type PhoneRules, toE164 } from './phone'
 
 export type Species = 'dog' | 'cat' | 'other'
 export type PetSize = 'small' | 'medium' | 'large'
+export type Color = 'black' | 'white' | 'brown' | 'tan' | 'gray' | 'yellow' | 'orange'
 
 /** «~1 cuadra · ~3 cuadras · ~1 km»: preset chips, never a drag handle. */
 export const RADIUS_OPTIONS_M = [100, 300, 1000] as const
@@ -15,7 +16,7 @@ export type AnimalDraft = {
   name: string
   species: Species | null
   size: PetSize | null
-  colors: string[]
+  colors: Color[]
   marks: string
   chipNumber: string
   photoUrls: string[]

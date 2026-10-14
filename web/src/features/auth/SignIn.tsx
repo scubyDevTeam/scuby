@@ -7,6 +7,7 @@ import {
   isEmail,
   RESEND_COOLDOWN_S,
 } from '@domain/shared/signin'
+import { useI18n } from '@i18n/react'
 import { requestGoogleCredential } from '@platform/google'
 import { GoogleIcon } from '@ui/BrandIcons'
 import { Button } from '@ui/Button'
@@ -28,13 +29,14 @@ type Props = {
  * session, and whoever rendered this re-renders with it.
  */
 export function SignIn({ googleClientId, demoCode, legal }: Props) {
+  const { t } = useI18n()
   const start = useStartEmailCode()
   const verify = useVerifyEmailCode()
   const google = useGoogleSignIn()
   const [email, setEmail] = useState('')
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [code, setCode] = useState('')
-  const [emailError, setEmailError] = useState<string | null>(null)
+  const [emailInvalid, setEmailInvalid] = useState(false)
   const [googleFailed, setGoogleFailed] = useState(false)
   const [cooldown, setCooldown] = useState(0)
 
@@ -46,8 +48,8 @@ export function SignIn({ googleClientId, demoCode, legal }: Props) {
 
   function send(event?: FormEvent) {
     event?.preventDefault()
-    if (!isEmail(email)) return setEmailError('Revisa tu correo: parece incompleto')
-    setEmailError(null)
+    if (!isEmail(email)) return setEmailInvalid(true)
+    setEmailInvalid(false)
     const address = email.trim()
     start.mutate(address, {
       onSuccess: () => {
@@ -77,46 +79,44 @@ export function SignIn({ googleClientId, demoCode, legal }: Props) {
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="m-0 text-muted">
-        Necesitamos saber quién eres para que los vecinos puedan contactarte. Sin contraseñas.
-      </p>
+      <p className="m-0 text-muted">{t('auth.sign_in.intro')}</p>
 
       {googleClientId || demoCode ? (
         <>
           <Button variant="outline" onClick={withGoogle} disabled={google.isPending}>
             <GoogleIcon />
-            {google.isPending ? 'Entrando…' : 'Continuar con Google'}
+            {t(google.isPending ? 'auth.sign_in.signing_in' : 'auth.sign_in.google')}
           </Button>
           {googleFailed || google.isError ? (
             <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
-              No pudimos entrar con Google. Prueba con tu correo.
+              {t('auth.sign_in.google_failed')}
             </p>
           ) : null}
           <p className="m-0 flex items-center gap-3 text-sm text-muted before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
-            o con tu correo
+            {t('auth.sign_in.or_email')}
           </p>
         </>
       ) : null}
 
       <form onSubmit={send} noValidate className="flex flex-col gap-3">
         <TextField
-          label="Correo electrónico"
+          label={t('auth.sign_in.email')}
           type="email"
           inputMode="email"
           autoComplete="email"
-          placeholder="tu@correo.com"
-          error={emailError}
+          placeholder={t('auth.sign_in.email_placeholder')}
+          error={emailInvalid ? t('auth.sign_in.email_invalid') : null}
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
         {sentTo ? null : (
           <Button type="submit" disabled={start.isPending}>
-            {start.isPending ? 'Enviando…' : 'Enviarme un código'}
+            {t(start.isPending ? 'auth.sign_in.sending' : 'auth.sign_in.send_code')}
           </Button>
         )}
         {start.isError ? (
-          <Notice tone="warning" title="No pudimos enviar el código.">
-            Revisa tu conexión e inténtalo de nuevo.
+          <Notice tone="warning" title={t('auth.sign_in.send_failed')}>
+            {t('common.check_connection')}
           </Notice>
         ) : null}
       </form>
@@ -124,17 +124,17 @@ export function SignIn({ googleClientId, demoCode, legal }: Props) {
       {sentTo ? (
         <div className="flex flex-col gap-3">
           <TextField
-            label={`Código de ${CODE_LENGTH} dígitos que te enviamos`}
+            label={t('auth.sign_in.code_label', { length: CODE_LENGTH })}
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={CODE_LENGTH}
             className="min-h-14 w-full rounded-2xl border-2 border-field bg-surface px-4 text-center font-mono text-2xl font-bold tracking-[0.5em] aria-invalid:border-lost"
-            hint={`Lo enviamos a ${sentTo}. Si no llega, revisa la carpeta de spam.`}
+            hint={t('auth.sign_in.code_hint', { email: sentTo })}
             error={
               wrongCode
-                ? 'Ese código no coincide. Revísalo o pide uno nuevo.'
+                ? t('auth.sign_in.wrong_code')
                 : verify.isError
-                  ? 'No pudimos comprobar el código. Inténtalo de nuevo.'
+                  ? t('auth.sign_in.check_failed')
                   : null
             }
             disabled={verify.isPending}
@@ -142,8 +142,8 @@ export function SignIn({ googleClientId, demoCode, legal }: Props) {
             onChange={(event) => typeCode(event.target.value)}
           />
           {demoCode ? (
-            <Notice tone="neutral" title="Modo demostración.">
-              No se envía ningún correo: usa el código {demoCode}.
+            <Notice tone="neutral" title={t('common.demo_mode')}>
+              {t('auth.sign_in.demo_code', { code: demoCode })}
             </Notice>
           ) : null}
           <Button
@@ -152,7 +152,9 @@ export function SignIn({ googleClientId, demoCode, legal }: Props) {
             disabled={cooldown > 0 || start.isPending}
             onClick={() => send()}
           >
-            {cooldown > 0 ? `Reenviar código en ${cooldown} s` : 'Reenviar código'}
+            {cooldown > 0
+              ? t('auth.sign_in.resend_in', { seconds: cooldown })
+              : t('auth.sign_in.resend')}
           </Button>
         </div>
       ) : null}

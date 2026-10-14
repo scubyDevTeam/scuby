@@ -22,9 +22,3 @@ export const PUBLIC_RADIUS_FLOOR_M = 200
 export function publicArea(area: Area): Area {
   return { center: area.center, radiusM: Math.max(area.radiusM, PUBLIC_RADIUS_FLOOR_M) }
 }
-
-/** «A 400 m» · «A 1,2 km» */
-export function formatDistance(meters: number): string {
-  if (meters < 1000) return `${Math.round(meters / 10) * 10} m`
-  return `${(meters / 1000).toFixed(1).replace('.', ',')} km`
-}

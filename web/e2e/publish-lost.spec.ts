@@ -1,52 +1,42 @@
-import { expect, test } from './test.ts'
+import { expect, tags, test } from './test.ts'
 
-// A 1×1 PNG: enough for the photo pipeline to decode, re-encode and upload.
-const photo = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-  'base64',
+test(
+  'publish a lost pet: sign in on the way, verify the phone, and see the case live',
+  tags('@publish-lost', '@PLOST-001'),
+  async ({ publish, casePage, myCases, feed }) => {
+    await test.step('the account is born at the first step that needs one', async () => {
+      await publish.open()
+      await publish.chooseLost()
+      await publish.signIn.withEmailCode('ana.gomez@correo.co')
+    })
+
+    await test.step('who is missing', async () => {
+      await publish.name('Kira')
+      await publish.photos.add('kira.png')
+      await publish.describe({ species: 'Perro', size: 'Mediano', colour: 'Café' })
+      await publish.next()
+    })
+
+    await test.step('where and when', async () => {
+      await publish.map.mark()
+      await publish.when('Ayer')
+    })
+
+    await test.step('the phone is verified and the case goes live', async () => {
+      await publish.phone.publishVerifying('300 715 2284')
+      await publish.published.openCase()
+    })
+
+    await test.step('the owner sees their own case, with the owner’s actions', async () => {
+      await expect(casePage.title('Kira')).toBeVisible()
+      await expect(casePage.reunitedButton).toBeVisible()
+    })
+
+    await test.step('it is in «Mis casos» and leads the feed', async () => {
+      await myCases.open()
+      await expect(myCases.item('Kira')).toBeVisible()
+      await feed.open()
+      await expect(feed.articles.first()).toContainText('Kira')
+    })
+  },
 )
-
-test('publish a lost pet: sign in on the way, verify the phone, and see the case live', async ({
-  page,
-}) => {
-  await page.goto('/publicar')
-  await page.getByRole('link', { name: /Perdí a mi mascota/ }).click()
-
-  // The account is born at the first step that needs one.
-  await page.getByLabel('Correo electrónico').fill('ana.gomez@correo.co')
-  await page.getByRole('button', { name: 'Enviarme un código' }).click()
-  await page.getByLabel(/Código de 6 dígitos/).fill('123456')
-
-  await page.getByLabel('Nombre').fill('Kira')
-  await page
-    .getByLabel(/Agregar foto/)
-    .setInputFiles({ name: 'kira.png', mimeType: 'image/png', buffer: photo })
-  await expect(page.getByRole('img', { name: 'Foto 1' })).toBeVisible()
-  await page.getByRole('button', { name: 'Perro' }).click()
-  await page.getByRole('button', { name: 'Mediano' }).click()
-  await page.getByRole('button', { name: 'Café' }).click()
-  await page.getByRole('button', { name: 'Continuar' }).click()
-
-  const picker = page.getByTestId('picker-map')
-  await expect(picker).toHaveAttribute('data-map-ready', 'true')
-  await picker.click()
-  await expect(page.getByText('Zona marcada.')).toBeVisible()
-  await page.getByRole('button', { name: 'Ayer' }).click()
-  await page.getByRole('button', { name: 'Continuar' }).click()
-
-  await page.getByLabel('Tu celular').fill('300 715 2284')
-  await page.getByRole('button', { name: 'Publicar y avisar a los vecinos' }).click()
-  await page.getByLabel('Código que te enviamos por SMS').fill('123456')
-
-  await expect(page.getByRole('heading', { name: '¡Aviso publicado!' })).toBeVisible()
-  await page.getByRole('link', { name: 'Ver mi aviso' }).click()
-
-  // The owner sees their own case, with the owner's actions.
-  await expect(page.getByRole('heading', { level: 1, name: 'Kira' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Ya apareció' })).toBeVisible()
-
-  await page.goto('/mis-casos')
-  await expect(page.getByRole('heading', { name: 'Kira' })).toBeVisible()
-  await page.goto('/')
-  await expect(page.getByRole('article').first()).toContainText('Kira')
-})

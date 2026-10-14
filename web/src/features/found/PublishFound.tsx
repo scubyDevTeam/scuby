@@ -22,6 +22,8 @@ import {
   StepHeader,
   useWhen,
 } from '@features/publish/parts'
+import { useI18n } from '@i18n/react'
+import type { TextKey } from '@i18n/translate'
 import { Button } from '@ui/Button'
 import { Chips, type Option } from '@ui/Choice'
 import { TextField } from '@ui/Field'
@@ -29,17 +31,13 @@ import { Notice } from '@ui/Notice'
 import { type FormEvent, type ReactNode, useState } from 'react'
 import { Candidates } from './Candidates'
 
-const titles: Record<FoundStep, string> = {
-  1: '¿Cómo es?',
-  2: '¿Dónde y cuándo lo encontraste?',
-  3: '¿Cómo te avisan?',
+const titles: Record<FoundStep, TextKey> = {
+  1: 'found.publish.title_animal',
+  2: 'found.publish.title_place',
+  3: 'found.publish.title_contact',
 }
 
-const holdingOptions: Option<HoldingWhere>[] = [
-  { value: 'home', label: 'En mi casa' },
-  { value: 'vet', label: 'En una veterinaria' },
-  { value: 'street_temporary', label: 'Sigue en la calle, lo cuido' },
-]
+const holdingOptions: readonly HoldingWhere[] = ['home', 'vet', 'street_temporary']
 
 type Props = {
   user: User
@@ -55,6 +53,7 @@ type Props = {
  * recovery claim on that lost case and no found case is created.
  */
 export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: Props) {
+  const { t } = useI18n()
   const country = useConfig().data?.countries[0]
   const match = useMatchAnimal()
   const publish = usePublishFound()
@@ -78,7 +77,7 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
   const verifiedPhone = changingPhone ? null : user.phone
   const current: FoundDraft = { ...draft, foundAt: when.at }
   const errors = foundStepErrors(step, current, { now, phoneRules, verifiedPhone })
-  const errorFor = messageFor(tried === step ? errors : [])
+  const errorFor = messageFor(t, tried === step ? errors : [])
   const askingCode = publish.data?.kind === 'otp'
 
   function send(otpCode: string | null) {
@@ -133,7 +132,9 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
     // The animal already has a family looking: a claim on their case, never a second card.
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-5 px-5 py-8">
-        <h1 className="m-0 text-3xl font-extrabold">¡Es {matching.picked.name}!</h1>
+        <h1 className="m-0 text-3xl font-extrabold">
+          {t('found.publish.matched_title', { name: matching.picked.name })}
+        </h1>
         <ClaimForm
           code={matching.picked.code}
           petName={matching.picked.name}
@@ -147,7 +148,7 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
   if (matching) {
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-5 px-5 py-8">
-        <h1 className="m-0 text-3xl font-extrabold">¿Es alguno de estos?</h1>
+        <h1 className="m-0 text-3xl font-extrabold">{t('found.candidates.title')}</h1>
         <Candidates
           candidates={matching.candidates}
           onPick={(picked) => setMatching({ ...matching, picked })}
@@ -155,7 +156,7 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
             setMatching(null)
             setStep(3)
           }}
-          noneLabel="No es ninguno, publicar mi aviso"
+          noneLabel={t('found.publish.none_matches')}
         />
       </div>
     )
@@ -164,13 +165,13 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
   if (publish.data?.kind === 'published') {
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-5 px-5 py-10">
-        <h1 className="m-0 text-3xl font-extrabold">¡Aviso publicado!</h1>
-        <Notice tone="success" title="Gracias por cuidarlo.">
-          Los vecinos de la zona ya pueden verlo. Si aparece su familia, te avisamos.
+        <h1 className="m-0 text-3xl font-extrabold">{t('found.publish.published_title')}</h1>
+        <Notice tone="success" title={t('found.publish.published_notice_title')}>
+          {t('found.publish.published_notice_body')}
         </Notice>
         {caseLink(
           publish.data.code,
-          'Ver mi aviso',
+          t('found.publish.view_case'),
           'flex min-h-12 items-center justify-center rounded-2xl bg-brand px-5 font-bold text-white no-underline',
         )}
       </div>
@@ -183,7 +184,7 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
   return (
     <form onSubmit={next} noValidate className="mx-auto flex max-w-lg flex-col gap-6 px-5 py-6">
       <StepHeader
-        title={titles[step]}
+        title={t(titles[step])}
         step={step}
         steps={3}
         onBack={() => (step === 1 ? onExit() : setStep((step - 1) as FoundStep))}
@@ -195,12 +196,12 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
             animal={draft}
             onChange={set}
             errorFor={errorFor}
-            marksLabel="Cómo es y cómo se porta"
+            marksLabel={t('found.publish.marks_label')}
           />
           <TextField
-            label="Guarda un dato que solo su dueño sabría"
+            label={t('found.publish.withheld_label')}
             optional
-            hint="Algo que no se vea en las fotos: una cicatriz, el color del collar, si está esterilizado. No se publica: te sirve para saber quién es de verdad su dueño."
+            hint={t('found.publish.withheld_hint')}
             value={draft.withheldDetail}
             onChange={(event) => set({ withheldDetail: event.target.value })}
           />
@@ -217,18 +218,21 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
             mapStyleUrl={mapStyleUrl}
             onChange={set}
             errorFor={errorFor}
-            whenTitle="¿Cuándo lo encontraste?"
+            whenTitle={t('found.publish.when_title')}
           />
-          <Section title="¿Dónde está ahora?">
+          <Section title={t('found.publish.where_now')}>
             <Chips
-              label="¿Dónde está ahora?"
-              options={holdingOptions}
+              label={t('found.publish.where_now')}
+              options={holdingOptions.map(
+                (value): Option<HoldingWhere> => ({
+                  value,
+                  label: t(`found.publish.holding.${value}`),
+                }),
+              )}
               value={draft.holdingWhere}
               onChange={(holdingWhere) => set({ holdingWhere })}
             />
-            <p className="m-0 text-sm text-muted">
-              Esto sí se muestra: le dice a su familia qué tan urgente es.
-            </p>
+            <p className="m-0 text-sm text-muted">{t('found.publish.where_now_hint')}</p>
           </Section>
         </>
       ) : null}
@@ -247,8 +251,8 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
             demoCode={demoCode}
           />
           {publish.isError && !wrongCode ? (
-            <Notice tone="warning" title="No pudimos publicar el aviso.">
-              Revisa tu conexión e inténtalo de nuevo.
+            <Notice tone="warning" title={t('found.publish.publish_failed')}>
+              {t('common.check_connection')}
             </Notice>
           ) : null}
         </>
@@ -256,15 +260,15 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
 
       {step < 3 ? (
         <Button type="submit" disabled={match.isPending}>
-          {match.isPending ? 'Buscando si alguien lo busca…' : 'Continuar'}
+          {match.isPending ? t('found.publish.matching') : t('found.publish.continue')}
         </Button>
       ) : (
         <Button type="submit" disabled={publish.isPending}>
           {publish.isPending
-            ? 'Publicando…'
+            ? t('found.publish.publishing')
             : askingCode
-              ? 'Confirmar código y publicar'
-              : 'Publicar y avisar a los vecinos'}
+              ? t('found.publish.confirm_code')
+              : t('found.publish.submit')}
         </Button>
       )}
     </form>

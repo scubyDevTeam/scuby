@@ -1,12 +1,14 @@
-// hand-written until O14 — provisional wire shape.
+// What the app needs before any screen: the countries it runs in (docs/eng/auth.md · Country is
+// configuration, never code).
 import * as z from 'zod/mini'
+import { point } from './primitives'
 
 const countryWire = z.object({
   code: z.string(),
   phone_prefix: z.string(),
   mobile_pattern: z.string(),
   /** Where a map opens when the device gives no location. */
-  default_center: z.object({ lat: z.number(), lng: z.number() }),
+  default_center: point,
 })
 
 export const configWire = z.object({

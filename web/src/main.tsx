@@ -4,10 +4,12 @@ import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { env } from './env'
+import { LocaleProvider } from './routes/-i18n'
 import { routeTree } from './routeTree.gen'
 import '@ui/tokens.css'
 
-const router = createRouter({ routeTree, defaultPreload: 'intent' })
+// The provider sits inside the router: the language is read from the URL.
+const router = createRouter({ routeTree, defaultPreload: 'intent', InnerWrap: LocaleProvider })
 
 declare module '@tanstack/react-router' {
   interface Register {

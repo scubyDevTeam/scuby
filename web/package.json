@@ -12,10 +12,13 @@
     "format": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "openapi": "UPDATE_OPENAPI=1 vitest run src/contracts/openapi.test.ts",
     "depcruise": "depcruise src --config .dependency-cruiser.cjs",
     "size": "node scripts/check-size.mjs",
     "check:brand": "sh scripts/check-brand.sh",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm check:brand && pnpm build && pnpm size && pnpm e2e",
+    "check:e2e-tags": "node scripts/check-e2e-tags.mjs",
+    "check:copy": "node scripts/check-copy.mjs",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm check:brand && pnpm check:copy && pnpm check:e2e-tags && pnpm build && pnpm size && pnpm e2e",
     "e2e": "playwright test"
   },
   "dependencies": {

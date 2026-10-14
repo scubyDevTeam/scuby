@@ -1,9 +1,11 @@
 import { useConfig, useReportSighting } from '@api-client/actions'
 import { ApiError } from '@api-client/http'
-import { sightingErrorCopy, validateSighting } from '@domain/lost/sightings'
+import { validateSighting } from '@domain/lost/sightings'
 import type { Area, Point } from '@domain/shared/geo'
 import { toE164 } from '@domain/shared/phone'
 import { durations } from '@domain/shared/time'
+import { useI18n } from '@i18n/react'
+import type { TextKey } from '@i18n/translate'
 import { getCurrentPosition } from '@platform/location'
 import { Button } from '@ui/Button'
 import { Chips, type Option } from '@ui/Choice'
@@ -12,15 +14,17 @@ import { PickerMap } from '@ui/Map/PickerMap'
 import { Notice } from '@ui/Notice'
 import { LocateFixed } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
+import { sightingErrorCopy } from './copy'
 
 type When = 'now' | 'earlier' | 'yesterday' | 'custom'
 
-const whenOptions: Option<When>[] = [
-  { value: 'now', label: 'Ahora' },
-  { value: 'earlier', label: 'Hace un rato' },
-  { value: 'yesterday', label: 'Ayer' },
-  { value: 'custom', label: 'Otra hora' },
-]
+const WHEN: readonly When[] = ['now', 'earlier', 'yesterday', 'custom']
+const whenLabel: Record<When, TextKey> = {
+  now: 'lost.sighting_form.when.now',
+  earlier: 'lost.sighting_form.when.earlier',
+  yesterday: 'lost.sighting_form.when.yesterday',
+  custom: 'lost.sighting_form.when.custom',
+}
 
 function seenAtFor(when: When, custom: string, now: Date): Date | null {
   if (when === 'now') return now
@@ -51,6 +55,8 @@ export function SightingForm({
   mapStyleUrl,
   onDone,
 }: Props) {
+  const i18n = useI18n()
+  const { t } = i18n
   const country = useConfig().data?.countries[0]
   const report = useReportSighting(code)
   const [point, setPoint] = useState<Point | null>(null)
@@ -70,21 +76,21 @@ export function SightingForm({
       : []
   const placeError = !point
     ? tried
-      ? `Marca en el mapa dónde viste a ${petName}`
+      ? t('lost.sighting_form.place_required', { name: petName })
       : null
     : ruleErrors.includes('too_far')
-      ? sightingErrorCopy('too_far', petName)
+      ? sightingErrorCopy(i18n, 'too_far', petName)
       : null
   const timeRule = ruleErrors.find((error) => error !== 'too_far')
   const timeError = !seenAt
     ? tried
-      ? 'Dinos a qué hora fue'
+      ? t('lost.sighting_form.time_required')
       : null
     : timeRule
-      ? sightingErrorCopy(timeRule, petName)
+      ? sightingErrorCopy(i18n, timeRule, petName)
       : null
   const contactPhone = phone.trim() && country ? toE164(phone, toRules(country)) : null
-  const phoneError = phone.trim() && !contactPhone ? 'Revisa el número de celular' : null
+  const phoneError = phone.trim() && !contactPhone ? t('contact.phone_invalid') : null
 
   async function useMyLocation() {
     setLocating('asking')
@@ -103,10 +109,10 @@ export function SightingForm({
   if (report.isSuccess) {
     return (
       <div className="flex flex-col gap-4">
-        <Notice tone="success" title="¡Gracias!">
-          Tu avistamiento ya está en el mapa y su familia fue avisada.
+        <Notice tone="success" title={t('lost.sighting_form.thanks_title')}>
+          {t('lost.sighting_form.thanks_body')}
         </Notice>
-        <Button onClick={onDone}>Listo</Button>
+        <Button onClick={onDone}>{t('common.done')}</Button>
       </div>
     )
   }
@@ -114,29 +120,27 @@ export function SightingForm({
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
       <section className="flex flex-col gap-2">
-        <p className="m-0 text-muted">Toca el mapa para marcar el punto.</p>
+        <p className="m-0 text-muted">{t('map.tap_to_mark')}</p>
         <PickerMap
           styleUrl={mapStyleUrl}
           area={area}
           value={point}
           onChange={setPoint}
           unavailable={
-            <Notice tone="neutral" title="No pudimos cargar el mapa.">
-              Usa tu ubicación para marcar el punto.
+            <Notice tone="neutral" title={t('map.unavailable')}>
+              {t('map.use_location_instead')}
             </Notice>
           }
         />
         <Button variant="secondary" onClick={useMyLocation} disabled={locating === 'asking'}>
           <LocateFixed aria-hidden="true" />
-          {locating === 'asking' ? 'Buscando tu ubicación…' : 'Usar mi ubicación'}
+          {t(locating === 'asking' ? 'map.locating' : 'map.use_my_location')}
         </Button>
         {locating === 'failed' ? (
-          <p className="m-0 text-sm text-muted">
-            No pudimos obtener tu ubicación. Toca el mapa para marcar el punto.
-          </p>
+          <p className="m-0 text-sm text-muted">{t('map.location_failed')}</p>
         ) : null}
         {point && !placeError ? (
-          <p className="m-0 text-sm font-semibold text-found">Punto marcado.</p>
+          <p className="m-0 text-sm font-semibold text-found">{t('map.point_marked')}</p>
         ) : null}
         {placeError ? (
           <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
@@ -146,11 +150,16 @@ export function SightingForm({
       </section>
 
       <section className="flex flex-col gap-2">
-        <h3 className="m-0 text-lg font-bold">¿Cuándo?</h3>
-        <Chips label="¿Cuándo la viste?" options={whenOptions} value={when} onChange={setWhen} />
+        <h3 className="m-0 text-lg font-bold">{t('lost.sighting_form.when_title')}</h3>
+        <Chips
+          label={t('lost.sighting_form.when_label')}
+          options={WHEN.map((value): Option<When> => ({ value, label: t(whenLabel[value]) }))}
+          value={when}
+          onChange={setWhen}
+        />
         {when === 'custom' ? (
           <TextField
-            label="Día y hora"
+            label={t('lost.sighting_form.day_and_time')}
             type="datetime-local"
             value={custom}
             onChange={(event) => setCustom(event.target.value)}
@@ -164,19 +173,19 @@ export function SightingForm({
       </section>
 
       <TextArea
-        label="Nota"
+        label={t('common.note')}
         optional
-        placeholder="Hacia dónde iba, cómo se veía…"
+        placeholder={t('lost.sighting_form.note_placeholder')}
         value={note}
         onChange={(event) => setNote(event.target.value)}
       />
 
       <div className="rounded-2xl bg-brand-mist p-4">
         <PhoneField
-          label="Tu WhatsApp"
+          label={t('contact.your_whatsapp')}
           optional
           prefix={country?.phonePrefix ?? ''}
-          hint="Su familia va a querer preguntarte en qué esquina exactamente. Solo ella lo ve."
+          hint={t('lost.sighting_form.phone_hint')}
           error={phoneError}
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
@@ -184,17 +193,19 @@ export function SightingForm({
       </div>
 
       {report.isError ? (
-        <Notice tone="warning" title="No pudimos enviar tu avistamiento.">
-          {report.error instanceof ApiError && report.error.kind === 'rejected'
-            ? 'Ya registraste un avistamiento hace poco.'
-            : 'Revisa tu conexión e inténtalo de nuevo.'}
+        <Notice tone="warning" title={t('lost.sighting_form.failed_title')}>
+          {t(
+            report.error instanceof ApiError && report.error.kind === 'rejected'
+              ? 'lost.sighting_form.too_soon'
+              : 'common.check_connection',
+          )}
         </Notice>
       ) : null}
 
       <Button type="submit" disabled={report.isPending}>
-        {report.isPending ? 'Enviando…' : 'Enviar avistamiento'}
+        {t(report.isPending ? 'lost.sighting_form.sending' : 'lost.sighting_form.submit')}
       </Button>
-      <p className="m-0 text-center text-sm text-muted">Sin cuenta.</p>
+      <p className="m-0 text-center text-sm text-muted">{t('contact.no_account')}</p>
     </form>
   )
 }

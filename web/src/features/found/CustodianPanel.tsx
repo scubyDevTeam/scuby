@@ -2,11 +2,11 @@ import { useAnswerOwnershipClaim, useResolveFound } from '@api-client/found'
 import type { FoundCase } from '@contracts/found'
 import { evidenceTier } from '@domain/found/evidence'
 import { holdOfferDue } from '@domain/found/machine'
-import { formatRelative } from '@domain/shared/time'
+import { useI18n } from '@i18n/react'
 import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass } from '@ui/Button'
 import { Notice } from '@ui/Notice'
-import { SAFETY_COPY, tierLabel } from './copy'
+import { tierLabel } from './copy'
 
 type Props = {
   foundCase: FoundCase
@@ -22,6 +22,8 @@ type Props = {
  * hard it is to fake, the detail they withheld replayed to them, and the day-15 offer.
  */
 export function CustodianPanel({ foundCase, now, onConfirmed, onKeep, onTransfer }: Props) {
+  const i18n = useI18n()
+  const { t } = i18n
   const answer = useAnswerOwnershipClaim(foundCase.code)
   const resolve = useResolveFound(foundCase.code)
   if (foundCase.viewer !== 'custodian' || foundCase.status !== 'active') return null
@@ -40,37 +42,39 @@ export function CustodianPanel({ foundCase, now, onConfirmed, onKeep, onTransfer
     <>
       {offer ? (
         <section
-          aria-label="Quince días sin dueño"
+          aria-label={t('found.custodian.offer_label')}
           className="flex flex-col gap-3 rounded-2xl bg-brand-mist p-4"
         >
           {/* An offer, not a warning: a finder has nothing to lose, the animal has a future to gain. */}
-          <p className="m-0 font-bold">Nadie ha reclamado a este peludo en 15 días.</p>
-          <p className="m-0 text-muted">Tú decides qué sigue para él.</p>
+          <p className="m-0 font-bold">{t('found.custodian.offer_title')}</p>
+          <p className="m-0 text-muted">{t('found.custodian.offer_body')}</p>
           <Button variant="outline" onClick={onTransfer}>
-            Lo entregué a una fundación
+            {t('found.actions.transfer')}
           </Button>
           <Button variant="outline" onClick={onKeep}>
-            Me lo quedo
+            {t('found.actions.keep')}
           </Button>
           <Button
             variant="secondary"
             disabled={resolve.isPending}
             onClick={() => resolve.mutate({ outcome: 'keep_searching' })}
           >
-            Sigo buscando al dueño
+            {t('found.custodian.keep_searching')}
           </Button>
         </section>
       ) : null}
 
       {open.length > 0 ? (
-        <section className="flex flex-col gap-3" aria-label="Posibles dueños">
-          <h2 className="m-0 text-2xl font-extrabold">Dicen que es suyo</h2>
+        <section className="flex flex-col gap-3" aria-label={t('found.custodian.claims_label')}>
+          <h2 className="m-0 text-2xl font-extrabold">{t('found.custodian.claims_title')}</h2>
           {foundCase.withheldDetail ? (
-            <Notice title={`Guardaste: «${foundCase.withheldDetail}».`}>
-              Pregúntale por eso antes de entregar.
+            <Notice
+              title={t('found.custodian.withheld_title', { detail: foundCase.withheldDetail })}
+            >
+              {t('found.custodian.withheld_body')}
             </Notice>
           ) : null}
-          <Notice tone="warning">{SAFETY_COPY}</Notice>
+          <Notice tone="warning">{t('found.safety')}</Notice>
           <ul className="m-0 flex list-none flex-col gap-3 p-0">
             {open.map((claim) => (
               <li
@@ -79,10 +83,10 @@ export function CustodianPanel({ foundCase, now, onConfirmed, onKeep, onTransfer
               >
                 <p className="m-0">
                   <strong>{claim.claimantName}</strong>{' '}
-                  <span className="text-muted">· {formatRelative(claim.createdAt, now)}</span>
+                  <span className="text-muted">· {i18n.relative(claim.createdAt, now)}</span>
                 </p>
                 <p className="m-0 font-semibold">
-                  {
+                  {t(
                     tierLabel[
                       evidenceTier({
                         fromLostCaseCode: claim.fromLostCaseCode,
@@ -90,14 +94,16 @@ export function CustodianPanel({ foundCase, now, onConfirmed, onKeep, onTransfer
                         chipNumber: claim.chipNumber,
                         photoCount: claim.photoCount,
                       })
-                    ]
-                  }
+                    ],
+                  )}
                 </p>
                 {claim.evidenceNotes ? (
                   <p className="m-0 text-muted">«{claim.evidenceNotes}»</p>
                 ) : null}
                 {claim.chipNumber ? (
-                  <p className="m-0 text-muted">Microchip: {claim.chipNumber}</p>
+                  <p className="m-0 text-muted">
+                    {t('found.custodian.microchip', { chip: claim.chipNumber })}
+                  </p>
                 ) : null}
                 {claim.whatsappUrl ? (
                   <a
@@ -107,7 +113,7 @@ export function CustodianPanel({ foundCase, now, onConfirmed, onKeep, onTransfer
                     className={buttonClass('whatsapp')}
                   >
                     <WhatsAppIcon />
-                    Abrir WhatsApp
+                    {t('contact.open_whatsapp')}
                   </a>
                 ) : null}
                 <div className="flex gap-2">
@@ -120,22 +126,22 @@ export function CustodianPanel({ foundCase, now, onConfirmed, onKeep, onTransfer
                       )
                     }
                   >
-                    Sí, es el dueño
+                    {t('found.custodian.confirm')}
                   </Button>
                   <Button
                     variant="outline"
                     disabled={answer.isPending}
                     onClick={() => answer.mutate({ claimId: claim.id, status: 'dismissed' })}
                   >
-                    No es
+                    {t('found.custodian.dismiss')}
                   </Button>
                 </div>
               </li>
             ))}
           </ul>
           {answer.isError ? (
-            <Notice tone="warning" title="No pudimos guardar tu respuesta.">
-              Inténtalo de nuevo.
+            <Notice tone="warning" title={t('found.custodian.answer_failed')}>
+              {t('common.try_again')}
             </Notice>
           ) : null}
         </section>

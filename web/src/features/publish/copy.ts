@@ -1,18 +1,20 @@
 import type { DraftError } from '@domain/shared/publish'
+import type { TextKey, Translator } from '@i18n/translate'
 
-export const errorCopy: Record<DraftError, string> = {
-  name_required: 'Dinos cómo se llama',
-  species_required: 'Elige la especie',
-  size_required: 'Elige el tamaño',
-  photo_required: 'Agrega al menos una foto',
-  place_required: 'Toca el mapa más o menos dónde fue',
-  time_required: 'Dinos cuándo fue',
-  time_in_the_future: 'La hora no puede ser en el futuro',
-  phone_invalid: 'Revisa el número de celular',
-  contact_required: 'Deja al menos una forma de contacto activa',
-  whatsapp_needs_number: 'Para recibir mensajes por WhatsApp, el número debe tener WhatsApp',
+const errorKey: Record<DraftError, TextKey> = {
+  name_required: 'publish.errors.name_required',
+  species_required: 'publish.errors.species_required',
+  size_required: 'publish.errors.size_required',
+  photo_required: 'publish.errors.photo_required',
+  place_required: 'publish.errors.place_required',
+  time_required: 'publish.errors.time_required',
+  time_in_the_future: 'publish.errors.time_in_the_future',
+  phone_invalid: 'contact.phone_invalid',
+  contact_required: 'publish.errors.contact_required',
+  whatsapp_needs_number: 'publish.errors.whatsapp_needs_number',
 }
 
 /** The message for an error, only if it is among those being shown. */
-export const messageFor = (shown: readonly DraftError[]) => (error: DraftError) =>
-  shown.includes(error) ? errorCopy[error] : null
+export const messageFor =
+  (t: Translator['t'], shown: readonly DraftError[]) => (error: DraftError) =>
+    shown.includes(error) ? t(errorKey[error]) : null

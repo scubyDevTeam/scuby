@@ -9,7 +9,8 @@ import { LostCasePage } from './LostCasePage'
 const now = new Date()
 
 function lostCase(code: string, overrides: Partial<LostCase> = {}): LostCase {
-  const parsed = parseCase(cases()[code])
+  const viewer = overrides.viewer && overrides.viewer !== 'public' ? 'responsible' : 'public'
+  const parsed = parseCase(cases(viewer)[code])
   if (parsed.vertical !== 'lost') throw new Error('expected a lost case')
   return { ...parsed, ...overrides }
 }

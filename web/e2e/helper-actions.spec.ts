@@ -1,49 +1,56 @@
-import { expect, test } from './test.ts'
+import { expect, tags, test } from './test.ts'
 
-test('«La vi»: mark the spot on the map and the sighting joins the trajectory', async ({
-  page,
-}) => {
-  await page.goto('/c/7K3PQ')
-  const sightings = page.getByRole('list', { name: 'Avistamientos' }).getByRole('listitem')
-  await expect(sightings).toHaveCount(3)
+test(
+  '«La vi»: mark the spot on the map and the sighting joins the trajectory',
+  tags('@helper', '@HELP-001'),
+  async ({ casePage }) => {
+    await test.step('Luna has three sightings', async () => {
+      await casePage.open('7K3PQ')
+      await expect(casePage.sightings).toHaveCount(3)
+    })
 
-  await page.getByRole('button', { name: /La vi/ }).click()
-  const picker = page.getByTestId('picker-map')
-  await expect(picker).toHaveAttribute('data-map-ready', 'true')
-  await picker.click()
-  await expect(page.getByText('Punto marcado.')).toBeVisible()
-  await page.getByLabel(/Nota/).fill('Iba hacia el parque')
-  await page.getByRole('button', { name: 'Enviar avistamiento' }).click()
+    await casePage.reportSighting('Iba hacia el parque')
 
-  await expect(page.getByText('¡Gracias!')).toBeVisible()
-  await page.getByRole('button', { name: 'Listo' }).click()
-  await expect(sightings).toHaveCount(4)
-  await expect(sightings.first()).toContainText('Iba hacia el parque')
-})
+    await test.step('the new sighting leads the trajectory', async () => {
+      await expect(casePage.sightings).toHaveCount(4)
+      await expect(casePage.sightings.first()).toContainText('Iba hacia el parque')
+    })
+  },
+)
 
-test('«La tengo conmigo»: leave a phone, the family is told, WhatsApp opens', async ({ page }) => {
-  await page.goto('/c/M2TQ4')
-  await expect(page.getByText('Posible hallazgo.')).toHaveCount(0)
+test(
+  '«La tengo conmigo»: leave a phone, the family is told, WhatsApp opens',
+  tags('@helper', '@HELP-002'),
+  async ({ casePage }) => {
+    await test.step('nobody has said they have Milo', async () => {
+      await casePage.open('M2TQ4')
+      await expect(casePage.possibleFind).toHaveCount(0)
+    })
 
-  await page.getByRole('button', { name: 'La tengo conmigo' }).click()
-  await page.getByLabel('Tu celular').fill('311 482 9017')
-  const whatsapp = page.waitForEvent('popup')
-  await page.getByRole('button', { name: /Avisar y abrir WhatsApp/ }).click()
+    await test.step('the claim opens WhatsApp with his family', async () => {
+      expect(await casePage.claimRecovery('311 482 9017')).toContain('wa.me')
+    })
 
-  expect((await whatsapp).url()).toContain('wa.me')
-  await expect(page.getByText('Ya le avisamos a su familia.')).toBeVisible()
-  await page.getByRole('button', { name: 'Listo' }).click()
-  // The claim exists whatever happens in WhatsApp: the page now says so.
-  await expect(page.getByText('Posible hallazgo.')).toBeVisible()
-})
+    await test.step('the claim exists whatever happens in WhatsApp: the page says so', async () => {
+      await expect(casePage.possibleFind).toBeVisible()
+    })
+  },
+)
 
-test('«Reportar»: pick a reason and send, with no account', async ({ page }) => {
-  await page.goto('/c/7K3PQ')
+test(
+  '«Reportar»: pick a reason and send, with no account',
+  tags('@helper', '@HELP-003'),
+  async ({ casePage }) => {
+    await casePage.open('7K3PQ')
 
-  await page.getByRole('button', { name: 'Reportar' }).click()
-  await page.getByLabel('Muestra datos personales').check()
-  await expect(page.getByText(/la ocultamos de inmediato/)).toBeVisible()
-  await page.getByRole('button', { name: 'Enviar reporte' }).click()
+    await test.step('personal data is hidden at once, and the form says so', async () => {
+      await casePage.startReport('Muestra datos personales')
+      await expect(casePage.text('la ocultamos de inmediato')).toBeVisible()
+    })
 
-  await expect(page.getByText('Gracias por avisar.')).toBeVisible()
-})
+    await test.step('the report is sent', async () => {
+      await casePage.sendReport()
+      await expect(casePage.text('Gracias por avisar.')).toBeVisible()
+    })
+  },
+)

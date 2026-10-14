@@ -25,6 +25,7 @@
       "@domain/*": ["./src/domain/*"],
       "@platform/*": ["./src/platform/*"],
       "@ui/*": ["./src/ui/*"],
+      "@i18n/*": ["./src/i18n/*"],
       "@mocks/*": ["./src/mocks/*"]
     },
 

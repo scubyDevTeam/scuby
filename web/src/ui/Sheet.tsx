@@ -1,3 +1,4 @@
+import { useI18n } from '@i18n/react'
 import { type ReactNode, useEffect, useRef } from 'react'
 
 /** Bottom sheet over the current screen, on the native <dialog> (focus trap and Esc for free). */
@@ -15,6 +16,7 @@ export function Sheet({
   size?: 'auto' | 'full'
   children: ReactNode
 }) {
+  const { t } = useI18n()
   const ref = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export function Sheet({
           <h2 className="m-0 text-2xl font-extrabold">{title}</h2>
           <button
             type="button"
-            aria-label="Cerrar"
+            aria-label={t('common.close')}
             onClick={onClose}
             className="flex size-11 shrink-0 items-center justify-center rounded-full bg-soft text-xl leading-none"
           >

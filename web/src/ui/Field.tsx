@@ -1,3 +1,4 @@
+import { useI18n } from '@i18n/react'
 import { type ComponentProps, type ReactNode, useId } from 'react'
 
 const inputClass =
@@ -19,10 +20,12 @@ function FieldShell({
   error,
   children,
 }: Shell & { id: string; children: ReactNode }) {
+  const { t } = useI18n()
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="font-bold">
-        {label} {optional ? <span className="font-normal text-muted">(opcional)</span> : null}
+        {label}{' '}
+        {optional ? <span className="font-normal text-muted">{t('common.optional')}</span> : null}
       </label>
       {children}
       {error ? (

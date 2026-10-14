@@ -20,16 +20,18 @@ import {
   StepHeader,
   useWhen,
 } from '@features/publish/parts'
+import { useI18n } from '@i18n/react'
+import type { TextKey } from '@i18n/translate'
 import { Button } from '@ui/Button'
 import { Chips } from '@ui/Choice'
 import { TextField } from '@ui/Field'
 import { Notice } from '@ui/Notice'
 import { type FormEvent, type ReactNode, useState } from 'react'
 
-const titles: Record<Step, string> = {
-  1: '¿Quién se perdió?',
-  2: '¿Dónde y cuándo?',
-  3: '¿Cómo te avisan?',
+const titles: Record<Step, TextKey> = {
+  1: 'lost.publish.step_1',
+  2: 'lost.publish.step_2',
+  3: 'lost.publish.step_3',
 }
 
 type Props = {
@@ -49,6 +51,7 @@ type Props = {
  * the publish answers `otp`.
  */
 export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: Props) {
+  const { t } = useI18n()
   const country = useConfig().data?.countries[0]
   const pets = useMyPets().data ?? []
   const publish = usePublishLost()
@@ -67,7 +70,7 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
   const verifiedPhone = changingPhone ? null : user.phone
   const current: LostDraft = { ...draft, lastSeenAt: when.at }
   const errors = stepErrors(step, current, { now, phoneRules, verifiedPhone })
-  const errorFor = messageFor(tried === step ? errors : [])
+  const errorFor = messageFor(t, tried === step ? errors : [])
   const blockedPet = pets.find((pet) => pet.id === draft.petId && pet.activeCaseCode)
   const askingCode = publish.data?.kind === 'otp'
 
@@ -111,14 +114,14 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
     const { code } = publish.data
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-5 px-5 py-10">
-        <h1 className="m-0 text-3xl font-extrabold">¡Aviso publicado!</h1>
-        <Notice tone="success" title={`Ya estamos buscando a ${draft.name.trim()}.`}>
-          Los vecinos de la zona pueden verlo y avisarte.
+        <h1 className="m-0 text-3xl font-extrabold">{t('lost.publish.published_title')}</h1>
+        <Notice tone="success" title={t('lost.publish.searching', { name: draft.name.trim() })}>
+          {t('lost.publish.neighbours_see')}
         </Notice>
-        <p className="m-0 text-muted">Compártelo: entre más gente lo vea, más ojos la buscan.</p>
+        <p className="m-0 text-muted">{t('lost.publish.share_it')}</p>
         {caseLink(
           code,
-          'Ver mi aviso',
+          t('lost.publish.see_mine'),
           'flex min-h-12 items-center justify-center rounded-2xl bg-brand px-5 font-bold text-white no-underline',
         )}
       </div>
@@ -132,7 +135,7 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
   return (
     <form onSubmit={next} noValidate className="mx-auto flex max-w-lg flex-col gap-6 px-5 py-6">
       <StepHeader
-        title={titles[step]}
+        title={t(titles[step])}
         step={step}
         steps={3}
         onBack={() => (step === 1 ? onExit() : setStep((step - 1) as Step))}
@@ -141,12 +144,12 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
       {step === 1 ? (
         <>
           {pets.length > 0 ? (
-            <Section title="¿Cuál se perdió?">
+            <Section title={t('lost.publish.which_pet')}>
               <Chips
-                label="¿Cuál se perdió?"
+                label={t('lost.publish.which_pet')}
                 options={[
                   ...pets.map((pet) => ({ value: pet.id, label: pet.name })),
-                  { value: 'new', label: 'Otra mascota' },
+                  { value: 'new', label: t('lost.publish.other_pet') },
                 ]}
                 value={draft.petId ?? 'new'}
                 onChange={(id) => {
@@ -159,10 +162,13 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
                 }}
               />
               {blockedPet?.activeCaseCode ? (
-                <Notice tone="warning" title={`${blockedPet.name} ya tiene un aviso activo.`}>
+                <Notice
+                  tone="warning"
+                  title={t('lost.publish.already_active', { name: blockedPet.name })}
+                >
                   {caseLink(
                     blockedPet.activeCaseCode,
-                    'Ver ese aviso',
+                    t('lost.publish.see_that'),
                     'font-bold text-lost-ink underline',
                   )}
                 </Notice>
@@ -170,7 +176,7 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
             </Section>
           ) : null}
           <TextField
-            label="Nombre"
+            label={t('lost.publish.name')}
             autoComplete="off"
             error={errorFor('name_required')}
             value={draft.name}
@@ -180,13 +186,13 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
             animal={draft}
             onChange={set}
             errorFor={errorFor}
-            marksLabel="Señas para reconocerla"
+            marksLabel={t('lost.publish.marks')}
           />
           <TextField
-            label="Número de microchip"
+            label={t('pet.microchip')}
             optional
             inputMode="numeric"
-            hint="Lo ven solo las veterinarias y refugios que la escaneen."
+            hint={t('lost.publish.chip_hint')}
             value={draft.chipNumber}
             onChange={(event) => set({ chipNumber: event.target.value })}
           />
@@ -202,7 +208,7 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
           mapStyleUrl={mapStyleUrl}
           onChange={set}
           errorFor={errorFor}
-          whenTitle="¿Cuándo la viste por última vez?"
+          whenTitle={t('lost.publish.when_title')}
         />
       ) : null}
 
@@ -220,30 +226,34 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
             demoCode={demoCode}
           />
           {conflict ? (
-            <Notice tone="warning" title="Esta mascota ya tiene un aviso activo.">
-              Revisa «Mis casos».
+            <Notice tone="warning" title={t('lost.publish.conflict_title')}>
+              {t('lost.publish.conflict_body')}
             </Notice>
           ) : publish.isError && !wrongCode ? (
-            <Notice tone="warning" title="No pudimos publicar el aviso.">
-              Revisa tu conexión e inténtalo de nuevo.
+            <Notice tone="warning" title={t('lost.publish.failed_title')}>
+              {t('common.check_connection')}
             </Notice>
           ) : null}
         </>
       ) : null}
 
       {step < 3 ? (
-        <Button type="submit">Continuar</Button>
+        <Button type="submit">{t('lost.publish.continue')}</Button>
       ) : (
         <>
           <Button type="submit" variant="danger" disabled={publish.isPending}>
-            {publish.isPending
-              ? 'Publicando…'
-              : askingCode
-                ? 'Confirmar código y publicar'
-                : 'Publicar y avisar a los vecinos'}
+            {t(
+              publish.isPending
+                ? 'lost.publish.publishing'
+                : askingCode
+                  ? 'lost.publish.confirm_code'
+                  : 'lost.publish.submit',
+            )}
           </Button>
           <p className="m-0 text-center text-sm text-muted">
-            Al publicar confirmas que {draft.name.trim() || 'esta'} es tu mascota.
+            {draft.name.trim()
+              ? t('lost.publish.ownership', { name: draft.name.trim() })
+              : t('lost.publish.ownership_unnamed')}
           </p>
         </>
       )}
