@@ -1,10 +1,14 @@
-import { useI18n } from '@i18n/react'
-import { createFileRoute } from '@tanstack/react-router'
-import { Message } from '@ui/States'
+import { Inbox } from '@features/inbox/Inbox'
+import { createFileRoute, Link } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/{-$locale}/_auth/bandeja')({ component: Inbox })
-
-function Inbox() {
-  const { t } = useI18n()
-  return <Message title={t('app.inbox.title')}>{t('app.inbox.empty')}</Message>
-}
+export const Route = createFileRoute('/{-$locale}/_auth/bandeja')({
+  component: () => (
+    <Inbox
+      caseLink={(code, children, className) => (
+        <Link to="/{-$locale}/c/$code" params={{ code }} className={className}>
+          {children}
+        </Link>
+      )}
+    />
+  ),
+})

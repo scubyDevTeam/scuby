@@ -1,4 +1,4 @@
-import { useCancelCase, useReopenCase, useReunite } from '@api-client/owner'
+import { useAnswerCheckin, useCancelCase, useReopenCase, useReunite } from '@api-client/owner'
 import {
   ATTRIBUTIONS,
   type Attribution,
@@ -34,27 +34,37 @@ function Failed() {
   )
 }
 
-/** «Ya apareció»: closes the case as reunited and asks who helped. */
+/**
+ * «Ya apareció»: closes the case as reunited and asks who helped. With a waiting time-based
+ * check-in, the close is sent as its answer (domain/lost/checkin · closeAnswersCheckin).
+ */
 export function ReuniteForm({
   code,
   petName,
   suggested,
+  checkinId = null,
   onDone,
 }: {
   code: string
   petName: string
   suggested: Attribution | null
+  checkinId?: string | null
   onDone: () => void
 }) {
   const { t } = useI18n()
-  const reunite = useReunite(code)
+  const close = useReunite(code)
+  const answer = useAnswerCheckin(code)
+  const reunite = checkinId ? answer : close
   const [attribution, setAttribution] = useState<Attribution | null>(suggested)
   const [tried, setTried] = useState(false)
 
   function submit(event: FormEvent) {
     event.preventDefault()
     setTried(true)
-    if (attribution) reunite.mutate({ attribution }, { onSuccess: onDone })
+    if (!attribution) return
+    if (checkinId)
+      answer.mutate({ checkinId, response: 'reunited', attribution }, { onSuccess: onDone })
+    else close.mutate({ attribution }, { onSuccess: onDone })
   }
 
   return (
@@ -83,17 +93,29 @@ export function ReuniteForm({
   )
 }
 
-/** «Eliminar aviso»: cancels the case. The pet stays in the account. */
-export function CancelForm({ code, onDone }: { code: string; onDone: () => void }) {
+/** «Eliminar aviso»: cancels the case. The pet stays in the account. Same check-in rule as above. */
+export function CancelForm({
+  code,
+  checkinId = null,
+  onDone,
+}: {
+  code: string
+  checkinId?: string | null
+  onDone: () => void
+}) {
   const { t } = useI18n()
-  const cancel = useCancelCase(code)
+  const close = useCancelCase(code)
+  const answer = useAnswerCheckin(code)
+  const cancel = checkinId ? answer : close
   const [reason, setReason] = useState<CancelReason | null>(null)
   const [tried, setTried] = useState(false)
 
   function submit(event: FormEvent) {
     event.preventDefault()
     setTried(true)
-    if (reason) cancel.mutate({ reason }, { onSuccess: onDone })
+    if (!reason) return
+    if (checkinId) answer.mutate({ checkinId, response: 'delete', reason }, { onSuccess: onDone })
+    else close.mutate({ reason }, { onSuccess: onDone })
   }
 
   return (

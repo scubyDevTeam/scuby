@@ -100,10 +100,6 @@
       "title": "Entra para continuar"
     },
     "legal": "Al continuar aceptas los Términos y la Política de tratamiento de datos.",
-    "inbox": {
-      "title": "Bandeja",
-      "empty": "Aquí llegarán tus avisos."
-    },
     "unfinished_door": {
       "title": "Estamos terminando esta parte",
       "body": "Por ahora puedes publicar un aviso de mascota perdida. <back>Volver</back>"
@@ -298,7 +294,39 @@
       "resend": "Reenviar código"
     },
     "profile": {
+      "title": "Perfil",
+      "loading": "Cargando tu perfil",
+      "load_failed": "No pudimos cargar tu perfil",
       "email_label": "Correo con el que entras",
+      "email_hint": "Es con el que entras, así que por ahora no se puede cambiar.",
+      "phone_label": "Tu celular · verificado",
+      "phone_hint": "Lo puedes cambiar cuando publiques tu próximo aviso.",
+      "no_phone": "Te pediremos un celular cuando publiques tu primer aviso.",
+      "name_label": "Tu nombre",
+      "name_hint": "Así te verán los vecinos.",
+      "city_label": "Ciudad",
+      "city_placeholder": "Medellín",
+      "bio_label": "Sobre ti",
+      "bio_hint": "Solo texto, sin enlaces. {length}/{max}",
+      "notifications_title": "Te avisamos de",
+      "notifications_hint": "Mientras tengas un caso activo, los avisos importantes de ese caso te llegan igual.",
+      "notifications": {
+        "lost": "Mascotas perdidas",
+        "found": "Mascotas encontradas",
+        "adoption": "Adopción",
+        "help": "Pedidos de ayuda"
+      },
+      "errors": {
+        "name_required": "Escribe tu nombre",
+        "name_rejected": "Revisa tu nombre",
+        "city_rejected": "Revisa la ciudad",
+        "bio_has_link": "Quita los enlaces: los vecinos te contactan por la app o por lo que elijas en cada aviso.",
+        "bio_too_long": "Acórtalo un poco",
+        "bio_rejected": "Quita los enlaces o acórtalo: solo se permite texto."
+      },
+      "save": "Guardar cambios",
+      "saving": "Guardando…",
+      "saved": "Guardamos tus cambios.",
       "sign_out": "Cerrar sesión"
     }
   },
@@ -511,6 +539,19 @@
       "submit": "Enviar reporte"
     }
   },
+  "inbox": {
+    "title": "Bandeja",
+    "list_label": "Avisos",
+    "loading": "Cargando tus avisos",
+    "load_failed": "No pudimos cargar tus avisos",
+    "empty_title": "Aún no tienes avisos",
+    "empty_hint": "Aquí llegarán los avisos sobre tus casos.",
+    "unread": "Sin leer",
+    "unread_count": {
+      "one": "1 aviso sin leer",
+      "other": "{count} avisos sin leer"
+    }
+  },
   "lost": {
     "pet": {
       "species_other": "Mascota"
@@ -605,6 +646,32 @@
       "confirm": "Sí, es {name}",
       "dismiss": "No era",
       "failed_title": "No pudimos guardar tu respuesta."
+    },
+    "checkin": {
+      "label": "Pregunta pendiente",
+      "time_based_title": "El aviso de {name} sigue publicado.",
+      "time_based_body": "Si no nos confirmas, lo archivaremos y dejará de llegarles a los vecinos.",
+      "claim_title": "Alguien dice que tiene a {name}.",
+      "claim_body": "Si no nos confirmas, quitaremos el aviso de posible hallazgo. La búsqueda sigue igual.",
+      "claim_phone": "Dejó su número: {phone}",
+      "answers": {
+        "still_lost": "Sigue perdida",
+        "reunited": "Ya apareció 🎉",
+        "delete": "Eliminar",
+        "claim_confirmed": "Sí, es {name} 🎉",
+        "claim_dismissed": "No es {name}",
+        "still_verifying": "Aún verificando"
+      },
+      "failed_title": "No pudimos guardar tu respuesta."
+    },
+    "moderation": {
+      "highlight": "Marcar como útil",
+      "hide": "Ocultar del mapa",
+      "unhide": "Volver a mostrar",
+      "hidden_title": "Ocultos del mapa",
+      "hidden_hint": "Solo tú los ves: no salen en el mapa ni en la lista de nadie más.",
+      "hidden_label": "Avistamientos ocultos",
+      "failed_title": "No pudimos guardar el cambio."
     },
     "owner_forms": {
       "attribution": {

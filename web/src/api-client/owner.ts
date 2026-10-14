@@ -98,13 +98,27 @@ export const useModerateSighting = (code: string) =>
     ),
   )
 
+/** `attribution` goes with `reunited`, `reason` with `delete` (04 · The follow-up loop). */
 export const useAnswerCheckin = (code: string) =>
-  useOwnerAction((input: { checkinId: string; response: CheckinAnswer }) =>
-    call(
-      api.answerCheckin,
-      { params: { code, checkinId: input.checkinId }, body: { response: input.response } },
-      parseCreated,
-    ),
+  useOwnerAction(
+    (input: {
+      checkinId: string
+      response: CheckinAnswer
+      attribution?: LostAttribution
+      reason?: LostCancelReason
+    }) =>
+      call(
+        api.answerCheckin,
+        {
+          params: { code, checkinId: input.checkinId },
+          body: {
+            response: input.response,
+            resolution_attribution: input.attribution ?? null,
+            resolution: input.reason ?? null,
+          },
+        },
+        parseCreated,
+      ),
   )
 
 export const notificationsQuery = queryOptions({

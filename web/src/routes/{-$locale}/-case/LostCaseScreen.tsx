@@ -1,5 +1,6 @@
 import type { LostCase } from '@contracts/case'
 import type { LostAction } from '@domain/lost/actions'
+import { closeAnswersCheckin } from '@domain/lost/checkin'
 import { suggestedAttribution } from '@domain/lost/resolution'
 import { publicArea } from '@domain/shared/geo'
 import { LostCasePage } from '@features/lost/LostCasePage'
@@ -38,6 +39,10 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
   const url = `${brand.origin}/c/${found.code}`
   const name = found.pet.name
   const close = () => setSheet(null)
+  // Closing or deleting while «¿sigue perdida?» waits is that question's answer.
+  const checkinId = closeAnswersCheckin(found.pendingCheckin)
+    ? (found.pendingCheckin?.id ?? null)
+    : null
 
   async function handle(action: LostAction) {
     if (action === 'report_sighting') return setSheet('sighting')
@@ -113,10 +118,13 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
                 hasConfirmedClaim: found.claims.some((claim) => claim.status === 'confirmed'),
                 hasHighlightedSighting: found.sightings.some((s) => s.highlightedByOwner),
               })}
+              checkinId={checkinId}
               onDone={close}
             />
           ) : null}
-          {sheet === 'cancel' ? <CancelForm code={found.code} onDone={close} /> : null}
+          {sheet === 'cancel' ? (
+            <CancelForm code={found.code} checkinId={checkinId} onDone={close} />
+          ) : null}
           {sheet === 'reopen' ? (
             <ReopenForm code={found.code} petName={found.pet.name} onDone={close} />
           ) : null}

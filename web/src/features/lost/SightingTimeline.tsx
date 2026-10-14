@@ -1,15 +1,19 @@
 import type { Sighting } from '@contracts/case'
 import type { PlacedSighting } from '@domain/lost/sightings'
 import { useI18n } from '@i18n/react'
+import type { ReactNode } from 'react'
 import { formatSeenAt } from './copy'
 
 /** docs/product/04 · Display rules §4: newest first — time, distance, thumbnail, reporter type. */
 export function SightingTimeline({
   sightings,
   now,
+  tools,
 }: {
   sightings: readonly PlacedSighting<Sighting>[]
   now: Date
+  /** The owner's hide / highlight under each item (display rule 3); nothing for anyone else. */
+  tools?: (sighting: Sighting) => ReactNode
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -47,6 +51,7 @@ export function SightingTimeline({
             {sighting.note ? (
               <p className="m-0 text-muted">{t('lost.timeline.note', { note: sighting.note })}</p>
             ) : null}
+            {tools?.(sighting)}
           </div>
           {sighting.photoUrls[0] ? (
             <img

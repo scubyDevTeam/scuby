@@ -1,7 +1,9 @@
 import { configQuery } from '@api-client/actions'
+import { notificationsQuery } from '@api-client/owner'
 import { queryClient } from '@api-client/query-client'
 import { useSession } from '@api-client/session'
 import { useI18n } from '@i18n/react'
+import { useQuery } from '@tanstack/react-query'
 import { createRootRoute, Link, Outlet, useMatchRoute } from '@tanstack/react-router'
 import { Message } from '@ui/States'
 import { Bell, FileText, Home, Plus, SearchX, User } from 'lucide-react'
@@ -65,8 +67,9 @@ function TopBar() {
         <Link to="/{-$locale}/mis-casos" className={link}>
           {t('app.nav.my_cases')}
         </Link>
-        <Link to="/{-$locale}/bandeja" className={link}>
+        <Link to="/{-$locale}/bandeja" className={`${link} flex items-center gap-2`}>
           {t('app.nav.inbox')}
+          <UnreadBadge />
         </Link>
         <Link
           to="/{-$locale}/publicar"
@@ -108,8 +111,15 @@ function BottomNav() {
         </li>
         <NavItem
           to="/{-$locale}/bandeja"
-          icon={<Bell aria-hidden="true" />}
+          icon={
+            <span className="relative">
+              <Bell aria-hidden="true" />
+              <UnreadBadge className="absolute -top-2 -right-3" spoken={false} />
+            </span>
+          }
           label={t('app.nav.inbox')}
+          // Read after the label: «Bandeja, 2 avisos sin leer».
+          after={<UnreadSpoken />}
         />
         <NavItem
           to="/{-$locale}/perfil"
@@ -121,14 +131,47 @@ function BottomNav() {
   )
 }
 
+/**
+ * The inbox's unread count, for a signed-in person only: an anonymous visitor has no inbox, so
+ * nothing is asked for. Opening the inbox reads what it shows, and the count drops with it.
+ */
+function useUnreadCount(): number {
+  const user = useSession().data
+  const inbox = useQuery({ ...notificationsQuery, enabled: Boolean(user) })
+  return user ? (inbox.data?.unreadCount ?? 0) : 0
+}
+
+/** The red count. `spoken: false` when the words are placed elsewhere, after the label. */
+function UnreadBadge({ className = '', spoken = true }: { className?: string; spoken?: boolean }) {
+  const count = useUnreadCount()
+  if (count === 0) return null
+  return (
+    <span
+      className={`inline-flex min-w-5 items-center justify-center rounded-full bg-lost px-1.5 text-xs leading-5 font-bold text-white ${className}`}
+    >
+      <span aria-hidden="true">{count}</span>
+      {spoken ? <UnreadSpoken /> : null}
+    </span>
+  )
+}
+
+function UnreadSpoken() {
+  const { t } = useI18n()
+  const count = useUnreadCount()
+  if (count === 0) return null
+  return <span className="sr-only">{t('inbox.unread_count', { count })}</span>
+}
+
 function NavItem({
   to,
   icon,
   label,
+  after,
 }: {
   to: '/{-$locale}' | '/{-$locale}/mis-casos' | '/{-$locale}/bandeja' | '/{-$locale}/perfil'
   icon: ReactNode
   label: string
+  after?: ReactNode
 }) {
   return (
     <li>
@@ -140,6 +183,7 @@ function NavItem({
       >
         {icon}
         {label}
+        {after}
       </Link>
     </li>
   )
