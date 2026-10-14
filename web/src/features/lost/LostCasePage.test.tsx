@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { type LostCase, parseCase } from '@contracts/case'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { cases } from '../../mocks/fixtures'
+import { renderWithQuery } from '../../test-utils'
 import { LostCasePage } from './LostCasePage'
 
 const now = new Date()
@@ -15,7 +16,7 @@ function lostCase(code: string, overrides: Partial<LostCase> = {}): LostCase {
 
 function show(caseData: LostCase) {
   const onAction = vi.fn()
-  render(
+  renderWithQuery(
     <LostCasePage
       lostCase={caseData}
       now={now}
@@ -83,6 +84,25 @@ describe('LostCasePage — the owner', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ya apareció' }))
     expect(onAction).toHaveBeenCalledWith('confirm_reunited')
     expect(screen.queryByRole('button', { name: /La vi/ })).toBeNull()
+  })
+
+  it('sees who says they have her — with the number as buttons — instead of the public badge', () => {
+    show(lostCase('7K3PQ', { viewer: 'owner' }))
+    const claims = within(screen.getByRole('region', { name: 'Posibles hallazgos' }))
+    expect(claims.getByText('+573114829017')).toBeTruthy()
+    expect(claims.getByRole('link', { name: 'Abrir WhatsApp' }).getAttribute('href')).toBe(
+      'https://wa.me/573114829017',
+    )
+    expect(claims.getByRole('link', { name: 'Llamar' }).getAttribute('href')).toBe(
+      'tel:+573114829017',
+    )
+    expect(screen.queryByText('Posible hallazgo.')).toBeNull()
+  })
+
+  it('a helper never sees the claims or their phones', () => {
+    show(lostCase('7K3PQ'))
+    expect(screen.queryByRole('region', { name: 'Posibles hallazgos' })).toBeNull()
+    expect(screen.queryByText('+573114829017')).toBeNull()
   })
 
   it('can reopen an archived case', () => {
