@@ -79,7 +79,7 @@ describe('PublishLost — 04 · Publishing, step by step', () => {
     fillWho()
     await screen.findByRole('button', { name: 'Usar mi ubicación' })
     go()
-    expect(screen.getByRole('alert').textContent).toBe('Toca el mapa más o menos donde se perdió')
+    expect(screen.getByRole('alert').textContent).toBe('Toca el mapa más o menos dónde fue')
   })
 
   it('asks for an area with a preset radius, 3 blocks unless changed', async () => {

@@ -1,10 +1,12 @@
 // The emulated backend's memory: fixtures at load, then whatever the app writes during the session.
 import type { z } from 'zod'
 import type { lostCaseWire } from '../contracts/case'
+import type { foundCaseWire } from '../contracts/found'
 import { cases } from './fixtures'
 import { mockPhoto } from './photo'
 
 type LostCaseWire = z.input<typeof lostCaseWire>
+type FoundCaseWire = z.input<typeof foundCaseWire>
 
 /** The account «Continuar con Google» signs into: it owns Luna, so the owner's side can be tried. */
 export const DEMO_OWNER_ID = 'user-carolina'
@@ -23,7 +25,10 @@ export type MockPet = {
 const fresh = () => ({
   cases: cases(),
   /** case code → account that published it */
-  owners: { '7K3PQ': DEMO_OWNER_ID } as Record<string, string>,
+  owners: { '7K3PQ': DEMO_OWNER_ID, C4STD: DEMO_OWNER_ID, F8UND: 'user-marcela' } as Record<
+    string,
+    string
+  >,
   /** case code → pet */
   casePets: { '7K3PQ': 'pet-luna' } as Record<string, string>,
   pets: [
@@ -68,6 +73,11 @@ export function persist() {
 }
 
 export const newId = (prefix: string) => `${prefix}${db.nextId++}`
+
+export function foundCase(code: unknown): FoundCaseWire | undefined {
+  const found = db.cases[String(code).toUpperCase()]
+  return found?.vertical === 'found' ? found : undefined
+}
 
 export function lostCase(code: unknown): LostCaseWire | undefined {
   const found = db.cases[String(code).toUpperCase()]

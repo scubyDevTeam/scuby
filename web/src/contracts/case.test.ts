@@ -14,8 +14,21 @@ describe('parseCase', () => {
     expect(parsed.contact?.whatsappUrl).toMatch(/^https:\/\/wa\.me\//)
   })
 
-  it('keeps the other verticals as a card until their pages exist', () => {
-    expect(parseCase(cases().F8UND)).toMatchObject({ vertical: 'found', placeName: 'Belén' })
+  it('keeps the verticals without a page yet as a card', () => {
+    expect(parseCase(cases().AD9PT)).toMatchObject({ vertical: 'adoption', placeName: 'Estadio' })
+  })
+
+  it('parses a found case, with the custodian-only fields empty for everyone else', () => {
+    const parsed = parseCase(cases().F8UND)
+    if (parsed.vertical !== 'found') throw new Error('expected a found case')
+    expect(parsed.found.at).toBeInstanceOf(Date)
+    expect(parsed.holdOfferAt.getTime() - parsed.heldSince.getTime()).toBe(15 * 86_400_000)
+    expect(
+      parseCase({ ...cases().F8UND, withheld_detail: undefined, ownership_claims: undefined }),
+    ).toMatchObject({
+      withheldDetail: null,
+      ownershipClaims: [],
+    })
   })
 
   it('rejects a status the state machine does not know', () => {

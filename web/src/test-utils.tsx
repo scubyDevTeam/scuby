@@ -35,7 +35,9 @@ export function stubApi(routes: Record<string, Answer | (() => Answer)> = {}) {
     'fetch',
     vi.fn(async (url: URL, init?: RequestInit) => {
       const key = `${init?.method ?? 'GET'} ${url.pathname}`
-      calls.push({ key, body: init?.body ? JSON.parse(String(init.body)) : undefined })
+      // Uploads send a form, not JSON: there is nothing to read back from them.
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined
+      calls.push({ key, body })
       const route = all[key]
       if (!route) return new Response(null, { status: 404 })
       const answer = typeof route === 'function' ? route() : route

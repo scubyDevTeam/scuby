@@ -1,61 +1,43 @@
-// docs/product/04 · Publishing and Location precision: what the publish form asks and checks.
-// Pre-checks for feedback; the server decides.
+// docs/product/04 · Publishing: the lost form, as three steps over the shared publish checks.
 import type { Point } from '../shared/geo'
-import { type PhoneRules, toE164 } from '../shared/phone'
+import type { PhoneRules } from '../shared/phone'
+import {
+  type AnimalDraft,
+  animalErrors,
+  areaErrors,
+  type ContactDraft,
+  contactErrors,
+  type DraftError,
+  emptyAnimal,
+  emptyArea,
+  emptyContact,
+} from '../shared/publish'
 
-/** «~1 cuadra · ~3 cuadras · ~1 km»: preset chips, never a drag handle. */
-export const RADIUS_OPTIONS_M = [100, 300, 1000] as const
-export const DEFAULT_RADIUS_M = 300
+export {
+  DEFAULT_RADIUS_M,
+  type DraftError,
+  type PetSize,
+  RADIUS_OPTIONS_M,
+  type Species,
+} from '../shared/publish'
 
-export type Species = 'dog' | 'cat' | 'other'
-export type PetSize = 'small' | 'medium' | 'large'
-
-export type LostDraft = {
-  /** An existing pet being reported again, or null for a new one. */
-  petId: string | null
-  name: string
-  species: Species | null
-  size: PetSize | null
-  colors: string[]
-  marks: string
-  chipNumber: string
-  photoUrls: string[]
-  center: Point | null
-  radiusM: number
-  lastSeenAt: Date | null
-  /** National number as typed; ignored when the account already has a verified phone. */
-  phone: string
-  hasWhatsapp: boolean
-  contact: { whatsapp: boolean; email: boolean; inApp: boolean }
-}
+export type LostDraft = AnimalDraft &
+  ContactDraft & {
+    /** An existing pet being reported again, or null for a new one. */
+    petId: string | null
+    center: Point | null
+    radiusM: number
+    lastSeenAt: Date | null
+  }
 
 export const emptyDraft: LostDraft = {
+  ...emptyAnimal,
+  ...emptyContact,
   petId: null,
-  name: '',
-  species: null,
-  size: null,
-  colors: [],
-  marks: '',
-  chipNumber: '',
-  photoUrls: [],
-  center: null,
-  radiusM: DEFAULT_RADIUS_M,
+  center: emptyArea.center,
+  radiusM: emptyArea.radiusM,
   lastSeenAt: null,
-  phone: '',
-  hasWhatsapp: true,
-  contact: { whatsapp: true, email: false, inApp: true },
 }
-
-export type DraftError =
-  | 'name_required'
-  | 'species_required'
-  | 'size_required'
-  | 'place_required'
-  | 'time_required'
-  | 'time_in_the_future'
-  | 'phone_invalid'
-  | 'contact_required'
-  | 'whatsapp_needs_number'
 
 export type Step = 1 | 2 | 3
 
@@ -63,28 +45,14 @@ type Context = { now: Date; phoneRules: PhoneRules | null; verifiedPhone: string
 
 /** What stops a step from continuing, in the order the form shows it. */
 export function stepErrors(step: Step, draft: LostDraft, context: Context): DraftError[] {
-  const errors: DraftError[] = []
-  if (step === 1) {
-    if (!draft.name.trim()) errors.push('name_required')
-    if (!draft.species) errors.push('species_required')
-    if (!draft.size) errors.push('size_required')
-  }
+  if (step === 1) return animalErrors(draft, { name: true, photo: false })
   if (step === 2) {
-    if (!draft.center) errors.push('place_required')
-    if (!draft.lastSeenAt) errors.push('time_required')
-    else if (draft.lastSeenAt.getTime() > context.now.getTime()) errors.push('time_in_the_future')
+    return areaErrors(
+      { center: draft.center, radiusM: draft.radiusM, at: draft.lastSeenAt },
+      context.now,
+    )
   }
-  if (step === 3) {
-    const needsNumber = !context.verifiedPhone
-    if (needsNumber && !(context.phoneRules && toE164(draft.phone, context.phoneRules))) {
-      errors.push('phone_invalid')
-    }
-    const { whatsapp, email, inApp } = draft.contact
-    if (!whatsapp && !email && !inApp) errors.push('contact_required')
-    // Exposing WhatsApp promises a chat: the publisher has to say the number has it.
-    if (whatsapp && !draft.hasWhatsapp) errors.push('whatsapp_needs_number')
-  }
-  return errors
+  return contactErrors(draft, context)
 }
 
 /** An existing pet fills step 1; the owner can still correct it. */

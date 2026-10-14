@@ -19,10 +19,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm exec vite --port ${PORT} --strictPort`,
+    // The built app, not the dev server: what ships is what is tested, and no dependency
+    // pre-bundling can reload the page mid-test.
+    command: `pnpm exec vite build --outDir dist-e2e && pnpm exec vite preview --outDir dist-e2e --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     // Always its own server: it runs with test-only env, which a dev server would not have.
     reuseExistingServer: false,
+    timeout: 120_000,
     env: {
       VITE_API_MOCK: 'true',
       // An empty map style, inline: maps load and work with no streets and no network.

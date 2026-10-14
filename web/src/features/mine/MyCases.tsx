@@ -12,6 +12,9 @@ const statusBadge: Record<string, { tone: BadgeTone; label: string }> = {
   reunited: { tone: 'found', label: 'Ya está en casa' },
   expired: { tone: 'info', label: 'Archivado' },
   cancelled: { tone: 'info', label: 'Cerrado' },
+  kept: { tone: 'found', label: 'Ya tiene hogar' },
+  converted: { tone: 'adoption', label: 'En adopción' },
+  transferred_to_org: { tone: 'found', label: 'Con una fundación' },
 }
 
 type Props = {
@@ -69,7 +72,11 @@ export function MyCases({ caseLink, publishLink }: Props) {
 }
 
 function Row({ item, now }: { item: MyCase; now: Date }) {
-  const badge = statusBadge[item.status] ?? { tone: 'info' as const, label: item.status }
+  // An active found case is not a search: it says what it is.
+  const badge =
+    item.vertical === 'found' && item.status === 'active'
+      ? { tone: 'found' as const, label: 'Lo cuidas tú' }
+      : (statusBadge[item.status] ?? { tone: 'info' as const, label: item.status })
   return (
     <article className="flex items-center gap-4 rounded-2xl bg-surface p-3 shadow-md">
       {item.photoUrl ? (
@@ -81,7 +88,9 @@ function Row({ item, now }: { item: MyCase; now: Date }) {
         <div className="flex flex-wrap gap-1">
           <Badge tone={badge.tone}>{badge.label}</Badge>
           {item.status === 'active' && item.openClaimCount > 0 ? (
-            <Badge tone="info">Posible hallazgo</Badge>
+            <Badge tone="info">
+              {item.vertical === 'found' ? 'Posible dueño' : 'Posible hallazgo'}
+            </Badge>
           ) : null}
         </div>
         <h2 className="m-0 text-xl font-extrabold">{item.title}</h2>
