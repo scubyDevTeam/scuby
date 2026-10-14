@@ -38,7 +38,11 @@ function TopBar() {
   return (
     <header className="sticky top-0 z-10 hidden bg-brand text-white lg:block">
       <div className="mx-auto flex max-w-6xl items-center gap-2 px-8 py-4">
-        <Link to="/" className="mr-auto text-2xl font-extrabold text-white no-underline">
+        <Link
+          to="/"
+          className="mr-auto flex items-center gap-3 text-2xl font-extrabold text-white no-underline"
+        >
+          <img src={brand.markUrl} alt="" className="h-10 w-auto" />
           {brand.name}
         </Link>
         <Link to="/mis-casos" className={link}>

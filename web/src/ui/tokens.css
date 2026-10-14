@@ -42,6 +42,15 @@
     line-height: 1.45;
   }
 
+  /* On a desktop, everything that does something shows the hand. */
+  button:not(:disabled),
+  a[href],
+  summary,
+  label:has(input),
+  [role="button"] {
+    cursor: pointer;
+  }
+
   :focus-visible {
     outline: 3px solid var(--color-brand-mid);
     outline-offset: 2px;
