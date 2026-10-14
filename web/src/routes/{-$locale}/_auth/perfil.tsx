@@ -6,11 +6,11 @@ import { LanguageLinks } from '../../-i18n'
 export const Route = createFileRoute('/{-$locale}/_auth/perfil')({ component: ProfileScreen })
 
 function ProfileScreen() {
-  const user = useSession().data
-  if (!user) return null
+  // The gate above already waited for the session; the profile itself is fetched by the screen.
+  if (!useSession().data) return null
   return (
     <>
-      <Profile user={user} />
+      <Profile />
       <div className="mx-auto max-w-lg px-5 pb-8">
         <LanguageLinks className="font-bold text-brand-deep" />
       </div>

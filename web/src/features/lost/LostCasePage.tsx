@@ -1,6 +1,7 @@
 import type { LostCase } from '@contracts/case'
 import { availableActions, hasPossibleFind, type LostAction, pageMode } from '@domain/lost/actions'
-import { placeSightings } from '@domain/lost/sightings'
+import { checkinAnswers, closeAnswersCheckin } from '@domain/lost/checkin'
+import { placeSightings, splitHidden } from '@domain/lost/sightings'
 import { publicArea } from '@domain/shared/geo'
 import { CaseShell } from '@features/case/CaseShell'
 import { useI18n } from '@i18n/react'
@@ -9,10 +10,16 @@ import { Button, buttonClass } from '@ui/Button'
 import { CaseMap } from '@ui/Map/CaseMap'
 import { Notice } from '@ui/Notice'
 import { Archive, Clock, Flag, PartyPopper, Share2 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { lazy, type ReactNode, Suspense } from 'react'
 import { ClaimsList } from './ClaimsList'
 import { describePet, formatDayMonth, sightingsCount } from './copy'
 import { SightingTimeline } from './SightingTimeline'
+
+// The owner's tools load only for the owner: a stranger opening the link never pays for them.
+const CheckinCard = lazy(() => import('./CheckinCard').then((m) => ({ default: m.CheckinCard })))
+const moderation = () => import('./SightingModeration')
+const SightingTools = lazy(() => moderation().then((m) => ({ default: m.SightingTools })))
+const HiddenSightings = lazy(() => moderation().then((m) => ({ default: m.HiddenSightings })))
 
 type Props = {
   lostCase: LostCase
@@ -32,13 +39,21 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
   const state = { status: lostCase.status, resolvedAt: lostCase.resolvedAt }
   const mode = pageMode(state)
   const actions = availableActions(state, lostCase.viewer, now)
-  const can = (action: LostAction) => actions.includes(action)
+  const checkin = lostCase.pendingCheckin
+  const answers = checkinAnswers(state, lostCase.viewer, checkin)
+  // A waiting «¿sigue perdida?» already carries «Ya apareció» and «Eliminar»: shown once, there.
+  const asked = answers.length > 0 && closeAnswersCheckin(checkin)
+  const can = (action: LostAction) =>
+    actions.includes(action) && !(asked && (action === 'confirm_reunited' || action === 'cancel'))
+  const isOwner = lostCase.viewer === 'owner'
   // The owner sees the circle they drew; everyone else sees it floored at 200 m.
   const area =
     lostCase.viewer === 'owner'
       ? { center: lastSeen.center, radiusM: lastSeen.radiusM }
       : publicArea({ center: lastSeen.center, radiusM: lastSeen.radiusM })
-  const sightings = placeSightings(lostCase.sightings, lastSeen.center, now)
+  // Display rule 2: the trail is the visible pins. Hidden ones reach only the owner, set apart.
+  const { visible, hidden } = splitHidden(lostCase.sightings)
+  const sightings = placeSightings(visible, lastSeen.center, now)
 
   const band =
     mode === 'open'
@@ -122,6 +137,22 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
         </p>
       </section>
 
+      {checkin && answers.length > 0 ? (
+        <Suspense fallback={null}>
+          <CheckinCard
+            code={lostCase.code}
+            petName={pet.name}
+            checkin={checkin}
+            answers={answers}
+            claimPhone={
+              lostCase.claims.find((claim) => claim.id === checkin.claimId)?.phone ?? null
+            }
+            onReunited={() => onAction('confirm_reunited')}
+            onDelete={() => onAction('cancel')}
+          />
+        </Suspense>
+      ) : null}
+
       {mode === 'closed' && lostCase.status === 'reunited' ? (
         <Notice
           tone="success"
@@ -174,7 +205,7 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
         <Button onClick={() => onAction('reopen')}>{t('lost.page.reopen')}</Button>
       ) : null}
 
-      {lostCase.viewer === 'owner' && mode === 'open' ? (
+      {isOwner && mode === 'open' ? (
         <ClaimsList
           code={lostCase.code}
           petName={pet.name}
@@ -213,10 +244,27 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
             }))}
           />
           {sightings.length > 0 ? (
-            <SightingTimeline sightings={sightings} now={now} />
-          ) : (
+            <SightingTimeline
+              sightings={sightings}
+              now={now}
+              tools={
+                isOwner
+                  ? (sighting) => (
+                      <Suspense fallback={null}>
+                        <SightingTools code={lostCase.code} sighting={sighting} />
+                      </Suspense>
+                    )
+                  : undefined
+              }
+            />
+          ) : isOwner && hidden.length > 0 ? null : (
             <p className="m-0 text-muted">{t('lost.page.no_sightings')}</p>
           )}
+          {isOwner && hidden.length > 0 ? (
+            <Suspense fallback={null}>
+              <HiddenSightings code={lostCase.code} sightings={hidden} now={now} />
+            </Suspense>
+          ) : null}
         </section>
       ) : null}
     </CaseShell>
