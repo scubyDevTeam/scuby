@@ -12,7 +12,7 @@ product and engineering source of truth is `docs/`; there is no application code
 | `docs/product/01–03` | Actors + entities, flow summaries, legal (Colombia instance) |
 | `docs/product/04–07` | The four verticals: lost, found, adoption, help. **Source of truth for their flow** — on conflict they win over 00–02, and the summary gets patched in the same change |
 | `docs/product/08–10` | Cross-cutting behavior: notifications, reporting, sharing |
-| `docs/eng/` | How we build: `frontend.md` (client architecture), `frontend-plan.md` (step-by-step build plan), `auth.md`, `comms.md` (channels/ladders/Conversations), `costs.md` (monthly spend + triggers), `feature-flags.md` (global/per-account flags + registry), `media-pipeline.md` (backend, infra pending) |
+| `docs/eng/` | How we build: `frontend.md` (client architecture), `frontend-plan.md` (step-by-step build plan), `api.md` (the API contract; `openapi.json` is generated), `auth.md`, `comms.md` (channels/ladders/Conversations), `costs.md` (monthly spend + triggers), `feature-flags.md` (global/per-account flags + registry), `media-pipeline.md` (backend, infra pending) |
 | `docs/open-items.md` | Open (undecided) and Deferred (decided not-now) — **the v1 contract**: Deferred rows are documentation, never requirements; build nothing from them |
 
 ## Rules for working in this repo
@@ -29,7 +29,8 @@ product and engineering source of truth is `docs/`; there is no application code
    rule and tags in `product/08`. Everything else is a query over rows.
 5. **Country-scoped values** (phone prefixes, currency, legal) go through configuration
    (`supported_countries` — `eng/auth.md`), never hard-coded.
-6. Spanish strings are UI copy; domain identifiers are English snake_case.
+6. UI copy is Spanish and lives in the language files (`web/src/i18n/locales/<lang>.json`), never in
+   a screen; domain identifiers, enums and i18n keys are English snake_case ([eng/frontend.md](docs/eng/frontend.md) · Languages).
 7. Git: the repo is `scubyDevTeam/scuby`. Before GitHub operations, `gh auth switch --user <account>`
    to an account that is a member of the `scubyDevTeam` org (work accounts can't push here).
 8. Commit messages start with a type prefix: `feat:` (behaviour), `test:`, `doc:`, `ci:` — one

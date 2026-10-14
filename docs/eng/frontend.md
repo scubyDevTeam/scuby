@@ -106,7 +106,8 @@ Exactly one route needs a server — the WhatsApp link preview, because WhatsApp
 JS. The route is the short link from [10 · Short links](../product/10-sharing.md):
 
 ```
-/c/:code  → rewritten to a Vercel function (share.ts, ~100 lines)
+/c/:code, /:locale/c/:code
+          → rewritten to a Vercel function (share.ts, ~100 lines)
             → fetches the public case summary from the backend API
             → reads the built index.html
             → injects og:/twitter: meta + a readable server-rendered summary paragraph
@@ -118,6 +119,7 @@ JS. The route is the short link from [10 · Short links](../product/10-sharing.m
 {
   "rewrites": [
     { "source": "/c/:code", "destination": "/api/share?code=:code" },
+    { "source": "/:locale(en)/c/:code", "destination": "/api/share?code=:code&locale=:locale" },
     { "source": "/(.*)",    "destination": "/index.html" }
   ]
 }
@@ -125,6 +127,8 @@ JS. The route is the short link from [10 · Short links](../product/10-sharing.m
 
 - **No user-agent sniffing**, no separate crawler app: everyone gets the same shell with the meta
   tags and summary filled in. Readable text before any JS runs.
+- The tags speak the URL's language (`/en/c/:code` → English; no segment → Spanish), the same
+  rule the SPA follows (*Languages*). Shared links and posters carry no segment.
 - Tag *content* (title, description, which statuses show what) is owned by
   [10 · Link previews](../product/10-sharing.md). This function only places it.
 - The `og:image` URL points at whatever renders the 1200×630 card — `@vercel/og` in a second
@@ -142,10 +146,11 @@ Four layers plus adapters. Dependencies point inward, always.
 src/routes/              file-based routes and screens
    └─ src/features       hooks and components — the product
         └─ src/api-client  fetch + TanStack Query
-             └─ src/contracts  Zod schemas, generated from the API spec
+             └─ src/contracts  the API contract: endpoints + Zod schemas (api.md)
                   └─ src/domain  pure rules — zero dependencies
 src/platform    ← adapters: push, location, camera, share, storage
 src/ui          ← shadcn components, tokens, Map/ (lazy)
+src/i18n        ← the language files and t() (see Languages)
 ```
 
 | Layer | May import |
@@ -154,8 +159,9 @@ src/ui          ← shadcn components, tokens, Map/ (lazy)
 | `contracts` | zod |
 | `api-client` | `contracts` |
 | `platform` | `@capacitor/*`, browser APIs |
-| `ui` | react, shadcn deps, maplibre (Map/ only) |
-| `features` | `domain`, `contracts`, `api-client`, `ui`, `platform`, react |
+| `ui` | react, shadcn deps, maplibre (Map/ only), `i18n` |
+| `i18n` | react, its own language files |
+| `features` | `domain`, `contracts`, `api-client`, `ui`, `platform`, `i18n`, react |
 | `routes` | everything above |
 
 Enforced in CI with **dependency-cruiser** — a dependency rule in a README is a suggestion.
@@ -175,9 +181,10 @@ confirmation copy says, what an optimistic update may assume. It never enforces 
 - A client-side `null` is an affordance; a server rejection is the truth. The UI must render a
   rejection it did not predict without breaking.
 - The two copies of each rule are accepted, and the drift is managed: the backend is not
-  TypeScript (Rails — [comms.md](comms.md)), so `contracts` are **generated from the API's OpenAPI
-  spec**, and a **contract test suite** replays each machine's transition table against the real
-  API and fails when they disagree. In place before the second vertical.
+  TypeScript (Rails — [comms.md](comms.md)), so the **contract is written first, in `contracts`,
+  and the OpenAPI document the backend implements is generated from it** ([api.md](api.md),
+  decision #24). A **contract test suite** replays each machine's transition table against the
+  real API and fails when they disagree. In place before the second vertical.
 
 ### Rule 3 — no flags, no rules the backend owns
 
@@ -241,7 +248,26 @@ the server-provided center + radius.
 | **Map** | Rule 5 above | [04](../product/04-lost-workflow.md) |
 | **Offline-ish** | Service worker caches shell and fonts; a case page opened from a link renders on a flaky connection once loaded. Writes online-only, except the sighting queue (*Risks* §6); a failed write keeps the form | — |
 | **Product name** | One file, `src/brand.ts` (name, short name, public origin), filled at build time from the `VITE_BRAND_*` and `VITE_PUBLIC_ORIGIN` env vars (every key, with mock defaults, in `web/.env`; `src/env.ts` is the only reader). UI copy, the page title, the PWA manifest, the poster and the share function's tags read it; **no user-facing string spells the name literally** (a CI grep enforces it). Notification and email copy is the backend's and needs the same setting there | [00 · #21](../product/00-product-map.md) |
+| **Languages** | Every word on screen comes from a language file; the language is a URL segment — *Languages* below | [00 · #25](../product/00-product-map.md) |
 | **Case lifecycles as UI model** | One machine per vertical in `src/domain` (below) | [04](../product/04-lost-workflow.md)–[07](../product/07-help-workflow.md) · state machines |
+
+## Languages
+
+No word the user reads is written in a screen. **UI copy lives in one JSON file per language**,
+`web/src/i18n/locales/<lang>.json`, and components read it by key: `t('case.lost.share_title',
+{ name })`. Spanish (`es.json`) is the source; every other file translates it key by key.
+
+| | |
+|---|---|
+| **Languages** | `es` (source, default) and `en`. A new language = one JSON file + one entry in `src/i18n/locales.ts` |
+| **In the URL** | The language is the first path segment, **optional**: `/c/7K3PQ` is Spanish, `/en/c/7K3PQ` English. All routes live under `src/routes/{-$locale}/`; links keep the current language on their own. `/es/…` redirects to `/…` (one address per page); an unknown segment is a 404. The URL decides — no browser-language redirect, so a link renders the same for everyone who opens it |
+| **Shared links and posters** | Carry no segment. A case's audience is its neighbourhood, so its short link is the default language; a visitor switches with the language links (desktop header, profile, sign-in) |
+| **Keys** | English snake_case, nested by screen (`lost.sighting_form.title`); shared words in `common`, `time`, `pet`, `map`, `contact` |
+| **Placeholders · plurals · markup** | `{name}` · `{ "one": …, "other": … }` picked with `Intl.PluralRules` by `count` · `<home>Ver otros avisos</home>` rendered with `rich()` into a link. Dates, lists («negro y canela») and relative times («hace 2 h») go through the locale's `Intl` formatters |
+| **Loading** | The source language ships in the bundle (first paint, no extra request). Others are a chunk each, loaded before the route renders. A key a translation lacks reads in Spanish, never blank |
+| **Enums are keys** | Values on the wire are English keys (`colors: ['black']`), never Spanish words; each language names them (`pet.colors.black`) |
+| **Text the server composes** | `place_name`, summaries, match reasons, notification bodies: the client sends `Accept-Language` on every request and the backend composes in that language ([api.md](api.md)). Push and email have no request — they use the account's language ([O17](../open-items.md)) |
+| **Enforced** | `pnpm check:copy` (CI) fails on text written in a screen — JSX text, sentence-like attributes, Spanish string literals. A test fails when a language file lacks a key, adds one, or drops a placeholder or tag. The product name is never in a file either: `{brand}` |
 
 ## What the frontend does NOT own
 
@@ -316,6 +342,20 @@ Every feature ships with its tests in the same change. No feature is done withou
 | **Unit** | Every rule in `domain` (one test per arrow, bound or table row of the owning doc, named after its section); every feature's screens in their states (content, loading, empty, error) and what each viewer is offered; `contracts`, `api-client` and `platform` behaviour | next to the code, `*.test.ts(x)` | Vitest (+ Testing Library on jsdom for components) |
 | **End to end** | **One happy path per feature**: the way a real person completes it, start to finish, in a phone-sized Chromium against the mocked API | `web/e2e/*.spec.ts` | Playwright |
 
+Specs drive the app through **page objects** (`web/e2e/pages/`, one per screen plus shared parts
+like sign-in and the map picker): a spec reads as what a person does, and a changed label is fixed
+in one place. The report reads the same way, through **steps**: every page-object action is a boxed
+`test.step` («Sign in as … with the emailed code»), so a failure points at the spec line that asked
+for it, and every spec groups its phases in named `test.step`s with their assertions inside («the
+claim exists whatever happens in WhatsApp: the page says so»). Every test carries **two tags — its flow and a key of its own** (`@publish-lost`,
+`@PLOST-001`; registry in `web/e2e/tags.ts`), so `pnpm e2e --grep @owner` runs one flow and a key in
+a ticket or a CI log names exactly one test. Keys are never reused; `pnpm check:e2e-tags` fails the
+build on a missing tag or a repeated key.
+
+The emulated backend has its own scenario suite (`web/src/mocks/backend.test.ts`): the client
+against the handlers over MSW in Node, every request and answer checked against the contract. It
+is the behaviour the real backend must reproduce ([api.md](api.md)).
+
 Unhappy paths, edge cases and rules are unit tests — fast and exact. The e2e suite stays one happy
 path per feature so it stays quick and trusted; a second e2e for a feature needs a reason a unit
 test cannot cover (the offline sighting queue is one). Both suites run in CI on every PR.
@@ -333,7 +373,7 @@ test cannot cover (the offline sighting queue is one). Both suites run in CI on 
 | Server state | **TanStack Query** (+ persister for the sighting queue) |
 | Forms | **react-hook-form + Zod** |
 | Contracts | Zod + types generated from the backend's OpenAPI spec |
-| API mocking | **MSW** — lets the frontend build against the contract before the backend exists |
+| API mocking | **MSW** — an emulated backend that answers through the contract, both ways ([api.md](api.md)) |
 | PWA | **vite-plugin-pwa** (Workbox) — installable shell, Web Push |
 | Errors | **Sentry** |
 | Deploy | **Vercel** — static `dist/` + the share function |
@@ -373,23 +413,26 @@ web/
 ├── src/
 │   ├── routes/                 TanStack Router, file-based
 │   │   ├── __root.tsx
-│   │   ├── c.$code.tsx         the case page (any vertical)
-│   │   ├── index.tsx           feed + map
-│   │   └── _auth/              session required: publicar, mis-casos, bandeja, perfil
+│   │   └── {-$locale}/         the optional language segment; every screen hangs from it
+│   │       ├── c.$code.tsx     the case page (any vertical)
+│   │       ├── index.tsx       feed + map
+│   │       └── _auth/          session required: publicar, mis-casos, bandeja, perfil
 │   ├── domain/                 pure, zero deps, advisory (Rule 2)
 │   │   ├── lost/  found/  adoption/  help/  shared/
-│   ├── contracts/              generated Zod schemas
+│   ├── contracts/              api.ts (every endpoint) + Zod schemas → docs/eng/openapi.json
 │   ├── api-client/             fetch + TanStack Query hooks
 │   ├── features/               lost/  found/  adoption/  help/  sharing/  auth/
 │   ├── ui/                     shadcn + tokens + Map/ (lazy)
+│   ├── i18n/                   locales/es.json, en.json · t() · the provider
 │   ├── platform/               location · camera · share · push · storage
-│   └── mocks/                  MSW handlers + fixtures
+│   └── mocks/                  the emulated backend: tables, fixtures, handlers via route.ts
 ├── android/  ios/              scope 2: Capacitor native projects — absent until then
 └── capacitor.config.ts         scope 2: app id, webDir, plugin config
 ```
 
 Feature folders, not type folders: `features/lost/` beats `hooks/`, `screens/`, `utils/` the moment
-there are four verticals. Route names are Spanish (they are UI); identifiers are English.
+there are four verticals. Route names are Spanish (they are UI, and the same in every language — the
+language segment is what changes); identifiers are English.
 
 ---
 
@@ -411,7 +454,7 @@ Risks 1, 3, 4, 5, 7 and 8 belong to the mobile scope; 2 and 6 apply from day one
    background. **Pass:** stable memory over five minutes of panning, no reload after backgrounding,
    cold map interactive under ~2 s. **Fail:** a native map view under the webview via plugin (a
    rescue, not a plan), or reopen the native question with evidence. The web is unaffected.
-2. **Client/server rule drift.** Managed by Rule 2: generated contracts + transition-table contract
+2. **Client/server rule drift.** Managed by Rule 2: contract-first API + transition-table contract
    tests before the second vertical.
 3. **Apple guideline 4.2** ("just a website"). Defence by construction: native push, camera, native
    geolocation, native share, offline shell, native sign-in — and by then, an app with real usage.
@@ -442,4 +485,4 @@ written and tested once. That boundary is what makes today's decision reversible
 ## Open
 
 Tracked in [open-items](../open-items.md): O10 (`og:image` renderer), O12 (session transport),
-O13 (app links), O14 (API spec + contract generation).
+O13 (app links). The API contract: [api.md](api.md).

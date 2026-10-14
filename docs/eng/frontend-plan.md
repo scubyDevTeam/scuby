@@ -32,7 +32,7 @@
 |---|---|---|
 | P | Prerequisites: accounts, tools, open decisions | No |
 | D | Design in Claude Design → inventory and gaps | No |
-| 0 | Scaffold `web/` | No |
+| 0 | Scaffold `web/`, languages in the URL | No |
 | 1 | Domain (rules as pure code) | No |
 | 2 | Case page `/c/:code` + WhatsApp preview | No |
 | 3 | Map + feed | No |
@@ -193,15 +193,25 @@ pointers to frontend.md and this doc, UI copy in Spanish / identifiers in Englis
 flags in the client (frontend.md Rule 3), no native APIs outside `src/platform`.
 **Done when:** a fresh Claude Code session in `web/` can state the rules without reading frontend.md.
 
+### 0.8 Languages
+**Read:** [frontend.md](frontend.md) · Languages; [00 · #25](../product/00-product-map.md).
+**Do:** `src/i18n` (language files, `t()`, `rich()`, the provider); every route under the optional
+`{-$locale}` segment; every screen's copy as keys in `es.json` with `en.json` beside it;
+`Accept-Language` on every request; `pnpm check:copy` in CI; one e2e for the language in the URL.
+From here on every feature lands its copy as keys, in both files.
+**Done when:** `pnpm check:copy` is green, `/en/…` renders English and `/…` Spanish, and the
+locale tests (same keys, placeholders and tags) pass.
+
 ---
 
 ## Phase 1 — Domain
 
 ### 1.1 Entity types
 **Read:** [04](../product/04-lost-workflow.md) and [05](../product/05-found-workflow.md) · Entities.
-**Do:** hand-written Zod schemas + types in `src/contracts/` for pet, lost_case, found_case,
-sighting, recovery_claim, ownership_claim, case_checkin, report — each file headed
-`// hand-written until O14`. MSW fixtures covering **every status** of every case.
+**Do:** Zod schemas + types in `src/contracts/` for pet, lost_case, found_case, sighting,
+recovery_claim, ownership_claim, case_checkin, report, and their endpoints in
+`src/contracts/api.ts` — the contract the backend implements ([api.md](api.md)). Fixtures covering
+**every status** of every case.
 **Done when:** fixtures validate against the schemas in a test.
 
 ### 1.2 Lost and found machines
@@ -297,9 +307,9 @@ before any WhatsApp handoff opens.
 
 ### 5.0 Unblock
 **Check before starting:** [O12](../open-items.md) (session transport — for scope 1 the httpOnly
-cookie leaning is enough) decided, [O14](../open-items.md) (OpenAPI spec) published, a staging API
-URL. Then: generate `contracts` from the spec, replace the hand-written schemas, and move endpoints
-off MSW one by one (MSW passthrough for the rest). Add the transition-table contract tests
+cookie leaning is enough) decided, and a staging API that implements
+[openapi.json](openapi.json) ([api.md](api.md) · Plugging in the real backend). Then point the app
+at it — `VITE_API_MOCK=false` — and run the e2e suite against it. Add the transition-table contract tests
 (frontend.md · Rule 2).
 
 ### 5.1 Sign-in ★
@@ -353,6 +363,8 @@ Same step shape as phase 5: read the section, build, compare with the design, te
 
 7.1 **Legal pages** — terms and privacy policy from [03](../product/03-legal-colombia.md), linked
 from sign-in and publishing.
+7.1b **Translations** — `en.json` read end to end by a fluent speaker; the legal pages exist in
+every language the app offers, or the language links hide until they do.
 7.2 **Production** — production API and env vars, Sentry alerts, MSW off in production builds,
 `robots.txt` and the static pages' meta.
 7.3 **Beta** — 10–20 real people for at least a week (the founders' networks); Sentry clean.
