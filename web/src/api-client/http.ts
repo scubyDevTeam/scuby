@@ -26,12 +26,15 @@ export class ApiError extends Error {
   /** The contract's own reason, when the answer carried the error envelope. */
   readonly code: ErrorCode | null
   readonly details: Record<string, string>
+  /** `validation_failed` only: wire field path → what is wrong with it (for logs, never shown). */
+  readonly fields: Record<string, string>
 
   constructor(
     kind: ApiErrorKind,
     status: number | null = null,
     code: ErrorCode | null = null,
     details: Record<string, string> = {},
+    fields: Record<string, string> = {},
   ) {
     super(`API error: ${code ?? kind}${status ? ` (${status})` : ''}`)
     this.name = 'ApiError'
@@ -39,6 +42,7 @@ export class ApiError extends Error {
     this.status = status
     this.code = code
     this.details = details
+    this.fields = fields
   }
 }
 
@@ -55,7 +59,13 @@ function kindFor(status: number): ApiErrorKind {
 async function failure(response: Response): Promise<ApiError> {
   // The envelope is optional on the way in: a proxy's 502 has none, and the status still says enough.
   const body = parseFailure(await response.json().catch(() => null))
-  return new ApiError(kindFor(response.status), response.status, body?.code, body?.details)
+  return new ApiError(
+    kindFor(response.status),
+    response.status,
+    body?.code,
+    body?.details,
+    body?.fields,
+  )
 }
 
 type Options<E extends Endpoint> = (keyof ParamsOf<E> extends never

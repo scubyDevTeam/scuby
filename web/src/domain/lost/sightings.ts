@@ -57,3 +57,46 @@ export function placeSightings<T extends SightingLike>(
     }
   })
 }
+
+/**
+ * Display rule 2: the trajectory joins *visible* pins. A pin the owner hid leaves the map and the
+ * numbering; only the owner gets it back from the server, and sees it apart, as hidden.
+ */
+export function splitHidden<T extends { hidden: boolean }>(
+  sightings: readonly T[],
+): { visible: T[]; hidden: T[] } {
+  return {
+    visible: sightings.filter((s) => !s.hidden),
+    hidden: sightings.filter((s) => s.hidden),
+  }
+}
+
+/** The owner's hand on a pin (display rules 3 and 5): star it, or take it off the public map. */
+export type SightingModeration = 'highlight' | 'unhighlight' | 'hide' | 'unhide'
+
+/** Only the owner moderates. A hidden pin offers only its way back; a visible one, both tools. */
+export function moderationOptions(
+  sighting: { hidden: boolean; highlightedByOwner: boolean },
+  viewer: 'owner' | 'public',
+): SightingModeration[] {
+  if (viewer !== 'owner') return []
+  if (sighting.hidden) return ['unhide']
+  return [sighting.highlightedByOwner ? 'unhighlight' : 'highlight', 'hide']
+}
+
+/** What each tool changes — only that field is sent. */
+export function moderationChange(option: SightingModeration): {
+  highlighted?: boolean
+  hidden?: boolean
+} {
+  switch (option) {
+    case 'highlight':
+      return { highlighted: true }
+    case 'unhighlight':
+      return { highlighted: false }
+    case 'hide':
+      return { hidden: true }
+    case 'unhide':
+      return { hidden: false }
+  }
+}

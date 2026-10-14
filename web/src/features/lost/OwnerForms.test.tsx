@@ -80,3 +80,43 @@ describe('ReopenForm — 04 · one tap', () => {
     expect(calls.at(-1)?.key).toBe('POST /cases/ARCH2/reopen')
   })
 })
+
+describe('OwnerForms — 04 · closing while «¿sigue perdida?» waits answers it', () => {
+  const path = 'POST /cases/M2TQ4/checkins/ck-milo-1/answer'
+
+  it('«Ya apareció» is sent as the check-in’s answer, with who helped', async () => {
+    const calls = stubApi({ [path]: { body: { id: 'ck-milo-1' } } })
+    const onDone = vi.fn()
+    renderWithQuery(
+      <ReuniteForm
+        code="M2TQ4"
+        petName="Milo"
+        suggested={null}
+        checkinId="ck-milo-1"
+        onDone={onDone}
+      />,
+    )
+    fireEvent.click(screen.getByLabelText('Apareció por otro lado'))
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, Milo ya está en casa' }))
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+    expect(calls.at(-1)).toEqual({
+      key: path,
+      body: { response: 'reunited', resolution_attribution: 'offline', resolution: null },
+    })
+  })
+
+  it('«Eliminar» is sent as the check-in’s answer, with the reason', async () => {
+    const calls = stubApi({ [path]: { body: { id: 'ck-milo-1' } } })
+    const onDone = vi.fn()
+    renderWithQuery(<CancelForm code="M2TQ4" checkinId="ck-milo-1" onDone={onDone} />)
+    fireEvent.click(screen.getByLabelText('Lo publiqué dos veces'))
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar aviso' }))
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled())
+    expect(calls.at(-1)).toEqual({
+      key: path,
+      body: { response: 'delete', resolution_attribution: null, resolution: 'duplicate' },
+    })
+  })
+})

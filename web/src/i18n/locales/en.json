@@ -100,10 +100,6 @@
       "title": "Sign in to continue"
     },
     "legal": "By continuing you accept the Terms and the Data Processing Policy.",
-    "inbox": {
-      "title": "Inbox",
-      "empty": "Your notifications will arrive here."
-    },
     "unfinished_door": {
       "title": "We're finishing this part",
       "body": "For now you can post a lost pet. <back>Back</back>"
@@ -298,7 +294,39 @@
       "resend": "Resend code"
     },
     "profile": {
+      "title": "Profile",
+      "loading": "Loading your profile",
+      "load_failed": "We couldn’t load your profile",
       "email_label": "Email you sign in with",
+      "email_hint": "It’s how you sign in, so it can’t be changed for now.",
+      "phone_label": "Your mobile · verified",
+      "phone_hint": "You can change it when you publish your next post.",
+      "no_phone": "We’ll ask for a mobile number when you publish your first post.",
+      "name_label": "Your name",
+      "name_hint": "This is how neighbours will see you.",
+      "city_label": "City",
+      "city_placeholder": "Medellín",
+      "bio_label": "About you",
+      "bio_hint": "Plain text only, no links. {length}/{max}",
+      "notifications_title": "Notify me about",
+      "notifications_hint": "While you have an active case, the important updates about it still reach you.",
+      "notifications": {
+        "lost": "Lost pets",
+        "found": "Found pets",
+        "adoption": "Adoption",
+        "help": "Requests for help"
+      },
+      "errors": {
+        "name_required": "Write your name",
+        "name_rejected": "Check your name",
+        "city_rejected": "Check the city",
+        "bio_has_link": "Remove the links: neighbours reach you through the app or however you choose on each post.",
+        "bio_too_long": "Make it a little shorter",
+        "bio_rejected": "Remove the links or shorten it: plain text only."
+      },
+      "save": "Save changes",
+      "saving": "Saving…",
+      "saved": "Your changes are saved.",
       "sign_out": "Sign out"
     }
   },
@@ -511,6 +539,19 @@
       "submit": "Send report"
     }
   },
+  "inbox": {
+    "title": "Inbox",
+    "list_label": "Notifications",
+    "loading": "Loading your notifications",
+    "load_failed": "We couldn't load your notifications",
+    "empty_title": "No notifications yet",
+    "empty_hint": "Notifications about your cases will show up here.",
+    "unread": "Unread",
+    "unread_count": {
+      "one": "1 unread notification",
+      "other": "{count} unread notifications"
+    }
+  },
   "lost": {
     "pet": {
       "species_other": "Pet"
@@ -605,6 +646,32 @@
       "confirm": "Yes, it's {name}",
       "dismiss": "It wasn't her",
       "failed_title": "We couldn't save your answer."
+    },
+    "checkin": {
+      "label": "Question waiting",
+      "time_based_title": "{name}'s listing is still up.",
+      "time_based_body": "If you don't confirm, we'll archive it and it will stop reaching your neighbours.",
+      "claim_title": "Someone says they have {name}.",
+      "claim_body": "If you don't confirm, we'll remove the possible-find notice. The search carries on the same.",
+      "claim_phone": "They left their number: {phone}",
+      "answers": {
+        "still_lost": "Still lost",
+        "reunited": "Back home 🎉",
+        "delete": "Delete",
+        "claim_confirmed": "Yes, it's {name} 🎉",
+        "claim_dismissed": "It isn't {name}",
+        "still_verifying": "Still checking"
+      },
+      "failed_title": "We couldn't save your answer."
+    },
+    "moderation": {
+      "highlight": "Mark as useful",
+      "hide": "Hide from the map",
+      "unhide": "Show again",
+      "hidden_title": "Hidden from the map",
+      "hidden_hint": "Only you see them: they're off the map and the list for everyone else.",
+      "hidden_label": "Hidden sightings",
+      "failed_title": "We couldn't save the change."
     },
     "owner_forms": {
       "attribution": {

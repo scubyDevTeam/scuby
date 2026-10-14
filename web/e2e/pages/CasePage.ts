@@ -24,7 +24,9 @@ export class CasePage {
     this.page = page
     this.signIn = new SignIn(page)
     this.map = page.getByTestId('map')
-    this.sightings = page.getByRole('list', { name: 'Avistamientos' }).getByRole('listitem')
+    this.sightings = page
+      .getByRole('list', { name: 'Avistamientos', exact: true })
+      .getByRole('listitem')
     this.possibleFind = page.getByText('Posible hallazgo.')
     this.possibleOwner = page.getByText('Posible dueño.')
     this.sawIt = page.getByRole('button', { name: /La vi/ })
@@ -32,7 +34,7 @@ export class CasePage {
     this.claimOwnershipButton = page.getByRole('button', { name: /Es mío/ })
     this.whatsapp = page.getByRole('link', { name: 'Escribirle por WhatsApp' })
     this.found = page.getByText('Se encontró', { exact: true })
-    this.reunitedButton = page.getByRole('button', { name: 'Ya apareció' })
+    this.reunitedButton = page.getByRole('button', { name: 'Ya apareció', exact: true })
     this.backWithOwner = page.getByRole('button', { name: 'Ya está con su dueño' })
     this.unavailable = page.getByRole('heading', { name: 'Este aviso ya no está disponible' })
     this.linkCopied = page.getByRole('heading', { name: 'Enlace copiado' })
@@ -160,6 +162,54 @@ export class CasePage {
   closeAsReunited(petName: string) {
     return step(`Close the case: ${petName} is home`, () =>
       this.page.getByRole('button', { name: `Sí, ${petName} ya está en casa` }).click(),
+    )
+  }
+
+  /** The question a check-in asks the owner (docs/product/04 · The follow-up loop). */
+  get checkin() {
+    return this.page.getByRole('region', { name: 'Pregunta pendiente' })
+  }
+
+  answerCheckin(answer: string) {
+    return step(`Answer the check-in: «${answer}»`, () =>
+      this.checkin.getByRole('button', { name: answer }).click(),
+    )
+  }
+
+  /** Picks an answer in the open form, e.g. who helped at the reunion. */
+  pick(label: string) {
+    return step(`Pick «${label}»`, () => this.page.getByLabel(label).check())
+  }
+
+  /** A sighting in the timeline, by its note. */
+  sighting(note: string) {
+    return this.sightings.filter({ hasText: note })
+  }
+
+  get hiddenSightings() {
+    return this.page.getByRole('list', { name: 'Avistamientos ocultos' }).getByRole('listitem')
+  }
+
+  usefulButton(note: string) {
+    return this.sighting(note).getByRole('button', { name: 'Marcar como útil' })
+  }
+
+  markUseful(note: string) {
+    return step(`Mark the sighting «${note}» as useful`, () => this.usefulButton(note).click())
+  }
+
+  hideSighting(note: string) {
+    return step(`Hide the sighting «${note}» from the map`, () =>
+      this.sighting(note).getByRole('button', { name: 'Ocultar del mapa' }).click(),
+    )
+  }
+
+  unhideSighting(note: string) {
+    return step(`Show the sighting «${note}» again`, () =>
+      this.hiddenSightings
+        .filter({ hasText: note })
+        .getByRole('button', { name: 'Volver a mostrar' })
+        .click(),
     )
   }
 

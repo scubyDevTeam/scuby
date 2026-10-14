@@ -1,6 +1,7 @@
 import { test as base } from '@playwright/test'
 import { CasePage } from './pages/CasePage.ts'
 import { FeedPage } from './pages/FeedPage.ts'
+import { InboxPage } from './pages/InboxPage.ts'
 import { Languages } from './pages/Languages.ts'
 import { MyCasesPage } from './pages/MyCasesPage.ts'
 import { ProfilePage } from './pages/ProfilePage.ts'
@@ -14,6 +15,7 @@ type Pages = {
   casePage: CasePage
   publish: PublishPage
   myCases: MyCasesPage
+  inbox: InboxPage
   profile: ProfilePage
   languages: Languages
 }
@@ -34,6 +36,7 @@ export const test = base.extend<Pages>({
   casePage: async ({ page }, use) => use(new CasePage(page)),
   publish: async ({ page }, use) => use(new PublishPage(page)),
   myCases: async ({ page }, use) => use(new MyCasesPage(page)),
+  inbox: async ({ page }, use) => use(new InboxPage(page)),
   profile: async ({ page }, use) => use(new ProfilePage(page)),
   languages: async ({ page }, use) => use(new Languages(page)),
 })

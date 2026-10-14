@@ -46,3 +46,58 @@ test(
     })
   },
 )
+
+test(
+  'the owner answers «¿sigue perdida?» with «ya apareció» and the case closes',
+  tags('@owner', '@OWNER-003'),
+  async ({ myCases, casePage }) => {
+    await myCases.open()
+    await myCases.signIn.withEmailCode('julian@correo.co')
+    await myCases.openCase('Milo')
+
+    await test.step('the check-in waits, framed as the listing going away', async () => {
+      await expect(casePage.checkin).toContainText('El aviso de Milo sigue publicado.')
+      await expect(casePage.reunitedButton).toHaveCount(0)
+    })
+
+    await test.step('«Ya apareció» leads into the reunion, which asks who helped', async () => {
+      await casePage.answerCheckin('Ya apareció 🎉')
+      await casePage.pick('Apareció por otro lado')
+      await casePage.closeAsReunited('Milo')
+    })
+
+    await test.step('the case closes as reunited and the question is gone', async () => {
+      await expect(casePage.text('¡Milo ya está en casa!')).toBeVisible()
+      await expect(casePage.checkin).toHaveCount(0)
+    })
+  },
+)
+
+test(
+  'the owner stars a sighting and takes another off the map',
+  tags('@owner', '@OWNER-004'),
+  async ({ myCases, casePage }) => {
+    await myCases.openAsDemoOwner()
+    await myCases.openCase('Luna')
+
+    await test.step('«Marcar como útil» stars the pin', async () => {
+      await casePage.markUseful('Iba hacia el parque')
+      await expect(casePage.usefulButton('Iba hacia el parque')).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+    })
+
+    await test.step('a hidden pin leaves the trail and waits apart, for the owner only', async () => {
+      await casePage.hideSighting('Corría asustada')
+      await expect(casePage.sightings).toHaveCount(2)
+      await expect(casePage.hiddenSightings).toHaveCount(1)
+    })
+
+    await test.step('and it can come back', async () => {
+      await casePage.unhideSighting('Corría asustada')
+      await expect(casePage.sightings).toHaveCount(3)
+      await expect(casePage.hiddenSightings).toHaveCount(0)
+    })
+  },
+)
