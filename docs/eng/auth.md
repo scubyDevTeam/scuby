@@ -15,7 +15,7 @@
 - **No password column exists.** Passwordless is not a shortcut — password auth still requires the
   same email infrastructure (resets), plus hashing, breach liability, and permanent support load.
 - Accounts are born **lazily** at the first gated action (publish, «es mío», «me interesa»,
-  «ya ayudé»). There is never a standalone signup screen.
+  «yo ayudo»). There is never a standalone signup screen.
 - Apple gotcha for later: it returns the user's name **only on first authorization** — capture it
   then or lose it. (Apple login itself is deferred — see Deferred.)
 - Sessions are long-lived (refresh ~12 months, device-bound).

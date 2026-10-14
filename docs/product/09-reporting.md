@@ -54,17 +54,12 @@ required; nothing else is. Rate-limited by device/IP, exactly like sightings.
    in bad conditions». It is also the one report type where *contacting the finder* beats hiding
    the post: hiding removes the animal from view without removing it from the balcony.
 
-4. **`scam_or_extortion` on a help request** is the third auto-acting category: it **suspends**
-   the request on the first report — loudly, «en revisión», reversible — per
-   [07](07-help-workflow.md)'s state machine, because money-collecting fraud converts
-   strangers' compassion into income every hour our amplification stays on.
-
-5. **Reporter identity is never shown to the reported party.** Not in the notification, not
+4. **Reporter identity is never shown to the reported party.** Not in the notification, not
    derivable from timing. Outcomes are not reported back to reporters in v1 — closing that loop is
    nice, but each outcome notification is a chance to triangulate who reported.
 
-6. **The platform hides and removes publications; it never adjudicates the underlying dispute.**
-   Who owns the animal, whether the fee was fair, whether the campaign was honest — intermediary
+5. **The platform hides and removes publications; it never adjudicates the underlying dispute.**
+   Who owns the animal, whether a promised ride or foster happened — intermediary
    posture, [03](03-legal-colombia.md). We act on the *publication*.
 
 ---

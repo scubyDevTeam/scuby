@@ -376,9 +376,9 @@ real cases for a week before phase 8.
 ## Phase 8 — Adoption, then Help
 
 Same shape: domain machine (06 / 07 · Case state machine) → case page variant → publish flow →
-owner/lister view → share. Adoption: [06](../product/06-adoption-workflow.md) (fee disclosure
-rule, «Me interesa» 4-field intro, what the lister sees). Help: [07](../product/07-help-workflow.md)
-(link-out only, trust tiers, the link-gate form state kept on the device).
+owner/lister view → share. Adoption: [06](../product/06-adoption-workflow.md) («Me interesa»
+4-field intro, what the lister sees). Help: [07](../product/07-help-workflow.md) (needs in kind,
+«Yo ayudo» pledges the beneficiary confirms, trust tiers — never money).
 
 ---
 
