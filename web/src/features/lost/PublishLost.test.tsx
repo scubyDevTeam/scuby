@@ -34,6 +34,7 @@ function show(user: User, routes: Routes = {}) {
       user={user}
       mapStyleUrl={undefined}
       demoCode="123456"
+      legal={null}
       onExit={() => {}}
       caseLink={(code, children) => <a href={`/c/${code}`}>{children}</a>}
     />,

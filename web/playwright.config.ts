@@ -30,6 +30,10 @@ export default defineConfig({
       VITE_API_MOCK: 'true',
       // An empty map style, inline: maps load and work with no streets and no network.
       VITE_MAP_STYLE_URL: 'data:application/json,{"version":8,"sources":{},"layers":[]}',
+      // A configured key, so push is on (the .env one is `mock-…`, which turns it off). Nothing
+      // reaches a push service: e2e/pages/PushOffer.ts stands in for the browser's PushManager.
+      VITE_VAPID_PUBLIC_KEY:
+        'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U',
     },
   },
 })

@@ -17,6 +17,9 @@ export const FLOWS = {
   '@i18n': 'I18N',
   '@inbox': 'INBOX',
   '@profile': 'PROFILE',
+  '@poster': 'POSTER',
+  '@push': 'PUSH',
+  '@legal': 'LEGAL',
 } as const
 
 export type Flow = keyof typeof FLOWS

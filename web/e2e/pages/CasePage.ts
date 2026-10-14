@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { PosterPage } from './PosterPage.ts'
 import { MapPicker, SignIn, whatsappFrom } from './parts.ts'
 import { step } from './step.ts'
 
@@ -6,6 +7,8 @@ import { step } from './step.ts'
 export class CasePage {
   readonly page: Page
   readonly signIn: SignIn
+  /** The share sheet: poster, WhatsApp, share and download (docs/product/10 §3–4). */
+  readonly poster: PosterPage
   readonly map: Locator
   readonly sightings: Locator
   readonly possibleFind: Locator
@@ -23,6 +26,7 @@ export class CasePage {
   constructor(page: Page) {
     this.page = page
     this.signIn = new SignIn(page)
+    this.poster = new PosterPage(page)
     this.map = page.getByTestId('map')
     this.sightings = page
       .getByRole('list', { name: 'Avistamientos', exact: true })
@@ -37,7 +41,8 @@ export class CasePage {
     this.reunitedButton = page.getByRole('button', { name: 'Ya apareció', exact: true })
     this.backWithOwner = page.getByRole('button', { name: 'Ya está con su dueño' })
     this.unavailable = page.getByRole('heading', { name: 'Este aviso ya no está disponible' })
-    this.linkCopied = page.getByRole('heading', { name: 'Enlace copiado' })
+    // Without a share sheet, «Compartir» downloads the image and copies the message with the link.
+    this.linkCopied = this.poster.saved
   }
 
   open(code: string) {
@@ -67,7 +72,7 @@ export class CasePage {
     )
   }
 
-  /** A browser without a share sheet: sharing falls back to copying the link. */
+  /** A browser without a share sheet: sharing falls back to download + copying the message. */
   withoutShareSheet() {
     return step('Use a browser without a share sheet', async () => {
       await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
@@ -78,9 +83,10 @@ export class CasePage {
   }
 
   share() {
-    return step('Share the case', () =>
-      this.page.getByRole('button', { name: 'Compartir aviso' }).click(),
-    )
+    return step('Share the case', async () => {
+      await this.poster.open()
+      await this.poster.shareImage()
+    })
   }
 
   copiedText() {
