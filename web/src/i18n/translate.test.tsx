@@ -15,11 +15,11 @@ describe('t()', () => {
   const { t } = createI18n('es', { brand: 'Marca' })
 
   it('reads a key and fills its placeholders', () => {
-    expect(t('case.lost.share_title', { name: 'Luna' })).toBe('Se busca: Luna')
+    expect(t('case.share_title_named', { name: 'Luna' })).toBe('Comparte a Luna')
   })
 
   it('leaves a placeholder it was not given, so the gap is visible', () => {
-    expect(t('case.lost.share_title')).toBe('Se busca: {name}')
+    expect(t('case.share_title_named')).toBe('Comparte a {name}')
   })
 
   it('picks the plural form by count', () => {
@@ -77,5 +77,12 @@ describe('rich()', () => {
     )
     expect(screen.getByRole('link', { name: 'Ver otros avisos' })).toBeTruthy()
     expect(screen.getByText('Laureles').tagName).toBe('EM')
+  })
+})
+
+describe('language files in parts', () => {
+  it('a deferred namespace reads in its language once its screen has asked for it', async () => {
+    await loadMessages('en', ['legal'])
+    expect(createI18n('en').t('legal.terms.title')).toBe('Terms and conditions')
   })
 })

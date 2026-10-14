@@ -1,7 +1,11 @@
 import { type Door, PublishDoors } from '@features/publish/PublishDoors'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { needsWords } from '../-i18n'
 
-export const Route = createFileRoute('/{-$locale}/publicar/')({ component: Doors })
+export const Route = createFileRoute('/{-$locale}/publicar/')({
+  beforeLoad: needsWords('publish'),
+  component: Doors,
+})
 
 const slug: Record<Door, string> = {
   lost: 'perdido',

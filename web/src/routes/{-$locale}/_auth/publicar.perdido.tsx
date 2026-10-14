@@ -2,8 +2,11 @@ import { useSession } from '@api-client/session'
 import { PublishLost } from '@features/lost/PublishLost'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { env } from '../../../env'
+import { needsWords } from '../../-i18n'
+import { LegalLine } from '../../-legal'
 
 export const Route = createFileRoute('/{-$locale}/_auth/publicar/perdido')({
+  beforeLoad: needsWords('publish', 'push'),
   component: PublishLostScreen,
 })
 
@@ -19,6 +22,7 @@ function PublishLostScreen() {
       user={user}
       mapStyleUrl={env.mapStyleUrl}
       demoCode={env.apiMock ? DEMO_CODE : undefined}
+      legal={<LegalLine />}
       onExit={() => navigate({ to: '/{-$locale}/publicar' })}
       caseLink={(code, children, className) => (
         <Link to="/{-$locale}/c/$code" params={{ code }} className={className}>

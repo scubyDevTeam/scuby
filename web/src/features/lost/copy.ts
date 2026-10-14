@@ -5,7 +5,10 @@ import type { SightingError } from '@domain/lost/sightings'
 import type { Translator } from '@i18n/translate'
 
 /** «Perro · Pequeño · Negro y canela» */
-export function describePet(i18n: Translator, pet: LostCase['pet']): string {
+export function describePet(
+  i18n: Translator,
+  pet: Pick<LostCase['pet'], 'species' | 'size' | 'colors'>,
+): string {
   const { t } = i18n
   const species =
     pet.species === 'other' ? t('lost.pet.species_other') : t(`pet.species.${pet.species}`)

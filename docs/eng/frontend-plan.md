@@ -362,7 +362,8 @@ Same step shape as phase 5: read the section, build, compare with the design, te
 ## Phase 7 — Web launch
 
 7.1 **Legal pages** — terms and privacy policy from [03](../product/03-legal-colombia.md), linked
-from sign-in and publishing.
+from sign-in and publishing. *Drafts in place* at `/terminos` and `/privacidad`, in every language,
+marked «Borrador» until the one lawyer review (03); the rights channel is `VITE_LEGAL_EMAIL`.
 7.1b **Translations** — `en.json` read end to end by a fluent speaker; the legal pages exist in
 every language the app offers, or the language links hide until they do.
 7.2 **Production** — production API and env vars, Sentry alerts, MSW off in production builds,

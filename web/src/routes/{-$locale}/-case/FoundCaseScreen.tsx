@@ -4,17 +4,18 @@ import type { FoundAction } from '@domain/found/actions'
 import { CustodianPanel } from '@features/found/CustodianPanel'
 import { describeFound } from '@features/found/copy'
 import { FoundCasePage } from '@features/found/FoundCasePage'
+import { withMessages } from '@i18n/locales'
 import { useI18n } from '@i18n/react'
 import type { TextKey } from '@i18n/translate'
-import { shareLink } from '@platform/share'
 import { Link } from '@tanstack/react-router'
-import { Button, roundButtonClass } from '@ui/Button'
+import { roundButtonClass } from '@ui/Button'
 import { Sheet } from '@ui/Sheet'
 import { Skeleton } from '@ui/States'
 import { ChevronLeft } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { brand } from '../../../brand'
 import { env } from '../../../env'
+import { LegalLine } from '../../-legal'
 
 // Loaded when their button is tapped: reading the case must not pay for them.
 const OwnershipClaimForm = lazy(() =>
@@ -26,10 +27,22 @@ const ResolveForm = lazy(() =>
 const ReopenForm = lazy(() =>
   import('@features/lost/OwnerForms').then((m) => ({ default: m.ReopenForm })),
 )
-const ReportForm = lazy(() =>
-  import('@features/reporting/ReportForm').then((m) => ({ default: m.ReportForm })),
+const ReportForm = lazy(
+  withMessages(['reporting'], () =>
+    import('@features/reporting/ReportForm').then((m) => ({ default: m.ReportForm })),
+  ),
 )
-const SignIn = lazy(() => import('@features/auth/SignIn').then((m) => ({ default: m.SignIn })))
+// The poster, its canvas code and the QR encoder: none of it belongs to a case's first load.
+const PosterSheet = lazy(
+  withMessages(['sharing'], () =>
+    import('@features/poster/PosterSheet').then((m) => ({ default: m.PosterSheet })),
+  ),
+)
+const SignIn = lazy(
+  withMessages(['auth'], () =>
+    import('@features/auth/SignIn').then((m) => ({ default: m.SignIn })),
+  ),
+)
 
 /** The code the emulated backend accepts (src/mocks/handlers.ts). */
 const DEMO_CODE = '123456'
@@ -42,7 +55,7 @@ type Open =
   | 'transferred_to_org'
   | 'cancelled'
   | 'reopen'
-  | 'copied'
+  | 'share'
   | null
 
 const sheetFor: Partial<Record<FoundAction, NonNullable<Open>>> = {
@@ -53,6 +66,7 @@ const sheetFor: Partial<Record<FoundAction, NonNullable<Open>>> = {
   transfer_to_org: 'transferred_to_org',
   cancel: 'cancelled',
   reopen: 'reopen',
+  share: 'share',
 }
 
 const titles: Record<NonNullable<Open>, TextKey> = {
@@ -63,7 +77,7 @@ const titles: Record<NonNullable<Open>, TextKey> = {
   transferred_to_org: 'case.found.transferred_title',
   cancelled: 'case.cancel_title',
   reopen: 'case.reopen_title',
-  copied: 'case.copied',
+  share: 'case.share_title',
 }
 
 export function FoundCaseScreen({ found }: { found: FoundCase }) {
@@ -74,17 +88,13 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
   const title = describeFound(i18n, found.pet)
   const close = () => setSheet(null)
 
-  async function handle(action: FoundAction) {
+  // The short link carries no language: posters and shared links reach everyone the same way.
+  const url = `${brand.origin}/c/${found.code}`
+  const shortUrl = `${new URL(brand.origin).host}/c/${found.code}`
+
+  function handle(action: FoundAction) {
     const next = sheetFor[action]
-    if (next) return setSheet(next)
-    if (action !== 'share') return
-    const result = await shareLink({
-      title: t('case.found.share_title', { title }),
-      text: t('case.found.share_text'),
-      // The short link carries no language: posters and shared links reach everyone the same way.
-      url: `${brand.origin}/c/${found.code}`,
-    })
-    if (result === 'copied') setSheet('copied')
+    if (next) setSheet(next)
   }
 
   return (
@@ -92,7 +102,7 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
       <FoundCasePage
         foundCase={found}
         now={new Date()}
-        shortUrl={`${new URL(brand.origin).host}/c/${found.code}`}
+        shortUrl={shortUrl}
         backLink={
           <Link to="/{-$locale}" aria-label={t('common.back_home')} className={roundButtonClass}>
             <ChevronLeft aria-hidden="true" />
@@ -110,7 +120,12 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
           />
         }
       />
-      <Sheet open={sheet !== null} onClose={close} title={sheet ? t(titles[sheet]) : ''}>
+      <Sheet
+        open={sheet !== null}
+        onClose={close}
+        title={sheet ? t(titles[sheet]) : ''}
+        size={sheet === 'share' ? 'full' : 'auto'}
+      >
         <Suspense fallback={<Skeleton className="h-40" />}>
           {sheet === 'mine' ? (
             // «Es mío» is never anonymous: it asks to take an animal. The account is born here.
@@ -120,7 +135,7 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
               <SignIn
                 googleClientId={env.googleClientId}
                 demoCode={env.apiMock ? DEMO_CODE : undefined}
-                legal={t('app.legal')}
+                legal={<LegalLine />}
               />
             )
           ) : null}
@@ -146,13 +161,14 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
           {sheet === 'reopen' ? (
             <ReopenForm code={found.code} petName={title.toLowerCase()} onDone={close} />
           ) : null}
+          {sheet === 'share' ? (
+            <PosterSheet
+              posterCase={found}
+              link={{ url, display: shortUrl }}
+              brand={{ name: brand.name, markUrl: brand.markUrl }}
+            />
+          ) : null}
         </Suspense>
-        {sheet === 'copied' ? (
-          <>
-            <p className="m-0 text-muted">{t('case.copied_hint')}</p>
-            <Button onClick={close}>{t('common.got_it')}</Button>
-          </>
-        ) : null}
       </Sheet>
     </>
   )

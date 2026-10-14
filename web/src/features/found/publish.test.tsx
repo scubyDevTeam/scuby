@@ -56,6 +56,7 @@ describe('PublishFound — 05 · match first, then create', () => {
         user={veteran}
         mapStyleUrl={undefined}
         demoCode="123456"
+        legal={null}
         onExit={onExit}
         caseLink={(code, children) => <a href={`/c/${code}`}>{children}</a>}
       />,

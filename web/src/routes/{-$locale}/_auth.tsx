@@ -6,14 +6,18 @@ import { Button } from '@ui/Button'
 import { Message, Skeleton } from '@ui/States'
 import { WifiOff } from 'lucide-react'
 import { env } from '../../env'
-import { LanguageLinks } from '../-i18n'
+import { LanguageLinks, needsWords } from '../-i18n'
+import { LegalLine } from '../-legal'
 
 /** The code the emulated backend accepts (src/mocks/handlers.ts). Shown only while mocks are on. */
 const DEMO_CODE = '123456'
 
 // Session required (frontend.md · Folder structure). There is no signup screen: whoever lands
 // here without a session signs in on the spot and continues to where they were going.
-export const Route = createFileRoute('/{-$locale}/_auth')({ component: Gate })
+export const Route = createFileRoute('/{-$locale}/_auth')({
+  beforeLoad: needsWords('auth'),
+  component: Gate,
+})
 
 function Gate() {
   const { t } = useI18n()
@@ -50,7 +54,7 @@ function Gate() {
       <SignIn
         googleClientId={env.googleClientId}
         demoCode={env.apiMock ? DEMO_CODE : undefined}
-        legal={t('app.legal')}
+        legal={<LegalLine />}
       />
       <LanguageLinks className="font-bold text-brand-deep" />
     </div>

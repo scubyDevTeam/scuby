@@ -2,11 +2,28 @@
 // the router itself (main.tsx · InnerWrap), so the not-found page speaks it too.
 import { setRequestLanguage } from '@api-client/http'
 import { queryClient } from '@api-client/query-client'
-import { DEFAULT_LOCALE, isLocale, LOCALES, type Locale, localeSegment } from '@i18n/locales'
+import {
+  DEFAULT_LOCALE,
+  isLocale,
+  LOCALES,
+  type Locale,
+  loadMessages,
+  localeSegment,
+} from '@i18n/locales'
+import type { DeferredNamespace } from '@i18n/namespaces'
 import { I18nProvider, useI18n } from '@i18n/react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { type ReactNode, useEffect, useMemo, useRef } from 'react'
 import { brand } from '../brand'
+
+/**
+ * A route's `beforeLoad` that brings the words its screen needs, in the URL's language:
+ * `beforeLoad: needsWords('publish')`.
+ */
+export const needsWords =
+  (...namespaces: DeferredNamespace[]) =>
+  ({ params }: { params: { locale?: string } }) =>
+    loadMessages(isLocale(params.locale) ? params.locale : DEFAULT_LOCALE, namespaces)
 
 export function useLocale(): Locale {
   const segment = useRouterState({

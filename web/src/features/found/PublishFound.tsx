@@ -18,6 +18,7 @@ import {
   AnimalFields,
   AreaFields,
   ContactFields,
+  Published,
   Section,
   StepHeader,
   useWhen,
@@ -43,6 +44,8 @@ type Props = {
   user: User
   mapStyleUrl: string | undefined
   demoCode: string | undefined
+  /** The consent line with the terms and the data policy linked (docs/product/03). */
+  legal: ReactNode
   onExit: () => void
   caseLink: (code: string, children: ReactNode, className: string) => ReactNode
 }
@@ -52,7 +55,7 @@ type Props = {
  * and when», the animal is matched against pets being searched for: recognising one opens a
  * recovery claim on that lost case and no found case is created.
  */
-export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: Props) {
+export function PublishFound({ user, mapStyleUrl, demoCode, legal, onExit, caseLink }: Props) {
   const { t } = useI18n()
   const country = useConfig().data?.countries[0]
   const match = useMatchAnimal()
@@ -164,17 +167,19 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
 
   if (publish.data?.kind === 'published') {
     return (
-      <div className="mx-auto flex max-w-lg flex-col gap-5 px-5 py-10">
-        <h1 className="m-0 text-3xl font-extrabold">{t('found.publish.published_title')}</h1>
-        <Notice tone="success" title={t('found.publish.published_notice_title')}>
-          {t('found.publish.published_notice_body')}
-        </Notice>
-        {caseLink(
+      <Published
+        title={t('found.publish.published_title')}
+        notice={
+          <Notice tone="success" title={t('found.publish.published_notice_title')}>
+            {t('found.publish.published_notice_body')}
+          </Notice>
+        }
+        link={caseLink(
           publish.data.code,
           t('found.publish.view_case'),
           'flex min-h-12 items-center justify-center rounded-2xl bg-brand px-5 font-bold text-white no-underline',
         )}
-      </div>
+      />
     )
   }
 
@@ -250,6 +255,7 @@ export function PublishFound({ user, mapStyleUrl, demoCode, onExit, caseLink }: 
             otp={askingCode ? { value: otp, onType: typeOtp, wrong: wrongCode } : null}
             demoCode={demoCode}
           />
+          <p className="m-0 text-sm text-muted">{legal}</p>
           {publish.isError && !wrongCode ? (
             <Notice tone="warning" title={t('found.publish.publish_failed')}>
               {t('common.check_connection')}

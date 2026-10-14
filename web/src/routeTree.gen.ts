@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as Char123LocaleChar125RouteRouteImport } from './routes/{-$locale}/route'
 import { Route as Char123LocaleChar125IndexRouteImport } from './routes/{-$locale}/index'
 import { Route as Char123LocaleChar125AuthRouteImport } from './routes/{-$locale}/_auth'
+import { Route as Char123LocaleChar125PrivacidadRouteImport } from './routes/{-$locale}/privacidad'
+import { Route as Char123LocaleChar125TerminosRouteImport } from './routes/{-$locale}/terminos'
 import { Route as Char123LocaleChar125AuthBandejaRouteImport } from './routes/{-$locale}/_auth/bandeja'
 import { Route as Char123LocaleChar125AuthMisCasosRouteImport } from './routes/{-$locale}/_auth/mis-casos'
 import { Route as Char123LocaleChar125AuthPerfilRouteImport } from './routes/{-$locale}/_auth/perfil'
@@ -38,6 +40,18 @@ const Char123LocaleChar125IndexRoute =
 const Char123LocaleChar125AuthRoute =
   Char123LocaleChar125AuthRouteImport.update({
     id: '/_auth',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
+const Char123LocaleChar125PrivacidadRoute =
+  Char123LocaleChar125PrivacidadRouteImport.update({
+    id: '/privacidad',
+    path: '/privacidad',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
+const Char123LocaleChar125TerminosRoute =
+  Char123LocaleChar125TerminosRouteImport.update({
+    id: '/terminos',
+    path: '/terminos',
     getParentRoute: () => Char123LocaleChar125RouteRoute,
   } as any)
 const Char123LocaleChar125AuthBandejaRoute =
@@ -103,6 +117,8 @@ const Char123LocaleChar125AuthPublicarEncontradoAvisoRoute =
 
 export interface FileRoutesByFullPath {
   '/{-$locale}': typeof Char123LocaleChar125RouteRouteWithChildren
+  '/{-$locale}/privacidad': typeof Char123LocaleChar125PrivacidadRoute
+  '/{-$locale}/terminos': typeof Char123LocaleChar125TerminosRoute
   '/{-$locale}/': typeof Char123LocaleChar125IndexRoute
   '/{-$locale}/bandeja': typeof Char123LocaleChar125AuthBandejaRoute
   '/{-$locale}/mis-casos': typeof Char123LocaleChar125AuthMisCasosRoute
@@ -117,6 +133,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/{-$locale}': typeof Char123LocaleChar125IndexRoute
+  '/{-$locale}/privacidad': typeof Char123LocaleChar125PrivacidadRoute
+  '/{-$locale}/terminos': typeof Char123LocaleChar125TerminosRoute
   '/{-$locale}/bandeja': typeof Char123LocaleChar125AuthBandejaRoute
   '/{-$locale}/mis-casos': typeof Char123LocaleChar125AuthMisCasosRoute
   '/{-$locale}/perfil': typeof Char123LocaleChar125AuthPerfilRoute
@@ -132,6 +150,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/{-$locale}': typeof Char123LocaleChar125RouteRouteWithChildren
   '/{-$locale}/_auth': typeof Char123LocaleChar125AuthRouteWithChildren
+  '/{-$locale}/privacidad': typeof Char123LocaleChar125PrivacidadRoute
+  '/{-$locale}/terminos': typeof Char123LocaleChar125TerminosRoute
   '/{-$locale}/': typeof Char123LocaleChar125IndexRoute
   '/{-$locale}/_auth/bandeja': typeof Char123LocaleChar125AuthBandejaRoute
   '/{-$locale}/_auth/mis-casos': typeof Char123LocaleChar125AuthMisCasosRoute
@@ -148,6 +168,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/{-$locale}'
+    | '/{-$locale}/privacidad'
+    | '/{-$locale}/terminos'
     | '/{-$locale}/'
     | '/{-$locale}/bandeja'
     | '/{-$locale}/mis-casos'
@@ -162,6 +184,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/{-$locale}'
+    | '/{-$locale}/privacidad'
+    | '/{-$locale}/terminos'
     | '/{-$locale}/bandeja'
     | '/{-$locale}/mis-casos'
     | '/{-$locale}/perfil'
@@ -176,6 +200,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/{-$locale}'
     | '/{-$locale}/_auth'
+    | '/{-$locale}/privacidad'
+    | '/{-$locale}/terminos'
     | '/{-$locale}/'
     | '/{-$locale}/_auth/bandeja'
     | '/{-$locale}/_auth/mis-casos'
@@ -214,6 +240,20 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/{-$locale}'
       preLoaderRoute: typeof Char123LocaleChar125AuthRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
+    }
+    '/{-$locale}/privacidad': {
+      id: '/{-$locale}/privacidad'
+      path: '/privacidad'
+      fullPath: '/{-$locale}/privacidad'
+      preLoaderRoute: typeof Char123LocaleChar125PrivacidadRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
+    }
+    '/{-$locale}/terminos': {
+      id: '/{-$locale}/terminos'
+      path: '/terminos'
+      fullPath: '/{-$locale}/terminos'
+      preLoaderRoute: typeof Char123LocaleChar125TerminosRouteImport
       parentRoute: typeof Char123LocaleChar125RouteRoute
     }
     '/{-$locale}/_auth/bandeja': {
@@ -316,6 +356,8 @@ const Char123LocaleChar125AuthRouteWithChildren =
 
 interface Char123LocaleChar125RouteRouteChildren {
   Char123LocaleChar125AuthRoute: typeof Char123LocaleChar125AuthRouteWithChildren
+  Char123LocaleChar125PrivacidadRoute: typeof Char123LocaleChar125PrivacidadRoute
+  Char123LocaleChar125TerminosRoute: typeof Char123LocaleChar125TerminosRoute
   Char123LocaleChar125IndexRoute: typeof Char123LocaleChar125IndexRoute
   Char123LocaleChar125CCodeRoute: typeof Char123LocaleChar125CCodeRoute
   Char123LocaleChar125PublicarTipoRoute: typeof Char123LocaleChar125PublicarTipoRoute
@@ -327,6 +369,8 @@ interface Char123LocaleChar125RouteRouteChildren {
 const Char123LocaleChar125RouteRouteChildren: Char123LocaleChar125RouteRouteChildren =
   {
     Char123LocaleChar125AuthRoute: Char123LocaleChar125AuthRouteWithChildren,
+    Char123LocaleChar125PrivacidadRoute: Char123LocaleChar125PrivacidadRoute,
+    Char123LocaleChar125TerminosRoute: Char123LocaleChar125TerminosRoute,
     Char123LocaleChar125IndexRoute: Char123LocaleChar125IndexRoute,
     Char123LocaleChar125CCodeRoute: Char123LocaleChar125CCodeRoute,
     Char123LocaleChar125PublicarTipoRoute:

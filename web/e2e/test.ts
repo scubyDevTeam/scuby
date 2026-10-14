@@ -3,9 +3,11 @@ import { CasePage } from './pages/CasePage.ts'
 import { FeedPage } from './pages/FeedPage.ts'
 import { InboxPage } from './pages/InboxPage.ts'
 import { Languages } from './pages/Languages.ts'
+import { LegalPage } from './pages/LegalPage.ts'
 import { MyCasesPage } from './pages/MyCasesPage.ts'
 import { ProfilePage } from './pages/ProfilePage.ts'
 import { PublishPage } from './pages/PublishPage.ts'
+import { PushOffer } from './pages/PushOffer.ts'
 
 export { expect } from '@playwright/test'
 export { tags } from './tags.ts'
@@ -18,6 +20,8 @@ type Pages = {
   inbox: InboxPage
   profile: ProfilePage
   languages: Languages
+  legal: LegalPage
+  push: PushOffer
 }
 
 /**
@@ -39,4 +43,6 @@ export const test = base.extend<Pages>({
   inbox: async ({ page }, use) => use(new InboxPage(page)),
   profile: async ({ page }, use) => use(new ProfilePage(page)),
   languages: async ({ page }, use) => use(new Languages(page)),
+  legal: async ({ page }, use) => use(new LegalPage(page)),
+  push: async ({ page }, use) => use(new PushOffer(page)),
 })

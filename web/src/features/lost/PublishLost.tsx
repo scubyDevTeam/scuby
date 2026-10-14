@@ -16,6 +16,7 @@ import {
   AnimalFields,
   AreaFields,
   ContactFields,
+  Published,
   Section,
   StepHeader,
   useWhen,
@@ -39,6 +40,8 @@ type Props = {
   mapStyleUrl: string | undefined
   /** Set when the backend is emulated: the SMS code it accepts. */
   demoCode: string | undefined
+  /** The consent line with the terms and the data policy linked (docs/product/03). */
+  legal: ReactNode
   /** Leaves the form (back from step 1). */
   onExit: () => void
   /** A link to a case page; the router lives in `routes`. */
@@ -50,7 +53,7 @@ type Props = {
  * Whether the number needs its SMS code is the server's call: the form asks for the code only when
  * the publish answers `otp`.
  */
-export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: Props) {
+export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLink }: Props) {
   const { t } = useI18n()
   const country = useConfig().data?.countries[0]
   const pets = useMyPets().data ?? []
@@ -113,18 +116,21 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
   if (publish.data?.kind === 'published') {
     const { code } = publish.data
     return (
-      <div className="mx-auto flex max-w-lg flex-col gap-5 px-5 py-10">
-        <h1 className="m-0 text-3xl font-extrabold">{t('lost.publish.published_title')}</h1>
-        <Notice tone="success" title={t('lost.publish.searching', { name: draft.name.trim() })}>
-          {t('lost.publish.neighbours_see')}
-        </Notice>
-        <p className="m-0 text-muted">{t('lost.publish.share_it')}</p>
-        {caseLink(
+      <Published
+        title={t('lost.publish.published_title')}
+        notice={
+          <Notice tone="success" title={t('lost.publish.searching', { name: draft.name.trim() })}>
+            {t('lost.publish.neighbours_see')}
+          </Notice>
+        }
+        link={caseLink(
           code,
           t('lost.publish.see_mine'),
           'flex min-h-12 items-center justify-center rounded-2xl bg-brand px-5 font-bold text-white no-underline',
         )}
-      </div>
+      >
+        <p className="m-0 text-muted">{t('lost.publish.share_it')}</p>
+      </Published>
     )
   }
 
@@ -225,6 +231,7 @@ export function PublishLost({ user, mapStyleUrl, demoCode, onExit, caseLink }: P
             otp={askingCode ? { value: otp, onType: typeOtp, wrong: wrongCode } : null}
             demoCode={demoCode}
           />
+          <p className="m-0 text-sm text-muted">{legal}</p>
           {conflict ? (
             <Notice tone="warning" title={t('lost.publish.conflict_title')}>
               {t('lost.publish.conflict_body')}

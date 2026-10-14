@@ -99,7 +99,7 @@
       "checking": "We couldn't check your session",
       "title": "Sign in to continue"
     },
-    "legal": "By continuing you accept the Terms and the Data Processing Policy.",
+    "legal": "By continuing you accept the <terms>Terms</terms> and the <privacy>Data Processing Policy</privacy>.",
     "unfinished_door": {
       "title": "We're finishing this part",
       "body": "For now you can post a lost pet. <back>Back</back>"
@@ -121,26 +121,22 @@
     "other_cases": "See other cases",
     "next_photo": "See the next photo",
     "photo_n": "See photo {n}",
-    "copied": "Link copied",
-    "copied_hint": "Paste it in WhatsApp or wherever you want to share it.",
     "report_title": "What's wrong with this post?",
     "cancel_title": "Delete this case",
     "reopen_title": "Reactivate the case",
     "lost": {
-      "share_title": "Missing: {name}",
-      "share_text": "Help us find her",
       "sighting_title": "Where did you see {name}?",
       "claim_title": "Do you have {name}?",
       "reunite_title": "Is {name} back?"
     },
     "found": {
-      "share_title": "Found: {title}",
-      "share_text": "Do you recognise it? Help us find its family",
       "mine_title": "Is this your pet?",
       "reunited_title": "Is it back with its owner?",
       "kept_title": "Are you keeping it?",
       "transferred_title": "Did you hand it to a foundation?"
-    }
+    },
+    "share_title": "Share this listing",
+    "share_title_named": "Share {name}"
   },
   "publish": {
     "errors": {
@@ -552,6 +548,54 @@
       "other": "{count} unread notifications"
     }
   },
+  "legal": {
+    "draft_title": "Draft",
+    "draft_body": "This text is awaiting legal review and may change before launch.",
+    "contact_pending": "the contact channel we will publish here before launch",
+    "other_document": "See also: {name}",
+    "terms": {
+      "title": "Terms and conditions",
+      "intro": "{brand} is a free bulletin board: it connects people looking for a lost pet, who found an animal, want to rehome one or need help, with the people nearby who can help. By using it you accept these rules.",
+      "intermediary_title": "We put people in touch, nothing more",
+      "intermediary_body": "We are not a party to the agreements between people who use {brand}. We show posts and put people in touch; whatever they agree is their own responsibility.",
+      "adoption_title": "Adoptions",
+      "adoption_body": "An adoption is an agreement between the adopter and the publisher. We don't approve adopters or decide who owns an animal.",
+      "money_title": "Money never passes through here",
+      "money_body": "{brand} does not receive, hold or transfer money. Help campaigns link to external platforms; any contribution is between the donor and the recipient.",
+      "badges_title": "What «Verified» means",
+      "badges_body": "A verification badge means we reviewed a document. It is not a guarantee about the person, the foundation or the campaign.",
+      "content_title": "What you post",
+      "content_body": "Only post true cases about real animals. Don't post other people's personal data or violent or misleading content. Anyone can report a post, and we may hide or remove what breaks these rules.",
+      "account_title": "Your account",
+      "account_body": "You sign in with Google or with a code we email you: there are no passwords. To post, we ask for a mobile number, verified once.",
+      "care_title": "When handing over or receiving an animal",
+      "care_body": "Ask for proof it's theirs — an earlier photo, a detail that isn't in the post, the vaccination card — and do the handover in a public place.",
+      "liability_title": "Liability",
+      "liability_body": "We offer {brand} as is. We are not responsible for what people agree or do between themselves, nor for the accuracy of what they post.",
+      "changes_title": "Changes",
+      "changes_body": "If we change these terms, we'll say so in the app before they apply."
+    },
+    "privacy": {
+      "title": "Data processing policy",
+      "intro": "How {brand} processes your personal data, under Colombia's Law 1581 of 2012.",
+      "controller_title": "Who is responsible",
+      "controller_body": "{brand} is responsible for processing your data. For any question or complaint, write to {contact}.",
+      "data_title": "What data we process",
+      "data_body": "Your name, your email, your mobile number if you post or leave one, the approximate location of posts and sightings, photos and what you write. We don't ask for your address, ID document, date of birth or gender.",
+      "purpose_title": "What for",
+      "purpose_body": "To publish and show posts, tell you about sightings and replies, put helpers in touch with the people searching, and prevent abuse of the platform.",
+      "shown_title": "What others see",
+      "shown_body": "A post's area is shown as a zone of at least 200 metres, never the exact spot. Your number is shown only if you choose to be messaged on WhatsApp.",
+      "sharing_title": "Who it is shared with",
+      "sharing_body": "With the providers that run the service — hosting, email, SMS and notifications — and only for that. We don't sell your data.",
+      "retention_title": "How long we keep it",
+      "retention_body": "While your account or your post is active, and afterwards only what the law requires. Contact details someone leaves on a post without an account are deleted once the post is no longer available.",
+      "rights_title": "Your rights",
+      "rights_body": "You can access, update, correct and ask us to delete your data, withdraw your consent and complain to the Superintendence of Industry and Commerce. Write to {contact}: we answer questions within 10 business days and complaints within 15.",
+      "consent_title": "Your consent",
+      "consent_body": "By creating your account or leaving your details on a post you consent to this processing."
+    }
+  },
   "lost": {
     "pet": {
       "species_other": "Pet"
@@ -725,6 +769,68 @@
       "submit": "Publish and alert neighbours",
       "ownership": "By publishing you confirm {name} is your pet.",
       "ownership_unnamed": "By publishing you confirm this is your pet."
+    }
+  },
+  "push": {
+    "offer": {
+      "title": "Want alerts on this phone?",
+      "body": "Turn on notifications and we'll tell you the moment someone answers your post.",
+      "enable": "Turn on alerts",
+      "enabling": "Turning on…",
+      "later": "Not now",
+      "done": "Done: we'll alert you on this phone.",
+      "denied": "Notifications are blocked. We'll keep you posted by email and in your Inbox.",
+      "failed": "We couldn't turn on alerts. Try again."
+    },
+    "install": {
+      "body": "To get alerts on iPhone: tap Share → Add to Home Screen, and open the app from there.",
+      "dismiss": "Got it"
+    }
+  },
+  "sharing": {
+    "format_label": "Poster format",
+    "formats": {
+      "square": "Square",
+      "story": "Story",
+      "print": "Print"
+    },
+    "preview": "Poster preview: {format}",
+    "label": {
+      "lost": "Missing",
+      "found": "Found"
+    },
+    "line": {
+      "lost": "Lost in {place} · {date} · {ago}",
+      "found": "Found in {place} · {date} · {ago}"
+    },
+    "no_photo": "No photo — see the description",
+    "scan": "Scan the code",
+    "info": "Up-to-date information and direct contact",
+    "footer": {
+      "no_upfront_money": "Nobody who really has the animal will ask you for money up front.",
+      "verify_campaign": "Campaign on vaki.co — check it before you donate."
+    },
+    "framer": {
+      "label": "Framing",
+      "recenter": "Center again"
+    },
+    "actions": {
+      "whatsapp": "Send the link on WhatsApp",
+      "share": "Share image",
+      "download": "Download",
+      "download_pdf": "Download PDF to print"
+    },
+    "print_hint": "A4 size. The QR code prints at {size} cm so it can be read from a distance. No phone numbers.",
+    "saved_copied": "We downloaded the image and copied the message. Paste it in WhatsApp.",
+    "saved": "We downloaded the image. Share it together with the listing's link.",
+    "error": "We couldn't create the poster on this phone. The WhatsApp link still works: it shows the photo when shared.",
+    "owner_hint": {
+      "lost": "Post it to your stories and put up printed copies near where they went missing. Neighbours are the ones who see it most.",
+      "found": "Post it to your stories and put up printed copies near where you found them. Neighbours are the ones who see it most."
+    },
+    "message": {
+      "lost": "🔎 {label}: {title} — {place}. {traits}. Lost on {date}. Up-to-date information and contact: {link}",
+      "found": "🐾 {label}: {title} — {place}. {traits}. Found on {date}. Do you know whose it is? Up-to-date information and contact: {link}"
     }
   }
 }

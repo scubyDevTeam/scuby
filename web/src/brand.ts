@@ -6,6 +6,8 @@ export const brand = {
   name: env.brandName,
   shortName: env.brandShortName,
   origin: env.publicOrigin,
+  /** The data-protection contact on the legal pages; undefined until configured. */
+  legalEmail: env.legalEmail,
   /** The logo files live in public/brand/ and change together with the name. */
   markUrl: '/brand/mark-white.png',
 } as const

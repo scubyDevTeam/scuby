@@ -99,7 +99,7 @@
       "checking": "No pudimos comprobar tu sesión",
       "title": "Entra para continuar"
     },
-    "legal": "Al continuar aceptas los Términos y la Política de tratamiento de datos.",
+    "legal": "Al continuar aceptas los <terms>Términos</terms> y la <privacy>Política de tratamiento de datos</privacy>.",
     "unfinished_door": {
       "title": "Estamos terminando esta parte",
       "body": "Por ahora puedes publicar un aviso de mascota perdida. <back>Volver</back>"
@@ -121,26 +121,22 @@
     "other_cases": "Ver otros avisos",
     "next_photo": "Ver la siguiente foto",
     "photo_n": "Ver foto {n}",
-    "copied": "Enlace copiado",
-    "copied_hint": "Pégalo en WhatsApp o donde quieras compartirlo.",
     "report_title": "¿Qué pasa con esta publicación?",
     "cancel_title": "Eliminar este aviso",
     "reopen_title": "Reactivar el aviso",
     "lost": {
-      "share_title": "Se busca: {name}",
-      "share_text": "Ayúdanos a encontrarla",
       "sighting_title": "¿Dónde viste a {name}?",
       "claim_title": "¿Tienes a {name}?",
       "reunite_title": "¿{name} ya apareció?"
     },
     "found": {
-      "share_title": "Se encontró: {title}",
-      "share_text": "¿Lo reconoces? Ayúdanos a encontrar a su familia",
       "mine_title": "¿Es tu mascota?",
       "reunited_title": "¿Ya está con su dueño?",
       "kept_title": "¿Te lo quedas?",
       "transferred_title": "¿Lo entregaste a una fundación?"
-    }
+    },
+    "share_title": "Comparte este aviso",
+    "share_title_named": "Comparte a {name}"
   },
   "publish": {
     "errors": {
@@ -552,6 +548,54 @@
       "other": "{count} avisos sin leer"
     }
   },
+  "legal": {
+    "draft_title": "Borrador",
+    "draft_body": "Este texto está pendiente de revisión legal y puede cambiar antes del lanzamiento.",
+    "contact_pending": "el canal de contacto que publicaremos aquí antes del lanzamiento",
+    "other_document": "Ver también: {name}",
+    "terms": {
+      "title": "Términos y condiciones",
+      "intro": "{brand} es un tablón de avisos gratuito: conecta a quien busca una mascota perdida, encontró un animal, quiere darlo en adopción o necesita ayuda con las personas cerca que pueden ayudar. Al usarlo aceptas estas reglas.",
+      "intermediary_title": "Facilitamos el contacto, nada más",
+      "intermediary_body": "No somos parte de los acuerdos entre quienes usan {brand}. Mostramos avisos y ponemos a las personas en contacto; lo que acuerden entre ellas es responsabilidad suya.",
+      "adoption_title": "Adopciones",
+      "adoption_body": "Una adopción es un acuerdo entre quien adopta y quien publica. No aprobamos adoptantes ni decidimos quién es el dueño de un animal.",
+      "money_title": "El dinero nunca pasa por aquí",
+      "money_body": "{brand} no recibe, guarda ni transfiere dinero. Las campañas de ayuda enlazan a plataformas externas; cualquier aporte es entre quien dona y quien recibe.",
+      "badges_title": "Qué significa «Verificado»",
+      "badges_body": "Una insignia de verificación significa que revisamos un documento. No es una garantía sobre la persona, la fundación ni la campaña.",
+      "content_title": "Lo que publicas",
+      "content_body": "Publica solo avisos ciertos sobre animales reales. No publiques datos personales de otras personas ni contenido violento o engañoso. Cualquiera puede reportar una publicación, y podemos ocultar o retirar lo que incumpla estas reglas.",
+      "account_title": "Tu cuenta",
+      "account_body": "Entras con Google o con un código que te enviamos por correo: no hay contraseñas. Para publicar te pedimos un celular, que verificamos una vez.",
+      "care_title": "Al entregar o recibir un animal",
+      "care_body": "Pide una prueba de que es suyo — una foto anterior, un dato que no salga en el aviso, el carnet de vacunas — y haz la entrega en un lugar público.",
+      "liability_title": "Responsabilidad",
+      "liability_body": "Ofrecemos {brand} tal como está. No respondemos por lo que las personas acuerden o hagan entre ellas, ni por la exactitud de lo que publican.",
+      "changes_title": "Cambios",
+      "changes_body": "Si cambiamos estos términos, lo avisaremos en la app antes de que apliquen."
+    },
+    "privacy": {
+      "title": "Política de tratamiento de datos",
+      "intro": "Cómo trata {brand} tus datos personales, según la Ley 1581 de 2012 de Colombia.",
+      "controller_title": "Quién es responsable",
+      "controller_body": "{brand} es responsable del tratamiento de tus datos. Para cualquier consulta o reclamo, escríbenos a {contact}.",
+      "data_title": "Qué datos tratamos",
+      "data_body": "Tu nombre, tu correo, tu celular si publicas o dejas uno, la ubicación aproximada de los avisos y avistamientos, las fotos y lo que escribes. No pedimos dirección, documento de identidad, fecha de nacimiento ni género.",
+      "purpose_title": "Para qué",
+      "purpose_body": "Para publicar y mostrar avisos, avisarte de avistamientos y respuestas, poner en contacto a quien ayuda con quien busca, y prevenir el abuso de la plataforma.",
+      "shown_title": "Qué ven los demás",
+      "shown_body": "La zona de un aviso se muestra como un área de al menos 200 metros, nunca el punto exacto. Tu número solo se muestra si eliges que te escriban por WhatsApp.",
+      "sharing_title": "Con quién se comparten",
+      "sharing_body": "Con los proveedores que hacen funcionar el servicio — alojamiento, envío de correos, SMS y notificaciones —, solo para eso. No vendemos tus datos.",
+      "retention_title": "Cuánto tiempo los guardamos",
+      "retention_body": "Mientras tu cuenta o tu aviso estén activos, y después solo lo que exija la ley. Los datos de contacto que alguien deja sin cuenta en un aviso se borran cuando el aviso deja de estar disponible.",
+      "rights_title": "Tus derechos",
+      "rights_body": "Puedes conocer, actualizar, rectificar y pedir que borremos tus datos, revocar tu autorización y quejarte ante la Superintendencia de Industria y Comercio. Escríbenos a {contact}: respondemos las consultas en máximo 10 días hábiles y los reclamos en máximo 15.",
+      "consent_title": "Tu autorización",
+      "consent_body": "Al crear tu cuenta o dejar tus datos en un aviso autorizas este tratamiento."
+    }
+  },
   "lost": {
     "pet": {
       "species_other": "Mascota"
@@ -725,6 +769,68 @@
       "submit": "Publicar y avisar a los vecinos",
       "ownership": "Al publicar confirmas que {name} es tu mascota.",
       "ownership_unnamed": "Al publicar confirmas que esta es tu mascota."
+    }
+  },
+  "push": {
+    "offer": {
+      "title": "¿Te avisamos en este teléfono?",
+      "body": "Activa las notificaciones y te contamos al instante cuando alguien responda a tu aviso.",
+      "enable": "Activar avisos",
+      "enabling": "Activando…",
+      "later": "Ahora no",
+      "done": "Listo: te avisaremos en este teléfono.",
+      "denied": "Las notificaciones están bloqueadas. Te contaremos todo por correo y en tu Bandeja.",
+      "failed": "No pudimos activar los avisos. Inténtalo de nuevo."
+    },
+    "install": {
+      "body": "Para recibir avisos en iPhone: toca Compartir → Añadir a pantalla de inicio, y abre la app desde ahí.",
+      "dismiss": "Entendido"
+    }
+  },
+  "sharing": {
+    "format_label": "Formato del afiche",
+    "formats": {
+      "square": "Cuadrado",
+      "story": "Historia",
+      "print": "Imprimir"
+    },
+    "preview": "Vista previa del afiche: {format}",
+    "label": {
+      "lost": "Se busca",
+      "found": "Se encontró"
+    },
+    "line": {
+      "lost": "Se perdió en {place} · {date} · {ago}",
+      "found": "Se encontró en {place} · {date} · {ago}"
+    },
+    "no_photo": "Sin foto — mira las señas",
+    "scan": "Escanea el código",
+    "info": "Información al día y contacto directo",
+    "footer": {
+      "no_upfront_money": "Nadie que de verdad lo tenga te va a pedir dinero por adelantado.",
+      "verify_campaign": "Campaña en vaki.co — verifica antes de donar."
+    },
+    "framer": {
+      "label": "Encuadre",
+      "recenter": "Centrar de nuevo"
+    },
+    "actions": {
+      "whatsapp": "Enviar el enlace por WhatsApp",
+      "share": "Compartir imagen",
+      "download": "Descargar",
+      "download_pdf": "Descargar PDF para imprimir"
+    },
+    "print_hint": "Tamaño A4. El código QR sale de {size} cm para que se lea desde lejos. Sin números de teléfono.",
+    "saved_copied": "Descargamos la imagen y copiamos el mensaje. Pégalo en WhatsApp.",
+    "saved": "Descargamos la imagen. Compártela junto con el enlace del aviso.",
+    "error": "No pudimos crear el afiche en este teléfono. El enlace por WhatsApp sí funciona: muestra la foto al compartirlo.",
+    "owner_hint": {
+      "lost": "Súbelo a tus historias y pega copias impresas cerca de donde se perdió. La gente del barrio es la que más lo ve.",
+      "found": "Súbelo a tus historias y pega copias impresas cerca de donde lo encontraste. La gente del barrio es la que más lo ve."
+    },
+    "message": {
+      "lost": "🔎 {label}: {title} — {place}. {traits}. Se perdió el {date}. Información al día y contacto: {link}",
+      "found": "🐾 {label}: {title} — {place}. {traits}. Se encontró el {date}. ¿Sabes de quién es? Información al día y contacto: {link}"
     }
   }
 }
