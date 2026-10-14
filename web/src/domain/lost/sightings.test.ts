@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { durations } from '../shared/time'
-import { placeSightings, validateSighting } from './sightings'
+import {
+  moderationChange,
+  moderationOptions,
+  placeSightings,
+  splitHidden,
+  validateSighting,
+} from './sightings'
 
 const now = new Date('2026-10-04T12:00:00Z')
 const ago = (ms: number) => new Date(now.getTime() - ms)
@@ -78,5 +84,50 @@ describe('04 · Display rules — trajectory', () => {
       now,
     )
     expect(placed.map((s) => s.emphasized)).toEqual([true, true])
+  })
+})
+
+describe('04 · Display rules — the trajectory joins visible pins (rule 2)', () => {
+  it('sets hidden pins apart, so they neither draw nor number', () => {
+    const { visible, hidden } = splitHidden([
+      { id: 'a', hidden: false },
+      { id: 'b', hidden: true },
+      { id: 'c', hidden: false },
+    ])
+    expect(visible.map((s) => s.id)).toEqual(['a', 'c'])
+    expect(hidden.map((s) => s.id)).toEqual(['b'])
+  })
+})
+
+describe('04 · Display rules — the owner hides or highlights a pin (rules 3 and 5)', () => {
+  it('offers the owner «marcar como útil» and hide on a visible pin', () => {
+    expect(moderationOptions({ hidden: false, highlightedByOwner: false }, 'owner')).toEqual([
+      'highlight',
+      'hide',
+    ])
+  })
+
+  it('a starred pin can be unstarred', () => {
+    expect(moderationOptions({ hidden: false, highlightedByOwner: true }, 'owner')).toEqual([
+      'unhighlight',
+      'hide',
+    ])
+  })
+
+  it('a hidden pin offers only its way back to the map', () => {
+    expect(moderationOptions({ hidden: true, highlightedByOwner: true }, 'owner')).toEqual([
+      'unhide',
+    ])
+  })
+
+  it('nobody but the owner moderates', () => {
+    expect(moderationOptions({ hidden: false, highlightedByOwner: false }, 'public')).toEqual([])
+  })
+
+  it('sends only the field that changes', () => {
+    expect(moderationChange('highlight')).toEqual({ highlighted: true })
+    expect(moderationChange('unhighlight')).toEqual({ highlighted: false })
+    expect(moderationChange('hide')).toEqual({ hidden: true })
+    expect(moderationChange('unhide')).toEqual({ hidden: false })
   })
 })

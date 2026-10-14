@@ -68,6 +68,13 @@ describe('call', () => {
     expect(error?.details).toEqual({ case_code: '7K3PQ' })
   })
 
+  it('names the fields a `validation_failed` rejected', async () => {
+    respond(422, { error: { code: 'validation_failed', message: 'x', fields: { bio: 'links' } } })
+    const error = await failureOf(call(api.updateProfile, { body: { bio: 'wa.me/1' } }, asIs))
+    expect(error?.code).toBe('validation_failed')
+    expect(error?.fields).toEqual({ bio: 'links' })
+  })
+
   it('still classifies a failure that carries no envelope', async () => {
     vi.stubGlobal(
       'fetch',
