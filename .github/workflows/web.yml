@@ -1,0 +1,35 @@
+name: web
+
+on:
+  pull_request:
+    paths: ['web/**', '.github/workflows/web.yml']
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/web.yml']
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm depcruise
+      - run: pnpm check:brand
+      - run: pnpm build
+      - run: pnpm size
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e

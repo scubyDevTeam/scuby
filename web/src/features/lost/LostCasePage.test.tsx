@@ -1,0 +1,127 @@
+// @vitest-environment jsdom
+import { type LostCase, parseCase } from '@contracts/case'
+import { fireEvent, screen, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import { cases } from '../../mocks/fixtures'
+import { renderWithQuery } from '../../test-utils'
+import { LostCasePage } from './LostCasePage'
+
+const now = new Date()
+
+function lostCase(code: string, overrides: Partial<LostCase> = {}): LostCase {
+  const parsed = parseCase(cases()[code])
+  if (parsed.vertical !== 'lost') throw new Error('expected a lost case')
+  return { ...parsed, ...overrides }
+}
+
+function show(caseData: LostCase) {
+  const onAction = vi.fn()
+  renderWithQuery(
+    <LostCasePage
+      lostCase={caseData}
+      now={now}
+      shortUrl="example.test/c/7K3PQ"
+      backLink={<a href="/">Volver</a>}
+      mapStyleUrl={undefined}
+      onAction={onAction}
+    />,
+  )
+  return onAction
+}
+
+describe('LostCasePage — active case, seen by a helper', () => {
+  it('offers the sighting and the claim, and reports which one was tapped', () => {
+    const onAction = show(lostCase('7K3PQ'))
+
+    fireEvent.click(screen.getByRole('button', { name: /La vi/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'La tengo conmigo' }))
+
+    expect(onAction.mock.calls).toEqual([['report_sighting'], ['claim_recovery']])
+  })
+
+  it('shows the possible-find badge while a claim is open, and keeps the actions', () => {
+    show(lostCase('7K3PQ'))
+    expect(screen.getByText('Posible hallazgo.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /La vi/ })).toBeTruthy()
+  })
+
+  it('lists sightings newest first, numbered from the oldest', () => {
+    show(lostCase('7K3PQ'))
+    const items = within(screen.getByRole('list', { name: 'Avistamientos' })).getAllByRole(
+      'listitem',
+    )
+    expect(items.map((item) => item.textContent?.[0])).toEqual(['3', '2', '1'])
+  })
+
+  it('never offers a helper the owner-only close', () => {
+    show(lostCase('7K3PQ'))
+    expect(screen.queryByRole('button', { name: 'Ya apareció' })).toBeNull()
+  })
+
+  it('links to WhatsApp only when the owner exposed it', () => {
+    show(lostCase('7K3PQ', { contact: { displayName: 'Carolina M.', whatsappUrl: null } }))
+    expect(screen.getByText('Carolina M.')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Escribirle por WhatsApp' })).toBeNull()
+  })
+})
+
+describe('LostCasePage — photos', () => {
+  it('steps through the photos and wraps around', () => {
+    show(lostCase('7K3PQ'))
+    const next = screen.getByRole('button', { name: 'Ver la siguiente foto' })
+    expect(next.textContent).toBe('1 / 4')
+    fireEvent.click(next)
+    expect(next.textContent).toBe('2 / 4')
+    fireEvent.click(screen.getByRole('button', { name: 'Ver foto 4' }))
+    fireEvent.click(next)
+    expect(next.textContent).toBe('1 / 4')
+  })
+})
+
+describe('LostCasePage — the owner', () => {
+  it('can close an active case as reunited', () => {
+    const onAction = show(lostCase('7K3PQ', { viewer: 'owner' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ya apareció' }))
+    expect(onAction).toHaveBeenCalledWith('confirm_reunited')
+    expect(screen.queryByRole('button', { name: /La vi/ })).toBeNull()
+  })
+
+  it('sees who says they have her — with the number as buttons — instead of the public badge', () => {
+    show(lostCase('7K3PQ', { viewer: 'owner' }))
+    const claims = within(screen.getByRole('region', { name: 'Posibles hallazgos' }))
+    expect(claims.getByText('+573114829017')).toBeTruthy()
+    expect(claims.getByRole('link', { name: 'Abrir WhatsApp' }).getAttribute('href')).toBe(
+      'https://wa.me/573114829017',
+    )
+    expect(claims.getByRole('link', { name: 'Llamar' }).getAttribute('href')).toBe(
+      'tel:+573114829017',
+    )
+    expect(screen.queryByText('Posible hallazgo.')).toBeNull()
+  })
+
+  it('a helper never sees the claims or their phones', () => {
+    show(lostCase('7K3PQ'))
+    expect(screen.queryByRole('region', { name: 'Posibles hallazgos' })).toBeNull()
+    expect(screen.queryByText('+573114829017')).toBeNull()
+  })
+
+  it('can reopen an archived case', () => {
+    const onAction = show(lostCase('ARCH2', { viewer: 'owner' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivar aviso' }))
+    expect(onAction).toHaveBeenCalledWith('reopen')
+  })
+})
+
+describe('LostCasePage — closed cases (10 §1)', () => {
+  it('a reunited case shows the banner and no actions', () => {
+    show(lostCase('H4PPY'))
+    expect(screen.getByText('¡Toby ya está en casa!')).toBeTruthy()
+    expect(screen.queryAllByRole('button')).toEqual([])
+  })
+
+  it('an archived case says so and offers a helper nothing', () => {
+    show(lostCase('ARCH2'))
+    expect(screen.getByText('Este aviso fue archivado.')).toBeTruthy()
+    expect(screen.queryAllByRole('button')).toEqual([])
+  })
+})

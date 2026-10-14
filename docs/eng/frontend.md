@@ -240,6 +240,7 @@ the server-provided center + radius.
 | **Form state across a trip out** | Help flow link gate — kept on the device, no server draft | [07](../product/07-help-workflow.md) · Publishing |
 | **Map** | Rule 5 above | [04](../product/04-lost-workflow.md) |
 | **Offline-ish** | Service worker caches shell and fonts; a case page opened from a link renders on a flaky connection once loaded. Writes online-only, except the sighting queue (*Risks* §6); a failed write keeps the form | — |
+| **Product name** | One file, `src/brand.ts` (name, short name, public origin), filled at build time from the `VITE_BRAND_*` and `VITE_PUBLIC_ORIGIN` env vars (every key, with mock defaults, in `web/.env`; `src/env.ts` is the only reader). UI copy, the page title, the PWA manifest, the poster and the share function's tags read it; **no user-facing string spells the name literally** (a CI grep enforces it). Notification and email copy is the backend's and needs the same setting there | [00 · #21](../product/00-product-map.md) |
 | **Case lifecycles as UI model** | One machine per vertical in `src/domain` (below) | [04](../product/04-lost-workflow.md)–[07](../product/07-help-workflow.md) · state machines |
 
 ## What the frontend does NOT own
@@ -296,13 +297,28 @@ beats an intention.
 
 | What | Budget | Enforced by |
 |---|---|---|
-| `/c/:code` — JS transferred, first load | **≤ 150 KB gzip** (map excluded) | `size-limit` in CI |
+| `/c/:code` — JS transferred, first load | **≤ 150 KB gzip** (map excluded) | `pnpm size` in CI: sums the route's chunks from the build manifest |
 | `/c/:code` — LCP | **≤ 2.0 s** on Slow 4G, mid-tier Android | Lighthouse CI on every PR |
 | Map cold load | **≤ 2.0 s** to first interactive tiles | manual on the reference device |
 | Uploaded photo | ≈ 300 KB, ≤ 1600 px, JPEG | client pipeline ([media-pipeline](media-pipeline.md)) |
 
 **Sentry from the first deploy**, with uploaded sourcemaps — `@sentry/react`; `@sentry/capacitor`
 arrives with the mobile scope. Users don't file bugs, they stop coming back.
+
+---
+
+## Testing
+
+Every feature ships with its tests in the same change. No feature is done without both:
+
+| Level | What | Where | Tool |
+|---|---|---|---|
+| **Unit** | Every rule in `domain` (one test per arrow, bound or table row of the owning doc, named after its section); every feature's screens in their states (content, loading, empty, error) and what each viewer is offered; `contracts`, `api-client` and `platform` behaviour | next to the code, `*.test.ts(x)` | Vitest (+ Testing Library on jsdom for components) |
+| **End to end** | **One happy path per feature**: the way a real person completes it, start to finish, in a phone-sized Chromium against the mocked API | `web/e2e/*.spec.ts` | Playwright |
+
+Unhappy paths, edge cases and rules are unit tests — fast and exact. The e2e suite stays one happy
+path per feature so it stays quick and trusted; a second e2e for a feature needs a reason a unit
+test cannot cover (the offline sighting queue is one). Both suites run in CI on every PR.
 
 ---
 
@@ -313,7 +329,7 @@ arrives with the mobile scope. Users don't file bugs, they stop coming back.
 | Build | **Vite** + React 19 + TypeScript strict |
 | Router | **TanStack Router** — file-based, type-safe params, SPA |
 | Styling | **Tailwind + shadcn/ui** |
-| Map | **MapLibre GL JS** + **Protomaps** tiles — GL symbol layers, lazy-loaded |
+| Map | **MapLibre GL JS** — GL symbol layers, lazy-loaded. Tiles: any style URL, set in `VITE_MAP_STYLE_URL`; **OpenFreeMap** (keyless, free) for development and until launch. The production source (OpenFreeMap, Protomaps hosted, or self-hosted `.pmtiles`) is decided with real traffic numbers — changing it is one env var. With no style URL, or no WebGL, the map falls back to a tile-less drawing of the same area and pins |
 | Server state | **TanStack Query** (+ persister for the sighting queue) |
 | Forms | **react-hook-form + Zod** |
 | Contracts | Zod + types generated from the backend's OpenAPI spec |
@@ -325,7 +341,7 @@ arrives with the mobile scope. Users don't file bugs, they stop coming back.
 | Native sign-in *(scope 2)* | Google: Capawesome Google Sign-In or `@capgo/capacitor-social-login` (Credential Manager on Android, Google SDK on iOS). Apple: Sign in with Apple through the same plugin family. Behind `src/platform/auth` |
 | Live updates *(scope 2)* | **Capgo** or **Capawesome** — JS/asset fixes reach installed apps without review (Apple 3.3.2 allows it for JS and assets, never a change of purpose). Not Ionic Appflow: closed to new customers, shuts down 2027-12-31 |
 | Store builds *(scope 2)* | GitHub Actions — macOS runner for iOS (no Mac required), Linux for Android; signing secrets in CI, never in the repo |
-| Tooling | **Biome** (lint + format) · dependency-cruiser · size-limit · **Vitest** on `domain` · **Playwright** web e2e · Lighthouse CI on `/c/:code` |
+| Tooling | **Biome** (lint + format) · dependency-cruiser · a size-budget script · **Vitest** + Testing Library · **Playwright** web e2e (see *Testing*) · Lighthouse CI on `/c/:code` |
 
 Pin the current major of each at scaffold time — this doc goes stale faster than the ecosystem.
 
@@ -336,7 +352,7 @@ Pin the current major of each at scaffold time — this doc goes stale faster th
 | Vite + TanStack Router | **Next.js `output: 'export'`** — gives up SSR, RSC, ISR, middleware, `next/image` (every reason to run it), keeps the App Router's complexity, and cannot statically export `/c/[code]` (codes are created at runtime). **React Router 7 framework mode** — SSR-shaped, we have no server. **TanStack Start** — a server we don't need yet; it is the in-place upgrade if we ever do |
 | One function injects OG into the shell | UA-sniffing (fragile); prerendering every case (unbounded ids); no server at all (kills the WhatsApp loop) |
 | One app, folders | Monorepo / workspaces — one deployable. A TS backend sharing `domain` was the only thing that would justify it; the backend is Rails |
-| MapLibre + Protomaps | Google Maps / Mapbox — bill per load, and this map is opened constantly by strangers who never sign up |
+| MapLibre + open tiles | Google Maps / Mapbox — bill per load, and this map is opened constantly by strangers who never sign up |
 | Discriminated unions + `transition()` | XState (nothing to justify it); scattered conditionals (copies that drift) |
 | Biome | ESLint + Prettier — two tools, more config, no benefit at this size |
 | JPEG client re-encode | WebP — Safari's canvas can't reliably encode it, and the server re-encodes the master as JPEG anyway ([media-pipeline](media-pipeline.md) §1) |
@@ -391,7 +407,7 @@ Risks 1, 3, 4, 5, 7 and 8 belong to the mobile scope; 2 and 6 apply from day one
    **first step of the mobile scope**, before any native work (on the web it's ordinary MapLibre,
    checked in web phase 3.4). Spike: map screen with ~300 clustered pins in a Capacitor build on a
    Redmi A3-class phone (3–4 GB RAM) over real 4G. It tests sustained memory (WebGL + tile cache +
-   WhatsApp running), cold Protomaps range requests, and whether the OS reclaims the webview in the
+   WhatsApp running), cold tile requests, and whether the OS reclaims the webview in the
    background. **Pass:** stable memory over five minutes of panning, no reload after backgrounding,
    cold map interactive under ~2 s. **Fail:** a native map view under the webview via plugin (a
    rescue, not a plan), or reopen the native question with evidence. The web is unaffected.

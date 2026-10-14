@@ -1,0 +1,49 @@
+// What the case page offers, by status and by who is looking (frontend.md · Rule 2).
+import { canReopen, type LostCaseState } from './machine'
+
+export type Viewer = 'owner' | 'public'
+
+export type LostAction =
+  | 'report_sighting' // «La vi»
+  | 'claim_recovery' // «La tengo conmigo»
+  | 'contact_owner'
+  | 'share'
+  | 'report_content'
+  | 'confirm_reunited'
+  | 'cancel'
+  | 'reopen'
+
+/** docs/product/10 §1: which face of the page a status shows. */
+export type LostPageMode = 'open' | 'closed' | 'archived'
+
+export function pageMode(state: LostCaseState): LostPageMode {
+  switch (state.status) {
+    case 'active':
+      return 'open'
+    case 'reunited':
+    case 'cancelled':
+      return 'closed'
+    case 'expired':
+      return 'archived'
+  }
+}
+
+export function availableActions(state: LostCaseState, viewer: Viewer, now: Date): LostAction[] {
+  switch (state.status) {
+    case 'active':
+      return viewer === 'owner'
+        ? ['confirm_reunited', 'cancel', 'share']
+        : ['report_sighting', 'claim_recovery', 'contact_owner', 'share', 'report_content']
+    case 'expired':
+      // Reachable and reopenable by the owner, no actions for anyone else.
+      return viewer === 'owner' && canReopen(state, now) ? ['reopen'] : []
+    case 'reunited':
+    case 'cancelled':
+      return []
+  }
+}
+
+/** «Posible hallazgo» is a badge derived from an open recovery claim, never a status. */
+export function hasPossibleFind(openClaimCount: number): boolean {
+  return openClaimCount > 0
+}

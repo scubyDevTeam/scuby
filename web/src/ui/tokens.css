@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/* Design v3 palette (web/design/reference). Blue is the identity; one accent per vertical. */
+@theme {
+  --color-brand: #2192f9;
+  --color-brand-deep: #0a6cd4;
+  --color-brand-pressed: #06529f;
+  --color-brand-mid: #6db6fb;
+  --color-brand-ice: #e3f1fe;
+  --color-brand-mist: #eaf4fe;
+  --color-ink: #12365c;
+
+  --color-lost: #dc3545;
+  --color-lost-deep: #c62828;
+  --color-lost-soft: #ffecea;
+  --color-lost-ink: #7a1c1c;
+  --color-found: #17875a;
+  --color-adoption: #2192f9;
+  --color-help: #6f52d9;
+  --color-whatsapp: #157f43;
+
+  --color-surface: #ffffff;
+  --color-soft: #edf1f5;
+  --color-line: #dce3ea;
+  --color-field: #c3cdd6;
+  --color-muted: #4c5d6b;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius-card: 1.25rem;
+}
+
+@layer base {
+  html {
+    color: var(--color-ink);
+    background: var(--color-surface);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  /* On a desktop, everything that does something shows the hand. */
+  button:not(:disabled),
+  a[href],
+  summary,
+  label:has(input),
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-brand-mid);
+    outline-offset: 2px;
+  }
+}

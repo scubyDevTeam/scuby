@@ -32,3 +32,5 @@ product and engineering source of truth is `docs/`; there is no application code
 6. Spanish strings are UI copy; domain identifiers are English snake_case.
 7. Git: the repo is `scubyDevTeam/scuby`. Before GitHub operations, `gh auth switch --user <account>`
    to an account that is a member of the `scubyDevTeam` org (work accounts can't push here).
+8. Commit messages start with a type prefix: `feat:` (behaviour), `test:`, `doc:`, `ci:` — one
+   kind of change per commit where it can be split.
