@@ -8,7 +8,9 @@ const ROUTE = 'c.$code'
 
 const manifest = JSON.parse(readFileSync('dist/.vite/manifest.json', 'utf8'))
 const entries = Object.entries(manifest)
-const starts = entries.filter(([key, chunk]) => chunk.isEntry || key.includes(`routes/${ROUTE}.tsx`))
+const starts = entries.filter(
+  ([key, chunk]) => chunk.isEntry || key.includes(`routes/${ROUTE}.tsx`),
+)
 if (starts.length < 2) {
   console.error(`Could not find the entry and the ${ROUTE} route in the build manifest.`)
   process.exit(1)
