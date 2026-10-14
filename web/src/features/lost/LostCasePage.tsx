@@ -4,7 +4,7 @@ import { placeSightings } from '@domain/lost/sightings'
 import { publicArea } from '@domain/shared/geo'
 import { formatRelative } from '@domain/shared/time'
 import { Button, buttonClass, roundButtonClass } from '@ui/Button'
-import { SchematicMap } from '@ui/Map/SchematicMap'
+import { CaseMap } from '@ui/Map/CaseMap'
 import { Notice } from '@ui/Notice'
 import { Archive, Clock, Flag, MessageCircle, PartyPopper, Share2 } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -17,10 +17,12 @@ type Props = {
   /** Host and code as printed on the band — the address people type from a poster. */
   shortUrl: string
   backLink: ReactNode
+  /** Tile style for the map; undefined draws the area and pins without streets. */
+  mapStyleUrl: string | undefined
   onAction: (action: LostAction) => void
 }
 
-export function LostCasePage({ lostCase, now, shortUrl, backLink, onAction }: Props) {
+export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, onAction }: Props) {
   const { pet, lastSeen } = lostCase
   const state = { status: lostCase.status, resolvedAt: lostCase.resolvedAt }
   const mode = pageMode(state)
@@ -121,7 +123,8 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, onAction }: Pr
               <h2 className="m-0 text-2xl font-extrabold">Por dónde va</h2>
               <span className="text-muted">{sightingsCount(sightings.length)}</span>
             </div>
-            <SchematicMap
+            <CaseMap
+              styleUrl={mapStyleUrl}
               area={area}
               areaLabel="Zona donde se perdió (aproximada)"
               pins={sightings.map((s) => ({

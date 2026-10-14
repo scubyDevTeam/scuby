@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test.ts'
 
 test('browse the feed, filter it, and open a case', async ({ page }) => {
   await page.goto('/')

@@ -26,7 +26,7 @@ export const env = {
   apiUrl: required('VITE_API_URL'),
   apiMock: raw.VITE_API_MOCK === 'true',
   googleClientId: optional('VITE_GOOGLE_CLIENT_ID'),
-  protomapsApiKey: optional('VITE_PROTOMAPS_API_KEY'),
+  mapStyleUrl: optional('VITE_MAP_STYLE_URL'),
   vapidPublicKey: optional('VITE_VAPID_PUBLIC_KEY'),
   sentryDsn: optional('VITE_SENTRY_DSN'),
 } as const

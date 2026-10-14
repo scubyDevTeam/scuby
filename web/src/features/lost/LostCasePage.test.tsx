@@ -21,6 +21,7 @@ function show(caseData: LostCase) {
       now={now}
       shortUrl="example.test/c/7K3PQ"
       backLink={<a href="/">Volver</a>}
+      mapStyleUrl={undefined}
       onAction={onAction}
     />,
   )

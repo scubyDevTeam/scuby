@@ -10,6 +10,7 @@ import { Message, Skeleton } from '@ui/States'
 import { ChevronLeft, FileX, SearchX, WifiOff } from 'lucide-react'
 import { useState } from 'react'
 import { brand } from '../brand'
+import { env } from '../env'
 
 export const Route = createFileRoute('/c/$code')({ component: CaseScreen })
 
@@ -103,6 +104,7 @@ function CaseScreen() {
             <ChevronLeft aria-hidden="true" />
           </Link>
         }
+        mapStyleUrl={env.mapStyleUrl}
         onAction={handle}
       />
       <Sheet

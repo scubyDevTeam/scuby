@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test.ts'
 
 test('a shared link to an active lost case shows who, where and what to do', async ({ page }) => {
   await page.goto('/c/7K3PQ')
@@ -13,6 +13,9 @@ test('a shared link to an active lost case shows who, where and what to do', asy
   const sightings = page.getByRole('list').getByRole('listitem')
   await expect(sightings).toHaveCount(3)
   await expect(sightings.first()).toContainText('hace 2 h')
+
+  // The map loads after the page, on its own.
+  await expect(page.getByTestId('map')).toHaveAttribute('data-map-ready', 'true')
 
   await expect(page.getByRole('link', { name: 'Escribirle por WhatsApp' })).toHaveAttribute(
     'href',
