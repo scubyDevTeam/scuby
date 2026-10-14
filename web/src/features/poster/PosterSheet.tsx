@@ -22,6 +22,7 @@ import { type PointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { posterLayout } from './layout'
 import {
   isResponsible,
+  ownerHint,
   type PosterCase,
   posterContent,
   type ShortLink,
@@ -232,9 +233,7 @@ export function PosterSheet({ posterCase, link, brand, prepare = preparePoster }
       ) : null}
       {notice === 'failed' ? <Notice tone="warning">{t('sharing.error')}</Notice> : null}
 
-      {responsible ? (
-        <p className="m-0 text-muted">{t(`sharing.owner_hint.${posterCase.vertical}`)}</p>
-      ) : null}
+      {responsible ? <p className="m-0 text-muted">{ownerHint(i18n, posterCase)}</p> : null}
     </div>
   )
 }

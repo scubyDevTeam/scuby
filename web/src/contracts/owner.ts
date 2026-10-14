@@ -14,6 +14,9 @@ import {
   verticalSchema,
 } from './primitives'
 
+// The inbox's shapes live in inbox.ts: the app chrome reads them on every page.
+export * from './inbox'
+
 export const petWire = z.object({
   id: z.string(),
   name: z.string(),
@@ -182,8 +185,8 @@ export function parsePublish(raw: unknown): PublishResult {
   return 'code' in wire ? { kind: 'published', code: wire.code } : { kind: 'otp' }
 }
 
-export const uploadWire = z.object({ url: photoUrl })
-export const parseUpload = (raw: unknown) => uploadWire.parse(raw).url
+// The upload answer lives with the helpers' shapes (actions.ts): every form with photos uses it.
+export { parseUpload, uploadWire } from './actions'
 
 /** «¿Quién te ayudó?» (docs/product/04 · `resolution` values). */
 export const lostAttributionSchema = z.enum([
@@ -208,8 +211,10 @@ export const moderateSightingRequest = z.object({
 })
 
 /**
- * One answer per check-in (docs/product/04 · The follow-up loop). The first three answer a
- * time-based check-in, the last three a claim check-in.
+ * One answer per check-in (docs/product/04 · The follow-up loop). On a lost case the first three
+ * answer a time-based check-in, the next three a claim check-in. On an adoption listing
+ * (docs/product/06) `still_available` is the one-tap answer; «ya fue adoptado» and «ya no está
+ * disponible» go through their own endpoints, which end the listing and its questions.
  */
 export const answerCheckinRequest = z.object({
   response: z.enum([
@@ -219,6 +224,7 @@ export const answerCheckinRequest = z.object({
     'claim_confirmed',
     'claim_dismissed',
     'still_verifying',
+    'still_available',
   ]),
   /** With `reunited`. `claim_confirmed` is always `platform_claim`. */
   resolution_attribution: z._default(z.nullable(lostAttributionSchema), null),
@@ -227,45 +233,3 @@ export const answerCheckinRequest = z.object({
 })
 
 export type CheckinAnswer = z.infer<typeof answerCheckinRequest>['response']
-
-/** The in-app inbox: a copy of every notification, whatever channel it also went out on (08). */
-const notificationWire = z.object({
-  id: z.string(),
-  /** The domain event that fired it, e.g. `sighting.reported` (docs/product/08). */
-  event: z.string(),
-  /** Already composed by the server, in Spanish. */
-  body: z.string(),
-  case_code: z.nullable(z.string()),
-  created_at: timestamp,
-  read_at: z.nullable(timestamp),
-})
-export const notificationsWire = z.object({
-  unread_count: z.int().check(z.nonnegative()),
-  items: z.array(notificationWire),
-})
-/** Mark these as read, or everything when `ids` is null. */
-export const readNotificationsRequest = z.object({ ids: z.nullable(z.array(z.string())) })
-
-export type Notification = {
-  id: string
-  event: string
-  body: string
-  caseCode: string | null
-  createdAt: Date
-  readAt: Date | null
-}
-
-export function parseNotifications(raw: unknown): { unreadCount: number; items: Notification[] } {
-  const wire = notificationsWire.parse(raw)
-  return {
-    unreadCount: wire.unread_count,
-    items: wire.items.map((item) => ({
-      id: item.id,
-      event: item.event,
-      body: item.body,
-      caseCode: item.case_code,
-      createdAt: new Date(item.created_at),
-      readAt: item.read_at ? new Date(item.read_at) : null,
-    })),
-  }
-}

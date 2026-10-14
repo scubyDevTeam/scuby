@@ -5,6 +5,7 @@ import { db, findCase, type LostRow, newCode, newId, type PersonRow } from '../d
 import {
   closeCheckins,
   closeClaimCheckins,
+  onListerInteraction,
   onOwnerInteraction,
   onPublished,
   onStillVerifying,
@@ -12,7 +13,13 @@ import {
 import { notify } from '../notify'
 import { Fail, fail, route } from '../route'
 import { DAY, iso, ms, placeName } from '../rules'
-import { myCasesView, notificationsView, petsView, REOPEN_WINDOW } from '../serialize'
+import {
+  ADOPTION_REOPEN_WINDOW,
+  myCasesView,
+  notificationsView,
+  petsView,
+  REOPEN_WINDOW,
+} from '../serialize'
 import { DEMO_CODE } from './auth'
 
 /** The phone step every publish shares (docs/eng/auth.md): verification belongs to the number. */
@@ -107,7 +114,13 @@ export const owner = [
     // Pet, owner link and case in one transaction: a case without a pet is never a state.
     if (!petId) {
       petId = newId('pet-')
-      db.pets.push({ id: petId, owner_id: user.id, ...body.pet })
+      db.pets.push({
+        id: petId,
+        owner_id: user.id,
+        custody_state: 'claimed',
+        health_flags: [],
+        ...body.pet,
+      })
     }
     const code = newCode()
     db.cases[code] = {
@@ -152,17 +165,20 @@ export const owner = [
     return { id: row.code }
   }),
 
-  // Lost or found: an expired case comes back with its sightings and trajectory, for 30 days.
+  // An expired case comes back with its sightings and trajectory: lost and found for 30 days, an
+  // adoption listing for 90.
   route(api.reopenCase, ({ params, user }) => {
     const row = findCase(params.code) ?? fail('not_found')
-    if (row.vertical !== 'lost' && row.vertical !== 'found') fail('not_found')
+    if (row.vertical === 'help') fail('not_found')
     if (row.created_by !== user.id) fail('forbidden')
     if (row.status !== 'expired' || !row.resolved_at) fail('invalid_transition')
-    if (Date.now() - ms(row.resolved_at) > REOPEN_WINDOW) fail('invalid_transition')
+    const window = row.vertical === 'adoption' ? ADOPTION_REOPEN_WINDOW : REOPEN_WINDOW
+    if (Date.now() - ms(row.resolved_at) > window) fail('invalid_transition')
     row.status = 'active'
     row.resolved_at = null
     row.resolution = null
     if (row.vertical === 'lost') onOwnerInteraction(row.code)
+    if (row.vertical === 'adoption') onListerInteraction(row.code)
     return { id: row.code }
   }),
 
@@ -196,13 +212,36 @@ export const owner = [
   }),
 
   route(api.answerCheckin, ({ params, user, body }) => {
+    const listing = findCase(params.code)
+    if (listing?.vertical === 'adoption') {
+      // «Sigue disponible» is the one-tap answer (06); the endings have their own endpoints.
+      if (listing.created_by !== user.id) fail('forbidden')
+      const checkin = db.checkins.find(
+        (c) => c.id === params.checkinId && c.case_code === listing.code,
+      )
+      if (!checkin) fail('not_found')
+      if (checkin.responded_at || checkin.cancelled_at || listing.status !== 'active') {
+        fail('invalid_transition')
+      }
+      if (body.response !== 'still_available') {
+        throw new Fail('validation_failed', undefined, {
+          response: `«${body.response}» does not answer an adoption check-in`,
+        })
+      }
+      checkin.responded_at = iso(Date.now())
+      checkin.response = body.response
+      onListerInteraction(listing.code)
+      return { id: checkin.id }
+    }
     const row = ownedLost(params.code, user)
     const checkin = db.checkins.find((c) => c.id === params.checkinId && c.case_code === row.code)
     if (!checkin) fail('not_found')
     if (checkin.responded_at || checkin.cancelled_at || row.status !== 'active') {
       fail('invalid_transition')
     }
-    const fitsTrigger = TIME_BASED.includes(body.response) === (checkin.trigger === 'time_based')
+    const fitsTrigger =
+      body.response !== 'still_available' &&
+      TIME_BASED.includes(body.response) === (checkin.trigger === 'time_based')
     if (!fitsTrigger) {
       throw new Fail('validation_failed', undefined, {
         response: `«${body.response}» does not answer a ${checkin.trigger} check-in`,

@@ -202,12 +202,13 @@ export function AreaFields({
 }: {
   center: Point | null
   radiusM: number
-  when: ReturnType<typeof useWhen>
+  /** Null for an area with no moment: where an adoptable animal lives now. */
+  when: ReturnType<typeof useWhen> | null
   defaultCenter: Point
   mapStyleUrl: string | undefined
   onChange: (patch: { center?: Point; radiusM?: number }) => void
   errorFor: ErrorFor
-  whenTitle: string
+  whenTitle?: string
 }) {
   const i18n = useI18n()
   const { t } = i18n
@@ -254,66 +255,71 @@ export function AreaFields({
           {t('publish.area.privacy')}
         </p>
       </Section>
-      <Section
-        title={whenTitle}
-        error={errorFor('time_required') ?? errorFor('time_in_the_future')}
-      >
-        <Chips
-          label={t('common.day')}
-          options={dayOptions(i18n)}
-          value={when.day}
-          onChange={when.setDay}
-        />
-        {when.day === 'other' ? (
-          <TextField
+      {when ? (
+        <Section
+          title={whenTitle ?? ''}
+          error={errorFor('time_required') ?? errorFor('time_in_the_future')}
+        >
+          <Chips
             label={t('common.day')}
-            type="date"
-            max={when.maxDate}
-            value={when.otherDate}
-            onChange={(event) => when.setOtherDate(event.target.value)}
+            options={dayOptions(i18n)}
+            value={when.day}
+            onChange={when.setDay}
           />
-        ) : null}
-        <TextField
-          label={t('publish.when.time')}
-          type="time"
-          value={when.time}
-          onChange={(event) => when.setTime(event.target.value)}
-        />
-      </Section>
+          {when.day === 'other' ? (
+            <TextField
+              label={t('common.day')}
+              type="date"
+              max={when.maxDate}
+              value={when.otherDate}
+              onChange={(event) => when.setOtherDate(event.target.value)}
+            />
+          ) : null}
+          <TextField
+            label={t('publish.when.time')}
+            type="time"
+            value={when.time}
+            onChange={(event) => when.setTime(event.target.value)}
+          />
+        </Section>
+      ) : null}
     </>
   )
 }
 
+type Otp = { value: string; onType: (input: string) => void; wrong: boolean }
+
 /**
- * The phone step of docs/eng/auth.md plus the contact preferences. The verified number is shown
- * prefilled with «Cambiar»; the SMS code is asked for only when the server answered `otp`.
+ * The phone step of docs/eng/auth.md: the verified number shown prefilled with «Cambiar», or the
+ * field to type one; «tiene WhatsApp» asserted by a checkbox; the SMS code asked for only when the
+ * server answered `otp`. Every publish ends with it, and so does «Me interesa» (06).
  */
-export function ContactFields({
-  user,
-  draft,
+export function PhoneStep({
+  phone,
+  hasWhatsapp,
   onChange,
-  errorFor,
+  error,
   phonePrefix,
+  phoneHint,
   verifiedPhone,
   onChangePhone,
   otp,
   demoCode,
 }: {
-  user: User
-  draft: ContactDraft
-  onChange: (patch: Partial<ContactDraft>) => void
-  errorFor: ErrorFor
+  phone: string
+  hasWhatsapp: boolean
+  onChange: (patch: { phone?: string; hasWhatsapp?: boolean }) => void
+  error: string | null
   phonePrefix: string
-  /** The account's verified number, unless the publisher asked to change it. */
+  phoneHint: string
+  /** The account's verified number, unless the person asked to change it. */
   verifiedPhone: string | null
   onChangePhone: () => void
   /** Present once the server asked for the code. */
-  otp: { value: string; onType: (input: string) => void; wrong: boolean } | null
+  otp: Otp | null
   demoCode: string | undefined
 }) {
   const { t } = useI18n()
-  const setContact = (patch: Partial<ContactDraft['contact']>) =>
-    onChange({ contact: { ...draft.contact, ...patch } })
   return (
     <>
       {verifiedPhone ? (
@@ -330,17 +336,17 @@ export function ContactFields({
         <PhoneField
           label={t('contact.your_phone')}
           prefix={phonePrefix}
-          hint={t('publish.phone.hint')}
-          error={errorFor('phone_invalid')}
+          hint={phoneHint}
+          error={error}
           disabled={otp !== null}
-          value={draft.phone}
+          value={phone}
           onChange={(event) => onChange({ phone: event.target.value })}
         />
       )}
       <Checkbox
         label={t('publish.phone.has_whatsapp')}
-        checked={draft.hasWhatsapp}
-        onChange={(hasWhatsapp) => onChange({ hasWhatsapp })}
+        checked={hasWhatsapp}
+        onChange={(checked) => onChange({ hasWhatsapp: checked })}
       />
 
       {otp ? (
@@ -363,6 +369,51 @@ export function ContactFields({
           ) : null}
         </section>
       ) : null}
+    </>
+  )
+}
+
+/** The phone step plus the contact preferences: how neighbours reach the publisher. */
+export function ContactFields({
+  user,
+  draft,
+  onChange,
+  errorFor,
+  phonePrefix,
+  verifiedPhone,
+  onChangePhone,
+  otp,
+  demoCode,
+}: {
+  user: User
+  draft: ContactDraft
+  onChange: (patch: Partial<ContactDraft>) => void
+  errorFor: ErrorFor
+  phonePrefix: string
+  /** The account's verified number, unless the publisher asked to change it. */
+  verifiedPhone: string | null
+  onChangePhone: () => void
+  /** Present once the server asked for the code. */
+  otp: Otp | null
+  demoCode: string | undefined
+}) {
+  const { t } = useI18n()
+  const setContact = (patch: Partial<ContactDraft['contact']>) =>
+    onChange({ contact: { ...draft.contact, ...patch } })
+  return (
+    <>
+      <PhoneStep
+        phone={draft.phone}
+        hasWhatsapp={draft.hasWhatsapp}
+        onChange={onChange}
+        error={errorFor('phone_invalid')}
+        phonePrefix={phonePrefix}
+        phoneHint={t('publish.phone.hint')}
+        verifiedPhone={verifiedPhone}
+        onChangePhone={onChangePhone}
+        otp={otp}
+        demoCode={demoCode}
+      />
 
       <section className="flex flex-col">
         <h2 className="m-0 text-lg font-bold">{t('publish.phone.channels')}</h2>

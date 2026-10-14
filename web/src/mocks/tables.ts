@@ -1,5 +1,13 @@
 // The emulated backend's tables: rows hold what the server knows — owners, reporters' numbers,
 // hidden pins — and serialize.ts decides what each viewer gets to see, as the real backend must.
+import type {
+  AdoptionResolution,
+  FeeCover,
+  HealthFlag,
+  Housing,
+  RequirementFlag,
+  Temperament,
+} from '../contracts/adoption'
 import type { Color, Point } from '../contracts/primitives'
 
 export type Species = 'dog' | 'cat' | 'other'
@@ -16,6 +24,8 @@ export type PersonRow = {
   city: string | null
   bio: string | null
   notification_prefs: { lost: boolean; found: boolean; adoption: boolean; help: boolean }
+  /** «miembro hace 8 meses»: a fact the adoption lister reads next to a name (06). */
+  joined_at: string
 }
 
 export type PetRow = {
@@ -29,6 +39,10 @@ export type PetRow = {
   marks: string | null
   chip_number: string | null
   photo_urls: string[]
+  /** `claimed` once someone holds the owner link — even when it is off the platform (06). */
+  custody_state: 'claimed' | 'unclaimed' | 'org_held'
+  /** Durable: a condition survives every case and every adoption (06 · `pet`). */
+  health_flags: HealthFlag[]
 }
 
 type Published = {
@@ -67,12 +81,58 @@ export type FoundRow = Published & {
   hold_offer_at: string
   withheld_detail: string | null
   org_name: string | null
+  /** Set on `converted`: the adoption listing this animal moved to. */
+  successor_case_code: string | null
 }
 
-/** Adoption and help have no flow yet: a card's worth of data, so feed and links resolve. */
+export type AdoptionRow = Published & {
+  vertical: 'adoption'
+  status: 'active' | 'adopted' | 'withdrawn' | 'expired'
+  resolution: AdoptionResolution | null
+  /** Set when the listing was born from a found case's day-15 conversion (05). */
+  predecessor_case_code: string | null
+  story: string
+  temperament: Temperament[]
+  requirement_flags: RequirementFlag[]
+  requirements: string | null
+  fee_cop: number
+  fee_covers: FeeCover[]
+  /** B2P seam: only `light` is legal in v1 and nothing branches on it. */
+  lane: 'light' | 'application'
+  location: Area
+  external_url: string | null
+  /** Only orgs with reviewed documents are `verified`; there are no orgs in the emulation. */
+  trust_tier: 'verified' | 'individual'
+}
+
+export type AdoptionInterestRow = {
+  id: string
+  case_code: string
+  /** Always registered: adopting is a commitment, not a tip. */
+  person_id: string
+  /** B2P seams: only `interest` is legal in v1, and `form_data` stays unwritten. */
+  kind: 'interest' | 'application'
+  form_data: null
+  intro: {
+    housing: Housing
+    has_yard: boolean
+    other_pets: string | null
+    household: string | null
+    why: string
+  }
+  /** The number the person verified, and whether it has WhatsApp: the lister's way back. */
+  contact_phone: string
+  phone_has_whatsapp: boolean
+  status: 'open' | 'chosen' | 'declined' | 'withdrawn'
+  created_at: string
+  /** The lister's first move on it; powers the «sin responder» nudge once it exists. */
+  first_responded_at: string | null
+}
+
+/** Help has no flow yet: a card's worth of data, so feed and links resolve. */
 export type CardRow = {
   code: string
-  vertical: 'adoption' | 'help'
+  vertical: 'help'
   status: 'active'
   title: string
   species: Species
@@ -83,7 +143,7 @@ export type CardRow = {
   detail: string | null
 }
 
-export type CaseRow = LostRow | FoundRow | CardRow
+export type CaseRow = LostRow | FoundRow | AdoptionRow | CardRow
 
 export type SightingRow = {
   id: string
@@ -175,6 +235,7 @@ export type Tables = {
   sightings: SightingRow[]
   recoveryClaims: RecoveryClaimRow[]
   ownershipClaims: OwnershipClaimRow[]
+  adoptionInterests: AdoptionInterestRow[]
   checkins: CheckinRow[]
   notifications: NotificationRow[]
   pushSubscriptions: PushRow[]

@@ -1,7 +1,7 @@
 import type { DraftError } from '@domain/shared/publish'
 import type { TextKey, Translator } from '@i18n/translate'
 
-const errorKey: Record<DraftError, TextKey> = {
+export const draftErrorKey: Record<DraftError, TextKey> = {
   name_required: 'publish.errors.name_required',
   species_required: 'publish.errors.species_required',
   size_required: 'publish.errors.size_required',
@@ -17,4 +17,4 @@ const errorKey: Record<DraftError, TextKey> = {
 /** The message for an error, only if it is among those being shown. */
 export const messageFor =
   (t: Translator['t'], shown: readonly DraftError[]) => (error: DraftError) =>
-    shown.includes(error) ? t(errorKey[error]) : null
+    shown.includes(error) ? t(draftErrorKey[error]) : null

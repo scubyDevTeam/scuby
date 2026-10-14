@@ -1,7 +1,7 @@
 // Modules the `locale-namespaces` plugin (vite.config.ts) makes out of src/i18n/locales/<lang>.json.
 type MessagesPart = Record<string, unknown>
 
-declare module 'virtual:messages/core/es' {
+declare module 'virtual:messages/es/core' {
   const part: MessagesPart
   export default part
 }

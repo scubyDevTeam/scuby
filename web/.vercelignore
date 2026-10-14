@@ -1,0 +1,2 @@
+# Every file in api/ becomes a Vercel function unless its name starts with `_`: tests are not.
+api/**/*.test.ts

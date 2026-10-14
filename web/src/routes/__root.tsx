@@ -1,13 +1,15 @@
 import { configQuery } from '@api-client/actions'
-import { notificationsQuery } from '@api-client/owner'
+import { notificationsQuery } from '@api-client/inbox'
 import { queryClient } from '@api-client/query-client'
 import { useSession } from '@api-client/session'
 import { useI18n } from '@i18n/react'
+import { reportError } from '@platform/errors'
 import { useQuery } from '@tanstack/react-query'
 import { createRootRoute, Link, Outlet, useMatchRoute } from '@tanstack/react-router'
+import { Button } from '@ui/Button'
 import { Message } from '@ui/States'
-import { Bell, FileText, Home, Plus, SearchX, User } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { Bell, CloudAlert, FileText, Home, Plus, SearchX, User } from 'lucide-react'
+import type { ErrorInfo, ReactNode } from 'react'
 import { brand } from '../brand'
 import { LanguageLinks } from './-i18n'
 
@@ -19,7 +21,33 @@ export const Route = createRootRoute({
   },
   component: Shell,
   notFoundComponent: NotFound,
+  // No route below sets its own boundary, so whatever breaks a screen lands here.
+  errorComponent: Crash,
+  // The router's type leaves out the second argument its boundary passes (React's ErrorInfo).
+  onCatch: (error: unknown, info?: ErrorInfo) =>
+    reportError(error, info?.componentStack ?? undefined),
 })
+
+/** A screen threw. Calm words and a way out; the report went with onCatch. */
+function Crash() {
+  const { t } = useI18n()
+  return (
+    <Message
+      icon={<CloudAlert aria-hidden="true" className="size-10" />}
+      title={t('errors_ui.crash.title')}
+      action={
+        <div className="flex w-full flex-col items-center gap-3">
+          <Button onClick={() => window.location.reload()}>{t('errors_ui.crash.reload')}</Button>
+          <Link to="/{-$locale}" className="font-bold text-brand-deep">
+            {t('errors_ui.crash.home')}
+          </Link>
+        </div>
+      }
+    >
+      {t('errors_ui.crash.body')}
+    </Message>
+  )
+}
 
 function NotFound() {
   const { t } = useI18n()

@@ -1,5 +1,6 @@
 import { useCase } from '@api-client/cases'
 import { ApiError } from '@api-client/http'
+import { withMessages } from '@i18n/locales'
 import { useI18n } from '@i18n/react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Button } from '@ui/Button'
@@ -15,6 +16,12 @@ const LostCaseScreen = lazy(() =>
 )
 const FoundCaseScreen = lazy(() =>
   import('./-case/FoundCaseScreen').then((m) => ({ default: m.FoundCaseScreen })),
+)
+// Its words come with it: they are not part of the first paint of every other case.
+const AdoptionCaseScreen = lazy(
+  withMessages(['adoption'], () =>
+    import('./-case/AdoptionCaseScreen').then((m) => ({ default: m.AdoptionCaseScreen })),
+  ),
 )
 
 const home = (chunks: ReactNode) => (
@@ -76,13 +83,15 @@ function CaseScreen() {
   }
 
   const found = query.data
-  if (found.vertical === 'lost' || found.vertical === 'found') {
+  if (found.vertical !== 'help') {
     return (
       <Suspense fallback={<Loading />}>
         {found.vertical === 'lost' ? (
           <LostCaseScreen found={found} />
-        ) : (
+        ) : found.vertical === 'found' ? (
           <FoundCaseScreen found={found} />
+        ) : (
+          <AdoptionCaseScreen found={found} />
         )}
       </Suspense>
     )

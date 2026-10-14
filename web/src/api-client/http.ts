@@ -4,7 +4,7 @@ import {
   type Endpoint,
   type ParamsOf,
   type QueryOf,
-} from '../contracts/api'
+} from '../contracts/endpoint'
 import { type ErrorCode, parseFailure } from '../contracts/errors'
 import { env } from '../env'
 

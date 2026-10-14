@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { OnError } from './OnError'
 import { SchematicMap } from './SchematicMap'
 import type { MapArea, MapPin } from './types'
@@ -17,8 +17,12 @@ type Props = {
 /** The area, the sighting pins and their trajectory — on a real map when the device can. */
 export function CaseMap({ styleUrl, area, areaLabel, pins }: Props) {
   const [failed, setFailed] = useState(false)
+  const [holder, ready] = useWhenSettledAndNear()
   const schematic = <SchematicMap area={area} areaLabel={areaLabel} pins={pins} />
   if (!styleUrl || failed) return schematic
+  // The drawing holds the place until the page has painted and the map is about to be seen: the
+  // ~250 KB of MapLibre and its tiles never compete with the case for the first paint.
+  if (!ready) return <div ref={holder}>{schematic}</div>
 
   return (
     <OnError fallback={schematic}>
@@ -37,4 +41,45 @@ export function CaseMap({ styleUrl, area, areaLabel, pins }: Props) {
       </Suspense>
     </OnError>
   )
+}
+
+/** True once the page has finished loading, is idle, and the element is within a screen of view. */
+function useWhenSettledAndNear() {
+  const ref = useRef<HTMLDivElement>(null)
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    let observer: IntersectionObserver | undefined
+    let cancelled = false
+    const watch = () => {
+      if (cancelled) return
+      const element = ref.current
+      if (!element || typeof IntersectionObserver === 'undefined') return setReady(true)
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            observer?.disconnect()
+            setReady(true)
+          }
+        },
+        { rootMargin: '100% 0px' },
+      )
+      observer.observe(element)
+    }
+    const idle = () => {
+      // Safari has no requestIdleCallback.
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(watch, { timeout: 2000 })
+      } else {
+        setTimeout(watch, 200)
+      }
+    }
+    if (document.readyState === 'complete') idle()
+    else window.addEventListener('load', idle, { once: true })
+    return () => {
+      cancelled = true
+      observer?.disconnect()
+      window.removeEventListener('load', idle)
+    }
+  }, [])
+  return [ref, ready] as const
 }

@@ -1,7 +1,7 @@
 // The languages the app speaks (docs/eng/frontend.md · Languages). The language is a segment of the
 // URL — `/en/c/7K3PQ` — and Spanish, the source, has none: `/c/7K3PQ`, so every printed poster and
 // every link already shared keeps working. A new language is one JSON file and one entry here.
-import esCore from 'virtual:messages/core/es'
+import esCore from 'virtual:messages/es/core'
 import { loaders } from 'virtual:messages/loaders'
 import type { DeferredNamespace } from './namespaces'
 

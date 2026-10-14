@@ -11,11 +11,12 @@ import { CaseMap } from '@ui/Map/CaseMap'
 import { Notice } from '@ui/Notice'
 import { Archive, Clock, Flag, PartyPopper, Share2 } from 'lucide-react'
 import { lazy, type ReactNode, Suspense } from 'react'
-import { ClaimsList } from './ClaimsList'
 import { describePet, formatDayMonth, sightingsCount } from './copy'
 import { SightingTimeline } from './SightingTimeline'
 
 // The owner's tools load only for the owner: a stranger opening the link never pays for them.
+// Owner-only, so lazy: a stranger opening the link never downloads the owner's actions.
+const ClaimsList = lazy(() => import('./ClaimsList').then((m) => ({ default: m.ClaimsList })))
 const CheckinCard = lazy(() => import('./CheckinCard').then((m) => ({ default: m.CheckinCard })))
 const moderation = () => import('./SightingModeration')
 const SightingTools = lazy(() => moderation().then((m) => ({ default: m.SightingTools })))
@@ -206,14 +207,16 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
       ) : null}
 
       {isOwner && mode === 'open' ? (
-        <ClaimsList
-          code={lostCase.code}
-          petName={pet.name}
-          claims={lostCase.claims}
-          now={now}
-          revealsOwnNumber={lostCase.contact?.whatsappUrl == null}
-          onConfirmed={() => onAction('confirm_reunited')}
-        />
+        <Suspense fallback={null}>
+          <ClaimsList
+            code={lostCase.code}
+            petName={pet.name}
+            claims={lostCase.claims}
+            now={now}
+            revealsOwnNumber={lostCase.contact?.whatsappUrl == null}
+            onConfirmed={() => onAction('confirm_reunited')}
+          />
+        </Suspense>
       ) : null}
 
       {mode === 'open' &&

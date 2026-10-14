@@ -1,0 +1,186 @@
+// docs/product/06 · `adoption_case` and the fee rule: what the listing form asks and checks.
+// Pre-checks for feedback; the server decides.
+import type { Point } from '../shared/geo'
+import type { PhoneRules } from '../shared/phone'
+import {
+  type AnimalDraft,
+  animalErrors,
+  type ContactDraft,
+  contactErrors,
+  DEFAULT_RADIUS_M,
+  type DraftError,
+  emptyAnimal,
+  emptyContact,
+} from '../shared/publish'
+
+export type Temperament =
+  | 'good_with_kids'
+  | 'good_with_cats'
+  | 'good_with_dogs'
+  | 'senior'
+  | 'puppy'
+export type RequirementFlag =
+  | 'needs_yard'
+  | 'no_small_children'
+  | 'no_other_dogs'
+  | 'indoor_only'
+  | 'experienced_home'
+export type HealthFlag =
+  | 'chronic_condition'
+  | 'special_needs'
+  | 'senior'
+  | 'fiv_felv'
+  | 'mobility_aid'
+  | 'behavioral_support'
+export type FeeCover = 'sterilization' | 'vaccines' | 'deworming' | 'microchip'
+export type ListerRole = 'owner' | 'custodian'
+
+export const TEMPERAMENTS: readonly Temperament[] = [
+  'good_with_kids',
+  'good_with_cats',
+  'good_with_dogs',
+  'senior',
+  'puppy',
+]
+export const REQUIREMENT_FLAGS: readonly RequirementFlag[] = [
+  'needs_yard',
+  'no_small_children',
+  'no_other_dogs',
+  'indoor_only',
+  'experienced_home',
+]
+export const HEALTH_FLAGS: readonly HealthFlag[] = [
+  'chronic_condition',
+  'special_needs',
+  'senior',
+  'fiv_felv',
+  'mobility_aid',
+  'behavioral_support',
+]
+export const FEE_COVERS: readonly FeeCover[] = [
+  'sterilization',
+  'vaccines',
+  'deworming',
+  'microchip',
+]
+
+export type AdoptionDraft = AnimalDraft &
+  ContactDraft & {
+    listerRole: ListerRole | null
+    healthFlags: HealthFlag[]
+    story: string
+    temperament: Temperament[]
+    requirementFlags: RequirementFlag[]
+    requirements: string
+    /** «¿Pides una cuota de recuperación?» — unanswered is not «no»: disclosure is mandatory. */
+    hasFee: boolean | null
+    /** Digits as typed, in pesos. */
+    fee: string
+    feeCovers: FeeCover[]
+    center: Point | null
+    radiusM: number
+    externalUrl: string
+  }
+
+export const emptyAdoptionDraft: AdoptionDraft = {
+  ...emptyAnimal,
+  ...emptyContact,
+  listerRole: null,
+  healthFlags: [],
+  story: '',
+  temperament: [],
+  requirementFlags: [],
+  requirements: '',
+  hasFee: null,
+  fee: '',
+  feeCovers: [],
+  center: null,
+  radiusM: DEFAULT_RADIUS_M,
+  externalUrl: '',
+}
+
+export type AdoptionDraftError =
+  | DraftError
+  | 'role_required'
+  | 'story_required'
+  | 'fee_required'
+  | 'fee_amount_required'
+  | 'fee_covers_required'
+  | 'external_url_invalid'
+
+/** The amount in pesos: 0 for «Sin cuota», null while the answer is missing or not a number. */
+export function feeAmount(draft: Pick<AdoptionDraft, 'hasFee' | 'fee'>): number | null {
+  if (draft.hasFee === null) return null
+  if (!draft.hasFee) return 0
+  const digits = draft.fee.replace(/\D/g, '')
+  const amount = digits ? Number(digits) : 0
+  return amount > 0 ? amount : null
+}
+
+/**
+ * The fee rule (06): the cuota cannot be left blank — zero is an answer, «Sin cuota» — and a
+ * non-zero fee must say what it reimburses.
+ */
+export function feeErrors(
+  draft: Pick<AdoptionDraft, 'hasFee' | 'fee' | 'feeCovers'>,
+): AdoptionDraftError[] {
+  if (draft.hasFee === null) return ['fee_required']
+  if (!draft.hasFee) return []
+  const errors: AdoptionDraftError[] = []
+  if (feeAmount(draft) === null) errors.push('fee_amount_required')
+  if (draft.feeCovers.length === 0) errors.push('fee_covers_required')
+  return errors
+}
+
+export const isWebUrl = (value: string) => /^https?:\/\/\S+\.\S+/.test(value.trim())
+
+export type AdoptionStep = 1 | 2 | 3
+
+type Context = { phoneRules: PhoneRules | null; verifiedPhone: string | null; converting: boolean }
+
+/**
+ * 1 · who is looking for a home (name and photo: a listing is a person's post about one animal),
+ * 2 · their story, the home they need and the fee, 3 · where they are and how to reach the lister.
+ */
+export function adoptionStepErrors(
+  step: AdoptionStep,
+  draft: AdoptionDraft,
+  context: Context,
+): AdoptionDraftError[] {
+  if (step === 1) {
+    const errors: AdoptionDraftError[] = animalErrors(draft, { name: true, photo: true })
+    // A converted stray keeps its custodian link: the question only applies to a new pet row.
+    if (!context.converting && !draft.listerRole) errors.push('role_required')
+    return errors
+  }
+  if (step === 2) {
+    const errors: AdoptionDraftError[] = []
+    if (!draft.story.trim()) errors.push('story_required')
+    return [...errors, ...feeErrors(draft)]
+  }
+  const errors: AdoptionDraftError[] = []
+  if (!draft.center) errors.push('place_required')
+  if (draft.externalUrl.trim() && !isWebUrl(draft.externalUrl)) errors.push('external_url_invalid')
+  return [...errors, ...contactErrors(draft, context)]
+}
+
+/** What a found case hands the listing (05 · «Publicar en adopción»): photos, traits, the place. */
+export function draftFromFound(found: {
+  pet: Pick<AnimalDraft, 'species' | 'size' | 'colors' | 'photoUrls'> & { marks: string | null }
+  center: Point
+  radiusM: number
+  story: string
+}): AdoptionDraft {
+  return {
+    ...emptyAdoptionDraft,
+    species: found.pet.species,
+    size: found.pet.size,
+    colors: found.pet.colors,
+    marks: found.pet.marks ?? '',
+    photoUrls: found.pet.photoUrls,
+    listerRole: 'custodian',
+    story: found.story,
+    center: found.center,
+    radiusM: found.radiusM,
+  }
+}

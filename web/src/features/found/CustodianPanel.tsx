@@ -6,6 +6,7 @@ import { useI18n } from '@i18n/react'
 import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass } from '@ui/Button'
 import { Notice } from '@ui/Notice'
+import type { ReactNode } from 'react'
 import { tierLabel } from './copy'
 
 type Props = {
@@ -15,13 +16,22 @@ type Props = {
   onConfirmed: () => void
   onKeep: () => void
   onTransfer: () => void
+  /** «Publicar en adopción»: the link to the listing form, pre-filled from this case (05 · 06). */
+  adoptionLink: ReactNode
 }
 
 /**
  * What only the custodian sees (docs/product/05): each «Es mío» with its evidence labelled by how
  * hard it is to fake, the detail they withheld replayed to them, and the day-15 offer.
  */
-export function CustodianPanel({ foundCase, now, onConfirmed, onKeep, onTransfer }: Props) {
+export function CustodianPanel({
+  foundCase,
+  now,
+  onConfirmed,
+  onKeep,
+  onTransfer,
+  adoptionLink,
+}: Props) {
   const i18n = useI18n()
   const { t } = i18n
   const answer = useAnswerOwnershipClaim(foundCase.code)
@@ -48,6 +58,7 @@ export function CustodianPanel({ foundCase, now, onConfirmed, onKeep, onTransfer
           {/* An offer, not a warning: a finder has nothing to lose, the animal has a future to gain. */}
           <p className="m-0 font-bold">{t('found.custodian.offer_title')}</p>
           <p className="m-0 text-muted">{t('found.custodian.offer_body')}</p>
+          {adoptionLink}
           <Button variant="outline" onClick={onTransfer}>
             {t('found.actions.transfer')}
           </Button>

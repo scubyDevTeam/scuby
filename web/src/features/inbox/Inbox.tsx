@@ -1,4 +1,4 @@
-import { useNotifications, useReadNotifications } from '@api-client/owner'
+import { useNotifications, useReadNotifications } from '@api-client/inbox'
 import type { Notification } from '@contracts/owner'
 import { useI18n } from '@i18n/react'
 import { Button } from '@ui/Button'

@@ -5,11 +5,14 @@
       "**",
       "!dist",
       "!dist-e2e",
+      "!dist-size",
       "!test-results",
       "!playwright-report",
+      "!.lighthouseci",
       "!design",
       "!public/mockServiceWorker.js",
-      "!src/routeTree.gen.ts"
+      "!src/routeTree.gen.ts",
+      "!api/_bundle/share.js"
     ]
   },
   "formatter": { "indentStyle": "space", "lineWidth": 100 },

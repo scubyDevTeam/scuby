@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
@@ -43,13 +44,14 @@ function localeNamespaces(): Plugin {
       if (path === 'loaders') {
         const entries = languages.map((lang) => {
           const parts = ['core', ...deferred].map(
-            (part) => `${JSON.stringify(part)}: () => import('${PREFIX}${part}/${lang}')`,
+            (part) => `${JSON.stringify(part)}: () => import('${PREFIX}${lang}/${part}')`,
           )
           return `${JSON.stringify(lang)}: { ${parts.join(', ')} }`
         })
         return `export const loaders = { ${entries.join(', ')} }`
       }
-      const [part, lang] = path.split('/')
+      // `<lang>/<part>`: the chunk takes the part's name, so `preview` can be kept out of the SW cache.
+      const [lang, part] = path.split('/')
       if (!part || !lang || !languages.includes(lang)) return
       this.addWatchFile(file(lang))
       const all: Record<string, unknown> = JSON.parse(readFileSync(file(lang), 'utf8'))
@@ -62,11 +64,46 @@ function localeNamespaces(): Plugin {
   }
 }
 
+/**
+ * Sourcemaps to Sentry (docs/eng/frontend.md · Budgets), only with a real SENTRY_AUTH_TOKEN (`mock-…`
+ * in .env = off, and the build is the same as without this). Uploaded under the build id the client
+ * reports as its release, then deleted: they are never served. The release-and-URL upload, not the
+ * debug-id one: that one stamps a snippet into every chunk, ≈3 KB gzip on the first load of
+ * `/c/:code`, which leaves no room under its 150 KB.
+ */
+function sentrySourcemaps(mode: string, release: string): Plugin[] | undefined {
+  const sentry = loadEnv(mode, process.cwd(), 'SENTRY_')
+  const token = sentry.SENTRY_AUTH_TOKEN
+  if (!token || token.startsWith('mock-')) return undefined
+  return sentryVitePlugin({
+    authToken: token,
+    org: sentry.SENTRY_ORG,
+    project: sentry.SENTRY_PROJECT,
+    release: {
+      name: release,
+      // src/platform/errors.ts passes the release to Sentry.init itself.
+      inject: false,
+      uploadLegacySourcemaps: { paths: ['./dist/assets'], urlPrefix: '~/assets' },
+    },
+    sourcemaps: { disable: true, filesToDeleteAfterUpload: ['./dist*/**/*.map'] },
+    telemetry: false,
+  })
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // The product name is configuration (src/brand.ts reads the same keys at runtime).
   const brand = loadEnv(mode, process.cwd(), 'VITE_BRAND_')
+  const apiMock = loadEnv(mode, process.cwd(), 'VITE_API_MOCK').VITE_API_MOCK === 'true'
+  // Vercel's system env at build time; read by src/env.ts as the error reports' release and environment.
+  const buildId = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? 'local'
+  const deployEnv = process.env.VERCEL_ENV ?? mode
+  const sourcemaps = sentrySourcemaps(mode, buildId)
   return {
+    define: {
+      'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId),
+      'import.meta.env.VITE_DEPLOY_ENV': JSON.stringify(deployEnv),
+    },
     plugins: [
       localeNamespaces(),
       tanstackRouter({ target: 'react', autoCodeSplitting: true }),
@@ -110,16 +147,26 @@ export default defineConfig(({ mode }) => {
           // The shell and the fonts. Not the map (lazy, and its tiles need the network anyway), and
           // not the emulated backend, which never runs next to this worker.
           globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
-          globIgnores: ['**/maplibre*', '**/browser-*.js', 'mockServiceWorker.js'],
+          globIgnores: [
+            '**/maplibre*',
+            '**/browser-*.js',
+            'mockServiceWorker.js',
+            // The link-preview words: only the server function reads them.
+            '**/preview-*.js',
+          ],
         },
       }),
+      sourcemaps,
     ],
     worker: { format: 'es' },
     // scripts/check-size.mjs reads the manifest to add up what one route really downloads.
-    build: { manifest: true },
+    build: {
+      manifest: true,
+      ...(sourcemaps ? { sourcemap: 'hidden' as const } : {}),
+    },
     test: {
       environment: 'node',
-      include: ['src/**/*.test.{ts,tsx}'],
+      include: ['src/**/*.test.{ts,tsx}', 'api/**/*.test.ts'],
       setupFiles: ['src/test-setup.ts'],
     },
     resolve: {
@@ -133,6 +180,10 @@ export default defineConfig(({ mode }) => {
         '@platform': layer('platform'),
         '@ui': layer('ui'),
         '@i18n': layer('i18n'),
+        // Without mocks, the emulated backend is not even in the module graph (src/mocks/off.ts).
+        ...(apiMock
+          ? {}
+          : { '@mocks/browser': fileURLToPath(new URL('./src/mocks/off.ts', import.meta.url)) }),
         '@mocks': layer('mocks'),
       },
     },

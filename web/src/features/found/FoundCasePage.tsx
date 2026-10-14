@@ -25,6 +25,8 @@ type Props = {
   onAction: (action: FoundAction) => void
   /** The custodian's tools: claims to answer and the hold-clock offer. */
   custodianPanel: ReactNode
+  /** On `converted`: the link to the adoption listing the animal moved to. */
+  successorLink?: ReactNode
 }
 
 export function FoundCasePage({
@@ -35,6 +37,7 @@ export function FoundCasePage({
   mapStyleUrl,
   onAction,
   custodianPanel,
+  successorLink,
 }: Props) {
   const i18n = useI18n()
   const { t } = i18n
@@ -143,6 +146,7 @@ export function FoundCasePage({
           {t('found.page.closed_body')}
         </Notice>
       ) : null}
+      {foundCase.status === 'converted' ? successorLink : null}
       {foundCase.status === 'cancelled' ? (
         <Notice tone="neutral" title={t('found.page.cancelled_title')}>
           {t('found.page.cancelled_body')}
