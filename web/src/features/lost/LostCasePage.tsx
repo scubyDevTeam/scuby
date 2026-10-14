@@ -3,10 +3,11 @@ import { availableActions, hasPossibleFind, type LostAction, pageMode } from '@d
 import { placeSightings } from '@domain/lost/sightings'
 import { publicArea } from '@domain/shared/geo'
 import { formatRelative } from '@domain/shared/time'
+import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass, roundButtonClass } from '@ui/Button'
 import { CaseMap } from '@ui/Map/CaseMap'
 import { Notice } from '@ui/Notice'
-import { Archive, Clock, Flag, MessageCircle, PartyPopper, Share2 } from 'lucide-react'
+import { Archive, Clock, Flag, PartyPopper, Share2 } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { describePet, formatDayMonth, sightingsCount } from './copy'
 import { SightingTimeline } from './SightingTimeline'
@@ -75,7 +76,7 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
                     rel="noreferrer"
                     className={buttonClass('whatsapp', 'lg:w-auto')}
                   >
-                    <MessageCircle aria-hidden="true" />
+                    <WhatsAppIcon />
                     Escribirle por WhatsApp
                   </a>
                 ) : null}

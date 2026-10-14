@@ -8,6 +8,7 @@ import {
   RESEND_COOLDOWN_S,
 } from '@domain/shared/signin'
 import { requestGoogleCredential } from '@platform/google'
+import { GoogleIcon } from '@ui/BrandIcons'
 import { Button } from '@ui/Button'
 import { TextField } from '@ui/Field'
 import { Notice } from '@ui/Notice'
@@ -83,6 +84,7 @@ export function SignIn({ googleClientId, demoCode, legal }: Props) {
       {googleClientId || demoCode ? (
         <>
           <Button variant="outline" onClick={withGoogle} disabled={google.isPending}>
+            <GoogleIcon />
             {google.isPending ? 'Entrando…' : 'Continuar con Google'}
           </Button>
           {googleFailed || google.isError ? (

@@ -1,10 +1,10 @@
 import { useClaimRecovery, useConfig } from '@api-client/actions'
 import { toE164 } from '@domain/shared/phone'
 import { openExternal } from '@platform/navigation'
+import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass } from '@ui/Button'
 import { PhoneField } from '@ui/Field'
 import { Notice } from '@ui/Notice'
-import { MessageCircle } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 
 type Props = {
@@ -65,7 +65,7 @@ export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
             rel="noreferrer"
             className={buttonClass('whatsapp')}
           >
-            <MessageCircle aria-hidden="true" />
+            <WhatsAppIcon />
             Abrir WhatsApp
           </a>
         ) : null}
@@ -94,7 +94,7 @@ export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
         </Notice>
       ) : null}
       <Button type="submit" variant="whatsapp" disabled={claim.isPending}>
-        <MessageCircle aria-hidden="true" />
+        <WhatsAppIcon />
         {claim.isPending ? 'Avisando…' : 'Avisar y abrir WhatsApp'}
       </Button>
       <Button variant="link" className="self-center" onClick={onOnlySaw}>
