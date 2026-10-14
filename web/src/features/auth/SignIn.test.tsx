@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { renderWithQuery, stubApi } from '../../test-utils'
 import { SignIn } from './SignIn'
 
-const user = { id: 'u1', display_name: 'Juan Pérez', email: 'juan@correo.co' }
+const user = { id: 'u1', display_name: 'Juan Pérez', email: 'juan@correo.co', phone: null }
 
 /** Renders the form next to who the session says is signed in — the thing signing in must change. */
 function Harness(props: { googleClientId?: string; demoCode?: string }) {

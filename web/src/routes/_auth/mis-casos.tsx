@@ -1,6 +1,19 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { Message } from '@ui/States'
+import { MyCases } from '@features/mine/MyCases'
+import { createFileRoute, Link } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_auth/mis-casos')({
-  component: () => <Message title="Mis casos">Aquí verás los avisos que publiques.</Message>,
+  component: () => (
+    <MyCases
+      caseLink={(code, children, className) => (
+        <Link to="/c/$code" params={{ code }} className={className}>
+          {children}
+        </Link>
+      )}
+      publishLink={(children, className) => (
+        <Link to="/publicar" className={className}>
+          {children}
+        </Link>
+      )}
+    />
+  ),
 })

@@ -41,6 +41,17 @@ export const lostCaseWire = z.object({
   }),
   open_claim_count: z.number().int().nonnegative(),
   sightings: z.array(sightingWire),
+  /** Who says they have the animal. Only the owner receives these. */
+  claims: z
+    .array(
+      z.object({
+        id: z.string(),
+        phone: z.string(),
+        created_at: timestamp,
+        status: z.enum(['open', 'confirmed', 'dismissed', 'stale']),
+      }),
+    )
+    .default([]),
   contact: z.object({ display_name: z.string(), whatsapp_url: z.string().nullable() }).nullable(),
 })
 
@@ -70,6 +81,14 @@ export type Sighting = {
   highlightedByOwner: boolean
 }
 
+export type RecoveryClaim = {
+  id: string
+  /** E.164: format-validated when collected, so it can be a button, never text to retype. */
+  phone: string
+  createdAt: Date
+  status: 'open' | 'confirmed' | 'dismissed' | 'stale'
+}
+
 export type LostCase = {
   code: string
   vertical: 'lost'
@@ -87,6 +106,7 @@ export type LostCase = {
   lastSeen: { center: { lat: number; lng: number }; radiusM: number; at: Date; placeName: string }
   openClaimCount: number
   sightings: Sighting[]
+  claims: RecoveryClaim[]
   contact: { displayName: string; whatsappUrl: string | null } | null
 }
 
@@ -142,6 +162,12 @@ export function parseCase(raw: unknown): CaseDetail {
       photoUrl: s.photo_url,
       source: s.source,
       highlightedByOwner: s.highlighted_by_owner,
+    })),
+    claims: wire.claims.map((claim) => ({
+      id: claim.id,
+      phone: claim.phone,
+      createdAt: new Date(claim.created_at),
+      status: claim.status,
     })),
     contact: wire.contact && {
       displayName: wire.contact.display_name,

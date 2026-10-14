@@ -155,3 +155,57 @@ export function RadioList<T extends string>({
     </fieldset>
   )
 }
+
+/** A yes/no setting with its explanation, as a switch. */
+export function Switch({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string
+  hint?: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  const id = useId()
+  return (
+    <label htmlFor={id} className="flex min-h-12 items-center justify-between gap-4 py-2">
+      <span>
+        <span className="block font-bold">{label}</span>
+        {hint ? <span className="block text-sm text-muted">{hint}</span> : null}
+      </span>
+      <input
+        id={id}
+        type="checkbox"
+        role="switch"
+        aria-checked={checked}
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="relative h-7 w-12 shrink-0 appearance-none rounded-full bg-field transition-colors before:absolute before:top-0.5 before:left-0.5 before:size-6 before:rounded-full before:bg-surface before:transition-transform checked:bg-brand-deep checked:before:translate-x-5"
+      />
+    </label>
+  )
+}
+
+export function Checkbox({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="flex min-h-11 items-center gap-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="size-6 accent-brand-deep"
+      />
+      {label}
+    </label>
+  )
+}

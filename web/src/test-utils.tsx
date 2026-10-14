@@ -12,7 +12,14 @@ export function renderWithQuery(ui: ReactElement) {
 }
 
 export const colombia = {
-  supported_countries: [{ code: 'CO', phone_prefix: '+57', mobile_pattern: '^3\\d{9}$' }],
+  supported_countries: [
+    {
+      code: 'CO',
+      phone_prefix: '+57',
+      mobile_pattern: '^3\\d{9}$',
+      default_center: { lat: 6.2442, lng: -75.5812 },
+    },
+  ],
 }
 
 type Answer = { status?: number; body?: unknown }

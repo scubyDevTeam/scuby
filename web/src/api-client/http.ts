@@ -5,6 +5,7 @@ export type ApiErrorKind =
   | 'unauthorized'
   | 'not_found'
   | 'gone'
+  | 'conflict' // it clashes with something that already exists
   | 'rejected' // the server refused what was sent: validation, rate limit
   | 'server'
   | 'unexpected_response'
@@ -25,6 +26,7 @@ export class ApiError extends Error {
 function kindFor(status: number): ApiErrorKind {
   if (status === 401) return 'unauthorized'
   if (status === 404) return 'not_found'
+  if (status === 409) return 'conflict'
   if (status === 410) return 'gone'
   if (status === 422 || status === 429) return 'rejected'
   return 'server'
@@ -68,4 +70,11 @@ export function apiPost<T>(path: string, body: unknown, parse: (raw: unknown) =>
     },
     parse,
   )
+}
+
+/** Sends one file as multipart: the browser sets the boundary, so no Content-Type here. */
+export function apiUpload<T>(path: string, file: Blob, parse: (raw: unknown) => T): Promise<T> {
+  const form = new FormData()
+  form.append('file', file, 'photo.jpg')
+  return send(new URL(path, env.apiUrl), { method: 'POST', body: form }, parse)
 }

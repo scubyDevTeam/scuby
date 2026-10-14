@@ -14,8 +14,10 @@ import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AuthBandejaRouteImport } from './routes/_auth/bandeja'
 import { Route as AuthMisCasosRouteImport } from './routes/_auth/mis-casos'
 import { Route as AuthPerfilRouteImport } from './routes/_auth/perfil'
-import { Route as AuthPublicarRouteImport } from './routes/_auth/publicar'
 import { Route as CCodeRouteImport } from './routes/c.$code'
+import { Route as PublicarIndexRouteImport } from './routes/publicar.index'
+import { Route as PublicarTipoRouteImport } from './routes/publicar.$tipo'
+import { Route as AuthPublicarPerdidoRouteImport } from './routes/_auth/publicar.perdido'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -41,15 +43,25 @@ const AuthPerfilRoute = AuthPerfilRouteImport.update({
   path: '/perfil',
   getParentRoute: () => AuthRoute,
 } as any)
-const AuthPublicarRoute = AuthPublicarRouteImport.update({
-  id: '/publicar',
-  path: '/publicar',
-  getParentRoute: () => AuthRoute,
-} as any)
 const CCodeRoute = CCodeRouteImport.update({
   id: '/c/$code',
   path: '/c/$code',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PublicarIndexRoute = PublicarIndexRouteImport.update({
+  id: '/publicar/',
+  path: '/publicar/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PublicarTipoRoute = PublicarTipoRouteImport.update({
+  id: '/publicar/$tipo',
+  path: '/publicar/$tipo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthPublicarPerdidoRoute = AuthPublicarPerdidoRouteImport.update({
+  id: '/publicar/perdido',
+  path: '/publicar/perdido',
+  getParentRoute: () => AuthRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -57,16 +69,20 @@ export interface FileRoutesByFullPath {
   '/bandeja': typeof AuthBandejaRoute
   '/mis-casos': typeof AuthMisCasosRoute
   '/perfil': typeof AuthPerfilRoute
-  '/publicar': typeof AuthPublicarRoute
   '/c/$code': typeof CCodeRoute
+  '/publicar/$tipo': typeof PublicarTipoRoute
+  '/publicar/': typeof PublicarIndexRoute
+  '/publicar/perdido': typeof AuthPublicarPerdidoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bandeja': typeof AuthBandejaRoute
   '/mis-casos': typeof AuthMisCasosRoute
   '/perfil': typeof AuthPerfilRoute
-  '/publicar': typeof AuthPublicarRoute
   '/c/$code': typeof CCodeRoute
+  '/publicar/$tipo': typeof PublicarTipoRoute
+  '/publicar': typeof PublicarIndexRoute
+  '/publicar/perdido': typeof AuthPublicarPerdidoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -75,15 +91,32 @@ export interface FileRoutesById {
   '/_auth/bandeja': typeof AuthBandejaRoute
   '/_auth/mis-casos': typeof AuthMisCasosRoute
   '/_auth/perfil': typeof AuthPerfilRoute
-  '/_auth/publicar': typeof AuthPublicarRoute
   '/c/$code': typeof CCodeRoute
+  '/publicar/$tipo': typeof PublicarTipoRoute
+  '/publicar/': typeof PublicarIndexRoute
+  '/_auth/publicar/perdido': typeof AuthPublicarPerdidoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/bandeja' | '/mis-casos' | '/perfil' | '/publicar' | '/c/$code'
+    | '/'
+    | '/bandeja'
+    | '/mis-casos'
+    | '/perfil'
+    | '/c/$code'
+    | '/publicar/$tipo'
+    | '/publicar/'
+    | '/publicar/perdido'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bandeja' | '/mis-casos' | '/perfil' | '/publicar' | '/c/$code'
+  to:
+    | '/'
+    | '/bandeja'
+    | '/mis-casos'
+    | '/perfil'
+    | '/c/$code'
+    | '/publicar/$tipo'
+    | '/publicar'
+    | '/publicar/perdido'
   id:
     | '__root__'
     | '/'
@@ -91,14 +124,18 @@ export interface FileRouteTypes {
     | '/_auth/bandeja'
     | '/_auth/mis-casos'
     | '/_auth/perfil'
-    | '/_auth/publicar'
     | '/c/$code'
+    | '/publicar/$tipo'
+    | '/publicar/'
+    | '/_auth/publicar/perdido'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
   CCodeRoute: typeof CCodeRoute
+  PublicarTipoRoute: typeof PublicarTipoRoute
+  PublicarIndexRoute: typeof PublicarIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -138,19 +175,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthPerfilRouteImport
       parentRoute: typeof AuthRoute
     }
-    '/_auth/publicar': {
-      id: '/_auth/publicar'
-      path: '/publicar'
-      fullPath: '/publicar'
-      preLoaderRoute: typeof AuthPublicarRouteImport
-      parentRoute: typeof AuthRoute
-    }
     '/c/$code': {
       id: '/c/$code'
       path: '/c/$code'
       fullPath: '/c/$code'
       preLoaderRoute: typeof CCodeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/publicar/': {
+      id: '/publicar/'
+      path: '/publicar'
+      fullPath: '/publicar/'
+      preLoaderRoute: typeof PublicarIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/publicar/$tipo': {
+      id: '/publicar/$tipo'
+      path: '/publicar/$tipo'
+      fullPath: '/publicar/$tipo'
+      preLoaderRoute: typeof PublicarTipoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_auth/publicar/perdido': {
+      id: '/_auth/publicar/perdido'
+      path: '/publicar/perdido'
+      fullPath: '/publicar/perdido'
+      preLoaderRoute: typeof AuthPublicarPerdidoRouteImport
+      parentRoute: typeof AuthRoute
     }
   }
 }
@@ -159,14 +210,14 @@ interface AuthRouteChildren {
   AuthBandejaRoute: typeof AuthBandejaRoute
   AuthMisCasosRoute: typeof AuthMisCasosRoute
   AuthPerfilRoute: typeof AuthPerfilRoute
-  AuthPublicarRoute: typeof AuthPublicarRoute
+  AuthPublicarPerdidoRoute: typeof AuthPublicarPerdidoRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
   AuthBandejaRoute: AuthBandejaRoute,
   AuthMisCasosRoute: AuthMisCasosRoute,
   AuthPerfilRoute: AuthPerfilRoute,
-  AuthPublicarRoute: AuthPublicarRoute,
+  AuthPublicarPerdidoRoute: AuthPublicarPerdidoRoute,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
@@ -175,6 +226,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
   CCodeRoute: CCodeRoute,
+  PublicarTipoRoute: PublicarTipoRoute,
+  PublicarIndexRoute: PublicarIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

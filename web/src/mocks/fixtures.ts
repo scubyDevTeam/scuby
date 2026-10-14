@@ -43,6 +43,9 @@ function luna(): LostCaseWire {
     // 100 m as the owner drew it: the page must render it at the 200 m public floor.
     last_seen: { center: laureles, radius_m: 100, at: ago(2 * DAY), place_name: 'Laureles' },
     open_claim_count: 1,
+    claims: [
+      { id: 'claim-luna', phone: '+573114829017', created_at: ago(3 * HOUR), status: 'open' },
+    ],
     sightings: [
       {
         id: 's1',
@@ -89,6 +92,7 @@ function closedLost(
     resolved_at: ago(resolvedAgo),
     pet: { ...luna().pet, name, photo_urls: [mockPhoto('#7a5c3e')] },
     open_claim_count: 0,
+    claims: [],
     sightings: [],
     contact: null,
   }

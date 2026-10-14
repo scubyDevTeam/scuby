@@ -7,14 +7,24 @@ const MapLibrePicker = lazy(() => import('./MapLibrePicker'))
 type Props = {
   styleUrl: string | undefined
   area: MapArea
+  showArea?: boolean
   value: MapPoint | null
+  radiusM?: number
   onChange: (point: MapPoint) => void
   /** Shown instead of the map when it cannot load: the caller still has to offer a way to answer. */
   unavailable: ReactNode
 }
 
 /** Asks «where?» by letting the person tap the spot. */
-export function PickerMap({ styleUrl, area, value, onChange, unavailable }: Props) {
+export function PickerMap({
+  styleUrl,
+  area,
+  showArea,
+  value,
+  radiusM,
+  onChange,
+  unavailable,
+}: Props) {
   const [failed, setFailed] = useState(false)
   if (!styleUrl || failed) return unavailable
 
@@ -25,7 +35,9 @@ export function PickerMap({ styleUrl, area, value, onChange, unavailable }: Prop
           <MapLibrePicker
             styleUrl={styleUrl}
             area={area}
+            showArea={showArea}
             value={value}
+            radiusM={radiusM}
             onChange={onChange}
             onError={() => setFailed(true)}
           />

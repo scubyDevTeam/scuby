@@ -59,3 +59,42 @@ export function Segmented<T extends string>({ label, options, value, onChange }:
     </fieldset>
   )
 }
+
+/** Any number of choices out of a few: colours, tags. */
+export function MultiChips<T extends string>({
+  label,
+  options,
+  values,
+  onChange,
+}: {
+  label: string
+  options: readonly Option<T>[]
+  values: readonly T[]
+  onChange: (values: T[]) => void
+}) {
+  return (
+    <fieldset className="m-0 flex flex-wrap gap-2 border-0 p-0">
+      <legend className="sr-only">{label}</legend>
+      {options.map((option) => {
+        const selected = values.includes(option.value)
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={selected}
+            onClick={() =>
+              onChange(
+                selected ? values.filter((v) => v !== option.value) : [...values, option.value],
+              )
+            }
+            className={`min-h-11 rounded-full border px-4 text-base font-semibold ${
+              selected ? 'border-brand bg-brand text-white' : 'border-line bg-surface text-ink'
+            }`}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </fieldset>
+  )
+}
