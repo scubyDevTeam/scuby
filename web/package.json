@@ -15,7 +15,8 @@
     "depcruise": "depcruise src --config .dependency-cruiser.cjs",
     "size": "size-limit",
     "check:brand": "sh scripts/check-brand.sh",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm check:brand && pnpm build && pnpm size"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm check:brand && pnpm build && pnpm size && pnpm e2e",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.2",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
+    "@playwright/test": "^1.64.0",
     "@size-limit/file": "^14.2.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/router-plugin": "^1.168.45",

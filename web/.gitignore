@@ -29,3 +29,7 @@ dist-ssr
 
 # Design screens: large PNG export, kept local (web/design/README.md)
 design/screens/
+
+# Playwright
+test-results
+playwright-report

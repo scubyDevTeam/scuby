@@ -9,7 +9,11 @@ const layer = (name: string) => fileURLToPath(new URL(`./src/${name}`, import.me
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
-  test: { environment: 'node', include: ['src/**/*.test.{ts,tsx}'] },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['src/test-setup.ts'],
+  },
   resolve: {
     // One alias per layer (docs/eng/frontend.md · Architecture). Mirror changes in tsconfig.app.json.
     alias: {

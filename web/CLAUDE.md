@@ -8,7 +8,8 @@ reasons behind it: `../docs/eng/frontend.md`. Order of work: `../docs/eng/fronte
 | | |
 |---|---|
 | `pnpm dev` | Dev server. With `VITE_API_MOCK=true` (the default in `.env`) MSW answers the API |
-| `pnpm check` | Everything CI runs: lint, types, tests, layer rule, brand check, build, size budget |
+| `pnpm check` | Everything CI runs: lint, types, unit tests, layer rule, brand check, build, size budget, e2e |
+| `pnpm test` · `pnpm e2e` | Vitest unit tests · Playwright happy paths (uses the installed Chrome locally) |
 | `pnpm format` | Biome, fixing what it can |
 | `pnpm test:watch` | Vitest in watch mode |
 
@@ -41,4 +42,6 @@ Enforced by `.dependency-cruiser.cjs`; `pnpm depcruise` fails the build on a vio
   starting with `mock-` means "not configured" and the feature stays off.
 - No feature flags in the client: when a flag changes a screen, the API response says so.
 - Every screen renders its loading, empty and error states.
+- **No feature without tests** (`../docs/eng/frontend.md` · Testing): unit tests next to the code
+  for its rules and screen states, plus one happy-path spec in `e2e/`.
 - The design: `design/reference/` (committed) and `design/screens/` (local, see its README).
