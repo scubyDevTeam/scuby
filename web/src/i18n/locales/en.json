@@ -154,10 +154,6 @@
       "health_hint": "Looking for someone who knows how to care for this.",
       "about_title": "What they are like",
       "home_title": "The home they need",
-      "fee_none": "No fee",
-      "fee_some": "Adoption fee: {amount}",
-      "fee_covers": "Covers {covers}.",
-      "fee_money": "Agreed between you: nothing is paid through the app.",
       "lister": "Posted by {name}",
       "tier_individual": "Posted by a person — checking each other is up to you.",
       "tier_verified": "Verified foundation: we reviewed their documents.",
@@ -204,12 +200,6 @@
       "mobility_aid": "Needs help getting around",
       "behavioral_support": "Needs behavioural support"
     },
-    "covers": {
-      "sterilization": "spaying/neutering",
-      "vaccines": "vaccines",
-      "deworming": "deworming",
-      "microchip": "microchip"
-    },
     "sheet": {
       "interest_title": "Interested in {name}?",
       "conversation_title": "Write to {name}",
@@ -219,7 +209,7 @@
     "poster": {
       "label": "For adoption",
       "line": "Looking for a home in {place} · since {date}",
-      "message": "🏡 {label}: {title} — {place}. {traits}. {fee}. Meet them and write to whoever is caring for them: {link}",
+      "message": "🏡 {label}: {title} — {place}. {traits}. Meet them and write to whoever is caring for them: {link}",
       "owner_hint": "Share it in your stories and in neighbourhood groups: many adoptions start with someone who knows someone."
     }
   },
@@ -368,13 +358,6 @@
       "temperament_title": "How they get along",
       "requirements_title": "The home they need",
       "requirements_label": "Anything else an adopter should know",
-      "fee_title": "Do you ask for an adoption fee?",
-      "fee_hint": "It’s common: it covers what you already spent on them. It’s always shown, even when it’s nothing.",
-      "fee_no": "No fee",
-      "fee_yes": "Yes, a fee",
-      "fee_amount": "Amount in pesos",
-      "fee_covers": "What does it cover?",
-      "fee_money": "Nobody pays through the app: it’s agreed between you.",
       "external_label": "Adoption form on your site",
       "external_hint": "If you have your own process, whoever is interested can follow it there.",
       "from_found": "From your found notice: photos and markings are already in.",
@@ -382,9 +365,6 @@
       "errors": {
         "role_required": "Tell us who they are to you",
         "story_required": "Tell us a bit of their story",
-        "fee_required": "Tell us whether you ask for a fee (it can be «No fee»)",
-        "fee_amount_required": "Write the amount of the fee",
-        "fee_covers_required": "Say what the fee covers",
         "external_url_invalid": "Check the link: it must start with https://"
       },
       "continue": "Continue",
@@ -480,7 +460,7 @@
       },
       "help": {
         "title": "Ask for help",
-        "text": "A campaign for a one-off expense."
+        "text": "A foster home, a ride or supplies."
       },
       "only_saw_title": "Just saw an animal on the street?",
       "only_saw_body": "Go through «I found an animal»: reporting it takes one tap and needs no account."
@@ -623,8 +603,7 @@
     },
     "effect": {
       "queued": "A person will review it. Meanwhile the post stays visible.",
-      "hidden_pending_review": "For this reason we hide it right away while a person reviews it, within 4 hours.",
-      "suspended_pending_review": "For this reason we pause it right away while a person reviews it, within 4 hours."
+      "hidden_pending_review": "For this reason we hide it right away while a person reviews it, within 4 hours."
     },
     "thanks": "Thanks for letting us know.",
     "received": "We got your report.",
@@ -835,9 +814,9 @@
       "adoption_title": "Adoptions",
       "adoption_body": "An adoption is an agreement between the adopter and the publisher. We don't approve adopters or decide who owns an animal.",
       "money_title": "Money never passes through here",
-      "money_body": "{brand} does not receive, hold or transfer money. Help campaigns link to external platforms; any contribution is between the donor and the recipient.",
+      "money_body": "{brand} does not receive, hold, transfer or show money: there are no donations and no fees. Help is in kind — a temporary home, a ride, supplies — and is arranged between people.",
       "badges_title": "What «Verified» means",
-      "badges_body": "A verification badge means we reviewed a document. It is not a guarantee about the person, the foundation or the campaign.",
+      "badges_body": "A verification badge means we reviewed a document. It is not a guarantee about the person or the foundation.",
       "content_title": "What you post",
       "content_body": "Only post true cases about real animals. Don't post other people's personal data or violent or misleading content. Anyone can report a post, and we may hide or remove what breaks these rules.",
       "account_title": "Your account",
@@ -1070,7 +1049,7 @@
       },
       "help": {
         "active": "Needs help",
-        "closed": "Campaign closed"
+        "closed": "Request closed"
       },
       "closed": "Closed"
     },
@@ -1131,8 +1110,7 @@
     "scan": "Scan the code",
     "info": "Up-to-date information and direct contact",
     "footer": {
-      "no_upfront_money": "Nobody who really has the animal will ask you for money up front.",
-      "verify_campaign": "Campaign on vaki.co — check it before you donate."
+      "no_upfront_money": "Nobody who really has the animal will ask you for money up front."
     },
     "framer": {
       "label": "Framing",

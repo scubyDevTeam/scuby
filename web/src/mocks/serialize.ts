@@ -195,7 +195,6 @@ function adoptionView(t: Tables, row: AdoptionRow, viewerId: string | null): Cas
     temperament: row.temperament,
     requirement_flags: row.requirement_flags,
     requirements: row.requirements,
-    fee: { cop: row.fee_cop, covers: row.fee_covers },
     location: {
       center: row.location.center,
       radius_m: row.location.radius_m,
@@ -238,11 +237,6 @@ function adoptionView(t: Tables, row: AdoptionRow, viewerId: string | null): Cas
       : [],
     pending_checkin: lister ? pendingCheckin(t, row.code) : null,
   }
-}
-
-/** «Sin cuota» · «Cuota $120.000» — composed by the server for the card, like a summary. */
-export function feeText(row: AdoptionRow): string {
-  return row.fee_cop === 0 ? 'Sin cuota' : `Cuota $${row.fee_cop.toLocaleString('es-CO')}`
 }
 
 export function caseView(t: Tables, row: CaseRow, viewerId: string | null): CaseWire {
@@ -296,7 +290,7 @@ function feedItem(t: Tables, row: CaseRow): FeedItem | null {
       possible_find: false,
       sightings_count: null,
       last_sighting_at: null,
-      detail: reserved ? `En proceso · ${feeText(row)}` : feeText(row),
+      detail: reserved ? 'En proceso' : null,
     }
   }
   if (row.vertical === 'found') {

@@ -22,17 +22,16 @@ export const SHARE_SHEET_FORMAT: PosterFormat = 'story'
 
 export type PosterVertical = 'lost' | 'found' | 'adoption' | 'help'
 
-/** The one line of footer copy per vertical; adoption has none. */
-export type PosterFooter = 'no_upfront_money' | 'verify_campaign'
+/** The one line of footer copy per vertical; adoption and help have none. */
+export type PosterFooter = 'no_upfront_money'
 
 export function posterFooter(vertical: PosterVertical): PosterFooter | null {
   switch (vertical) {
     case 'lost':
     case 'found':
       return 'no_upfront_money'
-    case 'help':
-      return 'verify_campaign'
     case 'adoption':
+    case 'help':
       return null
   }
 }

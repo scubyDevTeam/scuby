@@ -24,7 +24,7 @@ import {
   User,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { bandFor, feeCoversLine, feeLine } from './copy'
+import { bandFor } from './copy'
 
 type Props = {
   listing: AdoptionCase
@@ -51,7 +51,7 @@ function Chips({ labels }: { labels: string[] }) {
 
 /**
  * An adoption listing (docs/product/06): a post with reach and continuity. Health flags render
- * prominently — never buried; the fee is always disclosed; contact only ever through an interest.
+ * prominently — never buried; contact only ever through an interest.
  */
 export function AdoptionCasePage({
   listing,
@@ -77,7 +77,6 @@ export function AdoptionCasePage({
       ? { center: listing.location.center, radiusM: listing.location.radiusM }
       : publicArea({ center: listing.location.center, radiusM: listing.location.radiusM })
   const notice = mode === 'open' ? reservedNotice(listing.reserved, mine) : null
-  const covers = feeCoversLine(i18n, listing.fee)
   const interested = mine !== null && mine.status !== 'withdrawn' && mode === 'open'
 
   return (
@@ -184,12 +183,6 @@ export function AdoptionCasePage({
           <p className="m-0 text-muted">{t('adoption.page.health_hint')}</p>
         </section>
       ) : null}
-
-      <section className="flex flex-col gap-1">
-        <p className="m-0 text-xl font-bold">{feeLine(i18n, listing.fee)}</p>
-        {covers ? <p className="m-0">{covers}</p> : null}
-        <p className="m-0 text-sm text-muted">{t('adoption.page.fee_money')}</p>
-      </section>
 
       {mode === 'closed' ? (
         listing.status === 'adopted' ? (

@@ -5,7 +5,6 @@ import type { AdoptionCase } from '@contracts/adoption'
 import type { LostCase } from '@contracts/case'
 import type { FoundCase } from '@contracts/found'
 import { type PosterFormat, posterFooter } from '@domain/shared/poster'
-import { feeLine } from '@features/adoption/copy'
 import { describeFound } from '@features/found/copy'
 import { describePet, formatDayMonth } from '@features/lost/copy'
 import type { Translator } from '@i18n/translate'
@@ -100,7 +99,6 @@ export function shareMessage(i18n: Translator, posterCase: PosterCase, link: Sho
       title: titleOf(i18n, posterCase),
       place: placeName,
       traits: describePet(i18n, posterCase.pet),
-      fee: feeLine(i18n, posterCase.fee),
       link: link.url,
     })
   }

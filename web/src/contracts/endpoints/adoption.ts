@@ -17,8 +17,7 @@ export const publishAdoption = endpoint({
   summary:
     'Publishes an adoption listing, with the same phone step as every publish. With ' +
     '`from_found_case_code` it is the day-15 conversion of the caller’s found case: same pet, ' +
-    'the found case `converted`. A fee above the local norm on a person’s listing is published ' +
-    'and queued for moderation — never blocked, never silent.',
+    'the found case `converted`.',
   auth: 'session',
   body: publishAdoptionRequest,
   response: publishWire,

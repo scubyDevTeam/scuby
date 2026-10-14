@@ -2,7 +2,6 @@
 // hidden pins — and serialize.ts decides what each viewer gets to see, as the real backend must.
 import type {
   AdoptionResolution,
-  FeeCover,
   HealthFlag,
   Housing,
   RequirementFlag,
@@ -95,8 +94,6 @@ export type AdoptionRow = Published & {
   temperament: Temperament[]
   requirement_flags: RequirementFlag[]
   requirements: string | null
-  fee_cop: number
-  fee_covers: FeeCover[]
   /** B2P seam: only `light` is legal in v1 and nothing branches on it. */
   lane: 'light' | 'application'
   location: Area

@@ -4,17 +4,10 @@ import { api } from '../../contracts/api'
 import { type AdoptionRow, db, findCase, newCode, newId, type PersonRow } from '../db'
 import { closeCheckins, onListerInteraction, onListingPublished } from '../followup'
 import { notify } from '../notify'
-import { Fail, fail, route } from '../route'
+import { fail, route } from '../route'
 import { iso, ms, placeName } from '../rules'
 import { listingChannels } from '../serialize'
 import { verifiedPhone } from './owner'
-
-/**
- * The local norm for a cuota de recuperación: above it, a person's listing goes to the moderation
- * queue on publish. The number is the emulation's — 06 does not set it, and the real backend reads
- * it per country.
- */
-export const FEE_NORM_COP = 250_000
 
 function listed(code: string, user: PersonRow): AdoptionRow {
   const row = findCase(code) ?? fail('not_found')
@@ -33,10 +26,6 @@ function interestOf(row: AdoptionRow, id: string) {
 
 export const adoption = [
   route(api.publishAdoption, ({ user, body }) => {
-    // The fee rule (06): never blank, and a fee says what it covers.
-    if (body.fee_cop > 0 && body.fee_covers.length === 0) {
-      throw new Fail('validation_failed', undefined, { fee_covers: 'A fee says what it covers' })
-    }
     const converted = body.from_found_case_code ? findCase(body.from_found_case_code) : null
     if (body.from_found_case_code) {
       if (converted?.vertical !== 'found') fail('not_found')
@@ -95,8 +84,6 @@ export const adoption = [
       temperament: body.temperament,
       requirement_flags: body.requirement_flags,
       requirements: body.requirements,
-      fee_cop: body.fee_cop,
-      fee_covers: body.fee_covers,
       lane: 'light',
       location: {
         center: body.location_point,
@@ -106,18 +93,6 @@ export const adoption = [
       },
       external_url: body.external_url,
       trust_tier: 'individual',
-    }
-    // «Adopción con cuota» is the standard cover for a breeder selling puppies: queued, not blocked.
-    if (body.fee_cop > FEE_NORM_COP) {
-      db.reports.push({
-        id: newId('report-'),
-        target_type: 'adoption_case',
-        target_id: code,
-        reason: 'other',
-        note: 'fee_above_norm',
-        reporter_id: null,
-        created_at: iso(Date.now()),
-      })
     }
     onListingPublished(code)
     return { code }

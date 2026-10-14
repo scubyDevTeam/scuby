@@ -5,8 +5,6 @@
 // The reading half lives in adoption-case.ts, so the case page does not download these forms.
 import * as z from 'zod/mini'
 import {
-  type FeeCover,
-  feeCoverSchema,
   type HealthFlag,
   healthFlagSchema,
   type Intro,
@@ -49,8 +47,6 @@ export type PublishAdoptionInput = {
   temperament: Temperament[]
   requirementFlags: RequirementFlag[]
   requirements: string | null
-  feeCop: number
-  feeCovers: FeeCover[]
   center: { lat: number; lng: number }
   radiusM: number
   externalUrl: string | null
@@ -78,9 +74,6 @@ export const publishAdoptionRequest = z.object({
   temperament: z.array(temperamentSchema),
   requirement_flags: z.array(requirementFlagSchema),
   requirements: z.nullable(z.string().check(z.maxLength(1000))),
-  /** Never blank: zero is «Sin cuota». A non-zero fee must say what it covers. */
-  fee_cop: z.int().check(z.nonnegative(), z.lte(5_000_000)),
-  fee_covers: z.array(feeCoverSchema),
   location_point: point,
   location_radius_m: z.number().check(z.positive(), z.lte(5000)),
   /** An org's own application page. Independent of WhatsApp: a listing can have both. */
@@ -106,8 +99,6 @@ export const publishAdoptionBody = (
   temperament: input.temperament,
   requirement_flags: input.requirementFlags,
   requirements: input.requirements,
-  fee_cop: input.feeCop,
-  fee_covers: input.feeCop > 0 ? input.feeCovers : [],
   location_point: input.center,
   location_radius_m: input.radiusM,
   external_url: input.externalUrl,

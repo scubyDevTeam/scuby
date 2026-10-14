@@ -154,10 +154,6 @@
       "health_hint": "Busca a alguien que sepa acompañarlo en esto.",
       "about_title": "Cómo es",
       "home_title": "El hogar que busca",
-      "fee_none": "Sin cuota",
-      "fee_some": "Cuota de recuperación: {amount}",
-      "fee_covers": "Cubre {covers}.",
-      "fee_money": "Se acuerda entre ustedes: nada se paga por la app.",
       "lister": "Lo publica {name}",
       "tier_individual": "Publicado por una persona — la verificación es entre ustedes.",
       "tier_verified": "Fundación verificada: revisamos sus documentos.",
@@ -204,12 +200,6 @@
       "mobility_aid": "Necesita ayuda para moverse",
       "behavioral_support": "Necesita apoyo de conducta"
     },
-    "covers": {
-      "sterilization": "esterilización",
-      "vaccines": "vacunas",
-      "deworming": "desparasitación",
-      "microchip": "microchip"
-    },
     "sheet": {
       "interest_title": "¿Te interesa {name}?",
       "conversation_title": "Escríbele a {name}",
@@ -219,7 +209,7 @@
     "poster": {
       "label": "En adopción",
       "line": "Busca hogar en {place} · desde el {date}",
-      "message": "🏡 {label}: {title} — {place}. {traits}. {fee}. Conócelo y escribe a quien lo cuida: {link}",
+      "message": "🏡 {label}: {title} — {place}. {traits}. Conócelo y escribe a quien lo cuida: {link}",
       "owner_hint": "Compártelo en tus historias y en los grupos del barrio: muchas adopciones empiezan por alguien que conoce a alguien."
     }
   },
@@ -368,13 +358,6 @@
       "temperament_title": "Cómo es con otros",
       "requirements_title": "El hogar que necesita",
       "requirements_label": "Algo más que deba saber quien lo adopte",
-      "fee_title": "¿Pides una cuota de recuperación?",
-      "fee_hint": "Es común: cubre lo que ya gastaste en él. Se muestra siempre, también si no pides nada.",
-      "fee_no": "Sin cuota",
-      "fee_yes": "Sí, una cuota",
-      "fee_amount": "Valor en pesos",
-      "fee_covers": "¿Qué cubre?",
-      "fee_money": "Nadie paga por la app: se acuerda entre ustedes.",
       "external_label": "Formulario de adopción en tu sitio",
       "external_hint": "Si tienes tu propio proceso, quien se interese podrá seguirlo allí.",
       "from_found": "Viene de tu aviso: las fotos y las señas ya están.",
@@ -382,9 +365,6 @@
       "errors": {
         "role_required": "Dinos qué es para ti",
         "story_required": "Cuéntanos un poco de su historia",
-        "fee_required": "Dinos si pides una cuota (puede ser «Sin cuota»)",
-        "fee_amount_required": "Escribe el valor de la cuota",
-        "fee_covers_required": "Di qué cubre la cuota",
         "external_url_invalid": "Revisa el enlace: debe empezar por https://"
       },
       "continue": "Continuar",
@@ -480,7 +460,7 @@
       },
       "help": {
         "title": "Pedir ayuda",
-        "text": "Una campaña para un gasto puntual."
+        "text": "Un hogar temporal, transporte o insumos."
       },
       "only_saw_title": "¿Solo viste un animal en la calle?",
       "only_saw_body": "Entra por «Encontré un animal»: reportarlo toma un toque y no necesitas cuenta."
@@ -623,8 +603,7 @@
     },
     "effect": {
       "queued": "Una persona la revisará. Mientras tanto la publicación sigue visible.",
-      "hidden_pending_review": "Por este motivo la ocultamos de inmediato mientras una persona la revisa, en menos de 4 horas.",
-      "suspended_pending_review": "Por este motivo la pausamos de inmediato mientras una persona la revisa, en menos de 4 horas."
+      "hidden_pending_review": "Por este motivo la ocultamos de inmediato mientras una persona la revisa, en menos de 4 horas."
     },
     "thanks": "Gracias por avisar.",
     "received": "Recibimos tu reporte.",
@@ -835,9 +814,9 @@
       "adoption_title": "Adopciones",
       "adoption_body": "Una adopción es un acuerdo entre quien adopta y quien publica. No aprobamos adoptantes ni decidimos quién es el dueño de un animal.",
       "money_title": "El dinero nunca pasa por aquí",
-      "money_body": "{brand} no recibe, guarda ni transfiere dinero. Las campañas de ayuda enlazan a plataformas externas; cualquier aporte es entre quien dona y quien recibe.",
+      "money_body": "{brand} no recibe, guarda, transfiere ni muestra dinero: no hay donaciones ni cuotas. La ayuda es en especie — un hogar temporal, transporte, insumos — y se acuerda entre las personas.",
       "badges_title": "Qué significa «Verificado»",
-      "badges_body": "Una insignia de verificación significa que revisamos un documento. No es una garantía sobre la persona, la fundación ni la campaña.",
+      "badges_body": "Una insignia de verificación significa que revisamos un documento. No es una garantía sobre la persona ni la fundación.",
       "content_title": "Lo que publicas",
       "content_body": "Publica solo avisos ciertos sobre animales reales. No publiques datos personales de otras personas ni contenido violento o engañoso. Cualquiera puede reportar una publicación, y podemos ocultar o retirar lo que incumpla estas reglas.",
       "account_title": "Tu cuenta",
@@ -1070,7 +1049,7 @@
       },
       "help": {
         "active": "Necesita ayuda",
-        "closed": "Campaña cerrada"
+        "closed": "Solicitud cerrada"
       },
       "closed": "Aviso cerrado"
     },
@@ -1131,8 +1110,7 @@
     "scan": "Escanea el código",
     "info": "Información al día y contacto directo",
     "footer": {
-      "no_upfront_money": "Nadie que de verdad lo tenga te va a pedir dinero por adelantado.",
-      "verify_campaign": "Campaña en vaki.co — verifica antes de donar."
+      "no_upfront_money": "Nadie que de verdad lo tenga te va a pedir dinero por adelantado."
     },
     "framer": {
       "label": "Encuadre",
