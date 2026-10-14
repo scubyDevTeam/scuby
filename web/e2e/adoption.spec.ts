@@ -4,10 +4,9 @@ test(
   '«Me interesa»: a visitor introduces themselves, verifies their number and reaches the lister',
   tags('@adoption', '@ADOPT-001'),
   async ({ adoption }) => {
-    await test.step('a stranger opens Nube’s listing: the fee is disclosed, no contact yet', async () => {
+    await test.step('a stranger opens Nube’s listing: no contact yet', async () => {
       await adoption.open('AD9PT')
       await expect(adoption.title('Nube')).toBeVisible()
-      await expect(adoption.fee('Sin cuota')).toBeVisible()
     })
 
     await test.step('«Me interesa» needs an account: it is born here', async () => {

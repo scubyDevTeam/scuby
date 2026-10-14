@@ -527,8 +527,6 @@ const listing = {
   temperament: [],
   requirement_flags: [],
   requirements: null,
-  fee_cop: 0,
-  fee_covers: [],
   location_point: { lat: 6.2447, lng: -75.5916 },
   location_radius_m: 300,
   external_url: null,
@@ -567,7 +565,6 @@ describe('adoption — who sees what (06 · What the lister sees, identity ladde
     const canela = await asAdoption('B3TOS')
     expect(canela.reserved).toBe(true)
     expect(canela.interests).toEqual([])
-    expect(canela.fee).toEqual({ cop: 120_000, covers: ['sterilization', 'vaccines', 'deworming'] })
   })
 })
 
@@ -650,8 +647,8 @@ describe('adoption — the lister’s moves (06 · What the lister sees)', () =>
     expect((await failure(answer('int-misha-julian', 'chosen'))).code).toBe('invalid_transition')
     const feed = await call(api.getFeed, { query: {} }, parseFeed)
     expect(feed.items.slice(-2).map((i) => [i.code, i.detail])).toEqual([
-      ['B3TOS', 'En proceso · Cuota $120.000'],
-      ['M1SHI', 'En proceso · Sin cuota'],
+      ['B3TOS', 'En proceso'],
+      ['M1SHI', 'En proceso'],
     ])
 
     // «No se concretó»: manual, and full visibility comes back.
@@ -771,7 +768,7 @@ describe('adoption — the follow-up loop (06 · Cadence, expiry, 90-day reopen)
   })
 })
 
-describe('adoption — publishing (06 · fee rule; 05 · the day-15 conversion)', () => {
+describe('adoption — publishing (06 · adoption_case; 05 · the day-15 conversion)', () => {
   // The demo account with its number already verified: these scenarios are not about the phone step.
   const asVerifiedCarolina = async () => {
     await asCarolina()
@@ -791,27 +788,9 @@ describe('adoption — publishing (06 · fee rule; 05 · the day-15 conversion)'
     const pelusa = await asAdoption(published.code)
     expect([pelusa.viewer, pelusa.pet.healthFlags]).toEqual(['lister', ['fiv_felv']])
     const feed = await call(api.getFeed, { query: { vertical: 'adoption' } }, parseFeed)
-    expect(feed.items[0]).toMatchObject({ code: published.code, detail: 'Sin cuota' })
+    expect(feed.items[0]).toMatchObject({ code: published.code, detail: null })
     const mine = await call(api.listMyCases, {}, parseMyCases)
     expect(mine[0]).toMatchObject({ code: published.code, vertical: 'adoption' })
-  })
-
-  it('a fee must say what it covers', async () => {
-    await asVerifiedCarolina()
-    const body = { ...listing, fee_cop: 150_000, fee_covers: [] }
-    expect((await failure(call(api.publishAdoption, { body }, asIs))).code).toBe(
-      'validation_failed',
-    )
-  })
-
-  it('a fee above the local norm is published and queued for moderation — never blocked', async () => {
-    await asVerifiedCarolina()
-    const body = { ...listing, fee_cop: 400_000, fee_covers: ['vaccines' as const] }
-    const published = await call(api.publishAdoption, { body }, parsePublish)
-    if (published.kind !== 'published') throw new Error('expected a published listing')
-    expect(db.reports).toContainEqual(
-      expect.objectContaining({ target_id: published.code, note: 'fee_above_norm' }),
-    )
   })
 
   it('converts a found case at the day-15 offer: same pet, the found case `converted`', async () => {

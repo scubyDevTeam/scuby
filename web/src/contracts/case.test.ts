@@ -22,7 +22,6 @@ describe('parseCase', () => {
     const parsed = parseCase(cases().AD9PT)
     if (parsed.vertical !== 'adoption') throw new Error('expected an adoption listing')
     expect(parsed.publishedAt).toBeInstanceOf(Date)
-    expect(parsed.fee).toEqual({ cop: 0, covers: [] })
     expect(parsed.interests).toEqual([])
     expect(parsed.myInterest).toBeNull()
   })

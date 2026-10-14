@@ -134,8 +134,8 @@ describe('an adoption listing on the poster (10 §3 · label band, §4 · messag
     expect(content.footer).toBeNull()
   })
 
-  it('the message discloses the fee and ends in the short link', () => {
+  it('the message ends in the short link', () => {
     const message = shareMessage(es, nube(), link)
-    expect(message).toMatch(/^🏡 EN ADOPCIÓN: Nube — Estadio\. .*Sin cuota\. .*\/c\/7K3PQ$/)
+    expect(message).toMatch(/^🏡 EN ADOPCIÓN: Nube — Estadio\. .*\. Conócelo .*\/c\/7K3PQ$/)
   })
 })

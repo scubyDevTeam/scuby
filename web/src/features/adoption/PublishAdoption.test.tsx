@@ -65,28 +65,13 @@ describe('PublishAdoption — 06 · adoption_case', () => {
     expect(screen.getByText('Dinos qué es para ti')).toBeTruthy()
   })
 
-  it('the fee cannot be left blank, and a fee says what it covers', async () => {
-    show()
-    await stepOne()
-    fireEvent.change(screen.getByLabelText(/Cuéntanos su historia/), {
-      target: { value: 'La rescaté.' },
-    })
-    next()
-    expect(screen.getByText('Dinos si pides una cuota (puede ser «Sin cuota»)')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Sí, una cuota' }))
-    fireEvent.change(screen.getByLabelText('Valor en pesos'), { target: { value: '150000' } })
-    next()
-    expect(screen.getByText('Di qué cubre la cuota')).toBeTruthy()
-  })
-
-  it('publishes «Sin cuota» with the health flags, the area and the verified number', async () => {
+  it('publishes with the health flags, the area and the verified number', async () => {
     const calls = show()
     await stepOne()
     fireEvent.change(screen.getByLabelText(/Cuéntanos su historia/), {
       target: { value: 'La rescaté.' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Sin salir a la calle' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Sin cuota' }))
     next()
     fireEvent.click(await screen.findByRole('button', { name: 'Usar mi ubicación' }))
     await screen.findByText('Zona marcada.')
@@ -103,8 +88,6 @@ describe('PublishAdoption — 06 · adoption_case', () => {
         photo_urls: ['photo-1.jpg'],
       },
       requirement_flags: ['indoor_only'],
-      fee_cop: 0,
-      fee_covers: [],
       location_point: { lat: 6.2447, lng: -75.5916 },
       phone: null,
     })
@@ -121,7 +104,6 @@ describe('PublishAdoption — 06 · adoption_case', () => {
     expect((screen.getByLabelText(/Cuéntanos su historia/) as HTMLTextAreaElement).value).toMatch(
       /^Lo encontraron en Estadio el /,
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Sin cuota' }))
     next()
     fireEvent.click(screen.getByRole('button', { name: 'Publicar en adopción' }))
     await waitFor(() =>

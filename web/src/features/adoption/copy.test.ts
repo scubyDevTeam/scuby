@@ -1,26 +1,9 @@
 import { createI18n } from '@i18n/react'
 import { describe, expect, it } from 'vitest'
-import { feeCoversLine, feeLine, introMessage, memberSince } from './copy'
+import { introMessage, memberSince } from './copy'
 
 const i18n = createI18n('es')
 const now = new Date('2026-10-14T12:00:00Z')
-
-describe('06 · fee rule — how a fee reads', () => {
-  it('zero is disclosed too: «Sin cuota»', () => {
-    expect(feeLine(i18n, { cop: 0, covers: [] })).toBe('Sin cuota')
-    expect(feeCoversLine(i18n, { cop: 0, covers: [] })).toBeNull()
-  })
-
-  it('a fee says what it covers', () => {
-    const fee = { cop: 150_000, covers: ['sterilization', 'vaccines', 'deworming'] as const }
-    expect(feeLine(i18n, { ...fee, covers: [...fee.covers] }).replace(/\s/g, ' ')).toMatch(
-      /^Cuota de recuperación: \$ ?150\.000$/,
-    )
-    expect(feeCoversLine(i18n, { ...fee, covers: [...fee.covers] })).toBe(
-      'Cubre esterilización, vacunas y desparasitación.',
-    )
-  })
-})
 
 describe('06 · What the lister sees — facts, never a verdict', () => {
   it('«miembro hace 8 meses»', () => {
