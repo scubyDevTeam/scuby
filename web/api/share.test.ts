@@ -220,18 +220,50 @@ describe('link preview of a case (docs/product/10 §2)', () => {
     expect(adopted.tag('og:description')).toContain('¡Toby ya tiene hogar!')
   })
 
-  it('a help case, whose page is not built yet, previews with its card data', async () => {
+  it('a help request previews with what it still needs — help in kind, never money (07)', async () => {
+    const need = (kind: string, status: string) => ({
+      id: kind,
+      kind,
+      detail: '…',
+      target: 1,
+      needed_by: null,
+      status,
+      confirmed: 0,
+      pledged: 0,
+    })
     const help = {
-      code: 'P2KDN',
+      code: 'HE7PA',
       vertical: 'help',
       status: 'active',
-      title: 'Cirugía para Max',
-      place_name: 'Bello',
-      photo_url: null,
+      resolution: null,
+      published_at: '2026-10-10T09:00:00-05:00',
+      resolved_at: null,
+      viewer: 'public',
+      pet: {
+        name: 'Max',
+        species: 'dog',
+        size: 'large',
+        colors: ['yellow'],
+        marks: null,
+        photo_urls: ['https://cdn.example.test/max.jpg'],
+      },
+      story: 'Lo operaron de la cadera.',
+      location: { center: { lat: 6.17, lng: -75.58 }, radius_m: 1000, place_name: 'Envigado' },
+      trust_tier: 'unverified',
+      beneficiary_name: 'Julián R.',
+      needs: [need('foster', 'open'), need('transport', 'open'), need('supplies', 'covered')],
     }
-    const { tag } = await setup(() => json(help)).open('/api/share?code=P2KDN')
-    expect(tag('og:title')).toBe('NECESITA AYUDA: Cirugía para Max — Bello')
-    expect(tag('og:image')).toBeUndefined()
+    const { tag } = await setup(() => json(help)).open('/api/share?code=HE7PA')
+    expect(tag('og:title')).toBe('NECESITA AYUDA: Max — Envigado')
+    expect(tag('og:description')).toBe(
+      'Max necesita un hogar temporal y transporte. Ayuda en persona, nunca dinero.',
+    )
+    expect(tag('og:image')).toBe('https://cdn.example.test/max.jpg')
+
+    const closed = { ...help, status: 'closed', resolution: 'covered' }
+    const after = await setup(() => json(closed)).open('/api/share?code=HE7PA')
+    expect(after.tag('og:title')).toBe('SOLICITUD CERRADA: Max — Envigado')
+    expect(after.tag('og:description')).toContain('Max ya tiene la ayuda que necesitaba')
   })
 
   it('a stand-in data: photo is no image to a crawler', async () => {

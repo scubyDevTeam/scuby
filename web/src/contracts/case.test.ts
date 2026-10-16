@@ -14,8 +14,17 @@ describe('parseCase', () => {
     expect(parsed.contact?.whatsappUrl).toMatch(/^https:\/\/wa\.me\//)
   })
 
-  it('keeps the verticals without a page yet as a card', () => {
-    expect(parseCase(cases().HE7PA)).toMatchObject({ vertical: 'help', placeName: 'Envigado' })
+  it('parses a help request: needs with confirmed and pledged apart, never one sum', () => {
+    const parsed = parseCase(cases().HE7PA)
+    if (parsed.vertical !== 'help') throw new Error('expected a help request')
+    expect(parsed.needs.map((n) => [n.kind, n.confirmed, n.pledged])).toEqual([
+      ['foster', 0, 0],
+      ['transport', 0, 1],
+      ['supplies', 2, 0],
+    ])
+    // A stranger never receives who offered or their numbers.
+    expect(parsed.pledges).toEqual([])
+    expect(parsed.myPledges).toEqual([])
   })
 
   it('parses an adoption listing, with the lister-only fields empty for everyone else', () => {

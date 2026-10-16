@@ -50,6 +50,35 @@ export class PublishPage {
     )
   }
 
+  chooseHelp() {
+    return step('Choose «Pedir ayuda»', () =>
+      this.page.getByRole('link', { name: /Pedir ayuda/ }).click(),
+    )
+  }
+
+  // --- Help (docs/product/07 · Publishing) ---
+
+  /** Step 1: one of the account's pets. */
+  helpFor(pet: string) {
+    return step(`Ask for help for ${pet}`, () =>
+      this.page.getByRole('button', { name: pet, exact: true }).click(),
+    )
+  }
+
+  /** Step 2: one need, saying exactly what. */
+  ask(kind: 'Hogar temporal' | 'Transporte' | 'Insumos', detail: string) {
+    return step(`Ask for ${kind}: «${detail}»`, async () => {
+      await this.page.getByRole('button', { name: `Agregar ${kind}` }).click()
+      await this.page.getByRole('region', { name: kind }).getByRole('textbox').first().fill(detail)
+    })
+  }
+
+  tellNeighbours(story: string) {
+    return step('Tell the neighbours what happened', () =>
+      this.page.getByLabel(/Cuéntales a tus vecinos/).fill(story),
+    )
+  }
+
   // --- Adoption (docs/product/06 · adoption_case) ---
 
   /** Step 1's own questions: what the animal is called and who it is to the lister. */

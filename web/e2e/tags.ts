@@ -22,6 +22,8 @@ export const FLOWS = {
   '@legal': 'LEGAL',
   '@adoption': 'ADOPT',
   '@publish-adoption': 'PADOPT',
+  '@help-request': 'HREQ',
+  '@publish-help': 'PHELP',
 } as const
 
 export type Flow = keyof typeof FLOWS

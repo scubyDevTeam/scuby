@@ -8,6 +8,7 @@ import { parseInterest } from '../contracts/adoption'
 import { api } from '../contracts/api'
 import { parseCase } from '../contracts/case'
 import { parseFeed } from '../contracts/feed'
+import { parsePledge } from '../contracts/help'
 import { parseMyCases, parseNotifications, parsePets, parsePublish } from '../contracts/owner'
 import { parseProfile, parseUser } from '../contracts/session'
 import { db, type LostRow, resetDb } from './db'
@@ -166,6 +167,7 @@ describe('the feed (00 · Geography)', () => {
       'F8UND',
       'M2TQ4',
       '7K3PQ',
+      'NA7LA',
       'AD9PT',
       'HE7PA',
       'M1SHI',
@@ -822,6 +824,286 @@ describe('adoption — publishing (06 · adoption_case; 05 · the day-15 convers
   })
 })
 
+/** The demo account with a verified number, as after its first publish. */
+function carolinaHasAPhone() {
+  const carolina = db.persons.find((p) => p.id === DEMO_OWNER_ID_FOR_TESTS)
+  if (carolina) carolina.phone = '+573007152284'
+}
+
+describe('help — who sees what (07 · Identity ladder, help in kind)', () => {
+  it('a stranger sees the needs and their progress, never who offered or their numbers', async () => {
+    const request = await caseOf('HE7PA')
+    if (request.vertical !== 'help') throw new Error('expected a help request')
+    expect(request.viewer).toBe('public')
+    expect(request.trustTier).toBe('unverified')
+    expect(request.pledges).toEqual([])
+    expect(request.needs.find((n) => n.kind === 'transport')).toMatchObject({
+      confirmed: 0,
+      pledged: 1,
+    })
+  })
+
+  it('the beneficiary sees each pledge with a number to call', async () => {
+    await asCarolina()
+    const request = await caseOf('NA7LA')
+    if (request.vertical !== 'help') throw new Error('expected a help request')
+    expect(request.viewer).toBe('beneficiary')
+    expect(request.pledges.map((p) => [p.personName, p.status, p.phone])).toEqual([
+      ['Andrés R.', 'confirmed', '+573000000001'],
+      ['Marcela T.', 'pledged', '+573000000008'],
+    ])
+  })
+
+  it('no field anywhere carries money (decision #26)', async () => {
+    const raw = JSON.stringify(await call(api.getCase, { params: { code: 'HE7PA' } }, asIs))
+    expect(raw).not.toMatch(/amount|goal|raised|donat|payment|campaign/i)
+  })
+})
+
+describe('help — «Yo ayudo» (07 · `help_pledge`)', () => {
+  const pledge = (code: string, fields: Record<string, unknown> = {}) =>
+    call(
+      api.pledgeHelp,
+      {
+        params: { code },
+        body: {
+          need_id: 'need-max-home',
+          quantity: 1,
+          note: null,
+          phone: null,
+          phone_has_whatsapp: true,
+          otp_code: null,
+          ...fields,
+        },
+      },
+      parsePledge,
+    )
+
+  it('needs an account', async () => {
+    expect((await failure(pledge('HE7PA'))).kind).toBe('unauthorized')
+  })
+
+  it('needs a reachable number: a newcomer verifies one by SMS first', async () => {
+    await asNewcomer('laura.diaz@correo.co')
+    expect(await pledge('HE7PA', { phone: '+573001112233' })).toEqual({ kind: 'otp' })
+    const sent = await pledge('HE7PA', { phone: '+573001112233', otp_code: DEMO_CODE })
+    // The row first, then the channel: the beneficiary's WhatsApp.
+    expect(sent).toMatchObject({ kind: 'sent', whatsappUrl: 'https://wa.me/573000000006' })
+    const request = await caseOf('HE7PA')
+    if (request.vertical !== 'help') throw new Error('expected a help request')
+    expect(request.needs.find((n) => n.kind === 'foster')).toMatchObject({
+      confirmed: 0,
+      pledged: 1,
+    })
+    expect(request.myPledges).toMatchObject([{ needId: 'need-max-home', status: 'pledged' }])
+  })
+
+  it('tells the beneficiary someone offered', async () => {
+    await asCarolina()
+    carolinaHasAPhone()
+    await pledge('HE7PA')
+    const julian = db.notifications.filter((n) => n.person_id === 'user-julian')
+    expect(julian.at(-1)?.body).toBe('Carolina M. ofreció un hogar temporal para Max.')
+  })
+
+  it('the beneficiary never pledges to their own request', async () => {
+    await asCarolina()
+    const refused = await failure(pledge('NA7LA', { need_id: 'need-nala-home' }))
+    expect(refused.code).toBe('forbidden')
+  })
+
+  it('a pledger withdraws an offer not yet confirmed, and only theirs', async () => {
+    await asCarolina()
+    carolinaHasAPhone()
+    const sent = await pledge('HE7PA')
+    if (sent.kind !== 'sent') throw new Error('expected a pledge')
+    await call(api.withdrawPledge, { params: { code: 'HE7PA', pledgeId: sent.id } }, asIs)
+    const request = await caseOf('HE7PA')
+    if (request.vertical !== 'help') throw new Error('expected a help request')
+    expect(request.needs.find((n) => n.kind === 'foster')?.pledged).toBe(0)
+    const other = await failure(
+      call(api.withdrawPledge, { params: { code: 'HE7PA', pledgeId: 'pl-max-ride' } }, asIs),
+    )
+    expect(other.code).toBe('forbidden')
+  })
+})
+
+describe('help — only the beneficiary confirms (07 · Rules)', () => {
+  const answer = (pledgeId: string, status: 'confirmed' | 'declined') =>
+    call(api.answerPledge, { params: { code: 'NA7LA', pledgeId }, body: { status } }, asIs)
+
+  it('a pledger cannot confirm their own help', async () => {
+    await asNewcomer('marcela@correo.co')
+    expect((await failure(answer('pl-nala-home', 'confirmed'))).code).toBe('forbidden')
+  })
+
+  it('a confirmation that reaches the target covers the need and thanks the pledger', async () => {
+    await asCarolina()
+    await answer('pl-nala-home', 'confirmed')
+    const request = await caseOf('NA7LA')
+    if (request.vertical !== 'help') throw new Error('expected a help request')
+    expect(request.needs.find((n) => n.kind === 'foster')).toMatchObject({
+      status: 'covered',
+      confirmed: 1,
+      pledged: 0,
+    })
+    // The sand still needs two bags: the request stays open.
+    expect(request.status).toBe('active')
+    const marcela = db.notifications.filter((n) => n.person_id === 'user-marcela')
+    expect(marcela.at(-1)?.event).toBe('help_pledge.confirmed')
+  })
+
+  it('pledges alone never cover anything: a promise is not a ride', async () => {
+    await asCarolina()
+    await answer('pl-nala-home', 'declined')
+    const request = await caseOf('NA7LA')
+    if (request.vertical !== 'help') throw new Error('expected a help request')
+    expect(request.needs.find((n) => n.kind === 'foster')).toMatchObject({
+      status: 'open',
+      confirmed: 0,
+    })
+    expect((await failure(answer('pl-nala-home', 'confirmed'))).code).toBe('invalid_transition')
+  })
+
+  it('every need covered closes the request as `covered`', async () => {
+    await asCarolina()
+    await answer('pl-nala-home', 'confirmed')
+    await call(api.coverNeed, { params: { code: 'NA7LA', needId: 'need-nala-sand' } }, asIs)
+    const request = await caseOf('NA7LA')
+    expect(request).toMatchObject({ status: 'closed', resolution: 'covered' })
+  })
+
+  it('«ya no necesita ayuda» closes it and tells whoever still has an offer waiting', async () => {
+    await asCarolina()
+    await call(
+      api.closeHelp,
+      { params: { code: 'NA7LA' }, body: { resolution: 'need_ended' } },
+      asIs,
+    )
+    expect(await caseOf('NA7LA')).toMatchObject({ status: 'closed', resolution: 'need_ended' })
+    const marcela = db.notifications.filter((n) => n.person_id === 'user-marcela')
+    expect(marcela.at(-1)?.event).toBe('help_request.closed')
+    // Removal and closing touch only the request: Nala is still Carolina's.
+    expect(db.pets.find((p) => p.id === 'pet-nala')?.owner_id).toBe(DEMO_OWNER_ID_FOR_TESTS)
+  })
+})
+
+describe('help — the follow-up loop (07 · Cadence, soft expiry, 30-day reopen)', () => {
+  it('asks «¿sigue?» a week after publishing, and «sí, sigue» resets the clock', async () => {
+    await asCarolina()
+    later(5 * DAY + HOUR)
+    const asked = await caseOf('NA7LA')
+    if (asked.vertical !== 'help' || !asked.pendingCheckin) throw new Error('expected a check-in')
+    await call(
+      api.answerCheckin,
+      {
+        params: { code: 'NA7LA', checkinId: asked.pendingCheckin.id },
+        body: { response: 'still_needed' },
+      },
+      asIs,
+    )
+    const answered = await caseOf('NA7LA')
+    expect(answered.vertical === 'help' && answered.pendingCheckin).toBe(null)
+  })
+
+  it('two unanswered questions archive it; the beneficiary reopens it within 30 days', async () => {
+    await asCarolina()
+    later(5 * DAY + 14 * DAY + 2 * DAY)
+    expect(await caseOf('NA7LA')).toMatchObject({ status: 'expired', resolution: 'no_response' })
+    await call(api.reopenCase, { params: { code: 'NA7LA' } }, asIs)
+    expect(await caseOf('NA7LA')).toMatchObject({ status: 'active' })
+  })
+
+  it('a help check-in answers only «sigue»', async () => {
+    await asCarolina()
+    later(5 * DAY + HOUR)
+    const asked = await caseOf('NA7LA')
+    if (asked.vertical !== 'help' || !asked.pendingCheckin) throw new Error('expected a check-in')
+    const refused = await failure(
+      call(
+        api.answerCheckin,
+        {
+          params: { code: 'NA7LA', checkinId: asked.pendingCheckin.id },
+          body: { response: 'still_lost' },
+        },
+        asIs,
+      ),
+    )
+    expect(refused.code).toBe('validation_failed')
+  })
+})
+
+describe('help — publishing (07 · Publishing)', () => {
+  const body = (fields: Record<string, unknown> = {}) => ({
+    pet_id: null,
+    pet: {
+      name: 'Pelusa',
+      species: 'cat' as const,
+      size: 'small' as const,
+      colors: [],
+      marks: null,
+      photo_urls: [],
+    },
+    needs: [
+      {
+        kind: 'transport' as const,
+        detail: 'Al veterinario el viernes',
+        target: 1,
+        needed_by: null,
+      },
+    ],
+    story: 'Necesita ir al control y no tengo cómo llevarla.',
+    location_point: { lat: 6.2447, lng: -75.5916 },
+    location_radius_m: 300,
+    phone: null,
+    phone_has_whatsapp: true,
+    contact_prefs: { expose_whatsapp: true, expose_email: false, in_app_only: false },
+    otp_code: null,
+    ...fields,
+  })
+
+  it('publishes at once, unverified, with the pet and its owner link created together', async () => {
+    await asCarolina()
+    await call(api.updateProfile, { body: { display_name: 'Carolina Mejía' } }, asIs).catch(
+      () => undefined,
+    )
+    db.persons.find((p) => p.id === DEMO_OWNER_ID_FOR_TESTS)!.phone = '+573007152284'
+    const published = await call(api.publishHelp, { body: body() }, parsePublish)
+    if (published.kind !== 'published') throw new Error('expected it published')
+    const request = await caseOf(published.code)
+    expect(request).toMatchObject({ vertical: 'help', status: 'active', trustTier: 'unverified' })
+    const pet = db.pets.find((p) => p.name === 'Pelusa')
+    expect(pet).toMatchObject({ owner_id: DEMO_OWNER_ID_FOR_TESTS, custody_state: 'claimed' })
+  })
+
+  it('only for a pet the beneficiary holds', async () => {
+    await asCarolina()
+    carolinaHasAPhone()
+    const refused = await failure(
+      call(api.publishHelp, { body: body({ pet_id: 'pet-max', pet: null }) }, asIs),
+    )
+    expect(refused.code).toBe('not_found')
+  })
+
+  it('one to three needs, each with a detail; no other kind exists', async () => {
+    await asCarolina()
+    const none = await failure(call(api.publishHelp, { body: body({ needs: [] }) }, asIs))
+    expect(none.code).toBe('validation_failed')
+    const money = await failure(
+      call(
+        api.publishHelp,
+        {
+          body: body({
+            needs: [{ kind: 'money', detail: '500.000', target: null, needed_by: null }],
+          }),
+        },
+        asIs,
+      ),
+    )
+    expect(money.code).toBe('validation_failed')
+  })
+})
+
 describe('the account (auth.md · Profile, 08 · inbox)', () => {
   it('edits the profile, and refuses links in the bio', async () => {
     await asCarolina()
@@ -835,7 +1117,7 @@ describe('the account (auth.md · Profile, 08 · inbox)', () => {
 
   it('marks the inbox as read', async () => {
     await asCarolina()
-    expect((await call(api.listNotifications, {}, parseNotifications)).unreadCount).toBe(2)
+    expect((await call(api.listNotifications, {}, parseNotifications)).unreadCount).toBe(3)
     await call(api.readNotifications, { body: { ids: null } }, asIs)
     expect((await call(api.listNotifications, {}, parseNotifications)).unreadCount).toBe(0)
   })
