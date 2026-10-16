@@ -7,6 +7,7 @@ import type {
   RequirementFlag,
   Temperament,
 } from '../contracts/adoption'
+import type { HelpResolution } from '../contracts/help-case'
 import type { Color, Point } from '../contracts/primitives'
 
 export type Species = 'dog' | 'cat' | 'other'
@@ -126,21 +127,45 @@ export type AdoptionInterestRow = {
   first_responded_at: string | null
 }
 
-/** Help has no flow yet: a card's worth of data, so feed and links resolve. */
-export type CardRow = {
-  code: string
-  vertical: 'help'
-  status: 'active'
-  title: string
-  species: Species
-  place_name: string
-  point: Point
-  photo_url: string | null
-  published_at: string
-  detail: string | null
+export type HelpNeedRow = {
+  id: string
+  kind: 'foster' | 'transport' | 'supplies'
+  detail: string
+  /** Null = «lo que puedan». */
+  target: number | null
+  needed_by: string | null
+  /** `covered` when confirmations reach the target or the beneficiary says so (07). */
+  status: 'open' | 'covered' | 'closed'
 }
 
-export type CaseRow = LostRow | FoundRow | AdoptionRow | CardRow
+export type HelpRow = Published & {
+  vertical: 'help'
+  status: 'active' | 'closed' | 'expired' | 'removed'
+  resolution: HelpResolution | null
+  story: string
+  location: Area
+  /** Nothing in the emulation reviews requests: every one is `unverified` (07 · Trust, O9). */
+  trust_tier: 'unverified' | 'verified'
+  /** One to three, written together with the request. */
+  needs: HelpNeedRow[]
+}
+
+export type HelpPledgeRow = {
+  id: string
+  case_code: string
+  need_id: string
+  /** Always registered and reachable: a foster we cannot reach is not a foster (07). */
+  person_id: string
+  quantity: number
+  note: string | null
+  contact_phone: string
+  phone_has_whatsapp: boolean
+  status: 'pledged' | 'confirmed' | 'declined' | 'withdrawn'
+  created_at: string
+  confirmed_at: string | null
+}
+
+export type CaseRow = LostRow | FoundRow | AdoptionRow | HelpRow
 
 export type SightingRow = {
   id: string
@@ -233,6 +258,7 @@ export type Tables = {
   recoveryClaims: RecoveryClaimRow[]
   ownershipClaims: OwnershipClaimRow[]
   adoptionInterests: AdoptionInterestRow[]
+  helpPledges: HelpPledgeRow[]
   checkins: CheckinRow[]
   notifications: NotificationRow[]
   pushSubscriptions: PushRow[]

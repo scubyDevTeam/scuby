@@ -4,6 +4,7 @@
 export * from './endpoints/account'
 export * from './endpoints/adoption'
 export * from './endpoints/found'
+export * from './endpoints/help'
 export * from './endpoints/helpers'
 export * from './endpoints/inbox'
 export * from './endpoints/lost'

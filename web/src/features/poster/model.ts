@@ -4,15 +4,17 @@
 import type { AdoptionCase } from '@contracts/adoption'
 import type { LostCase } from '@contracts/case'
 import type { FoundCase } from '@contracts/found'
+import type { HelpCase } from '@contracts/help-case'
 import { type PosterFormat, posterFooter } from '@domain/shared/poster'
 import { describeFound } from '@features/found/copy'
+import { openNeedsLine } from '@features/help/copy'
 import { describePet, formatDayMonth } from '@features/lost/copy'
 import type { Translator } from '@i18n/translate'
 
 /** The case's short link: the full URL the QR encodes, and how it reads printed. */
 export type ShortLink = { url: string; display: string }
 
-export type PosterCase = LostCase | FoundCase | AdoptionCase
+export type PosterCase = LostCase | FoundCase | AdoptionCase | HelpCase
 
 /** The owner, custodian or lister — whoever is responsible — frames the photo and gets the tip. */
 export const isResponsible = (posterCase: PosterCase) => posterCase.viewer !== 'public'
@@ -47,15 +49,15 @@ const titleOf = (i18n: Translator, posterCase: PosterCase) =>
 
 /** «EN ADOPCIÓN», «SE BUSCA»: the label band, in capitals. */
 const labelOf = (i18n: Translator, posterCase: PosterCase) =>
-  (posterCase.vertical === 'adoption'
-    ? i18n.t('adoption.poster.label')
+  (posterCase.vertical === 'adoption' || posterCase.vertical === 'help'
+    ? i18n.t(`${posterCase.vertical}.poster.label`)
     : i18n.t(`sharing.label.${posterCase.vertical}`)
   ).toLocaleUpperCase(i18n.locale)
 
 /** The tip under the poster for whoever is responsible for the case. */
 export const ownerHint = (i18n: Translator, posterCase: PosterCase) =>
-  posterCase.vertical === 'adoption'
-    ? i18n.t('adoption.poster.owner_hint')
+  posterCase.vertical === 'adoption' || posterCase.vertical === 'help'
+    ? i18n.t(`${posterCase.vertical}.poster.owner_hint`)
     : i18n.t(`sharing.owner_hint.${posterCase.vertical}`)
 
 export function posterContent(
@@ -74,8 +76,11 @@ export function posterContent(
     title: titleOf(i18n, posterCase),
     traits: describePet(i18n, posterCase.pet),
     line:
-      posterCase.vertical === 'adoption'
-        ? t('adoption.poster.line', { place: placeName, date: formatDayMonth(i18n, at) })
+      posterCase.vertical === 'adoption' || posterCase.vertical === 'help'
+        ? t(`${posterCase.vertical}.poster.line`, {
+            place: placeName,
+            date: formatDayMonth(i18n, at),
+          })
         : t(`sharing.line.${posterCase.vertical}`, {
             place: placeName,
             date: formatDayMonth(i18n, at),
@@ -93,6 +98,15 @@ export function posterContent(
 /** docs/product/10 §4 · the pre-written message, always ending in the short link. */
 export function shareMessage(i18n: Translator, posterCase: PosterCase, link: ShortLink): string {
   const { placeName, at } = where(posterCase)
+  if (posterCase.vertical === 'help') {
+    return i18n.t('help.poster.message', {
+      label: labelOf(i18n, posterCase),
+      title: titleOf(i18n, posterCase),
+      place: placeName,
+      needs: openNeedsLine(i18n, posterCase),
+      link: link.url,
+    })
+  }
   if (posterCase.vertical === 'adoption') {
     return i18n.t('adoption.poster.message', {
       label: labelOf(i18n, posterCase),

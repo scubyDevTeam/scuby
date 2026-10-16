@@ -1,7 +1,7 @@
-// The follow-up loop of a lost case (docs/product/04 · Schedule) and of an adoption listing
-// (docs/product/06 · The follow-up loop): check-ins, stale claims, expiry. The real backend runs
+// The follow-up loop of a lost case (docs/product/04 · Schedule), an adoption listing
+// (docs/product/06 · The follow-up loop) and a help request (docs/product/07): check-ins, stale claims, expiry. The real backend runs
 // this as a job; the emulation runs it before answering each request.
-import { type AdoptionRow, db, type LostRow, newId } from './db'
+import { type AdoptionRow, db, type HelpRow, type LostRow, newId } from './db'
 import { notify } from './notify'
 import { DAY, HOUR, iso, ms } from './rules'
 
@@ -13,6 +13,9 @@ const CLAIM_STALE = 7 * DAY
 /** An individual lister: T+7 d, then every 14 d (06 · Cadence by lister type). */
 const LISTING_FIRST_CHECKIN = 7 * DAY
 const LISTING_CADENCE = 14 * DAY
+/** A help request: T+7 d, then every 14 d — or the day after a `needed_by`, if sooner (07). */
+const HELP_FIRST_CHECKIN = 7 * DAY
+const HELP_CADENCE = 14 * DAY
 
 function schedule(
   code: string,
@@ -79,6 +82,25 @@ export function onListerInteraction(code: string, at = Date.now()) {
     if (c.case_code === code && c.trigger === 'time_based' && open(c)) c.cancelled_at = iso(at)
   }
   schedule(code, at + LISTING_CADENCE, 'time_based')
+}
+
+/** The first «¿sigue?» of a request: a week out, or the day after a date that mattered. */
+export function onHelpPublished(row: HelpRow, at = Date.now()) {
+  const dates = row.needs.flatMap((n) =>
+    n.needed_by ? [ms(`${n.needed_by}T12:00:00Z`) + DAY] : [],
+  )
+  schedule(row.code, Math.min(at + HELP_FIRST_CHECKIN, ...dates), 'time_based')
+}
+
+/**
+ * Answering «sigue», confirming what arrived or covering a need is the beneficiary speaking: it
+ * resets the clock. A new pledge is not — someone else spoke.
+ */
+export function onBeneficiaryInteraction(code: string, at = Date.now()) {
+  for (const c of db.checkins) {
+    if (c.case_code === code && c.trigger === 'time_based' && open(c)) c.cancelled_at = iso(at)
+  }
+  schedule(code, at + HELP_CADENCE, 'time_based')
 }
 
 /** A case that ended asks nothing more. */
@@ -161,6 +183,36 @@ function advanceListing(row: AdoptionRow, at: number) {
   }
 }
 
+function advanceHelp(row: HelpRow, at: number) {
+  const latest = db.checkins
+    .filter((c) => c.case_code === row.code && c.trigger === 'time_based')
+    .sort((a, b) => ms(b.scheduled_at) - ms(a.scheduled_at))[0]
+  if (!latest) {
+    onHelpPublished(row, ms(row.published_at))
+  } else if (ms(latest.scheduled_at) <= at && !latest.cancelled_at) {
+    let next = ms(latest.scheduled_at) + HELP_CADENCE
+    while (next <= at) {
+      schedule(row.code, next, 'time_based')
+      next += HELP_CADENCE
+    }
+    schedule(row.code, next, 'time_based')
+  }
+  // Two unanswered in a row: soft expiry, reopenable for 30 days. The pet and links stay as they are.
+  if (unansweredStreak(row.code, at) >= 2) {
+    row.status = 'expired'
+    row.resolution = 'no_response'
+    row.resolved_at = iso(at)
+    closeCheckins(row.code, at)
+    const name = db.pets.find((p) => p.id === row.pet_id)?.name ?? 'tu mascota'
+    notify(
+      row.created_by,
+      'help_request.expired',
+      `Archivamos la solicitud de ${name}. Puedes reactivarla con un toque durante 30 días.`,
+      row.code,
+    )
+  }
+}
+
 export function tick(at = Date.now()) {
   for (const claim of db.recoveryClaims) {
     if (claim.status === 'open' && ms(claim.stale_at) <= at) {
@@ -171,5 +223,6 @@ export function tick(at = Date.now()) {
   for (const row of Object.values(db.cases)) {
     if (row.vertical === 'lost' && row.status === 'active') advance(row, at)
     if (row.vertical === 'adoption' && row.status === 'active') advanceListing(row, at)
+    if (row.vertical === 'help' && row.status === 'active') advanceHelp(row, at)
   }
 }

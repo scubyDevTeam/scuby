@@ -4,6 +4,7 @@ import * as z from 'zod/mini'
 import { type AdoptionCase, adoptionCaseWire, toAdoptionCase } from './adoption-case'
 import { checkinWire } from './checkin'
 import { type FoundCase, foundCaseWire, toFoundCase } from './found-case'
+import { type HelpCase, helpCaseWire, toHelpCase } from './help-case'
 import {
   type Color,
   colorSchema,
@@ -75,21 +76,11 @@ export const lostCaseWire = z.object({
   contact: z.nullable(z.object({ display_name: z.string(), whatsapp_url: z.nullable(z.string()) })),
 })
 
-/** Verticals whose page is not built yet still resolve, with the card's worth of data. */
-export const otherCaseWire = z.object({
-  code: z.string(),
-  vertical: z.literal('help'),
-  status: z.string(),
-  title: z.string(),
-  place_name: z.string(),
-  photo_url: z.nullable(z.string()),
-})
-
 export const caseWire = z.discriminatedUnion('vertical', [
   lostCaseWire,
   foundCaseWire,
   adoptionCaseWire,
-  otherCaseWire,
+  helpCaseWire,
 ])
 
 export type Sighting = {
@@ -141,31 +132,14 @@ export type LostCase = {
   contact: { displayName: string; whatsappUrl: string | null } | null
 }
 
-export type OtherCase = {
-  code: string
-  vertical: 'help'
-  status: string
-  title: string
-  placeName: string
-  photoUrl: string | null
-}
-
-export type CaseDetail = LostCase | FoundCase | AdoptionCase | OtherCase
+export type CaseDetail = LostCase | FoundCase | AdoptionCase | HelpCase
 
 export function parseCase(raw: unknown): CaseDetail {
   const wire = caseWire.parse(raw)
   if (wire.vertical === 'found') return toFoundCase(wire)
   if (wire.vertical === 'adoption') return toAdoptionCase(wire)
-  if (wire.vertical !== 'lost') {
-    return {
-      code: wire.code,
-      vertical: wire.vertical,
-      status: wire.status,
-      title: wire.title,
-      placeName: wire.place_name,
-      photoUrl: wire.photo_url,
-    }
-  }
+  if (wire.vertical === 'help') return toHelpCase(wire)
+
   return {
     code: wire.code,
     vertical: 'lost',

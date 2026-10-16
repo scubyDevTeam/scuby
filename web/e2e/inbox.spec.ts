@@ -7,14 +7,14 @@ test(
     await myCases.openAsDemoOwner()
 
     await test.step('the «Bandeja» tab counts what is unread', async () => {
-      await expect(inbox.navBadge).toHaveText('2 avisos sin leer')
+      await expect(inbox.navBadge).toHaveText('3 avisos sin leer')
     })
 
     await inbox.openFromNav()
 
     await test.step('newest first, the unread ones told apart', async () => {
       await expect(inbox.items.first()).toContainText('Alguien dice que tiene a Luna')
-      await expect(inbox.unread).toHaveCount(2)
+      await expect(inbox.unread).toHaveCount(3)
       await expect(inbox.item('ya llegó a los vecinos')).not.toContainText('Sin leer')
     })
 

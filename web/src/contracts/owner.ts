@@ -214,7 +214,8 @@ export const moderateSightingRequest = z.object({
  * One answer per check-in (docs/product/04 · The follow-up loop). On a lost case the first three
  * answer a time-based check-in, the next three a claim check-in. On an adoption listing
  * (docs/product/06) `still_available` is the one-tap answer; «ya fue adoptado» and «ya no está
- * disponible» go through their own endpoints, which end the listing and its questions.
+ * disponible» go through their own endpoints, which end the listing and its questions. On a help
+ * request (docs/product/07) `still_needed` is «Sigue»; «ya no necesita ayuda» is `closeHelp`.
  */
 export const answerCheckinRequest = z.object({
   response: z.enum([
@@ -225,6 +226,7 @@ export const answerCheckinRequest = z.object({
     'claim_dismissed',
     'still_verifying',
     'still_available',
+    'still_needed',
   ]),
   /** With `reunited`. `claim_confirmed` is always `platform_claim`. */
   resolution_attribution: z._default(z.nullable(lostAttributionSchema), null),

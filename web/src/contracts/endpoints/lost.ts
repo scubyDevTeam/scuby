@@ -65,8 +65,8 @@ export const reopenCase = endpoint({
   method: 'POST',
   path: '/cases/:code/reopen',
   summary:
-    'Reactivates an expired case: lost or found up to 30 days after it expired, an adoption ' +
-    'listing up to 90 (adoption timelines are months).',
+    'Reactivates an expired case: lost, found or a help request up to 30 days after it expired, ' +
+    'an adoption listing up to 90 (adoption timelines are months).',
   auth: 'session',
   response: createdWire,
   errors: OWNER_ONLY,
@@ -98,7 +98,8 @@ export const answerCheckin = endpoint({
   summary:
     'Answers the pending check-in. `reunited`, `delete` and `claim_confirmed` also end the case ' +
     'or the claim, exactly as their own endpoints would. An adoption listing answers ' +
-    '`still_available`; its endings go through `recordAdoption` and `withdrawAdoption`.',
+    '`still_available`; its endings go through `recordAdoption` and `withdrawAdoption`. A help ' +
+    'request answers `still_needed`; it ends through `closeHelp`.',
   auth: 'session',
   body: answerCheckinRequest,
   response: createdWire,

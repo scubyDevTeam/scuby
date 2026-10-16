@@ -5,6 +5,7 @@ import { db, findCase, type LostRow, newCode, newId, type PersonRow } from '../d
 import {
   closeCheckins,
   closeClaimCheckins,
+  onBeneficiaryInteraction,
   onListerInteraction,
   onOwnerInteraction,
   onPublished,
@@ -169,7 +170,6 @@ export const owner = [
   // adoption listing for 90.
   route(api.reopenCase, ({ params, user }) => {
     const row = findCase(params.code) ?? fail('not_found')
-    if (row.vertical === 'help') fail('not_found')
     if (row.created_by !== user.id) fail('forbidden')
     if (row.status !== 'expired' || !row.resolved_at) fail('invalid_transition')
     const window = row.vertical === 'adoption' ? ADOPTION_REOPEN_WINDOW : REOPEN_WINDOW
@@ -179,6 +179,7 @@ export const owner = [
     row.resolution = null
     if (row.vertical === 'lost') onOwnerInteraction(row.code)
     if (row.vertical === 'adoption') onListerInteraction(row.code)
+    if (row.vertical === 'help') onBeneficiaryInteraction(row.code)
     return { id: row.code }
   }),
 
@@ -233,6 +234,26 @@ export const owner = [
       onListerInteraction(listing.code)
       return { id: checkin.id }
     }
+    if (listing?.vertical === 'help') {
+      // «Sigue» is the one-tap answer (07); «ya no necesita ayuda» is closeHelp, which ends it.
+      if (listing.created_by !== user.id) fail('forbidden')
+      const checkin = db.checkins.find(
+        (c) => c.id === params.checkinId && c.case_code === listing.code,
+      )
+      if (!checkin) fail('not_found')
+      if (checkin.responded_at || checkin.cancelled_at || listing.status !== 'active') {
+        fail('invalid_transition')
+      }
+      if (body.response !== 'still_needed') {
+        throw new Fail('validation_failed', undefined, {
+          response: `«${body.response}» does not answer a help request's check-in`,
+        })
+      }
+      checkin.responded_at = iso(Date.now())
+      checkin.response = body.response
+      onBeneficiaryInteraction(listing.code)
+      return { id: checkin.id }
+    }
     const row = ownedLost(params.code, user)
     const checkin = db.checkins.find((c) => c.id === params.checkinId && c.case_code === row.code)
     if (!checkin) fail('not_found')
@@ -241,6 +262,7 @@ export const owner = [
     }
     const fitsTrigger =
       body.response !== 'still_available' &&
+      body.response !== 'still_needed' &&
       TIME_BASED.includes(body.response) === (checkin.trigger === 'time_based')
     if (!fitsTrigger) {
       throw new Fail('validation_failed', undefined, {

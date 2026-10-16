@@ -23,6 +23,11 @@ const AdoptionCaseScreen = lazy(
     import('./-case/AdoptionCaseScreen').then((m) => ({ default: m.AdoptionCaseScreen })),
   ),
 )
+const HelpCaseScreen = lazy(
+  withMessages(['help'], () =>
+    import('./-case/HelpCaseScreen').then((m) => ({ default: m.HelpCaseScreen })),
+  ),
+)
 
 const home = (chunks: ReactNode) => (
   <Link to="/{-$locale}" className="font-bold text-brand-deep">
@@ -83,22 +88,17 @@ function CaseScreen() {
   }
 
   const found = query.data
-  if (found.vertical !== 'help') {
-    return (
-      <Suspense fallback={<Loading />}>
-        {found.vertical === 'lost' ? (
-          <LostCaseScreen found={found} />
-        ) : found.vertical === 'found' ? (
-          <FoundCaseScreen found={found} />
-        ) : (
-          <AdoptionCaseScreen found={found} />
-        )}
-      </Suspense>
-    )
-  }
   return (
-    <Message title={found.title}>
-      {rich('case.unfinished', { place: found.placeName, home })}
-    </Message>
+    <Suspense fallback={<Loading />}>
+      {found.vertical === 'lost' ? (
+        <LostCaseScreen found={found} />
+      ) : found.vertical === 'found' ? (
+        <FoundCaseScreen found={found} />
+      ) : found.vertical === 'adoption' ? (
+        <AdoptionCaseScreen found={found} />
+      ) : (
+        <HelpCaseScreen found={found} />
+      )}
+    </Suspense>
   )
 }
