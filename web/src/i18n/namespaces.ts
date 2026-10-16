@@ -17,6 +17,10 @@ export const DEFERRED_NAMESPACES = [
   // publishing one wait for those forms.
   'adoption',
   'adoption_forms',
+  // The same for a help request: its page's words with its screen, offering help and the
+  // beneficiary's side with those forms.
+  'help',
+  'help_forms',
 ] as const
 
 export type DeferredNamespace = (typeof DEFERRED_NAMESPACES)[number]

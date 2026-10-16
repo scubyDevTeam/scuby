@@ -3,7 +3,7 @@
 import type { api, WireOf } from '../contracts/api'
 import type { Point } from '../contracts/primitives'
 import { DAY, lookSummary, lookTitle, metres, ms, publicName, whatsappUrl } from './rules'
-import type { AdoptionRow, CardRow, CaseRow, FoundRow, LostRow, PersonRow, Tables } from './tables'
+import type { AdoptionRow, CaseRow, FoundRow, HelpRow, LostRow, PersonRow, Tables } from './tables'
 
 type CaseWire = WireOf<typeof api.getCase>
 type FeedWire = WireOf<typeof api.getFeed>
@@ -239,42 +239,138 @@ function adoptionView(t: Tables, row: AdoptionRow, viewerId: string | null): Cas
   }
 }
 
+/** What a need got: confirmed by the beneficiary, and promised but not yet confirmed (07). */
+export function needProgress(t: Tables, code: string, needId: string) {
+  const pledges = t.helpPledges.filter((p) => p.case_code === code && p.need_id === needId)
+  const sum = (status: 'pledged' | 'confirmed') =>
+    pledges.filter((p) => p.status === status).reduce((total, p) => total + p.quantity, 0)
+  return { confirmed: sum('confirmed'), pledged: sum('pledged') }
+}
+
+/** The way back to the beneficiary, per their contact prefs; null = in-app only. */
+export function beneficiaryChannel(row: HelpRow): string | null {
+  return row.status === 'active' && row.contact_prefs.expose_whatsapp && row.phone_has_whatsapp
+    ? whatsappUrl(row.contact_phone)
+    : null
+}
+
+function helpView(t: Tables, row: HelpRow, viewerId: string | null): CaseWire {
+  const beneficiary = viewerId !== null && row.created_by === viewerId
+  const pet = petOf(t, row.pet_id)
+  const publisher = person(t, row.created_by)
+  const pledges = t.helpPledges.filter((p) => p.case_code === row.code)
+  const channel = beneficiaryChannel(row)
+  return {
+    code: row.code,
+    vertical: 'help',
+    status: row.status,
+    resolution: row.resolution,
+    published_at: row.published_at,
+    resolved_at: row.resolved_at,
+    viewer: beneficiary ? 'beneficiary' : 'public',
+    pet: {
+      name: pet.name ?? '',
+      species: pet.species,
+      size: pet.size,
+      colors: pet.colors,
+      marks: pet.marks,
+      photo_urls: pet.photo_urls,
+    },
+    story: row.story,
+    location: {
+      center: row.location.center,
+      radius_m: row.location.radius_m,
+      place_name: row.location.place_name,
+    },
+    trust_tier: row.trust_tier,
+    beneficiary_name: publisher ? publicName(publisher.display_name) : '',
+    needs: row.needs.map((need) => ({
+      id: need.id,
+      kind: need.kind,
+      detail: need.detail,
+      target: need.target,
+      needed_by: need.needed_by,
+      status: need.status,
+      ...needProgress(t, row.code, need.id),
+    })),
+    my_pledges:
+      viewerId && !beneficiary
+        ? pledges
+            .filter((p) => p.person_id === viewerId)
+            .map((p) => ({
+              id: p.id,
+              need_id: p.need_id,
+              quantity: p.quantity,
+              note: p.note,
+              status: p.status,
+              created_at: p.created_at,
+              whatsapp_url: channel,
+            }))
+        : [],
+    pledges: beneficiary
+      ? pledges
+          .filter((p) => p.status !== 'withdrawn')
+          .sort((a, b) => ms(a.created_at) - ms(b.created_at))
+          .map((p) => {
+            const who = person(t, p.person_id)
+            return {
+              id: p.id,
+              need_id: p.need_id,
+              quantity: p.quantity,
+              note: p.note,
+              status: p.status as 'pledged' | 'confirmed' | 'declined',
+              created_at: p.created_at,
+              person_name: who ? publicName(who.display_name) : 'Alguien',
+              phone: p.contact_phone,
+              whatsapp_url: p.phone_has_whatsapp ? whatsappUrl(p.contact_phone) : null,
+            }
+          })
+      : [],
+    pending_checkin: beneficiary ? pendingCheckin(t, row.code) : null,
+  }
+}
+
+const NEED_NAMES = {
+  foster: 'hogar temporal',
+  transport: 'transporte',
+  supplies: 'insumos',
+} as const
+
+/** «Necesita hogar temporal y transporte» — the server composes it; the emulation speaks Spanish. */
+function needsLine(row: HelpRow): string {
+  const open = row.needs.filter((n) => n.status === 'open').map((n) => NEED_NAMES[n.kind])
+  if (open.length === 0) return 'Ya tiene lo que pidió'
+  const list = open.length > 1 ? `${open.slice(0, -1).join(', ')} y ${open.at(-1)}` : open[0]
+  return `Necesita ${list}`
+}
+
 export function caseView(t: Tables, row: CaseRow, viewerId: string | null): CaseWire {
   if (row.vertical === 'lost') return lostView(t, row, viewerId)
   if (row.vertical === 'found') return foundView(t, row, viewerId)
   if (row.vertical === 'adoption') return adoptionView(t, row, viewerId)
-  return {
-    code: row.code,
-    vertical: row.vertical,
-    status: row.status,
-    title: row.title,
-    place_name: row.place_name,
-    photo_url: row.photo_url,
-  }
+  return helpView(t, row, viewerId)
 }
-
-const isCard = (row: CaseRow): row is CardRow => row.vertical === 'help'
 
 function feedItem(t: Tables, row: CaseRow): FeedItem | null {
   if (row.status !== 'active') return null
-  if (isCard(row)) {
+  const pet = petOf(t, row.pet_id)
+  if (row.vertical === 'help') {
     return {
       code: row.code,
-      vertical: row.vertical,
-      title: row.title,
-      species: row.species,
-      summary: null,
-      place_name: row.place_name,
-      point: row.point,
-      photo_url: row.photo_url,
+      vertical: 'help',
+      title: pet.name ?? lookTitle(pet),
+      species: pet.species,
+      summary: lookSummary(pet),
+      place_name: row.location.place_name,
+      point: row.location.center,
+      photo_url: pet.photo_urls[0] ?? null,
       happened_at: row.published_at,
       possible_find: false,
       sightings_count: null,
       last_sighting_at: null,
-      detail: row.detail,
+      detail: needsLine(row),
     }
   }
-  const pet = petOf(t, row.pet_id)
   if (row.vertical === 'adoption') {
     const reserved = isReserved(t, row.code)
     return {
@@ -349,13 +445,25 @@ export function feedView(t: Tables, near: Point | null): FeedWire {
 
 export function myCasesView(t: Tables, personId: string): WireOf<typeof api.listMyCases> {
   return Object.values(t.cases)
-    .filter(
-      (row): row is LostRow | FoundRow | AdoptionRow =>
-        'created_by' in row && row.created_by === personId,
-    )
+    .filter((row) => row.created_by === personId)
     .sort((a, b) => ms(b.published_at) - ms(a.published_at))
     .map((row) => {
       const pet = petOf(t, row.pet_id)
+      if (row.vertical === 'help') {
+        return {
+          code: row.code,
+          vertical: row.vertical,
+          status: row.status,
+          title: pet.name ?? lookTitle(pet),
+          place_name: row.location.place_name,
+          photo_url: pet.photo_urls[0] ?? null,
+          published_at: row.published_at,
+          // On a request, the offers waiting for the beneficiary to say whether they arrived.
+          open_claim_count: t.helpPledges.filter(
+            (p) => p.case_code === row.code && p.status === 'pledged',
+          ).length,
+        }
+      }
       if (row.vertical === 'adoption') {
         return {
           code: row.code,

@@ -3,7 +3,7 @@
 import type { caseWire } from '../src/contracts/case'
 import { describeFound } from '../src/features/found/copy'
 import { describePet } from '../src/features/lost/copy'
-import type { TextKey, Translator } from '../src/i18n/translate'
+import type { Translator } from '../src/i18n/translate'
 
 export type CaseWire = ReturnType<typeof caseWire.parse>
 
@@ -11,12 +11,6 @@ export type Preview = {
   title: string
   description: string
   image: { url: string; alt: string } | null
-}
-
-// The help page is not built yet: its wire is the card, with the status as a plain string.
-const HELP_LABELS: Partial<Record<string, TextKey>> = {
-  active: 'preview.label.help.active',
-  closed: 'preview.label.help.closed',
 }
 
 /**
@@ -39,7 +33,7 @@ function dayOf(i18n: Translator, iso: string): string {
  * (docs/eng/media-pipeline.md §3). When the renderer lands, this returns its URL for the code.
  */
 function previewImage(wire: CaseWire, origin: string): string | null {
-  const photo = wire.vertical === 'help' ? wire.photo_url : wire.pet.photo_urls[0]
+  const photo = wire.pet.photo_urls[0]
   if (!photo) return null
   try {
     const url = new URL(photo, origin)
@@ -89,11 +83,21 @@ function words(i18n: Translator, wire: CaseWire) {
         : t(`preview.description.adoption_${wire.status}`, { name })
     return { label, name, place: wire.location.place_name, description }
   }
-  const label = t(HELP_LABELS[wire.status] ?? 'preview.label.closed')
-  const description = t(
-    wire.status === 'active' ? 'preview.description.other_active' : 'preview.description.closed',
-  )
-  return { label, name: wire.title, place: wire.place_name, description }
+  const label = t(`preview.label.help.${wire.status}`)
+  const { name } = wire.pet
+  // What is still asked, named in the page's language: the needs are keys on the wire.
+  const open = wire.needs
+    .filter((need) => need.status === 'open')
+    .map((need) => t(`preview.need.${need.kind}`))
+  const needs =
+    open.length > 1
+      ? `${open.slice(0, -1).join(', ')}${t('preview.need.and')}${open.at(-1)}`
+      : (open[0] ?? '')
+  const description =
+    wire.status === 'active' && needs
+      ? t('preview.description.help_active', { name, needs })
+      : t(`preview.description.help_${wire.status === 'active' ? 'closed' : wire.status}`, { name })
+  return { label, name, place: wire.location.place_name, description }
 }
 
 /** `SE BUSCA: Luna — Santa Ana`, the one-line description and the image, in the page's language. */

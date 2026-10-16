@@ -21,6 +21,7 @@ import { Route as Char123LocaleChar125CCodeRouteImport } from './routes/{-$local
 import { Route as Char123LocaleChar125PublicarIndexRouteImport } from './routes/{-$locale}/publicar.index'
 import { Route as Char123LocaleChar125PublicarTipoRouteImport } from './routes/{-$locale}/publicar.$tipo'
 import { Route as Char123LocaleChar125AuthPublicarAdopcionRouteImport } from './routes/{-$locale}/_auth/publicar.adopcion'
+import { Route as Char123LocaleChar125AuthPublicarAyudaRouteImport } from './routes/{-$locale}/_auth/publicar.ayuda'
 import { Route as Char123LocaleChar125AuthPublicarPerdidoRouteImport } from './routes/{-$locale}/_auth/publicar.perdido'
 import { Route as Char123LocaleChar125PublicarEncontradoIndexRouteImport } from './routes/{-$locale}/publicar.encontrado.index'
 import { Route as Char123LocaleChar125PublicarEncontradoVistoRouteImport } from './routes/{-$locale}/publicar.encontrado.visto'
@@ -97,6 +98,12 @@ const Char123LocaleChar125AuthPublicarAdopcionRoute =
     path: '/publicar/adopcion',
     getParentRoute: () => Char123LocaleChar125AuthRoute,
   } as any)
+const Char123LocaleChar125AuthPublicarAyudaRoute =
+  Char123LocaleChar125AuthPublicarAyudaRouteImport.update({
+    id: '/publicar/ayuda',
+    path: '/publicar/ayuda',
+    getParentRoute: () => Char123LocaleChar125AuthRoute,
+  } as any)
 const Char123LocaleChar125AuthPublicarPerdidoRoute =
   Char123LocaleChar125AuthPublicarPerdidoRouteImport.update({
     id: '/publicar/perdido',
@@ -134,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/{-$locale}/publicar/$tipo': typeof Char123LocaleChar125PublicarTipoRoute
   '/{-$locale}/publicar/': typeof Char123LocaleChar125PublicarIndexRoute
   '/{-$locale}/publicar/adopcion': typeof Char123LocaleChar125AuthPublicarAdopcionRoute
+  '/{-$locale}/publicar/ayuda': typeof Char123LocaleChar125AuthPublicarAyudaRoute
   '/{-$locale}/publicar/perdido': typeof Char123LocaleChar125AuthPublicarPerdidoRoute
   '/{-$locale}/publicar/encontrado/visto': typeof Char123LocaleChar125PublicarEncontradoVistoRoute
   '/{-$locale}/publicar/encontrado/': typeof Char123LocaleChar125PublicarEncontradoIndexRoute
@@ -150,6 +158,7 @@ export interface FileRoutesByTo {
   '/{-$locale}/publicar/$tipo': typeof Char123LocaleChar125PublicarTipoRoute
   '/{-$locale}/publicar': typeof Char123LocaleChar125PublicarIndexRoute
   '/{-$locale}/publicar/adopcion': typeof Char123LocaleChar125AuthPublicarAdopcionRoute
+  '/{-$locale}/publicar/ayuda': typeof Char123LocaleChar125AuthPublicarAyudaRoute
   '/{-$locale}/publicar/perdido': typeof Char123LocaleChar125AuthPublicarPerdidoRoute
   '/{-$locale}/publicar/encontrado/visto': typeof Char123LocaleChar125PublicarEncontradoVistoRoute
   '/{-$locale}/publicar/encontrado': typeof Char123LocaleChar125PublicarEncontradoIndexRoute
@@ -169,6 +178,7 @@ export interface FileRoutesById {
   '/{-$locale}/publicar/$tipo': typeof Char123LocaleChar125PublicarTipoRoute
   '/{-$locale}/publicar/': typeof Char123LocaleChar125PublicarIndexRoute
   '/{-$locale}/_auth/publicar/adopcion': typeof Char123LocaleChar125AuthPublicarAdopcionRoute
+  '/{-$locale}/_auth/publicar/ayuda': typeof Char123LocaleChar125AuthPublicarAyudaRoute
   '/{-$locale}/_auth/publicar/perdido': typeof Char123LocaleChar125AuthPublicarPerdidoRoute
   '/{-$locale}/publicar/encontrado/visto': typeof Char123LocaleChar125PublicarEncontradoVistoRoute
   '/{-$locale}/publicar/encontrado/': typeof Char123LocaleChar125PublicarEncontradoIndexRoute
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/{-$locale}/publicar/$tipo'
     | '/{-$locale}/publicar/'
     | '/{-$locale}/publicar/adopcion'
+    | '/{-$locale}/publicar/ayuda'
     | '/{-$locale}/publicar/perdido'
     | '/{-$locale}/publicar/encontrado/visto'
     | '/{-$locale}/publicar/encontrado/'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/{-$locale}/publicar/$tipo'
     | '/{-$locale}/publicar'
     | '/{-$locale}/publicar/adopcion'
+    | '/{-$locale}/publicar/ayuda'
     | '/{-$locale}/publicar/perdido'
     | '/{-$locale}/publicar/encontrado/visto'
     | '/{-$locale}/publicar/encontrado'
@@ -222,6 +234,7 @@ export interface FileRouteTypes {
     | '/{-$locale}/publicar/$tipo'
     | '/{-$locale}/publicar/'
     | '/{-$locale}/_auth/publicar/adopcion'
+    | '/{-$locale}/_auth/publicar/ayuda'
     | '/{-$locale}/_auth/publicar/perdido'
     | '/{-$locale}/publicar/encontrado/visto'
     | '/{-$locale}/publicar/encontrado/'
@@ -318,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char123LocaleChar125AuthPublicarAdopcionRouteImport
       parentRoute: typeof Char123LocaleChar125AuthRoute
     }
+    '/{-$locale}/_auth/publicar/ayuda': {
+      id: '/{-$locale}/_auth/publicar/ayuda'
+      path: '/publicar/ayuda'
+      fullPath: '/{-$locale}/publicar/ayuda'
+      preLoaderRoute: typeof Char123LocaleChar125AuthPublicarAyudaRouteImport
+      parentRoute: typeof Char123LocaleChar125AuthRoute
+    }
     '/{-$locale}/_auth/publicar/perdido': {
       id: '/{-$locale}/_auth/publicar/perdido'
       path: '/publicar/perdido'
@@ -354,6 +374,7 @@ interface Char123LocaleChar125AuthRouteChildren {
   Char123LocaleChar125AuthMisCasosRoute: typeof Char123LocaleChar125AuthMisCasosRoute
   Char123LocaleChar125AuthPerfilRoute: typeof Char123LocaleChar125AuthPerfilRoute
   Char123LocaleChar125AuthPublicarAdopcionRoute: typeof Char123LocaleChar125AuthPublicarAdopcionRoute
+  Char123LocaleChar125AuthPublicarAyudaRoute: typeof Char123LocaleChar125AuthPublicarAyudaRoute
   Char123LocaleChar125AuthPublicarPerdidoRoute: typeof Char123LocaleChar125AuthPublicarPerdidoRoute
   Char123LocaleChar125AuthPublicarEncontradoAvisoRoute: typeof Char123LocaleChar125AuthPublicarEncontradoAvisoRoute
 }
@@ -366,6 +387,8 @@ const Char123LocaleChar125AuthRouteChildren: Char123LocaleChar125AuthRouteChildr
     Char123LocaleChar125AuthPerfilRoute: Char123LocaleChar125AuthPerfilRoute,
     Char123LocaleChar125AuthPublicarAdopcionRoute:
       Char123LocaleChar125AuthPublicarAdopcionRoute,
+    Char123LocaleChar125AuthPublicarAyudaRoute:
+      Char123LocaleChar125AuthPublicarAyudaRoute,
     Char123LocaleChar125AuthPublicarPerdidoRoute:
       Char123LocaleChar125AuthPublicarPerdidoRoute,
     Char123LocaleChar125AuthPublicarEncontradoAvisoRoute:

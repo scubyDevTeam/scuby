@@ -1,5 +1,6 @@
 // The emulated backend's starting rows: one lost case per status, found cases (one converted into
-// an adoption listing), adoption listings — open, «en proceso», adopted — and one help card. Dates are relative to "now" so «hace 2 h» stays true whenever it is opened.
+// an adoption listing), adoption listings — open, «en proceso», adopted — and help requests, one of
+// them the demo account's. Dates are relative to "now" so «hace 2 h» stays true whenever it is opened.
 import type { api, WireOf } from '../contracts/api'
 import { mockPhoto } from './photo'
 import { DAY, HOUR, iso } from './rules'
@@ -8,6 +9,9 @@ import type {
   AdoptionInterestRow,
   AdoptionRow,
   CaseRow,
+  HelpNeedRow,
+  HelpPledgeRow,
+  HelpRow,
   PersonRow,
   PetRow,
   SightingRow,
@@ -73,6 +77,61 @@ const pet = (
   chip_number: null,
   custody_state: fields.owner_id ? 'claimed' : 'unclaimed',
   health_flags: [],
+  ...fields,
+})
+
+const inDays = (days: number) => iso(Date.now() + days * DAY).slice(0, 10)
+
+const need = (
+  id: string,
+  kind: HelpNeedRow['kind'],
+  detail: string,
+  target: number | null,
+  neededBy: string | null = null,
+): HelpNeedRow => ({ id, kind, detail, target, needed_by: neededBy, status: 'open' })
+
+/** A help request as a person publishes it: unverified, WhatsApp exposed (docs/product/07). */
+function help(
+  code: string,
+  fields: Pick<
+    HelpRow,
+    'pet_id' | 'created_by' | 'published_at' | 'contact_phone' | 'story' | 'location' | 'needs'
+  > &
+    Partial<HelpRow>,
+): HelpRow {
+  return {
+    code,
+    vertical: 'help',
+    status: 'active',
+    resolved_at: null,
+    resolution: null,
+    resolution_attribution: null,
+    contact_prefs: exposeWhatsapp,
+    phone_has_whatsapp: true,
+    trust_tier: 'unverified',
+    ...fields,
+  }
+}
+
+const pledge = (
+  id: string,
+  caseCode: string,
+  needId: string,
+  personId: string,
+  phone: string,
+  fields: Partial<HelpPledgeRow> = {},
+): HelpPledgeRow => ({
+  id,
+  case_code: caseCode,
+  need_id: needId,
+  person_id: personId,
+  quantity: 1,
+  note: null,
+  contact_phone: phone,
+  phone_has_whatsapp: true,
+  status: 'pledged',
+  created_at: ago(DAY),
+  confirmed_at: null,
   ...fields,
 })
 
@@ -351,18 +410,50 @@ export function seed(): Tables {
         place_name: 'Laureles',
       },
     }),
-    {
-      code: 'HE7PA',
-      vertical: 'help',
-      status: 'active',
-      title: 'Max · cirugía de cadera',
-      species: 'dog',
-      place_name: 'Envigado',
-      point: offset(-7800, 900),
-      photo_url: mockPhoto('#b98a3e'),
+    help('HE7PA', {
+      pet_id: 'pet-max',
+      created_by: 'user-julian',
       published_at: ago(4 * DAY),
-      detail: '14 personas ayudaron',
-    },
+      contact_phone: '+573000000006',
+      story:
+        'A Max lo operaron de la cadera el lunes. Necesita reposo en un espacio tranquilo mientras se recupera, y yo trabajo todo el día fuera de casa.',
+      location: {
+        center: offset(-7800, 900),
+        radius_m: 1000,
+        at: ago(4 * DAY),
+        place_name: 'Envigado',
+      },
+      needs: [
+        need('need-max-home', 'foster', 'Dos semanas, mientras se recupera de la cirugía', 1),
+        need(
+          'need-max-ride',
+          'transport',
+          'De Envigado a la clínica en Laureles, control del martes 8 a. m.',
+          1,
+          inDays(3),
+        ),
+        need('need-max-food', 'supplies', 'Concentrado para perro adulto, bultos de 8 kg', null),
+      ],
+    }),
+    // Carolina's own request: the demo account sees the beneficiary's side — a home on offer to answer.
+    help('NA7LA', {
+      pet_id: 'pet-nala',
+      created_by: DEMO_OWNER_ID,
+      published_at: ago(2 * DAY),
+      contact_phone: '+573000000007',
+      story:
+        'Nala apareció en mi portería con una pata lastimada. Ya la vio el veterinario; necesita un hogar temporal mientras le encuentro familia.',
+      location: {
+        center: offset(300, -200),
+        radius_m: 300,
+        at: ago(2 * DAY),
+        place_name: 'Laureles',
+      },
+      needs: [
+        need('need-nala-home', 'foster', 'Tres semanas, mientras le encuentro familia', 1),
+        need('need-nala-sand', 'supplies', 'Bultos de arena para gato', 3),
+      ],
+    }),
   ]
 
   return {
@@ -453,6 +544,26 @@ export function seed(): Tables {
         health_flags: [],
         photo_urls: [mockPhoto('#8a6a4a')],
       },
+      pet({
+        id: 'pet-max',
+        owner_id: 'user-julian',
+        name: 'Max',
+        species: 'dog',
+        size: 'large',
+        colors: ['yellow'],
+        marks: 'Golden, muy tranquilo. Camina despacio por la cirugía.',
+        photo_urls: [mockPhoto('#b98a3e')],
+      }),
+      pet({
+        id: 'pet-nala',
+        owner_id: DEMO_OWNER_ID,
+        name: 'Nala',
+        species: 'cat',
+        size: 'medium',
+        colors: ['orange', 'white'],
+        marks: 'Le cuesta apoyar la pata delantera derecha.',
+        photo_urls: [mockPhoto('#d9893c')],
+      }),
       pet({
         id: 'pet-nube',
         owner_id: null,
@@ -608,6 +719,15 @@ export function seed(): Tables {
     ],
     notifications: [
       {
+        id: 'n-help-1',
+        person_id: DEMO_OWNER_ID,
+        event: 'help_pledge.created',
+        body: 'Marcela T. ofreció un hogar temporal para Nala.',
+        case_code: 'NA7LA',
+        created_at: ago(5 * HOUR),
+        read_at: null,
+      },
+      {
         id: 'n-1',
         person_id: DEMO_OWNER_ID,
         event: 'recovery_claim.opened',
@@ -634,6 +754,29 @@ export function seed(): Tables {
         created_at: ago(2 * DAY),
         read_at: ago(2 * DAY),
       },
+    ],
+    helpPledges: [
+      // Max: a ride on offer, waiting for Julián to say it happened; two bags that arrived.
+      pledge('pl-max-ride', 'HE7PA', 'need-max-ride', 'user-andres', '+573000000001', {
+        note: 'Tengo carro, puedo el martes temprano.',
+        created_at: ago(DAY),
+      }),
+      pledge('pl-max-food', 'HE7PA', 'need-max-food', 'user-sofia', '+573000000005', {
+        quantity: 2,
+        status: 'confirmed',
+        created_at: ago(3 * DAY),
+        confirmed_at: ago(2 * DAY),
+      }),
+      // Nala: Marcela offers a home — Carolina, the demo account, owes it an answer.
+      pledge('pl-nala-home', 'NA7LA', 'need-nala-home', 'user-marcela', '+573000000008', {
+        note: 'Vivo sola en apartamento, sin otros animales. Puedo recibirla este fin de semana.',
+        created_at: ago(5 * HOUR),
+      }),
+      pledge('pl-nala-sand', 'NA7LA', 'need-nala-sand', 'user-andres', '+573000000001', {
+        status: 'confirmed',
+        created_at: ago(DAY),
+        confirmed_at: ago(20 * HOUR),
+      }),
     ],
     pushSubscriptions: [],
     reports: [],

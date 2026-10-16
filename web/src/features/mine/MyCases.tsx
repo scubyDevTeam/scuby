@@ -18,19 +18,22 @@ const statusBadge: Record<string, { tone: BadgeTone; label: TextKey }> = {
   transferred_to_org: { tone: 'found', label: 'mine.status.transferred_to_org' },
   adopted: { tone: 'found', label: 'mine.status.adopted' },
   withdrawn: { tone: 'info', label: 'mine.status.withdrawn' },
+  closed: { tone: 'found', label: 'mine.status.closed' },
+  removed: { tone: 'info', label: 'mine.status.removed' },
 }
 
 /** An active found case is not a search, nor is a listing: each says what it is. */
 const activeBadge: Partial<Record<MyCase['vertical'], { tone: BadgeTone; label: TextKey }>> = {
   found: { tone: 'found', label: 'mine.status.found_active' },
   adoption: { tone: 'adoption', label: 'mine.status.adoption_active' },
+  help: { tone: 'help', label: 'mine.status.help_active' },
 }
 
 const waitingBadge: Record<MyCase['vertical'], TextKey> = {
   lost: 'mine.possible_find',
   found: 'mine.possible_owner',
   adoption: 'mine.interested',
-  help: 'mine.possible_find',
+  help: 'mine.pledges',
 }
 
 type Props = {
