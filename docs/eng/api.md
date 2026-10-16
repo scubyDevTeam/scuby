@@ -99,8 +99,10 @@ Simplified on purpose — the real backend must do better:
 | Display text composed in Spanish, whatever `Accept-Language` says | Composed in the request's language |
 
 Not in the contract yet: found-case check-ins (the custodian's «¿sigues con él?»), purge after 30
-days, reporter editing a sighting within 15 minutes, `«Lo tengo»` on an expired case (O3), and
-help. From the profile ([auth.md](auth.md) · Profile): the photo, changing the phone outside a
+days, reporter editing a sighting within 15 minutes, and `«Lo tengo»` on an expired case (O3).
+From help ([07](../product/07-help-workflow.md)): photos on a request beyond the pet's own, a
+request for a custodian's found animal opened from its found case, and operator review into
+`verified` (O9). From the profile ([auth.md](auth.md) · Profile): the photo, changing the phone outside a
 publish (start + verify an OTP), whether the phone is verified, and account-level contact prefs.
 From check-ins (04 · `case_checkin`): the date the case archives if nobody answers, which the copy
 «archivaremos la publicación en 5 días» needs. From push ([frontend.md](frontend.md) · Push): the **push

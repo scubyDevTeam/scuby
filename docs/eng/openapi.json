@@ -3173,6 +3173,1070 @@
         }
       }
     },
+    "/help-requests": {
+      "post": {
+        "operationId": "publishHelp",
+        "summary": "Publishes a help request — one to three needs in kind (`foster`, `transport`, `supplies`) for a pet the caller holds — with the phone step of every publish. With `pet_id: null` the pet is created and its owner link opens. Starts `unverified`, labelled so; nothing waits on review.",
+        "tags": [
+          "help-requests"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pet_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "pet": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 60
+                          },
+                          "species": {
+                            "type": "string",
+                            "enum": [
+                              "dog",
+                              "cat",
+                              "other"
+                            ]
+                          },
+                          "size": {
+                            "type": "string",
+                            "enum": [
+                              "small",
+                              "medium",
+                              "large"
+                            ]
+                          },
+                          "colors": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "black",
+                                "white",
+                                "brown",
+                                "tan",
+                                "gray",
+                                "yellow",
+                                "orange"
+                              ]
+                            }
+                          },
+                          "marks": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 500
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "photo_urls": {
+                            "maxItems": 6,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "species",
+                          "size",
+                          "colors",
+                          "marks",
+                          "photo_urls"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "needs": {
+                    "minItems": 1,
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "foster",
+                            "transport",
+                            "supplies"
+                          ]
+                        },
+                        "detail": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 300
+                        },
+                        "target": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 999
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "needed_by": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "detail",
+                        "target",
+                        "needed_by"
+                      ]
+                    }
+                  },
+                  "story": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "location_point": {
+                    "type": "object",
+                    "properties": {
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "lng": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180
+                      }
+                    },
+                    "required": [
+                      "lat",
+                      "lng"
+                    ]
+                  },
+                  "location_radius_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 5000
+                  },
+                  "phone": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\+[1-9]\\d{6,14}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "phone_has_whatsapp": {
+                    "type": "boolean"
+                  },
+                  "contact_prefs": {
+                    "type": "object",
+                    "properties": {
+                      "expose_whatsapp": {
+                        "type": "boolean"
+                      },
+                      "expose_email": {
+                        "type": "boolean"
+                      },
+                      "in_app_only": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "expose_whatsapp",
+                      "expose_email",
+                      "in_app_only"
+                    ]
+                  },
+                  "otp_code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "pet_id",
+                  "pet",
+                  "needs",
+                  "story",
+                  "location_point",
+                  "location_radius_m",
+                  "phone",
+                  "phone_has_whatsapp",
+                  "contact_prefs",
+                  "otp_code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "phone_step": {
+                          "type": "string",
+                          "const": "otp"
+                        }
+                      },
+                      "required": [
+                        "phone_step"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `invalid_code`, `phone_required`, `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{code}/pledges": {
+      "post": {
+        "operationId": "pledgeHelp",
+        "summary": "«Yo ayudo» on one need: the pledge row first, then the channel to the beneficiary. Needs a reachable number — a foster we cannot reach is not a foster — with the publish phone step. The beneficiary cannot pledge to their own request.",
+        "tags": [
+          "cases"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "need_id": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 99
+                  },
+                  "note": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 300
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "phone": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\+[1-9]\\d{6,14}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "phone_has_whatsapp": {
+                    "type": "boolean"
+                  },
+                  "otp_code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "need_id",
+                  "quantity",
+                  "note",
+                  "phone",
+                  "phone_has_whatsapp",
+                  "otp_code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "phone_step": {
+                          "type": "string",
+                          "const": "otp"
+                        }
+                      },
+                      "required": [
+                        "phone_step"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "whatsapp_url": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "whatsapp_url"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`error.code`: `invalid_transition`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `invalid_code`, `phone_required`, `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{code}/pledges/{pledgeId}/withdraw": {
+      "post": {
+        "operationId": "withdrawPledge",
+        "summary": "«Ya no puedo»: the pledger takes back an offer the beneficiary has not confirmed yet.",
+        "tags": [
+          "cases"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pledgeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`error.code`: `invalid_transition`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{code}/pledges/{pledgeId}": {
+      "post": {
+        "operationId": "answerPledge",
+        "summary": "The beneficiary says what arrived: `confirmed` (the ride happened, the food arrived) or `declined`. Final either way. Confirmations that reach a need’s target cover it; every need covered closes the request as `covered`.",
+        "tags": [
+          "cases"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pledgeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "confirmed",
+                      "declined"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`error.code`: `invalid_transition`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{code}/needs/{needId}/cover": {
+      "post": {
+        "operationId": "coverNeed",
+        "summary": "The beneficiary marks one need covered by their word — the way a «lo que puedan» need ends. Every need covered closes the request.",
+        "tags": [
+          "cases"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "needId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`error.code`: `invalid_transition`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{code}/close": {
+      "post": {
+        "operationId": "closeHelp",
+        "summary": "«Ya no necesita ayuda», with its reason. Pledgers with an open pledge are told. Pet and links are untouched.",
+        "tags": [
+          "cases"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resolution": {
+                    "type": "string",
+                    "enum": [
+                      "need_ended",
+                      "pet_deceased"
+                    ]
+                  }
+                },
+                "required": [
+                  "resolution"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`error.code`: `invalid_transition`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/cases/{code}/sightings": {
       "post": {
         "operationId": "reportSighting",
@@ -4741,7 +5805,7 @@
     "/cases/{code}/reopen": {
       "post": {
         "operationId": "reopenCase",
-        "summary": "Reactivates an expired case: lost or found up to 30 days after it expired, an adoption listing up to 90 (adoption timelines are months).",
+        "summary": "Reactivates an expired case: lost, found or a help request up to 30 days after it expired, an adoption listing up to 90 (adoption timelines are months).",
         "tags": [
           "cases"
         ],
@@ -5142,7 +6206,7 @@
     "/cases/{code}/checkins/{checkinId}/answer": {
       "post": {
         "operationId": "answerCheckin",
-        "summary": "Answers the pending check-in. `reunited`, `delete` and `claim_confirmed` also end the case or the claim, exactly as their own endpoints would. An adoption listing answers `still_available`; its endings go through `recordAdoption` and `withdrawAdoption`.",
+        "summary": "Answers the pending check-in. `reunited`, `delete` and `claim_confirmed` also end the case or the claim, exactly as their own endpoints would. An adoption listing answers `still_available`; its endings go through `recordAdoption` and `withdrawAdoption`. A help request answers `still_needed`; it ends through `closeHelp`.",
         "tags": [
           "cases"
         ],
@@ -5185,7 +6249,8 @@
                       "claim_confirmed",
                       "claim_dismissed",
                       "still_verifying",
-                      "still_available"
+                      "still_available",
+                      "still_needed"
                     ]
                   },
                   "resolution_attribution": {
@@ -6580,18 +7645,402 @@
                           "const": "help"
                         },
                         "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "closed",
+                            "expired",
+                            "removed"
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "covered",
+                                "need_ended",
+                                "pet_deceased",
+                                "no_response",
+                                "removed_by_moderation"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "published_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "resolved_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "viewer": {
+                          "type": "string",
+                          "enum": [
+                            "beneficiary",
+                            "public"
+                          ]
+                        },
+                        "pet": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "species": {
+                              "type": "string",
+                              "enum": [
+                                "dog",
+                                "cat",
+                                "other"
+                              ]
+                            },
+                            "size": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "small",
+                                    "medium",
+                                    "large"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "colors": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "black",
+                                  "white",
+                                  "brown",
+                                  "tan",
+                                  "gray",
+                                  "yellow",
+                                  "orange"
+                                ]
+                              }
+                            },
+                            "marks": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "photo_urls": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "species",
+                            "size",
+                            "colors",
+                            "marks",
+                            "photo_urls"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "story": {
                           "type": "string"
                         },
-                        "title": {
+                        "location": {
+                          "type": "object",
+                          "properties": {
+                            "center": {
+                              "type": "object",
+                              "properties": {
+                                "lat": {
+                                  "type": "number",
+                                  "minimum": -90,
+                                  "maximum": 90
+                                },
+                                "lng": {
+                                  "type": "number",
+                                  "minimum": -180,
+                                  "maximum": 180
+                                }
+                              },
+                              "required": [
+                                "lat",
+                                "lng"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "radius_m": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "place_name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "center",
+                            "radius_m",
+                            "place_name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "trust_tier": {
+                          "type": "string",
+                          "enum": [
+                            "unverified",
+                            "verified"
+                          ]
+                        },
+                        "beneficiary_name": {
                           "type": "string"
                         },
-                        "place_name": {
-                          "type": "string"
+                        "needs": {
+                          "minItems": 1,
+                          "maxItems": 3,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "foster",
+                                  "transport",
+                                  "supplies"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "target": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "needed_by": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "open",
+                                  "covered",
+                                  "closed"
+                                ]
+                              },
+                              "confirmed": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "pledged": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "detail",
+                              "target",
+                              "needed_by",
+                              "status",
+                              "confirmed",
+                              "pledged"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
-                        "photo_url": {
-                          "type": [
-                            "string",
-                            "null"
+                        "my_pledges": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "need_id": {
+                                "type": "string"
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "note": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pledged",
+                                  "confirmed",
+                                  "declined",
+                                  "withdrawn"
+                                ]
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "whatsapp_url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "need_id",
+                              "quantity",
+                              "note",
+                              "status",
+                              "created_at",
+                              "whatsapp_url"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "pledges": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "need_id": {
+                                "type": "string"
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "note": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pledged",
+                                  "confirmed",
+                                  "declined"
+                                ]
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "person_name": {
+                                "type": "string"
+                              },
+                              "phone": {
+                                "type": "string"
+                              },
+                              "whatsapp_url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "need_id",
+                              "quantity",
+                              "note",
+                              "status",
+                              "created_at",
+                              "person_name",
+                              "phone",
+                              "whatsapp_url"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "pending_checkin": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "trigger": {
+                                  "type": "string",
+                                  "enum": [
+                                    "time_based",
+                                    "post_recovery_claim"
+                                  ]
+                                },
+                                "claim_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "asked_at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "trigger",
+                                "claim_id",
+                                "asked_at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         }
                       },
@@ -6599,9 +8048,19 @@
                         "code",
                         "vertical",
                         "status",
-                        "title",
-                        "place_name",
-                        "photo_url"
+                        "resolution",
+                        "published_at",
+                        "resolved_at",
+                        "viewer",
+                        "pet",
+                        "story",
+                        "location",
+                        "trust_tier",
+                        "beneficiary_name",
+                        "needs",
+                        "my_pledges",
+                        "pledges",
+                        "pending_checkin"
                       ],
                       "additionalProperties": false
                     }

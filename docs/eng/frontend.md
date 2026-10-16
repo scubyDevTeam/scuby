@@ -45,9 +45,8 @@ admire the scroll physics. The specific risks and their mitigations are under *R
 - **Play App Signing** enrolled from the first Android build — the signing key is never a file
   someone can lose.
 - **Nothing the app needs long-term lives in WebView storage.** Auth state of record, preferences,
-  drafts that matter: server. Two things are deliberately device-local and *transient* — the help
-  flow's link-gate form state ([07](../product/07-help-workflow.md) · Publishing) and the sighting
-  retry queue (*Risks* §6). Losing them in a rewrite costs nothing.
+  drafts that matter: server. One thing is deliberately device-local and *transient* — the sighting
+  retry queue (*Risks* §6). Losing it in a rewrite costs nothing.
 - Push tokens are per-install; a new binary re-registers on first launch. `push_subscription`
   already expects that.
 
@@ -254,7 +253,6 @@ the server-provided center + radius.
 | **Phone step** in every publish flow | Inline field, country prefilled from `supported_countries`, libphonenumber format check, OTP entry when told `otp` | [auth.md](auth.md) · UI contract |
 | **Sign-in** | Google one-tap + email 6-digit code (the mobile scope adds the native Google plugin and Apple); accounts born lazily at the first gated action; no signup screen | [auth.md](auth.md) |
 | **Validation for feedback** | Distance/time checks on sightings in the form; server re-checks | [04](../product/04-lost-workflow.md) · Validation |
-| **Form state across a trip out** | Help flow link gate — kept on the device, no server draft | [07](../product/07-help-workflow.md) · Publishing |
 | **Map** | Rule 5 above | [04](../product/04-lost-workflow.md) |
 | **Offline-ish** | Service worker caches shell and fonts; a case page opened from a link renders on a flaky connection once loaded. Writes online-only, except the sighting queue (*Risks* §6); a failed write keeps the form | —. The app service worker (`src/service-worker/sw.ts`, vite-plugin-pwa) is **not registered while `VITE_API_MOCK` is on**: MSW's worker holds the same `/` scope and would be replaced |
 | **Product name** | One file, `src/brand.ts` (name, short name, public origin), filled at build time from the `VITE_BRAND_*` and `VITE_PUBLIC_ORIGIN` env vars (every key, with mock defaults, in `web/.env`; `src/env.ts` is the only reader). UI copy, the page title, the PWA manifest, the poster and the share function's tags read it; **no user-facing string spells the name literally** (a CI grep enforces it). Notification and email copy is the backend's and needs the same setting there | [00 · #21](../product/00-product-map.md) |
