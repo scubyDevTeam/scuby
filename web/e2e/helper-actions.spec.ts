@@ -89,3 +89,21 @@ test(
     })
   },
 )
+
+test(
+  '«La tengo conmigo» on an archived notice brings it back to life',
+  tags('@helper', '@HELP-005'),
+  async ({ casePage }) => {
+    await test.step('Kira’s notice was archived: no sighting, but «La tengo» is there', async () => {
+      await casePage.open('ARCH2')
+      await expect(casePage.text('Este aviso fue archivado.')).toBeVisible()
+      await expect(casePage.sawIt).toHaveCount(0)
+    })
+
+    await test.step('the claim opens WhatsApp and the notice is active again', async () => {
+      expect(await casePage.claimRecovery('311 482 9017')).toContain('wa.me')
+      await expect(casePage.text('Este aviso fue archivado.')).toHaveCount(0)
+      await expect(casePage.possibleFind).toBeVisible()
+    })
+  },
+)

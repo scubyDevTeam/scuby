@@ -108,7 +108,7 @@ Simplified on purpose — the real backend must do better:
 | Display text composed in Spanish, whatever `Accept-Language` says | Composed in the request's language |
 
 Not in the contract yet: purge after 30
-days, and `«Lo tengo»` on an expired case (O3).
+days.
 From help ([07](../product/07-help-workflow.md)): photos on a request beyond the pet's own, and operator review into
 `verified` (O9). From the profile ([auth.md](auth.md) · Profile): whether the phone is verified, and account-level contact prefs.
 From check-ins (04 · `case_checkin`): the date the case archives if nobody answers, which the copy

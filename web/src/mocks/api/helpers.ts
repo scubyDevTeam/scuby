@@ -2,11 +2,11 @@
 import { api } from '../../contracts/api'
 import type { Point } from '../../contracts/primitives'
 import { db, type FoundRow, findCase, type LostRow, newId, type SightingRow } from '../db'
-import { onClaimOpened } from '../followup'
+import { onClaimOpened, onOwnerInteraction } from '../followup'
 import { notify } from '../notify'
 import { fail, route } from '../route'
 import { ago, DAY, distance, HOUR, iso, metres, ms } from '../rules'
-import { EDIT_WINDOW, ownership } from '../serialize'
+import { EDIT_WINDOW, ownership, REOPEN_WINDOW } from '../serialize'
 
 const MAX_DISTANCE_M = 30_000
 const BEFORE_CASE = DAY
@@ -145,7 +145,19 @@ export const helpers = [
   route(api.claimRecovery, ({ params, body, user }) => {
     const row = findCase(params.code) ?? fail('not_found')
     if (row.vertical !== 'lost') fail('not_found')
-    if (row.status !== 'active') fail('invalid_transition')
+    // Someone holding the animal is stronger evidence of a live search than the owner tapping
+    // «reabrir» (decision #29): inside the 30-day window, a claim reactivates an archived case.
+    const reopens =
+      row.status === 'expired' &&
+      row.resolved_at !== null &&
+      Date.now() - ms(row.resolved_at) <= REOPEN_WINDOW
+    if (row.status !== 'active' && !reopens) fail('invalid_transition')
+    if (reopens) {
+      row.status = 'active'
+      row.resolved_at = null
+      row.resolution = null
+      onOwnerInteraction(row.code)
+    }
     const id = newId('claim-')
     const staleAt = onClaimOpened(row.code, id)
     db.recoveryClaims.push({

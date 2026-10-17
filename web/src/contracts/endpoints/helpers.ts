@@ -47,7 +47,9 @@ export const deleteSighting = endpoint({
 export const claimRecovery = endpoint({
   method: 'POST',
   path: '/cases/:code/recovery-claims',
-  summary: '«Lo tengo» on a lost case. Creates the claim, then answers the channel to the owner.',
+  summary:
+    '«Lo tengo» on a lost case. Creates the claim, then answers the channel to the owner. On a ' +
+    'case archived less than 30 days ago it reactivates it first (decision #29).',
   auth: 'public',
   body: recoveryClaimRequest,
   status: 201,

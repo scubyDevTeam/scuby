@@ -1987,3 +1987,21 @@ describe('the custodian’s follow-up loop (05 · The follow-up loop, Schedule)'
     expect(new Date(added[0]!.scheduled_at).getTime() - Date.now()).toBe(48 * HOUR)
   })
 })
+
+describe('«La tengo» on an archived case (decision #29, closes O3)', () => {
+  const claim = (code: string) =>
+    call(api.claimRecovery, { params: { code }, body: { phone: '+573114829017' } }, asIs)
+
+  it('reactivates a case archived less than 30 days ago, and tells the owner', async () => {
+    await claim('ARCH2')
+    expect(db.cases.ARCH2).toMatchObject({ status: 'active', resolution: null })
+    expect(db.recoveryClaims.some((c) => c.case_code === 'ARCH2')).toBe(true)
+    expect(db.notifications.at(-1)?.event).toBe('recovery_claim.opened')
+  })
+
+  it('a case archived longer ago, or closed, takes no claim', async () => {
+    db.cases.ARCH2!.resolved_at = new Date(Date.now() - 31 * DAY).toISOString()
+    expect((await failure(claim('ARCH2'))).code).toBe('invalid_transition')
+    expect((await failure(claim('H4PPY'))).code).toBe('invalid_transition')
+  })
+})

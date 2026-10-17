@@ -132,10 +132,12 @@ describe('LostCasePage — closed cases (10 §1)', () => {
     expect(screen.queryAllByRole('button')).toEqual([])
   })
 
-  it('an archived case says so and offers a helper nothing', () => {
-    show(lostCase('ARCH2'))
+  it('an archived case says so, offers no sighting, and still takes «La tengo conmigo» (#29)', () => {
+    const onAction = show(lostCase('ARCH2'))
     expect(screen.getByText('Este aviso fue archivado.')).toBeTruthy()
-    expect(screen.queryAllByRole('button')).toEqual([])
+    expect(screen.queryByRole('button', { name: /La vi/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'La tengo conmigo' }))
+    expect(onAction).toHaveBeenCalledWith('claim_recovery')
   })
 })
 
