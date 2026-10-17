@@ -80,9 +80,9 @@ describe('10 §1 — what the page offers by status', () => {
     },
   )
 
-  it('an expired case is archived: reopenable by the owner, nothing for anyone else', () => {
+  it('an expired case is archived: the owner reopens it, someone who has the animal says so (#29)', () => {
     expect(pageMode(closed('expired'))).toBe('archived')
     expect(availableActions(closed('expired'), 'owner', now)).toEqual(['reopen'])
-    expect(availableActions(closed('expired'), 'public', now)).toEqual([])
+    expect(availableActions(closed('expired'), 'public', now)).toEqual(['claim_recovery', 'share'])
   })
 })
