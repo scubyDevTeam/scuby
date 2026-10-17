@@ -3378,6 +3378,1813 @@
         }
       }
     },
+    "/cases/{code}": {
+      "patch": {
+        "operationId": "editCase",
+        "summary": "Corrects an active found, adoption or help case: photos, signs, story, and for an adoption its temperament and requirements. Only its publisher. Fields left out stay; a field the vertical has no use for is `validation_failed`. Never re-broadcasts. A lost case uses `editLost`.",
+        "tags": [
+          "cases"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "photo_urls": {
+                    "minItems": 1,
+                    "maxItems": 6,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "marks": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "story": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "temperament": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "good_with_kids",
+                        "good_with_cats",
+                        "good_with_dogs",
+                        "senior",
+                        "puppy"
+                      ]
+                    }
+                  },
+                  "requirements": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`error.code`: `invalid_transition`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getCase",
+        "summary": "A case by its short code. The same URL answers more to the person responsible for it (`viewer`): claims, hidden pins, reporters’ numbers, the pending check-in, the withheld detail.",
+        "tags": [
+          "cases"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "vertical": {
+                          "type": "string",
+                          "const": "lost"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "reunited",
+                            "expired",
+                            "cancelled"
+                          ]
+                        },
+                        "resolved_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "viewer": {
+                          "type": "string",
+                          "enum": [
+                            "owner",
+                            "public"
+                          ]
+                        },
+                        "pet": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "species": {
+                              "type": "string",
+                              "enum": [
+                                "dog",
+                                "cat",
+                                "other"
+                              ]
+                            },
+                            "size": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "small",
+                                    "medium",
+                                    "large"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "colors": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "black",
+                                  "white",
+                                  "brown",
+                                  "tan",
+                                  "gray",
+                                  "yellow",
+                                  "orange"
+                                ]
+                              }
+                            },
+                            "marks": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "photo_urls": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "species",
+                            "size",
+                            "colors",
+                            "marks",
+                            "photo_urls"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "last_seen": {
+                          "type": "object",
+                          "properties": {
+                            "center": {
+                              "type": "object",
+                              "properties": {
+                                "lat": {
+                                  "type": "number",
+                                  "minimum": -90,
+                                  "maximum": 90
+                                },
+                                "lng": {
+                                  "type": "number",
+                                  "minimum": -180,
+                                  "maximum": 180
+                                }
+                              },
+                              "required": [
+                                "lat",
+                                "lng"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "radius_m": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "place_name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "center",
+                            "radius_m",
+                            "at",
+                            "place_name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "open_claim_count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sightings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "point": {
+                                "type": "object",
+                                "properties": {
+                                  "lat": {
+                                    "type": "number",
+                                    "minimum": -90,
+                                    "maximum": 90
+                                  },
+                                  "lng": {
+                                    "type": "number",
+                                    "minimum": -180,
+                                    "maximum": 180
+                                  }
+                                },
+                                "required": [
+                                  "lat",
+                                  "lng"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "seen_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "note": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "photo_urls": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "source": {
+                                "type": "string",
+                                "enum": [
+                                  "anonymous",
+                                  "registered"
+                                ]
+                              },
+                              "highlighted_by_owner": {
+                                "type": "boolean"
+                              },
+                              "contact_phone": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^\\+[1-9]\\d{6,14}$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "hidden": {
+                                "default": false,
+                                "type": "boolean"
+                              },
+                              "mine": {
+                                "default": false,
+                                "type": "boolean"
+                              },
+                              "editable_until": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "point",
+                              "seen_at",
+                              "note",
+                              "photo_urls",
+                              "source",
+                              "highlighted_by_owner",
+                              "contact_phone",
+                              "hidden",
+                              "mine",
+                              "editable_until"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "claims": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "phone": {
+                                "type": "string",
+                                "pattern": "^\\+[1-9]\\d{6,14}$"
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "open",
+                                  "confirmed",
+                                  "dismissed",
+                                  "stale"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "phone",
+                              "created_at",
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "pending_checkin": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "trigger": {
+                                  "type": "string",
+                                  "enum": [
+                                    "time_based",
+                                    "post_recovery_claim"
+                                  ]
+                                },
+                                "claim_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "asked_at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "trigger",
+                                "claim_id",
+                                "asked_at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "contact": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "display_name": {
+                                  "type": "string"
+                                },
+                                "whatsapp_url": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "display_name",
+                                "whatsapp_url"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "vertical",
+                        "status",
+                        "resolved_at",
+                        "viewer",
+                        "pet",
+                        "last_seen",
+                        "open_claim_count",
+                        "sightings",
+                        "claims",
+                        "pending_checkin",
+                        "contact"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "vertical": {
+                          "type": "string",
+                          "const": "found"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "reunited",
+                            "kept",
+                            "converted",
+                            "transferred_to_org",
+                            "expired",
+                            "cancelled"
+                          ]
+                        },
+                        "resolved_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "viewer": {
+                          "type": "string",
+                          "enum": [
+                            "custodian",
+                            "public"
+                          ]
+                        },
+                        "pet": {
+                          "type": "object",
+                          "properties": {
+                            "species": {
+                              "type": "string",
+                              "enum": [
+                                "dog",
+                                "cat",
+                                "other"
+                              ]
+                            },
+                            "size": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "small",
+                                    "medium",
+                                    "large"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "colors": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "black",
+                                  "white",
+                                  "brown",
+                                  "tan",
+                                  "gray",
+                                  "yellow",
+                                  "orange"
+                                ]
+                              }
+                            },
+                            "marks": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "photo_urls": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "species",
+                            "size",
+                            "colors",
+                            "marks",
+                            "photo_urls"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "found": {
+                          "type": "object",
+                          "properties": {
+                            "center": {
+                              "type": "object",
+                              "properties": {
+                                "lat": {
+                                  "type": "number",
+                                  "minimum": -90,
+                                  "maximum": 90
+                                },
+                                "lng": {
+                                  "type": "number",
+                                  "minimum": -180,
+                                  "maximum": 180
+                                }
+                              },
+                              "required": [
+                                "lat",
+                                "lng"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "radius_m": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "place_name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "center",
+                            "radius_m",
+                            "at",
+                            "place_name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "holding_where": {
+                          "type": "string",
+                          "enum": [
+                            "home",
+                            "vet",
+                            "street_temporary",
+                            "no_longer_held"
+                          ]
+                        },
+                        "held_since": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "hold_offer_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "open_claim_count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "withheld_detail": {
+                          "default": null,
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "ownership_claims": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "claimant_name": {
+                                "type": "string"
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "open",
+                                  "confirmed",
+                                  "dismissed",
+                                  "withdrawn",
+                                  "stale"
+                                ]
+                              },
+                              "evidence_notes": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "chip_number": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "photo_count": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "from_lost_case_code": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "whatsapp_url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "claimant_name",
+                              "created_at",
+                              "status",
+                              "evidence_notes",
+                              "chip_number",
+                              "photo_count",
+                              "from_lost_case_code",
+                              "whatsapp_url"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "successor_case_code": {
+                          "default": null,
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "contact": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "display_name": {
+                                  "type": "string"
+                                },
+                                "whatsapp_url": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "display_name",
+                                "whatsapp_url"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "vertical",
+                        "status",
+                        "resolved_at",
+                        "viewer",
+                        "pet",
+                        "found",
+                        "holding_where",
+                        "held_since",
+                        "hold_offer_at",
+                        "open_claim_count",
+                        "withheld_detail",
+                        "ownership_claims",
+                        "successor_case_code",
+                        "contact"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "vertical": {
+                          "type": "string",
+                          "const": "adoption"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "adopted",
+                            "withdrawn",
+                            "expired"
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "adopted_in_app",
+                                "adopted_offline",
+                                "kept",
+                                "deceased",
+                                "transferred",
+                                "no_response"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "published_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "resolved_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "viewer": {
+                          "type": "string",
+                          "enum": [
+                            "lister",
+                            "public"
+                          ]
+                        },
+                        "pet": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "species": {
+                              "type": "string",
+                              "enum": [
+                                "dog",
+                                "cat",
+                                "other"
+                              ]
+                            },
+                            "size": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "small",
+                                    "medium",
+                                    "large"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "colors": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "black",
+                                  "white",
+                                  "brown",
+                                  "tan",
+                                  "gray",
+                                  "yellow",
+                                  "orange"
+                                ]
+                              }
+                            },
+                            "marks": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "photo_urls": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "health_flags": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "chronic_condition",
+                                  "special_needs",
+                                  "senior",
+                                  "fiv_felv",
+                                  "mobility_aid",
+                                  "behavioral_support"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "species",
+                            "size",
+                            "colors",
+                            "marks",
+                            "photo_urls",
+                            "health_flags"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "story": {
+                          "type": "string"
+                        },
+                        "temperament": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "good_with_kids",
+                              "good_with_cats",
+                              "good_with_dogs",
+                              "senior",
+                              "puppy"
+                            ]
+                          }
+                        },
+                        "requirement_flags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "needs_yard",
+                              "no_small_children",
+                              "no_other_dogs",
+                              "indoor_only",
+                              "experienced_home"
+                            ]
+                          }
+                        },
+                        "requirements": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "location": {
+                          "type": "object",
+                          "properties": {
+                            "center": {
+                              "type": "object",
+                              "properties": {
+                                "lat": {
+                                  "type": "number",
+                                  "minimum": -90,
+                                  "maximum": 90
+                                },
+                                "lng": {
+                                  "type": "number",
+                                  "minimum": -180,
+                                  "maximum": 180
+                                }
+                              },
+                              "required": [
+                                "lat",
+                                "lng"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "radius_m": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "place_name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "center",
+                            "radius_m",
+                            "place_name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "trust_tier": {
+                          "type": "string",
+                          "enum": [
+                            "verified",
+                            "individual"
+                          ]
+                        },
+                        "lister_name": {
+                          "type": "string"
+                        },
+                        "reserved": {
+                          "type": "boolean"
+                        },
+                        "my_interest": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "open",
+                                    "chosen",
+                                    "withdrawn"
+                                  ]
+                                },
+                                "created_at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "whatsapp_url": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "external_url": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "status",
+                                "created_at",
+                                "whatsapp_url",
+                                "external_url"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "interests": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "open",
+                                  "chosen",
+                                  "declined"
+                                ]
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "person": {
+                                "type": "object",
+                                "properties": {
+                                  "display_name": {
+                                    "type": "string"
+                                  },
+                                  "city": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "member_since": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "sightings_reported": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "open_adoption_interests": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "display_name",
+                                  "city",
+                                  "member_since",
+                                  "sightings_reported",
+                                  "open_adoption_interests"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "intro": {
+                                "type": "object",
+                                "properties": {
+                                  "housing": {
+                                    "type": "string",
+                                    "enum": [
+                                      "house",
+                                      "apartment"
+                                    ]
+                                  },
+                                  "has_yard": {
+                                    "type": "boolean"
+                                  },
+                                  "other_pets": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 300
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "household": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 300
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "why": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 1000
+                                  }
+                                },
+                                "required": [
+                                  "housing",
+                                  "has_yard",
+                                  "other_pets",
+                                  "household",
+                                  "why"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "whatsapp_url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "status",
+                              "created_at",
+                              "person",
+                              "intro",
+                              "whatsapp_url"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "pending_checkin": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "trigger": {
+                                  "type": "string",
+                                  "enum": [
+                                    "time_based",
+                                    "post_recovery_claim"
+                                  ]
+                                },
+                                "claim_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "asked_at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "trigger",
+                                "claim_id",
+                                "asked_at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "vertical",
+                        "status",
+                        "resolution",
+                        "published_at",
+                        "resolved_at",
+                        "viewer",
+                        "pet",
+                        "story",
+                        "temperament",
+                        "requirement_flags",
+                        "requirements",
+                        "location",
+                        "trust_tier",
+                        "lister_name",
+                        "reserved",
+                        "my_interest",
+                        "interests",
+                        "pending_checkin"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "vertical": {
+                          "type": "string",
+                          "const": "help"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "closed",
+                            "expired",
+                            "removed"
+                          ]
+                        },
+                        "resolution": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "covered",
+                                "need_ended",
+                                "pet_deceased",
+                                "no_response",
+                                "removed_by_moderation"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "published_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "resolved_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "viewer": {
+                          "type": "string",
+                          "enum": [
+                            "beneficiary",
+                            "public"
+                          ]
+                        },
+                        "pet": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "species": {
+                              "type": "string",
+                              "enum": [
+                                "dog",
+                                "cat",
+                                "other"
+                              ]
+                            },
+                            "size": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "small",
+                                    "medium",
+                                    "large"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "colors": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "black",
+                                  "white",
+                                  "brown",
+                                  "tan",
+                                  "gray",
+                                  "yellow",
+                                  "orange"
+                                ]
+                              }
+                            },
+                            "marks": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "photo_urls": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "species",
+                            "size",
+                            "colors",
+                            "marks",
+                            "photo_urls"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "story": {
+                          "type": "string"
+                        },
+                        "location": {
+                          "type": "object",
+                          "properties": {
+                            "center": {
+                              "type": "object",
+                              "properties": {
+                                "lat": {
+                                  "type": "number",
+                                  "minimum": -90,
+                                  "maximum": 90
+                                },
+                                "lng": {
+                                  "type": "number",
+                                  "minimum": -180,
+                                  "maximum": 180
+                                }
+                              },
+                              "required": [
+                                "lat",
+                                "lng"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "radius_m": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "place_name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "center",
+                            "radius_m",
+                            "place_name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "trust_tier": {
+                          "type": "string",
+                          "enum": [
+                            "unverified",
+                            "verified"
+                          ]
+                        },
+                        "beneficiary_name": {
+                          "type": "string"
+                        },
+                        "needs": {
+                          "minItems": 1,
+                          "maxItems": 3,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "foster",
+                                  "transport",
+                                  "supplies"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "target": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "needed_by": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "open",
+                                  "covered",
+                                  "closed"
+                                ]
+                              },
+                              "confirmed": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "pledged": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "detail",
+                              "target",
+                              "needed_by",
+                              "status",
+                              "confirmed",
+                              "pledged"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "my_pledges": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "need_id": {
+                                "type": "string"
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "note": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pledged",
+                                  "confirmed",
+                                  "declined",
+                                  "withdrawn"
+                                ]
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "whatsapp_url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "need_id",
+                              "quantity",
+                              "note",
+                              "status",
+                              "created_at",
+                              "whatsapp_url"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "pledges": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "need_id": {
+                                "type": "string"
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "note": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pledged",
+                                  "confirmed",
+                                  "declined"
+                                ]
+                              },
+                              "created_at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "person_name": {
+                                "type": "string"
+                              },
+                              "phone": {
+                                "type": "string"
+                              },
+                              "whatsapp_url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "need_id",
+                              "quantity",
+                              "note",
+                              "status",
+                              "created_at",
+                              "person_name",
+                              "phone",
+                              "whatsapp_url"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "pending_checkin": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "trigger": {
+                                  "type": "string",
+                                  "enum": [
+                                    "time_based",
+                                    "post_recovery_claim"
+                                  ]
+                                },
+                                "claim_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "asked_at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "trigger",
+                                "claim_id",
+                                "asked_at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "vertical",
+                        "status",
+                        "resolution",
+                        "published_at",
+                        "resolved_at",
+                        "viewer",
+                        "pet",
+                        "story",
+                        "location",
+                        "trust_tier",
+                        "beneficiary_name",
+                        "needs",
+                        "my_pledges",
+                        "pledges",
+                        "pending_checkin"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`error.code`: `gone`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/matches": {
       "post": {
         "operationId": "matchAnimal",
@@ -8428,1655 +10235,6 @@
                     "supported_countries"
                   ],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "`error.code`: `validation_failed`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "`error.code`: `rate_limited`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "`error.code`: `server_error`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/cases/{code}": {
-      "get": {
-        "operationId": "getCase",
-        "summary": "A case by its short code. The same URL answers more to the person responsible for it (`viewer`): claims, hidden pins, reporters’ numbers, the pending check-in, the withheld detail.",
-        "tags": [
-          "cases"
-        ],
-        "security": [],
-        "parameters": [
-          {
-            "name": "code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "vertical": {
-                          "type": "string",
-                          "const": "lost"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "reunited",
-                            "expired",
-                            "cancelled"
-                          ]
-                        },
-                        "resolved_at": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "viewer": {
-                          "type": "string",
-                          "enum": [
-                            "owner",
-                            "public"
-                          ]
-                        },
-                        "pet": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string"
-                            },
-                            "species": {
-                              "type": "string",
-                              "enum": [
-                                "dog",
-                                "cat",
-                                "other"
-                              ]
-                            },
-                            "size": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "small",
-                                    "medium",
-                                    "large"
-                                  ]
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "colors": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "enum": [
-                                  "black",
-                                  "white",
-                                  "brown",
-                                  "tan",
-                                  "gray",
-                                  "yellow",
-                                  "orange"
-                                ]
-                              }
-                            },
-                            "marks": {
-                              "type": [
-                                "string",
-                                "null"
-                              ]
-                            },
-                            "photo_urls": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            }
-                          },
-                          "required": [
-                            "name",
-                            "species",
-                            "size",
-                            "colors",
-                            "marks",
-                            "photo_urls"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "last_seen": {
-                          "type": "object",
-                          "properties": {
-                            "center": {
-                              "type": "object",
-                              "properties": {
-                                "lat": {
-                                  "type": "number",
-                                  "minimum": -90,
-                                  "maximum": 90
-                                },
-                                "lng": {
-                                  "type": "number",
-                                  "minimum": -180,
-                                  "maximum": 180
-                                }
-                              },
-                              "required": [
-                                "lat",
-                                "lng"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "radius_m": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            },
-                            "at": {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            "place_name": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "center",
-                            "radius_m",
-                            "at",
-                            "place_name"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "open_claim_count": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "sightings": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "point": {
-                                "type": "object",
-                                "properties": {
-                                  "lat": {
-                                    "type": "number",
-                                    "minimum": -90,
-                                    "maximum": 90
-                                  },
-                                  "lng": {
-                                    "type": "number",
-                                    "minimum": -180,
-                                    "maximum": 180
-                                  }
-                                },
-                                "required": [
-                                  "lat",
-                                  "lng"
-                                ],
-                                "additionalProperties": false
-                              },
-                              "seen_at": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "note": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              },
-                              "photo_urls": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              },
-                              "source": {
-                                "type": "string",
-                                "enum": [
-                                  "anonymous",
-                                  "registered"
-                                ]
-                              },
-                              "highlighted_by_owner": {
-                                "type": "boolean"
-                              },
-                              "contact_phone": {
-                                "default": null,
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "pattern": "^\\+[1-9]\\d{6,14}$"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              },
-                              "hidden": {
-                                "default": false,
-                                "type": "boolean"
-                              },
-                              "mine": {
-                                "default": false,
-                                "type": "boolean"
-                              },
-                              "editable_until": {
-                                "default": null,
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "format": "date-time"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "point",
-                              "seen_at",
-                              "note",
-                              "photo_urls",
-                              "source",
-                              "highlighted_by_owner",
-                              "contact_phone",
-                              "hidden",
-                              "mine",
-                              "editable_until"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "claims": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "phone": {
-                                "type": "string",
-                                "pattern": "^\\+[1-9]\\d{6,14}$"
-                              },
-                              "created_at": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": [
-                                  "open",
-                                  "confirmed",
-                                  "dismissed",
-                                  "stale"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "phone",
-                              "created_at",
-                              "status"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "pending_checkin": {
-                          "default": null,
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "trigger": {
-                                  "type": "string",
-                                  "enum": [
-                                    "time_based",
-                                    "post_recovery_claim"
-                                  ]
-                                },
-                                "claim_id": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                },
-                                "asked_at": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "trigger",
-                                "claim_id",
-                                "asked_at"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "contact": {
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "display_name": {
-                                  "type": "string"
-                                },
-                                "whatsapp_url": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "display_name",
-                                "whatsapp_url"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "vertical",
-                        "status",
-                        "resolved_at",
-                        "viewer",
-                        "pet",
-                        "last_seen",
-                        "open_claim_count",
-                        "sightings",
-                        "claims",
-                        "pending_checkin",
-                        "contact"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "vertical": {
-                          "type": "string",
-                          "const": "found"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "reunited",
-                            "kept",
-                            "converted",
-                            "transferred_to_org",
-                            "expired",
-                            "cancelled"
-                          ]
-                        },
-                        "resolved_at": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "viewer": {
-                          "type": "string",
-                          "enum": [
-                            "custodian",
-                            "public"
-                          ]
-                        },
-                        "pet": {
-                          "type": "object",
-                          "properties": {
-                            "species": {
-                              "type": "string",
-                              "enum": [
-                                "dog",
-                                "cat",
-                                "other"
-                              ]
-                            },
-                            "size": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "small",
-                                    "medium",
-                                    "large"
-                                  ]
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "colors": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "enum": [
-                                  "black",
-                                  "white",
-                                  "brown",
-                                  "tan",
-                                  "gray",
-                                  "yellow",
-                                  "orange"
-                                ]
-                              }
-                            },
-                            "marks": {
-                              "type": [
-                                "string",
-                                "null"
-                              ]
-                            },
-                            "photo_urls": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            }
-                          },
-                          "required": [
-                            "species",
-                            "size",
-                            "colors",
-                            "marks",
-                            "photo_urls"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "found": {
-                          "type": "object",
-                          "properties": {
-                            "center": {
-                              "type": "object",
-                              "properties": {
-                                "lat": {
-                                  "type": "number",
-                                  "minimum": -90,
-                                  "maximum": 90
-                                },
-                                "lng": {
-                                  "type": "number",
-                                  "minimum": -180,
-                                  "maximum": 180
-                                }
-                              },
-                              "required": [
-                                "lat",
-                                "lng"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "radius_m": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            },
-                            "at": {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            "place_name": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "center",
-                            "radius_m",
-                            "at",
-                            "place_name"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "holding_where": {
-                          "type": "string",
-                          "enum": [
-                            "home",
-                            "vet",
-                            "street_temporary",
-                            "no_longer_held"
-                          ]
-                        },
-                        "held_since": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "hold_offer_at": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "open_claim_count": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "withheld_detail": {
-                          "default": null,
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "ownership_claims": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "claimant_name": {
-                                "type": "string"
-                              },
-                              "created_at": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": [
-                                  "open",
-                                  "confirmed",
-                                  "dismissed",
-                                  "withdrawn",
-                                  "stale"
-                                ]
-                              },
-                              "evidence_notes": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              },
-                              "chip_number": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              },
-                              "photo_count": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "from_lost_case_code": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              },
-                              "whatsapp_url": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "claimant_name",
-                              "created_at",
-                              "status",
-                              "evidence_notes",
-                              "chip_number",
-                              "photo_count",
-                              "from_lost_case_code",
-                              "whatsapp_url"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "successor_case_code": {
-                          "default": null,
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "contact": {
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "display_name": {
-                                  "type": "string"
-                                },
-                                "whatsapp_url": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "display_name",
-                                "whatsapp_url"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "vertical",
-                        "status",
-                        "resolved_at",
-                        "viewer",
-                        "pet",
-                        "found",
-                        "holding_where",
-                        "held_since",
-                        "hold_offer_at",
-                        "open_claim_count",
-                        "withheld_detail",
-                        "ownership_claims",
-                        "successor_case_code",
-                        "contact"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "vertical": {
-                          "type": "string",
-                          "const": "adoption"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "adopted",
-                            "withdrawn",
-                            "expired"
-                          ]
-                        },
-                        "resolution": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "adopted_in_app",
-                                "adopted_offline",
-                                "kept",
-                                "deceased",
-                                "transferred",
-                                "no_response"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "published_at": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "resolved_at": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "viewer": {
-                          "type": "string",
-                          "enum": [
-                            "lister",
-                            "public"
-                          ]
-                        },
-                        "pet": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string"
-                            },
-                            "species": {
-                              "type": "string",
-                              "enum": [
-                                "dog",
-                                "cat",
-                                "other"
-                              ]
-                            },
-                            "size": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "small",
-                                    "medium",
-                                    "large"
-                                  ]
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "colors": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "enum": [
-                                  "black",
-                                  "white",
-                                  "brown",
-                                  "tan",
-                                  "gray",
-                                  "yellow",
-                                  "orange"
-                                ]
-                              }
-                            },
-                            "marks": {
-                              "type": [
-                                "string",
-                                "null"
-                              ]
-                            },
-                            "photo_urls": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            },
-                            "health_flags": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "enum": [
-                                  "chronic_condition",
-                                  "special_needs",
-                                  "senior",
-                                  "fiv_felv",
-                                  "mobility_aid",
-                                  "behavioral_support"
-                                ]
-                              }
-                            }
-                          },
-                          "required": [
-                            "name",
-                            "species",
-                            "size",
-                            "colors",
-                            "marks",
-                            "photo_urls",
-                            "health_flags"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "story": {
-                          "type": "string"
-                        },
-                        "temperament": {
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "good_with_kids",
-                              "good_with_cats",
-                              "good_with_dogs",
-                              "senior",
-                              "puppy"
-                            ]
-                          }
-                        },
-                        "requirement_flags": {
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "needs_yard",
-                              "no_small_children",
-                              "no_other_dogs",
-                              "indoor_only",
-                              "experienced_home"
-                            ]
-                          }
-                        },
-                        "requirements": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "location": {
-                          "type": "object",
-                          "properties": {
-                            "center": {
-                              "type": "object",
-                              "properties": {
-                                "lat": {
-                                  "type": "number",
-                                  "minimum": -90,
-                                  "maximum": 90
-                                },
-                                "lng": {
-                                  "type": "number",
-                                  "minimum": -180,
-                                  "maximum": 180
-                                }
-                              },
-                              "required": [
-                                "lat",
-                                "lng"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "radius_m": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            },
-                            "place_name": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "center",
-                            "radius_m",
-                            "place_name"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "trust_tier": {
-                          "type": "string",
-                          "enum": [
-                            "verified",
-                            "individual"
-                          ]
-                        },
-                        "lister_name": {
-                          "type": "string"
-                        },
-                        "reserved": {
-                          "type": "boolean"
-                        },
-                        "my_interest": {
-                          "default": null,
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "status": {
-                                  "type": "string",
-                                  "enum": [
-                                    "open",
-                                    "chosen",
-                                    "withdrawn"
-                                  ]
-                                },
-                                "created_at": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                },
-                                "whatsapp_url": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                },
-                                "external_url": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "status",
-                                "created_at",
-                                "whatsapp_url",
-                                "external_url"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "interests": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": [
-                                  "open",
-                                  "chosen",
-                                  "declined"
-                                ]
-                              },
-                              "created_at": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "person": {
-                                "type": "object",
-                                "properties": {
-                                  "display_name": {
-                                    "type": "string"
-                                  },
-                                  "city": {
-                                    "type": [
-                                      "string",
-                                      "null"
-                                    ]
-                                  },
-                                  "member_since": {
-                                    "type": "string",
-                                    "format": "date-time"
-                                  },
-                                  "sightings_reported": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 9007199254740991
-                                  },
-                                  "open_adoption_interests": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "maximum": 9007199254740991
-                                  }
-                                },
-                                "required": [
-                                  "display_name",
-                                  "city",
-                                  "member_since",
-                                  "sightings_reported",
-                                  "open_adoption_interests"
-                                ],
-                                "additionalProperties": false
-                              },
-                              "intro": {
-                                "type": "object",
-                                "properties": {
-                                  "housing": {
-                                    "type": "string",
-                                    "enum": [
-                                      "house",
-                                      "apartment"
-                                    ]
-                                  },
-                                  "has_yard": {
-                                    "type": "boolean"
-                                  },
-                                  "other_pets": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string",
-                                        "maxLength": 300
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ]
-                                  },
-                                  "household": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string",
-                                        "maxLength": 300
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ]
-                                  },
-                                  "why": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 1000
-                                  }
-                                },
-                                "required": [
-                                  "housing",
-                                  "has_yard",
-                                  "other_pets",
-                                  "household",
-                                  "why"
-                                ],
-                                "additionalProperties": false
-                              },
-                              "whatsapp_url": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "status",
-                              "created_at",
-                              "person",
-                              "intro",
-                              "whatsapp_url"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "pending_checkin": {
-                          "default": null,
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "trigger": {
-                                  "type": "string",
-                                  "enum": [
-                                    "time_based",
-                                    "post_recovery_claim"
-                                  ]
-                                },
-                                "claim_id": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                },
-                                "asked_at": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "trigger",
-                                "claim_id",
-                                "asked_at"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "vertical",
-                        "status",
-                        "resolution",
-                        "published_at",
-                        "resolved_at",
-                        "viewer",
-                        "pet",
-                        "story",
-                        "temperament",
-                        "requirement_flags",
-                        "requirements",
-                        "location",
-                        "trust_tier",
-                        "lister_name",
-                        "reserved",
-                        "my_interest",
-                        "interests",
-                        "pending_checkin"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "vertical": {
-                          "type": "string",
-                          "const": "help"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "active",
-                            "closed",
-                            "expired",
-                            "removed"
-                          ]
-                        },
-                        "resolution": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "covered",
-                                "need_ended",
-                                "pet_deceased",
-                                "no_response",
-                                "removed_by_moderation"
-                              ]
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "published_at": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "resolved_at": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "viewer": {
-                          "type": "string",
-                          "enum": [
-                            "beneficiary",
-                            "public"
-                          ]
-                        },
-                        "pet": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string"
-                            },
-                            "species": {
-                              "type": "string",
-                              "enum": [
-                                "dog",
-                                "cat",
-                                "other"
-                              ]
-                            },
-                            "size": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "small",
-                                    "medium",
-                                    "large"
-                                  ]
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "colors": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "enum": [
-                                  "black",
-                                  "white",
-                                  "brown",
-                                  "tan",
-                                  "gray",
-                                  "yellow",
-                                  "orange"
-                                ]
-                              }
-                            },
-                            "marks": {
-                              "type": [
-                                "string",
-                                "null"
-                              ]
-                            },
-                            "photo_urls": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            }
-                          },
-                          "required": [
-                            "name",
-                            "species",
-                            "size",
-                            "colors",
-                            "marks",
-                            "photo_urls"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "story": {
-                          "type": "string"
-                        },
-                        "location": {
-                          "type": "object",
-                          "properties": {
-                            "center": {
-                              "type": "object",
-                              "properties": {
-                                "lat": {
-                                  "type": "number",
-                                  "minimum": -90,
-                                  "maximum": 90
-                                },
-                                "lng": {
-                                  "type": "number",
-                                  "minimum": -180,
-                                  "maximum": 180
-                                }
-                              },
-                              "required": [
-                                "lat",
-                                "lng"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "radius_m": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            },
-                            "place_name": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "center",
-                            "radius_m",
-                            "place_name"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "trust_tier": {
-                          "type": "string",
-                          "enum": [
-                            "unverified",
-                            "verified"
-                          ]
-                        },
-                        "beneficiary_name": {
-                          "type": "string"
-                        },
-                        "needs": {
-                          "minItems": 1,
-                          "maxItems": 3,
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "kind": {
-                                "type": "string",
-                                "enum": [
-                                  "foster",
-                                  "transport",
-                                  "supplies"
-                                ]
-                              },
-                              "detail": {
-                                "type": "string"
-                              },
-                              "target": {
-                                "anyOf": [
-                                  {
-                                    "type": "integer",
-                                    "exclusiveMinimum": 0,
-                                    "maximum": 9007199254740991
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              },
-                              "needed_by": {
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": [
-                                  "open",
-                                  "covered",
-                                  "closed"
-                                ]
-                              },
-                              "confirmed": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "pledged": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 9007199254740991
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "kind",
-                              "detail",
-                              "target",
-                              "needed_by",
-                              "status",
-                              "confirmed",
-                              "pledged"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "my_pledges": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "need_id": {
-                                "type": "string"
-                              },
-                              "quantity": {
-                                "type": "integer",
-                                "exclusiveMinimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "note": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": [
-                                  "pledged",
-                                  "confirmed",
-                                  "declined",
-                                  "withdrawn"
-                                ]
-                              },
-                              "created_at": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "whatsapp_url": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "need_id",
-                              "quantity",
-                              "note",
-                              "status",
-                              "created_at",
-                              "whatsapp_url"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "pledges": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "need_id": {
-                                "type": "string"
-                              },
-                              "quantity": {
-                                "type": "integer",
-                                "exclusiveMinimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "note": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": [
-                                  "pledged",
-                                  "confirmed",
-                                  "declined"
-                                ]
-                              },
-                              "created_at": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "person_name": {
-                                "type": "string"
-                              },
-                              "phone": {
-                                "type": "string"
-                              },
-                              "whatsapp_url": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "need_id",
-                              "quantity",
-                              "note",
-                              "status",
-                              "created_at",
-                              "person_name",
-                              "phone",
-                              "whatsapp_url"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "pending_checkin": {
-                          "default": null,
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "trigger": {
-                                  "type": "string",
-                                  "enum": [
-                                    "time_based",
-                                    "post_recovery_claim"
-                                  ]
-                                },
-                                "claim_id": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
-                                },
-                                "asked_at": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "trigger",
-                                "claim_id",
-                                "asked_at"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "code",
-                        "vertical",
-                        "status",
-                        "resolution",
-                        "published_at",
-                        "resolved_at",
-                        "viewer",
-                        "pet",
-                        "story",
-                        "location",
-                        "trust_tier",
-                        "beneficiary_name",
-                        "needs",
-                        "my_pledges",
-                        "pledges",
-                        "pending_checkin"
-                      ],
-                      "additionalProperties": false
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`error.code`: `not_found`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "410": {
-            "description": "`error.code`: `gone`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

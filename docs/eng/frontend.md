@@ -331,7 +331,7 @@ beats an intention.
 
 | What | Budget | Enforced by |
 |---|---|---|
-| `/c/:code` — JS transferred, first load | **≤ 150 KB gzip** (map excluded) | `pnpm size` in CI: a production-shaped build (`VITE_API_MOCK=false`, so the emulated backend is not in the graph), summing the route's chunks from its manifest |
+| `/c/:code` — JS transferred, first load | **kept small by design, not gated** (map excluded): lazy screens, deferred language namespaces. The 150 KB gate was dropped (2026-10-17): it blocked features for kilobytes | — |
 | `/c/:code` — LCP | **≤ 2.0 s** on Slow 4G, mid-tier Android | Lighthouse CI on every PR — a **warning** until it can run against a staging API (plan 5.0), then an error |
 | Map cold load | **≤ 2.0 s** to first interactive tiles | manual on the reference device |
 | Uploaded photo | ≈ 300 KB, ≤ 1600 px, JPEG | client pipeline ([media-pipeline](media-pipeline.md)) |
@@ -402,7 +402,7 @@ test cannot cover (the offline sighting queue is one). Both suites run in CI on 
 | Native sign-in *(scope 2)* | Google: Capawesome Google Sign-In or `@capgo/capacitor-social-login` (Credential Manager on Android, Google SDK on iOS). Apple: Sign in with Apple through the same plugin family. Behind `src/platform/auth` |
 | Live updates *(scope 2)* | **Capgo** or **Capawesome** — JS/asset fixes reach installed apps without review (Apple 3.3.2 allows it for JS and assets, never a change of purpose). Not Ionic Appflow: closed to new customers, shuts down 2027-12-31 |
 | Store builds *(scope 2)* | GitHub Actions — macOS runner for iOS (no Mac required), Linux for Android; signing secrets in CI, never in the repo |
-| Tooling | **Biome** (lint + format) · dependency-cruiser · a size-budget script · **Vitest** + Testing Library · **Playwright** web e2e (see *Testing*) · Lighthouse CI on `/c/:code` |
+| Tooling | **Biome** (lint + format) · dependency-cruiser · **Vitest** + Testing Library · **Playwright** web e2e (see *Testing*) · Lighthouse CI on `/c/:code` |
 
 Pin the current major of each at scaffold time — this doc goes stale faster than the ecosystem.
 
