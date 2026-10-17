@@ -71,6 +71,16 @@ export const updateProfile = endpoint({
   response: profileWire,
 })
 
+export const deleteAccount = endpoint({
+  method: 'DELETE',
+  path: '/me',
+  summary:
+    'Deletes the account (the stores require it in-app; decision #28). Its active cases ' +
+    'are closed, what it contributed to others’ cases stays anonymous, its interests and offers ' +
+    'are withdrawn, its inbox, devices and conversations are erased, and the session ends.',
+  auth: 'session',
+})
+
 export const registerPush = endpoint({
   method: 'POST',
   path: '/me/push-subscriptions',

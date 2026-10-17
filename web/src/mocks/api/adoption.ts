@@ -15,6 +15,7 @@ import { notify } from '../notify'
 import { fail, route } from '../route'
 import { iso, ms, placeName } from '../rules'
 import { listingChannels } from '../serialize'
+import { openThread } from './conversations'
 import { verifiedPhone } from './owner'
 
 function listed(code: string, user: PersonRow): AdoptionRow {
@@ -172,6 +173,14 @@ export const adoption = [
       status: 'open',
       created_at: iso(Date.now()),
       first_responded_at: null,
+    })
+    openThread({
+      caseCode: row.code,
+      startedBy: user.id,
+      otherId: row.created_by,
+      topic: 'interesado en adoptar',
+      label: 'Mensaje automático · su presentación',
+      body: body.intro.why,
     })
     notify(
       row.created_by,

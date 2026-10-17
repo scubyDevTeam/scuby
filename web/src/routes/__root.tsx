@@ -1,4 +1,5 @@
 import { configQuery } from '@api-client/actions'
+import { conversationsQuery } from '@api-client/conversations'
 import { notificationsQuery } from '@api-client/inbox'
 import { queryClient } from '@api-client/query-client'
 import { useSession } from '@api-client/session'
@@ -160,13 +161,15 @@ function BottomNav() {
 }
 
 /**
- * The inbox's unread count, for a signed-in person only: an anonymous visitor has no inbox, so
+ * The inbox's unread count (alerts and messages), for a signed-in person only: an anonymous visitor has no inbox, so
  * nothing is asked for. Opening the inbox reads what it shows, and the count drops with it.
  */
 function useUnreadCount(): number {
   const user = useSession().data
   const inbox = useQuery({ ...notificationsQuery, enabled: Boolean(user) })
-  return user ? (inbox.data?.unreadCount ?? 0) : 0
+  // The bell counts alerts and messages together: both wait in the same tab.
+  const messages = useQuery({ ...conversationsQuery, enabled: Boolean(user) })
+  return user ? (inbox.data?.unreadCount ?? 0) + (messages.data?.unreadCount ?? 0) : 0
 }
 
 /** The red count. `spoken: false` when the words are placed elsewhere, after the label. */
