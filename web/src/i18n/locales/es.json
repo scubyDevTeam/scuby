@@ -127,7 +127,8 @@
     "lost": {
       "sighting_title": "¿Dónde viste a {name}?",
       "claim_title": "¿Tienes a {name}?",
-      "reunite_title": "¿{name} ya apareció?"
+      "reunite_title": "¿{name} ya apareció?",
+      "correct_title": "Corregir tu avistamiento de {name}"
     },
     "found": {
       "mine_title": "¿Es tu mascota?",
@@ -1225,7 +1226,16 @@
       "offline": "Sin conexión",
       "queued_title": "Guardamos tu avistamiento",
       "queued_body": "Se envía solo apenas vuelva la señal. No tienes que repetirlo.",
-      "back_to_case": "Volver al aviso de {name}"
+      "back_to_case": "Volver al aviso de {name}",
+      "ask_title": "¿Lo viste otra vez, o quieres corregir el punto anterior?",
+      "ask_again": "Lo vi otra vez",
+      "ask_correct": "Corregir",
+      "correcting_intro": "Mueve el punto o cambia la hora. No creamos un avistamiento nuevo.",
+      "correct_submit": "Guardar corrección",
+      "correcting": "Guardando…",
+      "corrected_title": "Listo, corregimos tu avistamiento.",
+      "corrected_body": "El punto ya está donde dijiste.",
+      "correct_failed": "No pudimos guardar la corrección. Puede que ya haya pasado el tiempo para corregirlo."
     },
     "claim_form": {
       "phone_required": "Escribe tu número de celular",
@@ -1345,7 +1355,15 @@
       "photo_alt": "Foto del avistamiento",
       "write": "Escribirle",
       "call": "Llamar",
-      "saw_it_too": "La vi aquí también"
+      "saw_it_too": "La vi aquí también",
+      "yours": "Es tuyo. Puedes corregirlo o borrarlo hasta las {time}.",
+      "correct": "Corregir el punto",
+      "delete": "Borrar mi avistamiento",
+      "delete_confirm": "¿Seguro que quieres borrarlo? No se puede deshacer.",
+      "delete_yes": "Sí, borrarlo",
+      "delete_no": "No",
+      "deleting": "Borrando…",
+      "delete_failed": "No pudimos borrarlo. Puede que ya haya pasado el tiempo."
     }
   },
   "preview": {

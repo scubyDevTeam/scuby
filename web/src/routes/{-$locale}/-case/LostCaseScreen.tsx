@@ -1,7 +1,8 @@
-import type { LostCase } from '@contracts/case'
+import type { LostCase, Sighting } from '@contracts/case'
 import type { LostAction } from '@domain/lost/actions'
 import { closeAnswersCheckin } from '@domain/lost/checkin'
 import { suggestedAttribution } from '@domain/lost/resolution'
+import { pinToCorrect } from '@domain/lost/sightings'
 import { publicArea } from '@domain/shared/geo'
 import { LostCasePage } from '@features/lost/LostCasePage'
 import { withMessages } from '@i18n/locales'
@@ -43,11 +44,16 @@ type Open = 'sighting' | 'claim' | 'report' | 'reunite' | 'cancel' | 'reopen' | 
 export function LostCaseScreen({ found }: { found: LostCase }) {
   const { t } = useI18n()
   const [sheet, setSheet] = useState<Open>(null)
+  // The pin the reporter is correcting: the sighting form opens on it (04 · Correction window).
+  const [correcting, setCorrecting] = useState<Sighting | null>(null)
   // The short link carries no language: posters and shared links reach everyone the same way.
   const url = `${brand.origin}/c/${found.code}`
   const shortUrl = `${new URL(brand.origin).host}/c/${found.code}`
   const name = found.pet.name
-  const close = () => setSheet(null)
+  const close = () => {
+    setSheet(null)
+    setCorrecting(null)
+  }
   // Closing or deleting while «¿sigue perdida?» waits is that question's answer.
   const checkinId = closeAnswersCheckin(found.pendingCheckin)
     ? (found.pendingCheckin?.id ?? null)
@@ -64,7 +70,9 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
   }
 
   const titles: Record<NonNullable<Open>, string> = {
-    sighting: t('case.lost.sighting_title', { name }),
+    sighting: correcting
+      ? t('case.lost.correct_title', { name })
+      : t('case.lost.sighting_title', { name }),
     claim: t('case.lost.claim_title', { name }),
     report: t('case.report_title'),
     share: t('case.share_title_named', { name }),
@@ -86,6 +94,10 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
         }
         mapStyleUrl={env.mapStyleUrl}
         onAction={handle}
+        onCorrect={(sighting) => {
+          setCorrecting(sighting)
+          setSheet('sighting')
+        }}
       />
       <Sheet
         open={sheet !== null}
@@ -96,6 +108,9 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
         <Suspense fallback={<Skeleton className="h-40" />}>
           {sheet === 'sighting' ? (
             <SightingForm
+              key={correcting?.id ?? 'new'}
+              correcting={correcting}
+              ownPin={pinToCorrect(found.sightings, new Date())}
               code={found.code}
               petName={found.pet.name}
               lastSeenPoint={found.lastSeen.center}

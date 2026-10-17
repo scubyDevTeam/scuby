@@ -38,6 +38,27 @@ export const sightingBody = (input: SightingInput): SightingBody => ({
   ...(input.clientId ? { client_id: input.clientId } : {}),
 })
 
+/** «Corregir»: the pin and the time move, no new row (docs/product/04 · Second pin from the same reporter). */
+export const sightingCorrectionRequest = z.object({
+  point,
+  seen_at: timestamp,
+  note: z.nullable(z.string().check(z.maxLength(500))),
+})
+
+export type SightingCorrection = {
+  point: { lat: number; lng: number }
+  seenAt: Date
+  note: string | null
+}
+
+export const sightingCorrectionBody = (
+  input: SightingCorrection,
+): z.input<typeof sightingCorrectionRequest> => ({
+  point: input.point,
+  seen_at: input.seenAt.toISOString(),
+  note: input.note,
+})
+
 /** The phone is the whole value of a claim, so it is required (docs/product/04 · recovery_claim). */
 export const recoveryClaimRequest = z.object({
   phone,

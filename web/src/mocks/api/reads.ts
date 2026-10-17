@@ -16,11 +16,11 @@ export const reads = [
     ],
   })),
 
-  route(api.getCase, ({ params, user }) => {
+  route(api.getCase, ({ params, user, reporterKey }) => {
     const code = params.code.toUpperCase()
     if (db.purged.includes(code)) fail('gone')
     const row = findCase(code) ?? fail('not_found')
-    return caseView(db, row, user?.id ?? null)
+    return caseView(db, row, user?.id ?? null, reporterKey)
   }),
 
   route(api.getFeed, ({ query }) => {

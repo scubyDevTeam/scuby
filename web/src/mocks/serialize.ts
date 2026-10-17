@@ -2,8 +2,17 @@
 // and the withheld detail go to the person responsible for the case and to nobody else.
 import type { api, WireOf } from '../contracts/api'
 import type { Point } from '../contracts/primitives'
-import { DAY, lookSummary, lookTitle, metres, ms, publicName, whatsappUrl } from './rules'
-import type { AdoptionRow, CaseRow, FoundRow, HelpRow, LostRow, PersonRow, Tables } from './tables'
+import { DAY, iso, lookSummary, lookTitle, metres, ms, publicName, whatsappUrl } from './rules'
+import type {
+  AdoptionRow,
+  CaseRow,
+  FoundRow,
+  HelpRow,
+  LostRow,
+  PersonRow,
+  SightingRow,
+  Tables,
+} from './tables'
 
 type CaseWire = WireOf<typeof api.getCase>
 type FeedWire = WireOf<typeof api.getFeed>
@@ -49,7 +58,12 @@ export function pendingCheckin(t: Tables, code: string, at = Date.now()) {
     : null
 }
 
-function lostView(t: Tables, row: LostRow, viewerId: string | null): CaseWire {
+function lostView(
+  t: Tables,
+  row: LostRow,
+  viewerId: string | null,
+  device: string | null,
+): CaseWire {
   const owner = viewerId !== null && row.created_by === viewerId
   const pet = petOf(t, row.pet_id)
   const claims = t.recoveryClaims.filter((c) => c.case_code === row.code)
@@ -82,6 +96,7 @@ function lostView(t: Tables, row: LostRow, viewerId: string | null): CaseWire {
         highlighted_by_owner: s.highlighted_by_owner,
         contact_phone: owner ? s.contact_phone : null,
         hidden: s.status !== 'visible',
+        ...ownership(s, viewerId, device),
       })),
     claims: owner
       ? claims.map((c) => ({
@@ -344,8 +359,26 @@ function needsLine(row: HelpRow): string {
   return `Necesita ${list}`
 }
 
-export function caseView(t: Tables, row: CaseRow, viewerId: string | null): CaseWire {
-  if (row.vertical === 'lost') return lostView(t, row, viewerId)
+/** The pin is the viewer's own, and for how long they may still correct it (04 · Correction window). */
+export const EDIT_WINDOW = 15 * 60_000
+export function ownership(s: SightingRow, viewerId: string | null, device: string | null) {
+  const mine =
+    (viewerId !== null && s.reporter_id === viewerId) ||
+    (device !== null && s.reporter_key === device)
+  const until = ms(s.created_at) + EDIT_WINDOW
+  return {
+    mine,
+    editable_until: mine && s.status === 'visible' && until > Date.now() ? iso(until) : null,
+  }
+}
+
+export function caseView(
+  t: Tables,
+  row: CaseRow,
+  viewerId: string | null,
+  device: string | null = null,
+): CaseWire {
+  if (row.vertical === 'lost') return lostView(t, row, viewerId, device)
   if (row.vertical === 'found') return foundView(t, row, viewerId)
   if (row.vertical === 'adoption') return adoptionView(t, row, viewerId)
   return helpView(t, row, viewerId)

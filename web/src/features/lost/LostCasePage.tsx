@@ -1,4 +1,4 @@
-import type { LostCase } from '@contracts/case'
+import type { LostCase, Sighting } from '@contracts/case'
 import { availableActions, hasPossibleFind, type LostAction, pageMode } from '@domain/lost/actions'
 import { checkinAnswers, closeAnswersCheckin } from '@domain/lost/checkin'
 import { placeSightings, splitHidden } from '@domain/lost/sightings'
@@ -43,9 +43,19 @@ type Props = {
   /** Tile style for the map; undefined draws the area and pins without streets. */
   mapStyleUrl: string | undefined
   onAction: (action: LostAction) => void
+  /** «Corregir el punto» on one's own pin: the screen opens the form on it. */
+  onCorrect?: (sighting: Sighting) => void
 }
 
-export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, onAction }: Props) {
+export function LostCasePage({
+  lostCase,
+  now,
+  shortUrl,
+  backLink,
+  mapStyleUrl,
+  onAction,
+  onCorrect,
+}: Props) {
   const i18n = useI18n()
   const { t } = i18n
   const { pet, lastSeen } = lostCase
@@ -296,6 +306,14 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
                 isOwner={isOwner}
                 onClose={() => setPinId(null)}
                 onSawItToo={can('report_sighting') ? () => onAction('report_sighting') : undefined}
+                onCorrect={
+                  onCorrect
+                    ? () => {
+                        setPinId(null)
+                        onCorrect(pin)
+                      }
+                    : undefined
+                }
               />
             </Suspense>
           ) : null}

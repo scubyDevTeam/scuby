@@ -1,10 +1,12 @@
 // What a helper does without an account (docs/product/04 · sighting, recovery_claim; 09).
 import { api } from '../../contracts/api'
-import { db, findCase, newId, type SightingRow } from '../db'
+import type { Point } from '../../contracts/primitives'
+import { db, type FoundRow, findCase, type LostRow, newId, type SightingRow } from '../db'
 import { onClaimOpened } from '../followup'
 import { notify } from '../notify'
 import { fail, route } from '../route'
 import { ago, DAY, distance, HOUR, iso, metres, ms } from '../rules'
+import { ownership } from '../serialize'
 
 const MAX_DISTANCE_M = 30_000
 const BEFORE_CASE = DAY
@@ -25,6 +27,27 @@ function rateLimit(reporter: { id: string | null; key: string }, caseCode: strin
   }
 }
 
+/** The same checks the form ran, again: the client is not trusted input (04 · Validation). */
+function checkSighting(row: LostRow | FoundRow, point: Point, seenAtIso: string) {
+  const area = row.vertical === 'lost' ? row.last_seen : row.found
+  const seenAt = ms(seenAtIso)
+  if (seenAt > Date.now() + 5 * 60_000) fail('seen_at_in_future')
+  if (seenAt < ms(area.at) - BEFORE_CASE) fail('seen_at_before_case')
+  const away = metres(point, area.center)
+  if (away > MAX_DISTANCE_M) fail('sighting_too_far')
+  return { seenAt, away }
+}
+
+/** One's own pin, still inside its correction window (04): anything else is not theirs to change. */
+function ownEditable(code: string, id: string, userId: string | null, device: string): SightingRow {
+  const sighting =
+    db.sightings.find((s) => s.id === id && s.case_code === code) ?? fail('not_found')
+  const mine = ownership(sighting, userId, device)
+  if (!mine.mine || sighting.status !== 'visible') fail('forbidden')
+  if (!mine.editable_until) fail('forbidden')
+  return sighting
+}
+
 export const helpers = [
   route(api.reportSighting, ({ params, body, user, reporterKey }) => {
     const row = findCase(params.code) ?? fail('not_found')
@@ -36,14 +59,7 @@ export const helpers = [
       : undefined
     if (replayed) return { id: replayed.id }
     if (row.status !== 'active') fail('invalid_transition')
-    const area = row.vertical === 'lost' ? row.last_seen : row.found
-
-    // The same checks the form ran, again: the client is not trusted input (04 · Validation).
-    const seenAt = ms(body.seen_at)
-    if (seenAt > Date.now() + 5 * 60_000) fail('seen_at_in_future')
-    if (seenAt < ms(area.at) - BEFORE_CASE) fail('seen_at_before_case')
-    const away = metres(body.point, area.center)
-    if (away > MAX_DISTANCE_M) fail('sighting_too_far')
+    const { seenAt, away } = checkSighting(row, body.point, body.seen_at)
     rateLimit({ id: user?.id ?? null, key: reporterKey }, row.code)
 
     const id = newId('s-')
@@ -101,6 +117,26 @@ export const helpers = [
   }),
 
   // The row exists before the channel opens: the badge appears whatever happens in WhatsApp.
+  route(api.correctSighting, ({ params, body, user, reporterKey }) => {
+    const row = findCase(params.code) ?? fail('not_found')
+    if (row.vertical !== 'lost' && row.vertical !== 'found') fail('not_found')
+    const sighting = ownEditable(row.code, params.sightingId, user?.id ?? null, reporterKey)
+    if (row.status !== 'active') fail('invalid_transition')
+    checkSighting(row, body.point, body.seen_at)
+    // No new row: the pin moves, and the reporter's contact and photos stay with it.
+    sighting.point = body.point
+    sighting.seen_at = body.seen_at
+    sighting.note = body.note
+    return null
+  }),
+
+  route(api.deleteSighting, ({ params, user, reporterKey }) => {
+    const row = findCase(params.code) ?? fail('not_found')
+    const sighting = ownEditable(row.code, params.sightingId, user?.id ?? null, reporterKey)
+    db.sightings.splice(db.sightings.indexOf(sighting), 1)
+    return null
+  }),
+
   route(api.claimRecovery, ({ params, body, user }) => {
     const row = findCase(params.code) ?? fail('not_found')
     if (row.vertical !== 'lost') fail('not_found')

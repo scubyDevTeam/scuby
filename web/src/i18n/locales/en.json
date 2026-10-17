@@ -127,7 +127,8 @@
     "lost": {
       "sighting_title": "Where did you see {name}?",
       "claim_title": "Do you have {name}?",
-      "reunite_title": "Is {name} back?"
+      "reunite_title": "Is {name} back?",
+      "correct_title": "Correct your sighting of {name}"
     },
     "found": {
       "mine_title": "Is this your pet?",
@@ -1225,7 +1226,16 @@
       "offline": "No connection",
       "queued_title": "We saved your sighting",
       "queued_body": "It sends itself as soon as the signal is back. You don't need to repeat it.",
-      "back_to_case": "Back to the post for {name}"
+      "back_to_case": "Back to the post for {name}",
+      "ask_title": "Did you see them again, or do you want to correct the earlier point?",
+      "ask_again": "I saw them again",
+      "ask_correct": "Correct it",
+      "correcting_intro": "Move the point or change the time. We won’t create a new sighting.",
+      "correct_submit": "Save correction",
+      "correcting": "Saving…",
+      "corrected_title": "Done, we corrected your sighting.",
+      "corrected_body": "The point is now where you said.",
+      "correct_failed": "We couldn’t save the correction. The time to correct it may have passed."
     },
     "claim_form": {
       "phone_required": "Enter your mobile number",
@@ -1345,7 +1355,15 @@
       "photo_alt": "Photo of the sighting",
       "write": "Message them",
       "call": "Call",
-      "saw_it_too": "I saw her here too"
+      "saw_it_too": "I saw her here too",
+      "yours": "This one is yours. You can correct or delete it until {time}.",
+      "correct": "Correct the point",
+      "delete": "Delete my sighting",
+      "delete_confirm": "Are you sure you want to delete it? This can’t be undone.",
+      "delete_yes": "Yes, delete it",
+      "delete_no": "No",
+      "deleting": "Deleting…",
+      "delete_failed": "We couldn’t delete it. The time may have passed."
     }
   },
   "preview": {

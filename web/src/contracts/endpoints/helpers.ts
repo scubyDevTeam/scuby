@@ -3,6 +3,7 @@ import {
   claimWire,
   recoveryClaimRequest,
   reportRequest,
+  sightingCorrectionRequest,
   sightingRequest,
   uploadWire,
 } from '../actions'
@@ -20,6 +21,27 @@ export const reportSighting = endpoint({
   status: 201,
   response: createdWire,
   errors: ['not_found', 'invalid_transition', ...SIGHTING_RULES],
+})
+
+export const correctSighting = endpoint({
+  method: 'POST',
+  path: '/cases/:code/sightings/:sightingId/correction',
+  summary:
+    '«Corregir»: moves the reporter’s own pin and its time, no new row. Only its reporter, only ' +
+    'until `editable_until` (`created_at + 15 min`); the same distance and time checks as a new pin.',
+  auth: 'public',
+  body: sightingCorrectionRequest,
+  errors: ['not_found', 'forbidden', 'invalid_transition', ...SIGHTING_RULES],
+})
+
+export const deleteSighting = endpoint({
+  method: 'DELETE',
+  path: '/cases/:code/sightings/:sightingId',
+  summary:
+    'Deletes the reporter’s own pin. Only its reporter, only until `editable_until`; after that ' +
+    'only the owner (hide) or moderation (remove) can take it off the map.',
+  auth: 'public',
+  errors: ['not_found', 'forbidden'],
 })
 
 export const claimRecovery = endpoint({
