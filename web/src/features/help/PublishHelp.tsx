@@ -29,6 +29,7 @@ import {
   Section,
   StepHeader,
 } from '@features/publish/parts'
+import { draftKey, useSavedForm } from '@features/publish/saved-draft'
 import { useI18n } from '@i18n/react'
 import type { TextKey, Translator } from '@i18n/translate'
 import { Button } from '@ui/Button'
@@ -97,12 +98,14 @@ export function PublishHelp({
   const country = useConfig().data?.countries[0]
   const pets = useMyPets().data ?? []
   const publish = usePublishHelp()
-  const [step, setStep] = useState<HelpStep>(1)
-  const [draft, setDraft] = useState<HelpDraft>(() =>
+  // What was typed survives a reload, per account and per found case it asks for.
+  const form = useSavedForm<HelpStep, HelpDraft>(
+    draftKey(`help.${fromFound?.code ?? 'new'}`, user.id),
     fromFound
       ? { ...emptyHelpDraft, fromCaseCode: fromFound.code, center: fromFound.found.center }
       : emptyHelpDraft,
   )
+  const { step, setStep, draft, setDraft } = form
   const [changingPhone, setChangingPhone] = useState(false)
   const [otp, setOtp] = useState('')
   const [tried, setTried] = useState<HelpStep | 0>(0)
@@ -124,35 +127,42 @@ export function PublishHelp({
   function send(otpCode: string | null) {
     const { species, size, center } = draft
     if (!center || (!draft.petId && !draft.fromCaseCode && (!species || !size))) return
-    publish.mutate({
-      petId: draft.petId,
-      fromCaseCode: draft.fromCaseCode,
-      pet:
-        draft.petId || draft.fromCaseCode || !species || !size
-          ? null
-          : {
-              name: draft.name.trim(),
-              species,
-              size,
-              colors: draft.colors,
-              marks: draft.marks.trim() || null,
-              photoUrls: draft.photoUrls,
-            },
-      needs: draft.needs.map((need) => ({
-        kind: need.kind,
-        detail: need.detail.trim(),
-        target: targetOf(need),
-        neededBy: need.neededBy || null,
-      })),
-      story: draft.story.trim(),
-      photoUrls: draft.evidenceUrls,
-      center,
-      radiusM: draft.radiusM,
-      phone: verifiedPhone ? null : phoneRules ? toE164(draft.phone, phoneRules) : null,
-      hasWhatsapp: draft.hasWhatsapp,
-      contact: draft.contact,
-      otpCode,
-    })
+    publish.mutate(
+      {
+        petId: draft.petId,
+        fromCaseCode: draft.fromCaseCode,
+        pet:
+          draft.petId || draft.fromCaseCode || !species || !size
+            ? null
+            : {
+                name: draft.name.trim(),
+                species,
+                size,
+                colors: draft.colors,
+                marks: draft.marks.trim() || null,
+                photoUrls: draft.photoUrls,
+              },
+        needs: draft.needs.map((need) => ({
+          kind: need.kind,
+          detail: need.detail.trim(),
+          target: targetOf(need),
+          neededBy: need.neededBy || null,
+        })),
+        story: draft.story.trim(),
+        photoUrls: draft.evidenceUrls,
+        center,
+        radiusM: draft.radiusM,
+        phone: verifiedPhone ? null : phoneRules ? toE164(draft.phone, phoneRules) : null,
+        hasWhatsapp: draft.hasWhatsapp,
+        contact: draft.contact,
+        otpCode,
+      },
+      {
+        onSuccess: (result) => {
+          if (result.kind === 'published') form.clear()
+        },
+      },
+    )
   }
 
   function next(event: FormEvent) {
@@ -202,6 +212,13 @@ export function PublishHelp({
         steps={3}
         onBack={() => (step === 1 ? onExit() : setStep((step - 1) as HelpStep))}
       />
+      {form.restored ? (
+        <Notice tone="info" title={t('publish.draft.restored_title')}>
+          <Button variant="link" className="ml-1" onClick={form.discard}>
+            {t('publish.draft.start_over')}
+          </Button>
+        </Notice>
+      ) : null}
 
       {step === 1 && fromFound ? (
         <section className="flex items-center gap-3 rounded-2xl bg-brand-mist p-4">

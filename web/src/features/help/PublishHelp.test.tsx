@@ -2,8 +2,8 @@
 import { parseCase } from '@contracts/case'
 import type { FoundCase } from '@contracts/found'
 import type { User } from '@contracts/session'
-import { fireEvent, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { cases } from '../../mocks/fixtures'
 import { renderWithQuery, stubApi } from '../../test-utils'
 import { PublishHelp } from './PublishHelp'
@@ -25,6 +25,9 @@ const nala = {
   active_case_code: null,
   reopenable_case_code: null,
 }
+
+// Each form starts empty: a draft kept by an earlier test would open in its place.
+beforeEach(() => localStorage.clear())
 
 function show(routes: Parameters<typeof stubApi>[0] = {}, fromFound: FoundCase | null = null) {
   const calls = stubApi({ 'GET /me/pets': { body: [nala] }, ...routes })
@@ -147,5 +150,18 @@ describe('PublishHelp — for the animal a custodian holds (07 · The pet)', () 
       pet_id: null,
       pet: null,
     })
+  })
+})
+
+describe('the form survives a reload', () => {
+  it('opens on what was typed, says so, and «Empezar de nuevo» clears it', async () => {
+    show()
+    fireEvent.change(await screen.findByLabelText('Nombre'), { target: { value: 'Toby' } })
+    cleanup()
+    show()
+    expect(((await screen.findByLabelText('Nombre')) as HTMLInputElement).value).toBe('Toby')
+    expect(screen.getByText('Seguimos donde ibas.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Empezar de nuevo' }))
+    expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('')
   })
 })
