@@ -36,8 +36,10 @@ export function availableActions(state: LostCaseState, viewer: Viewer, now: Date
         ? ['confirm_reunited', 'edit', 'cancel', 'share']
         : ['report_sighting', 'claim_recovery', 'contact_owner', 'share', 'report_content']
     case 'expired':
-      // Reachable and reopenable by the owner, no actions for anyone else.
-      return viewer === 'owner' && canReopen(state, now) ? ['reopen'] : []
+      // Reachable for 30 days: the owner reopens it, and someone who has the animal says so —
+      // which reactivates it (decision #29). Sightings wait for the case to be live again.
+      if (!canReopen(state, now)) return []
+      return viewer === 'owner' ? ['reopen'] : ['claim_recovery', 'share']
     case 'reunited':
     case 'cancelled':
       return []
