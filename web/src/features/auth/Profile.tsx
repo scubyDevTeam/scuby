@@ -1,5 +1,5 @@
 import { ApiError } from '@api-client/http'
-import { useProfile, useSignOut, useUpdateProfile } from '@api-client/session'
+import { useDeleteAccount, useProfile, useSignOut, useUpdateProfile } from '@api-client/session'
 import type { Profile as ProfileData, ProfileUpdate } from '@contracts/session'
 import { BIO_MAX_LENGTH, type ProfileError, profileErrors } from '@domain/shared/profile'
 import { initials } from '@domain/shared/signin'
@@ -77,6 +77,7 @@ export function Profile({ mapStyleUrl }: { mapStyleUrl?: string }) {
       >
         {t('auth.profile.sign_out')}
       </Button>
+      {profile.data ? <DeleteAccount /> : null}
     </div>
   )
 }
@@ -231,5 +232,41 @@ function ProfileForm({ profile }: { profile: ProfileData }) {
         {update.isPending ? t('auth.profile.saving') : t('auth.profile.save')}
       </Button>
     </form>
+  )
+}
+
+/** «Eliminar mi cuenta» (O15): the stores require it in the app; it asks once, plainly. */
+function DeleteAccount() {
+  const { t } = useI18n()
+  const remove = useDeleteAccount()
+  const [asking, setAsking] = useState(false)
+  return (
+    <section className="flex flex-col gap-3 border-t border-line pt-6">
+      <h2 className="m-0 text-lg font-bold">{t('auth.profile.delete.title')}</h2>
+      {asking ? (
+        <>
+          <p className="m-0 text-muted">{t('auth.profile.delete.body')}</p>
+          {remove.isError ? (
+            <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
+              {t('auth.profile.delete.failed')}
+            </p>
+          ) : null}
+          <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate()}>
+            {t(remove.isPending ? 'auth.profile.delete.deleting' : 'auth.profile.delete.confirm')}
+          </Button>
+          <Button variant="outline" onClick={() => setAsking(false)}>
+            {t('auth.profile.delete.cancel')}
+          </Button>
+        </>
+      ) : (
+        <Button
+          variant="link"
+          className="self-start text-lost-deep"
+          onClick={() => setAsking(true)}
+        >
+          {t('auth.profile.delete.start')}
+        </Button>
+      )}
+    </section>
   )
 }

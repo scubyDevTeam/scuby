@@ -4,6 +4,7 @@ import { db, type FoundRow, findCase, newCode, newId, type PersonRow } from '../
 import { notify } from '../notify'
 import { fail, route } from '../route'
 import { COLOR, DAY, iso, metres, placeName } from '../rules'
+import { openThread } from './conversations'
 import { verifiedPhone } from './owner'
 
 const HOLD = 15 * DAY
@@ -117,6 +118,17 @@ export const found = [
       photo_urls: body.photo_urls,
       // Only a lost case published before the found one counts as the claimant's evidence (05).
       from_lost_case_code: ownLost && ownLost.published_at < row.published_at ? ownLost.code : null,
+    })
+    openThread({
+      caseCode: row.code,
+      startedBy: user.id,
+      otherId: row.created_by,
+      topic: 'reclamo «Es mío»',
+      label: 'Mensaje automático · evidencia de «Es mío»',
+      body: body.evidence_notes
+        ? `Lo que dijo para identificarlo: «${body.evidence_notes}».`
+        : 'Dice que es suyo. Escríbele para confirmarlo.',
+      photoUrls: body.photo_urls,
     })
     notify(
       row.created_by,

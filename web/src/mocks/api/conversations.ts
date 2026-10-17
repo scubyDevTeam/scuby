@@ -97,6 +97,52 @@ function lastLine(message: MessageRow | undefined): string {
   return message.body
 }
 
+/**
+ * The thread a claim or an interest opens, born with the server's own first message — the evidence
+ * or the introduction the person already gave (comms.md rule 1: created with its first message).
+ * One per pair and case: a second claim does not start another.
+ */
+export function openThread(input: {
+  caseCode: string
+  startedBy: string
+  otherId: string
+  topic: string
+  label: string
+  body: string
+  photoUrls?: string[]
+}) {
+  const exists = db.conversations.some(
+    (c) =>
+      c.case_code === input.caseCode &&
+      [c.started_by, c.other_id].includes(input.startedBy) &&
+      [c.started_by, c.other_id].includes(input.otherId),
+  )
+  if (exists) return
+  const createdAt = iso(Date.now())
+  const id = newId('conv-')
+  db.conversations.push({
+    id,
+    case_code: input.caseCode,
+    started_by: input.startedBy,
+    other_id: input.otherId,
+    topic: input.topic,
+    created_at: createdAt,
+    // The one who wrote it has read it; the other has not.
+    read_at: { [input.startedBy]: createdAt },
+  })
+  db.messages.push({
+    id: newId('msg-'),
+    conversation_id: id,
+    sender_id: null,
+    kind: 'automatic',
+    label: input.label,
+    body: input.body,
+    photo_urls: input.photoUrls ?? [],
+    phone: null,
+    created_at: createdAt,
+  })
+}
+
 export const conversations = [
   route(api.listConversations, ({ user }) => {
     const mineRows = db.conversations.filter(

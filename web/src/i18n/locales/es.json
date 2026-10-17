@@ -599,6 +599,15 @@
           "done_title": "Listo, te avisaremos.",
           "done_body": "Solo si importa: una notificación por cada mascota perdida cerca."
         }
+      },
+      "delete": {
+        "title": "Eliminar mi cuenta",
+        "body": "Cierra tus avisos activos, retira tus ofertas e intereses y borra tus mensajes, avisos y dispositivos. Lo que aportaste a avisos de otras personas queda sin tu nombre. No se puede deshacer.",
+        "start": "Eliminar mi cuenta",
+        "confirm": "Sí, eliminar mi cuenta",
+        "cancel": "No, conservarla",
+        "deleting": "Eliminando…",
+        "failed": "No pudimos eliminar tu cuenta. Inténtalo de nuevo."
       }
     }
   },
@@ -1011,8 +1020,8 @@
     "empty_hint": "Aquí llegarán los avisos sobre tus casos.",
     "unread": "Sin leer",
     "unread_count": {
-      "one": "1 aviso sin leer",
-      "other": "{count} avisos sin leer"
+      "one": "1 sin leer",
+      "other": "{count} sin leer"
     }
   },
   "legal": {

@@ -73,6 +73,20 @@ export function useGoogleSignIn() {
   })
 }
 
+/** The person asked to be erased: the same cleanup as signing out, after the server did it. */
+export function useDeleteAccount() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => call(accountEndpoints.deleteAccount, {}, parseNothing),
+    onSuccess: () => {
+      client.setQueryData(SESSION, null)
+      client.removeQueries({ queryKey: ['me'] })
+      client.removeQueries({ queryKey: ['conversation'] })
+      client.invalidateQueries({ queryKey: ['case'] })
+    },
+  })
+}
+
 export function useSignOut() {
   const client = useQueryClient()
   return useMutation({

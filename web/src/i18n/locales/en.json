@@ -599,6 +599,15 @@
           "done_title": "Done, we’ll tell you.",
           "done_body": "Only what matters: one notification for each lost pet nearby."
         }
+      },
+      "delete": {
+        "title": "Delete my account",
+        "body": "Closes your active notices, withdraws your offers and interests, and erases your messages, alerts and devices. What you contributed to other people’s notices stays without your name. This can’t be undone.",
+        "start": "Delete my account",
+        "confirm": "Yes, delete my account",
+        "cancel": "No, keep it",
+        "deleting": "Deleting…",
+        "failed": "We couldn’t delete your account. Try again."
       }
     }
   },
@@ -1011,8 +1020,8 @@
     "empty_hint": "Notifications about your cases will show up here.",
     "unread": "Unread",
     "unread_count": {
-      "one": "1 unread notification",
-      "other": "{count} unread notifications"
+      "one": "1 unread",
+      "other": "{count} unread"
     }
   },
   "legal": {
