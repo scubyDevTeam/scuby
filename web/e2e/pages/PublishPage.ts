@@ -32,6 +32,40 @@ export class PublishPage {
     return step('Open «Publicar»', () => this.page.goto('/publicar').then(() => undefined))
   }
 
+  /** The lost form, signed into the demo account (it owns Luna and an expired Pelusa). */
+  openLostAsDemoOwner() {
+    return step('Open «Perdí mi mascota» as the demo owner', async () => {
+      await this.page.goto('/publicar/perdido')
+      await this.signIn.withGoogle()
+    })
+  }
+
+  choosePet(name: string) {
+    return step(`Choose the pet «${name}»`, () =>
+      this.page.getByRole('button', { name, exact: true }).click(),
+    )
+  }
+
+  reactivateOffer(name: string) {
+    return this.page.getByText(`${name} ya tenía un aviso`)
+  }
+
+  reactivate(name: string) {
+    return step(`Reactivate ${name}'s notice`, () =>
+      this.page.getByRole('button', { name: `Reactivar el aviso de ${name}` }).click(),
+    )
+  }
+
+  get reactivated() {
+    return this.page.getByText(/está activo de nuevo/)
+  }
+
+  seeReactivated() {
+    return step('Open the reactivated notice', () =>
+      this.page.getByRole('link', { name: 'Ver ese aviso' }).click(),
+    )
+  }
+
   openFound() {
     return step('Open «Encontré un animal»', () =>
       this.page.goto('/publicar/encontrado').then(() => undefined),

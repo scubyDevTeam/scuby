@@ -1,6 +1,6 @@
 import { useConfig } from '@api-client/actions'
 import { ApiError } from '@api-client/http'
-import { useMyPets, usePublishLost } from '@api-client/owner'
+import { useMyPets, usePublishLost, useReopenCase } from '@api-client/owner'
 import type { User } from '@contracts/session'
 import {
   draftFromPet,
@@ -74,6 +74,9 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
   const current: LostDraft = { ...draft, lastSeenAt: when.at }
   const errors = stepErrors(step, current, { now, phoneRules, verifiedPhone })
   const errorFor = messageFor(t, tried === step ? errors : [])
+  // Reactivating makes the pet «active» when the pets are fetched again: the answer is kept here.
+  const [reopened, setReopened] = useState<{ name: string; code: string } | null>(null)
+  const reopenPet = pets.find((pet) => pet.id === draft.petId && pet.reopenableCaseCode)
   const blockedPet = pets.find((pet) => pet.id === draft.petId && pet.activeCaseCode)
   const askingCode = publish.data?.kind === 'otp'
 
@@ -170,7 +173,23 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
                   )
                 }}
               />
-              {blockedPet?.activeCaseCode ? (
+              {reopened ? (
+                <Notice
+                  tone="success"
+                  title={t('lost_forms.publish.reopen_done', { name: reopened.name })}
+                >
+                  {caseLink(reopened.code, t('lost_forms.publish.see_that'), 'font-bold underline')}
+                </Notice>
+              ) : reopenPet?.reopenableCaseCode ? (
+                <ReopenOffer
+                  name={reopenPet.name}
+                  code={reopenPet.reopenableCaseCode}
+                  onReopened={() =>
+                    setReopened({ name: reopenPet.name, code: reopenPet.reopenableCaseCode ?? '' })
+                  }
+                />
+              ) : null}
+              {blockedPet?.activeCaseCode && !reopened ? (
                 <Notice
                   tone="warning"
                   title={t('lost_forms.publish.already_active', { name: blockedPet.name })}
@@ -268,5 +287,43 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
         </>
       )}
     </form>
+  )
+}
+
+/**
+ * «Luna ya tenía un aviso — ¿lo reactivamos?» (04 · Publishing): an expired case from the last 30
+ * days comes back in one tap, with its sightings and trail. Publishing a new one stays possible.
+ */
+function ReopenOffer({
+  name,
+  code,
+  onReopened,
+}: {
+  name: string
+  code: string
+  onReopened: () => void
+}) {
+  const { t } = useI18n()
+  const reopen = useReopenCase(code)
+  return (
+    <div className="flex flex-col gap-2">
+      <Notice tone="info" title={t('lost_forms.publish.reopen_title', { name })}>
+        {t('lost_forms.publish.reopen_body')}
+      </Notice>
+      {reopen.isError ? (
+        <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
+          {t('lost_forms.publish.reopen_failed')}
+        </p>
+      ) : null}
+      <Button
+        disabled={reopen.isPending}
+        // The promise, not mutate's callback: the pets refetch swaps this component out first.
+        onClick={() => reopen.mutateAsync(undefined).then(onReopened, () => undefined)}
+      >
+        {t(reopen.isPending ? 'lost_forms.publish.reopening' : 'lost_forms.publish.reopen_action', {
+          name,
+        })}
+      </Button>
+    </div>
   )
 }

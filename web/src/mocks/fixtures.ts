@@ -256,6 +256,11 @@ export function seed(): Tables {
     },
     closedLost('H4PPY', 'Toby', 'reunited', 3 * DAY, 'reunited_home'),
     closedLost('ARCH2', 'Kira', 'expired', 5 * DAY, 'no_response'),
+    // The demo account's: expired 3 days ago, so publishing Pelusa again offers to reactivate it.
+    {
+      ...closedLost('PEL4S', 'Pelusa', 'expired', 3 * DAY, 'no_response'),
+      created_by: DEMO_OWNER_ID,
+    },
     closedLost('CANC3', 'Rocky', 'cancelled', DAY, 'false_alarm'),
     {
       code: 'F8UND',
@@ -533,6 +538,19 @@ export function seed(): Tables {
         custody_state: 'claimed',
         health_flags: [],
         photo_urls: [mockPhoto('#c9772f')],
+      },
+      {
+        id: 'pet-pelusa',
+        owner_id: DEMO_OWNER_ID,
+        name: 'Pelusa',
+        species: 'cat' as const,
+        size: 'small' as const,
+        colors: ['gray' as const],
+        marks: null,
+        chip_number: null,
+        custody_state: 'claimed' as const,
+        health_flags: [],
+        photo_urls: [mockPhoto('#8a8a8a')],
       },
       ...['Toby', 'Kira', 'Rocky'].map((name) => ({
         id: `pet-${name.toLowerCase()}`,

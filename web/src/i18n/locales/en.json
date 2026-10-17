@@ -1357,7 +1357,13 @@
       "confirm_code": "Confirm code and publish",
       "submit": "Publish and alert neighbours",
       "ownership": "By publishing you confirm {name} is your pet.",
-      "ownership_unnamed": "By publishing you confirm this is your pet."
+      "ownership_unnamed": "By publishing you confirm this is your pet.",
+      "reopen_title": "{name} already had a notice",
+      "reopen_body": "Shall we reactivate it? Their sightings and trail are still there. You can also publish a new one.",
+      "reopen_action": "Reactivate {name}’s notice",
+      "reopening": "Reactivating…",
+      "reopen_done": "Done, {name}’s notice is active again.",
+      "reopen_failed": "We couldn’t reactivate it. You can publish a new one."
     },
     "checkin": {
       "label": "Question waiting",
