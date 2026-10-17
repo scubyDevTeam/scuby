@@ -183,6 +183,14 @@ export const helpers = [
     }
   }),
 
+  route(api.recordShare, ({ params, body }) => {
+    // A metric, not a feature: an unknown code is not worth an error the client would ignore anyway.
+    if (findCase(params.code)) {
+      db.shares.push({ case_code: params.code.toUpperCase(), ...body, created_at: iso(Date.now()) })
+    }
+    return null
+  }),
+
   route(api.sendReport, ({ body, user }) => {
     const exists =
       body.target_type === 'sighting'

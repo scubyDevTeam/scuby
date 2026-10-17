@@ -3,6 +3,7 @@ import {
   claimWire,
   recoveryClaimRequest,
   reportRequest,
+  shareOpenedRequest,
   sightingCorrectionRequest,
   sightingRequest,
   uploadWire,
@@ -55,6 +56,16 @@ export const claimRecovery = endpoint({
   status: 201,
   response: claimWire,
   errors: ['not_found', 'invalid_transition'],
+})
+
+export const recordShare = endpoint({
+  method: 'POST',
+  path: '/cases/:code/shares',
+  summary:
+    '`share.opened` (10 §5): someone opened a way to share the case — the system sheet, WhatsApp ' +
+    'or a download. Anonymous; an unknown code is ignored. The client never waits for it.',
+  auth: 'public',
+  body: shareOpenedRequest,
 })
 
 export const sendReport = endpoint({
