@@ -109,6 +109,7 @@ export type Checkin = {
   trigger: 'time_based' | 'post_recovery_claim'
   claimId: string | null
   askedAt: Date
+  archivesAt: Date | null
 }
 
 export type RecoveryClaim = {
@@ -194,6 +195,9 @@ export function parseCase(raw: unknown): CaseDetail {
       trigger: wire.pending_checkin.trigger,
       claimId: wire.pending_checkin.claim_id,
       askedAt: new Date(wire.pending_checkin.asked_at),
+      archivesAt: wire.pending_checkin.archives_at
+        ? new Date(wire.pending_checkin.archives_at)
+        : null,
     },
     contact: wire.contact && {
       displayName: wire.contact.display_name,

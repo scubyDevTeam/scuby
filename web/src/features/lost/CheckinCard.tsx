@@ -5,6 +5,7 @@ import { useI18n } from '@i18n/react'
 import type { TextKey } from '@i18n/translate'
 import { Button, type ButtonVariant } from '@ui/Button'
 import { Notice } from '@ui/Notice'
+import { formatDayMonth } from './copy'
 
 const answerLabel: Record<CheckinResponse, TextKey> = {
   still_lost: 'lost_forms.checkin.answers.still_lost',
@@ -50,7 +51,8 @@ export function CheckinCard({
   onReunited,
   onDelete,
 }: Props) {
-  const { t } = useI18n()
+  const i18n = useI18n()
+  const { t } = i18n
   const answer = useAnswerCheckin(code)
   const isClaim = checkin.trigger === 'post_recovery_claim'
 
@@ -72,7 +74,13 @@ export function CheckinCard({
             name: petName,
           })}
         </strong>{' '}
-        {t(isClaim ? 'lost_forms.checkin.claim_body' : 'lost_forms.checkin.time_based_body')}
+        {isClaim
+          ? t('lost_forms.checkin.claim_body')
+          : checkin.archivesAt
+            ? t('lost_forms.checkin.time_based_body_dated', {
+                date: formatDayMonth(i18n, checkin.archivesAt),
+              })
+            : t('lost_forms.checkin.time_based_body')}
       </p>
       {isClaim && claimPhone ? (
         <p className="m-0 text-sm">{t('lost_forms.checkin.claim_phone', { phone: claimPhone })}</p>
