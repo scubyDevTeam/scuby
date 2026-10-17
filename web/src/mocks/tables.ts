@@ -274,6 +274,13 @@ export type PushRow = {
   device: string | null
 }
 
+export type ShareRow = {
+  case_code: string
+  channel: 'system' | 'whatsapp' | 'download'
+  format: 'square' | 'story' | 'print' | 'text'
+  created_at: string
+}
+
 export type ReportRow = {
   id: string
   target_type: string
@@ -301,5 +308,6 @@ export type Tables = {
   messages: MessageRow[]
   pushSubscriptions: PushRow[]
   reports: ReportRow[]
+  shares: ShareRow[]
   nextId: number
 }

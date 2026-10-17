@@ -105,6 +105,15 @@ export const reportReasonSchema = z.enum([
 ])
 
 /** Anonymous and one tap: a reason is required, nothing else is (docs/product/09). */
+/**
+ * `share.opened` (docs/product/10 §5): someone opened a way to share a case — intent, not outcome.
+ * The only evidence a share happened; it keeps `platform_share` attributions honest.
+ */
+export const shareOpenedRequest = z.object({
+  channel: z.enum(['system', 'whatsapp', 'download']),
+  format: z.enum(['square', 'story', 'print', 'text']),
+})
+
 export const reportRequest = z.object({
   target_type: reportTargetSchema,
   /** A case's short code, or the id of a sighting or claim. */

@@ -4,6 +4,7 @@ import type { Crop, PosterFormat } from '@domain/shared/poster'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cases } from '../../mocks/fixtures'
+import { stubApi } from '../../test-utils'
 import { PosterSheet } from './PosterSheet'
 import type { PreparedPoster, PreparePoster } from './render'
 
@@ -188,5 +189,23 @@ describe('PosterSheet — who sees what', () => {
     await waitFor(() => expect(fake.drawn.length).toBeGreaterThan(0))
     expect(screen.queryByRole('slider')).toBeNull()
     expect(vi.mocked(fake.prepare).mock.calls[0]?.[0].content.photoUrl).toBeNull()
+  })
+
+  it('records which way the case was shared, without waiting on it (10 §5)', async () => {
+    const calls = stubApi({ 'POST /cases/7K3PQ/shares': { status: 204 } })
+    const fake = fakePoster()
+    stubNavigator({ share: vi.fn().mockResolvedValue(undefined), canShare: () => true })
+    render(
+      <PosterSheet posterCase={lost('public')} link={link} brand={brand} prepare={fake.prepare} />,
+    )
+    fireEvent.click(screen.getByRole('link', { name: 'Enviar el enlace por WhatsApp' }))
+    await waitFor(() => expect(fake.drawn.length).toBeGreaterThan(0))
+    fireEvent.click(screen.getByRole('button', { name: /Compartir imagen/ }))
+    await waitFor(() =>
+      expect(calls.filter((c) => c.key === 'POST /cases/7K3PQ/shares').map((c) => c.body)).toEqual([
+        { channel: 'whatsapp', format: 'text' },
+        { channel: 'system', format: 'story' },
+      ]),
+    )
   })
 })

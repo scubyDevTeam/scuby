@@ -1,5 +1,7 @@
 // «Comparte a Luna»: the poster in three formats and the three share buttons (docs/product/10 §3–4).
 // Behind a lazy boundary — the poster, its canvas code and the QR encoder never load with the case.
+
+import { recordShare } from '@api-client/actions'
 import {
   CENTERED,
   type Crop,
@@ -92,7 +94,10 @@ export function PosterSheet({ posterCase, link, brand, prepare = preparePoster }
     return (
       <div className="flex flex-col gap-4">
         <Notice tone="warning">{t('sharing.error')}</Notice>
-        <WhatsappButton message={message} />
+        <WhatsappButton
+          message={message}
+          onOpen={() => recordShare(posterCase.code, { channel: 'whatsapp', format: 'text' })}
+        />
       </div>
     )
   }
@@ -140,6 +145,7 @@ export function PosterSheet({ posterCase, link, brand, prepare = preparePoster }
   const share = () =>
     run(async () => {
       if (!ready) return
+      recordShare(posterCase.code, { channel: 'system', format: SHARE_SHEET_FORMAT })
       const result = await shareImage({
         file: await ready.toFile(SHARE_SHEET_FORMAT, crop),
         text: message,
@@ -149,7 +155,9 @@ export function PosterSheet({ posterCase, link, brand, prepare = preparePoster }
 
   const download = () =>
     run(async () => {
-      if (ready) downloadFile(await ready.toFile(format, crop))
+      if (!ready) return
+      recordShare(posterCase.code, { channel: 'download', format })
+      downloadFile(await ready.toFile(format, crop))
     })
 
   const { width, height } = POSTER_FORMATS[format]
@@ -216,7 +224,10 @@ export function PosterSheet({ posterCase, link, brand, prepare = preparePoster }
 
       {format === 'print' ? <Notice>{t('sharing.print_hint', { size: qrCm })}</Notice> : null}
 
-      <WhatsappButton message={message} />
+      <WhatsappButton
+        message={message}
+        onOpen={() => recordShare(posterCase.code, { channel: 'whatsapp', format: 'text' })}
+      />
       <div className="grid grid-cols-2 gap-3">
         <Button onClick={share} disabled={!ready || busy}>
           <Share2 aria-hidden="true" />
@@ -238,11 +249,12 @@ export function PosterSheet({ posterCase, link, brand, prepare = preparePoster }
   )
 }
 
-function WhatsappButton({ message }: { message: string }) {
+function WhatsappButton({ message, onOpen }: { message: string; onOpen: () => void }) {
   const { t } = useI18n()
   return (
     <a
       href={whatsappShareUrl(message)}
+      onClick={onOpen}
       target="_blank"
       rel="noreferrer"
       className={buttonClass('whatsapp')}

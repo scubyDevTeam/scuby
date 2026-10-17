@@ -959,6 +959,7 @@ export function seed(): Tables {
     ],
     pushSubscriptions: [],
     reports: [],
+    shares: [],
     nextId: 1,
   }
 }

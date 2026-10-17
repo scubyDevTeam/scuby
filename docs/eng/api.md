@@ -115,6 +115,5 @@ From check-ins (04 · `case_checkin`): the date the case archives if nobody answ
 «archivaremos la publicación en 5 días» needs. From push ([frontend.md](frontend.md) · Push): the **push
 payload** the service worker reads — today `{ title, body, url, tag?, checkin?: { code, id,
 actions[] } }` in `web/src/service-worker/push.ts`, to be agreed and moved here — and what
-`device` on a push subscription holds (the client sends `null`). From sharing (10 §5): an endpoint
-for `share.opened`; the client records nothing yet. Each arrives as entries in `api.ts` with the
+`device` on a push subscription holds (the client sends `null`). Each arrives as entries in `api.ts` with the
 feature that needs it.

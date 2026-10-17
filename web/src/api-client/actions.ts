@@ -45,3 +45,16 @@ export function useSendReport() {
       call(helpersEndpoints.sendReport, { body: reportBody(input) }, parseCreated),
   })
 }
+
+/** `share.opened` (10 §5): fire and forget — sharing never waits for, nor fails on, the metric. */
+export function recordShare(
+  code: string,
+  share: {
+    channel: 'system' | 'whatsapp' | 'download'
+    format: 'square' | 'story' | 'print' | 'text'
+  },
+): void {
+  call(helpersEndpoints.recordShare, { params: { code }, body: share }, () => null).catch(
+    () => undefined,
+  )
+}
