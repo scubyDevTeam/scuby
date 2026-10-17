@@ -160,6 +160,23 @@ export class PublishPage {
     })
   }
 
+  reload() {
+    return step('Reload the page', () => this.page.reload().then(() => undefined))
+  }
+
+  get draftRestored() {
+    return this.page.getByText('Seguimos donde ibas.')
+  }
+
+  /** The form's step heading: «¿Quién se perdió?», «¿Dónde y cuándo?»… */
+  get stepTitle() {
+    return this.page.getByRole('heading', { level: 1 })
+  }
+
+  get nameField() {
+    return this.page.getByLabel('Nombre')
+  }
+
   name(name: string) {
     return step(`Name the pet ${name}`, () => this.page.getByLabel('Nombre').fill(name))
   }

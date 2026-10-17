@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { User } from '@contracts/session'
-import { fireEvent, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithQuery, stubApi } from '../../test-utils'
 import { PublishLost } from './PublishLost'
 
@@ -17,6 +17,9 @@ const luna = {
   photo_urls: [],
   active_case_code: null,
 }
+
+// Each form starts empty: a draft kept by an earlier test would open in its place.
+beforeEach(() => localStorage.clear())
 
 type Routes = Parameters<typeof stubApi>[0]
 
@@ -232,5 +235,18 @@ describe('PublishLost — 04 · reuse a pet before creating one', () => {
     show(veteran, { 'GET /me/pets': { body: [luna] } })
     fireEvent.click(await screen.findByRole('button', { name: 'Luna' }))
     expect(screen.queryByText('Luna ya tenía un aviso')).toBeNull()
+  })
+})
+
+describe('PublishLost — the form survives a reload', () => {
+  it('opens on what was typed, says so, and «Empezar de nuevo» clears it', async () => {
+    show(newcomer)
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Toby' } })
+    cleanup()
+    show(newcomer)
+    expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Toby')
+    expect(screen.getByText('Seguimos donde ibas.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Empezar de nuevo' }))
+    expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('')
   })
 })
