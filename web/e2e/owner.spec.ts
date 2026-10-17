@@ -55,8 +55,9 @@ test(
     await myCases.signIn.withEmailCode('julian@correo.co')
     await myCases.openCase('Milo')
 
-    await test.step('the check-in waits, framed as the listing going away', async () => {
+    await test.step('the check-in waits, framed as the listing going away — on a date', async () => {
       await expect(casePage.checkin).toContainText('El aviso de Milo sigue publicado.')
+      await expect(casePage.checkin).toContainText(/lo archivaremos el \d+ de \p{L}+/u)
       await expect(casePage.reunitedButton).toHaveCount(0)
     })
 

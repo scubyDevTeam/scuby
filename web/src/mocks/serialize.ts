@@ -2,6 +2,7 @@
 // and the withheld detail go to the person responsible for the case and to nobody else.
 import type { api, WireOf } from '../contracts/api'
 import type { Point } from '../contracts/primitives'
+import { archivesAt } from './cadence'
 import { DAY, iso, lookSummary, lookTitle, metres, ms, publicName, whatsappUrl } from './rules'
 import type {
   AdoptionRow,
@@ -53,8 +54,16 @@ export function pendingCheckin(t: Tables, code: string, at = Date.now()) {
       (c) => c.case_code === code && !c.responded_at && !c.cancelled_at && ms(c.scheduled_at) <= at,
     )
     .sort((a, b) => ms(a.scheduled_at) - ms(b.scheduled_at))[0]
+  const vertical = t.cases[code]?.vertical
   return due
-    ? { id: due.id, trigger: due.trigger, claim_id: due.claim_id, asked_at: due.scheduled_at }
+    ? {
+        id: due.id,
+        trigger: due.trigger,
+        claim_id: due.claim_id,
+        asked_at: due.scheduled_at,
+        archives_at:
+          due.trigger === 'time_based' && vertical ? archivesAt(vertical, due.scheduled_at) : null,
+      }
     : null
 }
 

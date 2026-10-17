@@ -1,6 +1,7 @@
 import { useAnswerPledge, useCoverNeed, useStillNeeded } from '@api-client/help'
 import type { BeneficiaryPledge, HelpCase } from '@contracts/help-case'
 import { pledgeMoves } from '@domain/help/machine'
+import { formatDayMonth } from '@features/lost/copy'
 import { useI18n } from '@i18n/react'
 import { Badge } from '@ui/Badge'
 import { WhatsAppIcon } from '@ui/BrandIcons'
@@ -21,7 +22,8 @@ type Props = {
  * beneficiary confirms it.
  */
 export function BeneficiaryPanel({ request, now, onClose }: Props) {
-  const { t } = useI18n()
+  const i18n = useI18n()
+  const { t } = i18n
   const stillNeeded = useStillNeeded(request.code)
   const cover = useCoverNeed(request.code)
   if (request.viewer !== 'beneficiary' || request.status !== 'active') return null
@@ -37,7 +39,11 @@ export function BeneficiaryPanel({ request, now, onClose }: Props) {
           className="flex flex-col gap-3 rounded-2xl bg-brand-mist p-4"
         >
           <p className="m-0 font-bold">{t('help.checkin.title', { name })}</p>
-          <p className="m-0 text-muted">{t('help.checkin.body')}</p>
+          <p className="m-0 text-muted">
+            {checkin.archivesAt
+              ? t('help.checkin.body_dated', { date: formatDayMonth(i18n, checkin.archivesAt) })
+              : t('help.checkin.body')}
+          </p>
           <Button disabled={stillNeeded.isPending} onClick={() => stillNeeded.mutate(checkin.id)}>
             {t('help.checkin.still')}
           </Button>

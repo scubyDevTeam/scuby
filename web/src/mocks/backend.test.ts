@@ -2030,3 +2030,27 @@ describe('`share.opened` (10 §5)', () => {
     expect(db.shares).toHaveLength(before)
   })
 })
+
+describe('the date a case archives on (04 · case_checkin)', () => {
+  it('a time-based question says when: the next one a cadence later, plus its escalation', async () => {
+    await asCarolina()
+    handTo('M2TQ4', DEMO_OWNER_ID_FOR_TESTS)
+    const milo = await caseOf('M2TQ4')
+    if (milo.vertical !== 'lost' || !milo.pendingCheckin) throw new Error('expected a question')
+    expect(milo.pendingCheckin.archivesAt?.getTime()).toBe(
+      milo.pendingCheckin.askedAt.getTime() + 7 * DAY + DAY,
+    )
+  })
+
+  it('a claim question archives nothing', async () => {
+    await asCarolina()
+    db.checkins = db.checkins.filter((c) => c.claim_id !== null || c.case_code !== '7K3PQ')
+    db.checkins.find((c) => c.id === 'ck-luna-claim-1')!.scheduled_at = new Date(
+      Date.now() - HOUR,
+    ).toISOString()
+    const luna = await caseOf('7K3PQ')
+    if (luna.vertical !== 'lost') throw new Error('expected lost')
+    expect(luna.pendingCheckin?.trigger).toBe('post_recovery_claim')
+    expect(luna.pendingCheckin?.archivesAt).toBeNull()
+  })
+})

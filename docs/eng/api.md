@@ -110,9 +110,7 @@ Simplified on purpose — the real backend must do better:
 Not in the contract yet: purge after 30
 days.
 From help ([07](../product/07-help-workflow.md)): photos on a request beyond the pet's own, and operator review into
-`verified` (O9). From the profile ([auth.md](auth.md) · Profile): whether the phone is verified, and account-level contact prefs.
-From check-ins (04 · `case_checkin`): the date the case archives if nobody answers, which the copy
-«archivaremos la publicación en 5 días» needs. From push ([frontend.md](frontend.md) · Push): the **push
+`verified` (O9). From the profile ([auth.md](auth.md) · Profile): whether the phone is verified, and account-level contact prefs. From push ([frontend.md](frontend.md) · Push): the **push
 payload** the service worker reads — today `{ title, body, url, tag?, checkin?: { code, id,
 actions[] } }` in `web/src/service-worker/push.ts`, to be agreed and moved here — and what
 `device` on a push subscription holds (the client sends `null`). Each arrives as entries in `api.ts` with the

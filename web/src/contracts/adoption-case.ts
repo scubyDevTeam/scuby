@@ -193,6 +193,7 @@ export type AdoptionCase = {
     trigger: 'time_based' | 'post_recovery_claim'
     claimId: string | null
     askedAt: Date
+    archivesAt: Date | null
   } | null
 }
 
@@ -260,6 +261,9 @@ export function toAdoptionCase(wire: z.infer<typeof adoptionCaseWire>): Adoption
       trigger: wire.pending_checkin.trigger,
       claimId: wire.pending_checkin.claim_id,
       askedAt: new Date(wire.pending_checkin.asked_at),
+      archivesAt: wire.pending_checkin.archives_at
+        ? new Date(wire.pending_checkin.archives_at)
+        : null,
     },
   }
 }

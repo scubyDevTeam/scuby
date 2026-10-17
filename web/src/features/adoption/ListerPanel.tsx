@@ -1,6 +1,7 @@
 import { useAnswerInterest, useStillAvailable } from '@api-client/adoption'
 import type { AdoptionCase, AdoptionInterest } from '@contracts/adoption'
 import { interestMoves, isReserved, MOVE_STATUS } from '@domain/adoption/machine'
+import { formatDayMonth } from '@features/lost/copy'
 import { useI18n } from '@i18n/react'
 import { Badge } from '@ui/Badge'
 import { WhatsAppIcon } from '@ui/BrandIcons'
@@ -23,7 +24,8 @@ type Props = {
  * account next to the name, never a verdict. No ranking, no scoring: oldest first.
  */
 export function ListerPanel({ listing, now, onRecord, onWithdraw }: Props) {
-  const { t } = useI18n()
+  const i18n = useI18n()
+  const { t } = i18n
   const stillAvailable = useStillAvailable(listing.code)
   if (listing.viewer !== 'lister' || listing.status !== 'active') return null
 
@@ -55,7 +57,13 @@ export function ListerPanel({ listing, now, onRecord, onWithdraw }: Props) {
               ? t('adoption_forms.checkin.waiting', { count: waiting, name })
               : t('adoption_forms.checkin.no_interest')}
           </p>
-          <p className="m-0 text-muted">{t('adoption_forms.checkin.body')}</p>
+          <p className="m-0 text-muted">
+            {checkin.archivesAt
+              ? t('adoption_forms.checkin.body_dated', {
+                  date: formatDayMonth(i18n, checkin.archivesAt),
+                })
+              : t('adoption_forms.checkin.body')}
+          </p>
           <Button
             disabled={stillAvailable.isPending}
             onClick={() => stillAvailable.mutate(checkin.id)}

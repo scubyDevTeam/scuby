@@ -149,6 +149,8 @@ describe('LostCasePage — the check-in the owner owes (04 · The follow-up loop
     const calls = stubApi({ [answerPath]: { body: { id: 'ck-milo-1' } } })
     show(lostCase('M2TQ4', { viewer: 'owner' }))
     expect(await screen.findByText('El aviso de Milo sigue publicado.')).toBeTruthy()
+    // The date it archives on, not a vague «pronto» (04 · case_checkin).
+    expect(screen.getByText(/lo archivaremos el \d+ de \p{L}+ y dejará de llegarles/u)).toBeTruthy()
 
     fireEvent.click(question().getByRole('button', { name: 'Sigue perdida' }))
 
@@ -185,6 +187,7 @@ describe('LostCasePage — the check-in the owner owes (04 · The follow-up loop
           trigger: 'post_recovery_claim',
           claimId: 'claim-luna',
           askedAt: now,
+          archivesAt: null,
         },
       }),
     )
@@ -212,7 +215,13 @@ describe('LostCasePage — the check-in the owner owes (04 · The follow-up loop
   it('a helper is never asked, even if a check-in reached the page', async () => {
     show(
       lostCase('M2TQ4', {
-        pendingCheckin: { id: 'ck-milo-1', trigger: 'time_based', claimId: null, askedAt: now },
+        pendingCheckin: {
+          id: 'ck-milo-1',
+          trigger: 'time_based',
+          claimId: null,
+          askedAt: now,
+          archivesAt: null,
+        },
       }),
     )
     await new Promise((resolve) => setTimeout(resolve, 0))
