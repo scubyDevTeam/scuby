@@ -271,6 +271,42 @@ export class CasePage {
     })
   }
 
+  /** Your own pin's sheet says so, and offers the two tools of its window. */
+  get ownPinTools() {
+    return this.pinSheet.getByText(/Es tuyo\. Puedes corregirlo o borrarlo hasta las /)
+  }
+
+  /** «Corregir el punto»: moves the pin and its note, no new sighting. */
+  correctOwnPin(note: string) {
+    return step(`Correct your own pin: «${note}»`, async () => {
+      await this.pinSheet.getByRole('button', { name: 'Corregir el punto' }).click()
+      await new MapPicker(this.page).mark()
+      await this.page.getByLabel(/Nota/).fill(note)
+      await this.page.getByRole('button', { name: 'Guardar corrección' }).click()
+      await expect(this.page.getByText('Listo, corregimos tu avistamiento.')).toBeVisible()
+      await this.page.getByRole('button', { name: 'Listo' }).click()
+    })
+  }
+
+  /** A second pin from the same reporter: the question, and «Corregir» moves the earlier one. */
+  correctInstead() {
+    return step('Answer «Corregir» to the second-pin question', async () => {
+      await expect(
+        this.page.getByText('¿Lo viste otra vez, o quieres corregir el punto anterior?'),
+      ).toBeVisible()
+      await this.page.getByRole('button', { name: 'Corregir', exact: true }).click()
+      await expect(this.page.getByText('Listo, corregimos tu avistamiento.')).toBeVisible()
+      await this.page.getByRole('button', { name: 'Listo' }).click()
+    })
+  }
+
+  deleteOwnPin() {
+    return step('Delete your own pin', async () => {
+      await this.pinSheet.getByRole('button', { name: 'Borrar mi avistamiento' }).click()
+      await this.pinSheet.getByRole('button', { name: 'Sí, borrarlo' }).click()
+    })
+  }
+
   closePinSheet() {
     return step('Close the pin sheet with Escape', () => this.page.keyboard.press('Escape'))
   }

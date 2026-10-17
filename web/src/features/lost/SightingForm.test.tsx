@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+
+import type { Sighting } from '@contracts/case'
 import { onlineManager } from '@tanstack/react-query'
 import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -158,5 +160,117 @@ describe('SightingForm — 04 · only the pin is required', () => {
     expect((posted(calls)[0]?.body as Record<string, unknown> | undefined)?.client_id).toEqual(
       expect.any(String),
     )
+  })
+})
+
+describe('SightingForm — your own pin (04 · Second pin, Correction window)', () => {
+  const own: Sighting = {
+    id: 's9',
+    point: { lat: 6.2461, lng: -75.5899 },
+    seenAt: new Date(Date.now() - 5 * 60_000),
+    note: 'Cerca del parque',
+    photoUrls: [],
+    source: 'anonymous',
+    highlightedByOwner: false,
+    contactPhone: null,
+    hidden: false,
+    mine: true,
+    editableUntil: new Date(Date.now() + 10 * 60_000),
+  }
+
+  function open(
+    props: { correcting?: Sighting; ownPin?: Sighting },
+    routes: Parameters<typeof stubApi>[0] = {},
+  ) {
+    const calls = stubApi({
+      'POST /cases/7K3PQ/sightings': { status: 201, body: { id: 's10' } },
+      'POST /cases/7K3PQ/sightings/s9/correction': { status: 204 },
+      ...routes,
+    })
+    vi.stubGlobal('navigator', {
+      geolocation: {
+        getCurrentPosition: (ok: (p: unknown) => void) => ok({ coords: nearby }),
+      },
+    })
+    renderWithQuery(
+      <SightingForm
+        code="7K3PQ"
+        petName="Luna"
+        lastSeenPoint={lastSeenPoint}
+        lastSeenAt={new Date(Date.now() - 2 * 86_400_000)}
+        area={{ center: lastSeenPoint, radiusM: 200 }}
+        mapStyleUrl={undefined}
+        onDone={() => {}}
+        {...props}
+      />,
+    )
+    return calls
+  }
+
+  it('correcting opens on the pin, with its note, and has no number to ask for', async () => {
+    open({ correcting: own })
+    expect(screen.getByText(/No creamos un avistamiento nuevo/)).toBeTruthy()
+    expect((screen.getByLabelText(/Nota/) as HTMLTextAreaElement).value).toBe('Cerca del parque')
+    expect(screen.queryByLabelText(/Tu WhatsApp/)).toBeNull()
+    expect(screen.getByText('Punto marcado.')).toBeTruthy()
+  })
+
+  it('«Guardar corrección» moves the pin: one correction, no new sighting', async () => {
+    const calls = open({ correcting: own })
+    fireEvent.change(screen.getByLabelText(/Nota/), { target: { value: 'Más hacia la 70' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }))
+
+    expect(await screen.findByText('Listo, corregimos tu avistamiento.')).toBeTruthy()
+    expect(calls.map((c) => c.key).filter((k) => k.startsWith('POST'))).toEqual([
+      'POST /cases/7K3PQ/sightings/s9/correction',
+    ])
+    const body = calls.find((c) => c.key.endsWith('/correction'))?.body as Record<string, unknown>
+    expect(body.point).toEqual(own.point)
+    expect(body.note).toBe('Más hacia la 70')
+  })
+
+  it('says so when the window closed in the meantime', async () => {
+    open({ correcting: own }, { 'POST /cases/7K3PQ/sightings/s9/correction': { status: 403 } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }))
+    expect(await screen.findByText(/ya haya pasado el tiempo/)).toBeTruthy()
+  })
+
+  it('a second pin asks before saving, and «Lo vi otra vez» creates a new sighting', async () => {
+    const calls = open({ ownPin: own })
+    await locate()
+    await screen.findByText('Punto marcado.')
+    send()
+
+    expect(
+      await screen.findByText('¿Lo viste otra vez, o quieres corregir el punto anterior?'),
+    ).toBeTruthy()
+    expect(posted(calls)).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Lo vi otra vez' }))
+    expect(await screen.findByText('¡Gracias!')).toBeTruthy()
+    expect(posted(calls).map((c) => c.key)).toEqual(['POST /cases/7K3PQ/sightings'])
+  })
+
+  it('«Corregir» moves the earlier pin to the new point instead', async () => {
+    const calls = open({ ownPin: own })
+    await locate()
+    await screen.findByText('Punto marcado.')
+    send()
+    fireEvent.click(await screen.findByRole('button', { name: 'Corregir' }))
+
+    expect(await screen.findByText('Listo, corregimos tu avistamiento.')).toBeTruthy()
+    expect(posted(calls).map((c) => c.key)).toEqual(['POST /cases/7K3PQ/sightings/s9/correction'])
+    expect((posted(calls)[0]!.body as { point: unknown }).point).toEqual({
+      lat: nearby.latitude,
+      lng: nearby.longitude,
+    })
+  })
+
+  it('without an earlier pin of yours there is no question', async () => {
+    const calls = open({})
+    await locate()
+    await screen.findByText('Punto marcado.')
+    send()
+    expect(await screen.findByText('¡Gracias!')).toBeTruthy()
+    expect(posted(calls)).toHaveLength(1)
   })
 })

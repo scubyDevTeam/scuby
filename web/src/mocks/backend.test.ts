@@ -1518,3 +1518,101 @@ describe('the in-app chat (comms.md · Twilio Conversations)', () => {
     ).toBe('not_found')
   })
 })
+
+describe('your own sighting (04 · Second pin, Correction window)', () => {
+  const pin = { lat: 6.2455, lng: -75.5905 }
+  const send = (fields: Record<string, unknown> = {}) =>
+    call(
+      api.reportSighting,
+      {
+        params: { code: '7K3PQ' },
+        body: {
+          point: pin,
+          seen_at: new Date().toISOString(),
+          note: null,
+          contact_phone: null,
+          ...fields,
+        },
+      },
+      (raw) => (raw as { id: string }).id,
+    )
+  const luna = async () => {
+    const found = await caseOf('7K3PQ')
+    if (found.vertical !== 'lost') throw new Error('expected lost')
+    return found
+  }
+  const correct = (id: string, fields: Record<string, unknown> = {}) =>
+    call(
+      api.correctSighting,
+      {
+        params: { code: '7K3PQ', sightingId: id },
+        body: {
+          point: { lat: 6.2461, lng: -75.5899 },
+          seen_at: new Date().toISOString(),
+          note: 'Más acá',
+          ...fields,
+        },
+      },
+      asIs,
+    )
+
+  it('marks the pin as yours for fifteen minutes, and no one else’s', async () => {
+    const id = await send()
+    const own = (await luna()).sightings.find((s) => s.id === id)
+    expect(own?.mine).toBe(true)
+    expect(own?.editableUntil?.getTime()).toBe(Date.now() + 15 * 60_000)
+    const others = (await luna()).sightings.filter((s) => s.id !== id)
+    expect(others.every((s) => !s.mine && s.editableUntil === null)).toBe(true)
+  })
+
+  it('a stranger on another device sees none of them as theirs', async () => {
+    const id = await send()
+    db.sightings.find((s) => s.id === id)!.reporter_key = 'device-someone-else'
+    expect((await luna()).sightings.every((s) => !s.mine)).toBe(true)
+  })
+
+  it('«Corregir» moves the pin: same id, no new row, the checks run again', async () => {
+    const id = await send()
+    const before = (await luna()).sightings.length
+    await correct(id)
+    const after = await luna()
+    expect(after.sightings).toHaveLength(before)
+    expect(after.sightings.find((s) => s.id === id)).toMatchObject({
+      point: { lat: 6.2461, lng: -75.5899 },
+      note: 'Más acá',
+    })
+    expect((await failure(correct(id, { point: { lat: 7.5, lng: -75.5 } }))).code).toBe(
+      'sighting_too_far',
+    )
+  })
+
+  it('past the window it is part of the record: neither correct nor delete', async () => {
+    const id = await send()
+    later(16 * 60_000)
+    expect((await failure(correct(id))).code).toBe('forbidden')
+    expect(
+      (await failure(call(api.deleteSighting, { params: { code: '7K3PQ', sightingId: id } }, asIs)))
+        .code,
+    ).toBe('forbidden')
+    expect((await luna()).sightings.find((s) => s.id === id)?.editableUntil).toBeNull()
+  })
+
+  it('deleting takes the pin off the case', async () => {
+    const id = await send()
+    await call(api.deleteSighting, { params: { code: '7K3PQ', sightingId: id } }, asIs)
+    expect((await luna()).sightings.some((s) => s.id === id)).toBe(false)
+  })
+
+  it('someone else’s pin is not yours to change', async () => {
+    const other = db.sightings.find((s) => s.case_code === '7K3PQ')!
+    expect((await failure(correct(other.id))).code).toBe('forbidden')
+    expect(
+      (
+        await failure(
+          call(api.deleteSighting, { params: { code: '7K3PQ', sightingId: other.id } }, asIs),
+        )
+      ).code,
+    ).toBe('forbidden')
+    expect((await failure(correct('s-nope'))).code).toBe('not_found')
+  })
+})
