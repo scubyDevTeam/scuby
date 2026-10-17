@@ -2005,3 +2005,28 @@ describe('«La tengo» on an archived case (decision #29, closes O3)', () => {
     expect((await failure(claim('H4PPY'))).code).toBe('invalid_transition')
   })
 })
+
+describe('`share.opened` (10 §5)', () => {
+  it('records the channel and format of a share, with or without an account', async () => {
+    await call(
+      api.recordShare,
+      { params: { code: '7k3pq' }, body: { channel: 'whatsapp', format: 'text' } },
+      asIs,
+    )
+    expect(db.shares.at(-1)).toMatchObject({
+      case_code: '7K3PQ',
+      channel: 'whatsapp',
+      format: 'text',
+    })
+  })
+
+  it('an unknown code is ignored, not refused', async () => {
+    const before = db.shares.length
+    await call(
+      api.recordShare,
+      { params: { code: 'NOPE1' }, body: { channel: 'system', format: 'story' } },
+      asIs,
+    )
+    expect(db.shares).toHaveLength(before)
+  })
+})
