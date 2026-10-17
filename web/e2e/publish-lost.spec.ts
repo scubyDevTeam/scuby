@@ -40,3 +40,23 @@ test(
     })
   },
 )
+
+test(
+  'publishing a pet whose notice expired recently offers to reactivate it',
+  tags('@publish-lost', '@PLOST-002'),
+  async ({ publish, casePage }) => {
+    await publish.openLostAsDemoOwner()
+
+    await test.step('choosing the pet shows the offer instead of a blank form', async () => {
+      await publish.choosePet('Pelusa')
+      await expect(publish.reactivateOffer('Pelusa')).toBeVisible()
+    })
+
+    await test.step('one tap reactivates it and its page is active again', async () => {
+      await publish.reactivate('Pelusa')
+      await expect(publish.reactivated).toBeVisible()
+      await publish.seeReactivated()
+      await expect(casePage.title('Pelusa')).toBeVisible()
+    })
+  },
+)

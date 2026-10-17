@@ -199,4 +199,38 @@ describe('PublishLost — 04 · reuse a pet before creating one', () => {
     go()
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('¿Quién se perdió?')
   })
+
+  it('offers to reactivate an expired notice, and reactivating shows it again', async () => {
+    const calls = show(veteran, {
+      'GET /me/pets': { body: [{ ...luna, reopenable_case_code: 'ARCH2' }] },
+      'POST /cases/ARCH2/reopen': { status: 201, body: { id: 'x' } },
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Luna' }))
+    expect(screen.getByText('Luna ya tenía un aviso')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivar el aviso de Luna' }))
+
+    expect(await screen.findByText('Listo, el aviso de Luna está activo de nuevo.')).toBeTruthy()
+    expect(calls.some((c) => c.key === 'POST /cases/ARCH2/reopen')).toBe(true)
+    expect(screen.getByRole('link', { name: 'Ver ese aviso' }).getAttribute('href')).toBe(
+      '/c/ARCH2',
+    )
+  })
+
+  it('says so when it cannot be reactivated, leaving the new notice possible', async () => {
+    show(veteran, {
+      'GET /me/pets': { body: [{ ...luna, reopenable_case_code: 'ARCH2' }] },
+      'POST /cases/ARCH2/reopen': { status: 409 },
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Luna' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivar el aviso de Luna' }))
+    expect(await screen.findByText(/No pudimos reactivarlo/)).toBeTruthy()
+    go()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('¿Quién se perdió?')
+  })
+
+  it('offers nothing for a pet with no expired notice', async () => {
+    show(veteran, { 'GET /me/pets': { body: [luna] } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Luna' }))
+    expect(screen.queryByText('Luna ya tenía un aviso')).toBeNull()
+  })
 })
