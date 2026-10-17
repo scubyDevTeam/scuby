@@ -36,7 +36,7 @@ export class ChatPage {
   }
 
   heading(name: string) {
-    return this.page.getByRole('heading', { name })
+    return this.page.getByRole('heading', { name, level: 1 })
   }
 
   openMessagesTab() {
