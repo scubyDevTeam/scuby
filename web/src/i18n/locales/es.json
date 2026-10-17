@@ -1357,7 +1357,13 @@
       "confirm_code": "Confirmar código y publicar",
       "submit": "Publicar y avisar a los vecinos",
       "ownership": "Al publicar confirmas que {name} es tu mascota.",
-      "ownership_unnamed": "Al publicar confirmas que esta es tu mascota."
+      "ownership_unnamed": "Al publicar confirmas que esta es tu mascota.",
+      "reopen_title": "{name} ya tenía un aviso",
+      "reopen_body": "¿Lo reactivamos? Sus avistamientos y su recorrido siguen ahí. También puedes publicar uno nuevo.",
+      "reopen_action": "Reactivar el aviso de {name}",
+      "reopening": "Reactivando…",
+      "reopen_done": "Listo, el aviso de {name} está activo de nuevo.",
+      "reopen_failed": "No pudimos reactivarlo. Puedes publicar uno nuevo."
     },
     "checkin": {
       "label": "Pregunta pendiente",
