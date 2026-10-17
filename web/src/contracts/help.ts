@@ -38,6 +38,8 @@ export type PublishHelpInput = {
   } | null
   needs: NeedInput[]
   story: string
+  /** The request's own evidence (a vet note), beside the pet's photos. */
+  photoUrls?: string[]
   center: { lat: number; lng: number }
   radiusM: number
   phone: string | null
@@ -76,6 +78,8 @@ export const publishHelpRequest = z.object({
   /** A request is always a bounded ask: one to three needs, each saying exactly what. */
   needs: z.array(needRequest).check(z.minLength(1), z.maxLength(3)),
   story: z.string().check(z.minLength(1), z.maxLength(2000)),
+  /** Evidence beyond the pet's own photos — a vet note — never of a person (07 · `photos[]`). */
+  photo_urls: z._default(z.array(photoUrl).check(z.maxLength(3)), []),
   location_point: point,
   location_radius_m: z.number().check(z.positive(), z.lte(5000)),
   ...publisherPhone,
@@ -99,6 +103,7 @@ export const publishHelpBody = (input: PublishHelpInput): z.input<typeof publish
     needed_by: need.neededBy,
   })),
   story: input.story,
+  photo_urls: input.photoUrls ?? [],
   location_point: input.center,
   location_radius_m: input.radiusM,
   phone: input.phone,

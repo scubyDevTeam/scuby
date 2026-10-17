@@ -93,7 +93,7 @@ export function HelpCasePage({
     <CaseShell
       band={bandFor(i18n, request)}
       shortUrl={shortUrl}
-      photoUrls={pet.photoUrls}
+      photoUrls={[...pet.photoUrls, ...request.photoUrls]}
       photoAlt={t('help.page.photo_alt', { name })}
       backLink={backLink}
       onShare={can('share') ? () => onAction('share') : undefined}

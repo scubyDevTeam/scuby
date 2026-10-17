@@ -85,6 +85,8 @@ export const helpCaseWire = z.object({
     photo_urls: z.array(z.string()),
   }),
   story: z.string(),
+  /** The request's own evidence (a vet note): shown after the pet's photos. */
+  photo_urls: z._default(z.array(z.string()), []),
   /** Where the help is needed: an area, rendered at 200 m or more in public (04 · precision). */
   location: z.object({
     center: point,
@@ -151,6 +153,7 @@ export type HelpCase = {
     photoUrls: string[]
   }
   story: string
+  photoUrls: string[]
   location: { center: { lat: number; lng: number }; radiusM: number; placeName: string }
   trustTier: HelpTrustTier
   beneficiaryName: string
@@ -184,6 +187,7 @@ export function toHelpCase(wire: z.infer<typeof helpCaseWire>): HelpCase {
       photoUrls: wire.pet.photo_urls,
     },
     story: wire.story,
+    photoUrls: wire.photo_urls,
     location: {
       center: wire.location.center,
       radiusM: wire.location.radius_m,

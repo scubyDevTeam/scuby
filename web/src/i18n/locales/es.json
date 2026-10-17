@@ -1049,7 +1049,9 @@
         "needed_by_past": "Esa fecha ya pasó",
         "story_required": "Cuéntales qué pasó"
       },
-      "for_found": "Para el animal que encontraste"
+      "for_found": "Para el animal que encontraste",
+      "evidence_title": "Fotos del pedido (opcional)",
+      "evidence_hint": "Por ejemplo la fórmula o la nota del veterinario. Nunca fotos de personas."
     }
   },
   "inbox": {
