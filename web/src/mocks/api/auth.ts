@@ -43,7 +43,9 @@ export const auth = [
 
   // Any credential works here; the demo Google account owns Luna and holds a found dog.
   route(api.googleSignIn, () => {
-    const user = db.persons.find((p) => p.id === DEMO_OWNER_ID) ?? fail('unauthorized')
+    // After «Eliminar mi cuenta» the same Google account comes back as a new, empty one — as it
+    // would in production — never as a refusal.
+    const user = db.persons.find((p) => p.id === DEMO_OWNER_ID) ?? account('carolina@correo.co')
     signIn(user)
     return userView(user)
   }),

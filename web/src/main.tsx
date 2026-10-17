@@ -6,7 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { API_MOCK } from './env'
+import { API_MOCK, RESET_DEMO_EVENT } from './env'
 import { LocaleProvider } from './routes/-i18n'
 import { routeTree } from './routeTree.gen'
 import '@ui/tokens.css'
@@ -34,8 +34,9 @@ function registerAppWorker() {
 
 async function start() {
   if (API_MOCK) {
-    const { startMocks } = await import('@mocks/browser')
+    const { resetDemo, startMocks } = await import('@mocks/browser')
     await startMocks()
+    window.addEventListener(RESET_DEMO_EVENT, resetDemo)
   } else {
     registerAppWorker()
   }

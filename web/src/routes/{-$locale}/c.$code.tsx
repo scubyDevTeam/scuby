@@ -7,6 +7,7 @@ import { Button } from '@ui/Button'
 import { Message, Skeleton } from '@ui/States'
 import { FileX, SearchX, WifiOff } from 'lucide-react'
 import { lazy, type ReactNode, Suspense } from 'react'
+import { ResetDemo } from '../-demo'
 
 export const Route = createFileRoute('/{-$locale}/c/$code')({ component: CaseScreen })
 
@@ -82,9 +83,15 @@ function CaseScreen() {
       <Message
         icon={<WifiOff aria-hidden="true" className="size-10" />}
         title={t('case.load_failed')}
-        action={<Button onClick={() => query.refetch()}>{t('common.retry')}</Button>}
+        action={
+          <>
+            <Button onClick={() => query.refetch()}>{t('common.retry')}</Button>
+            <ResetDemo />
+          </>
+        }
       >
-        {t('common.check_connection')}
+        {/* «Revisa tu conexión» only when there was no answer at all: a server that failed is ours. */}
+        {kind === 'network' ? t('common.check_connection') : t('common.server_failed')}
       </Message>
     )
   }

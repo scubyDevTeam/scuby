@@ -16,7 +16,8 @@
     "demo_mode": "Demo mode.",
     "day": "Day",
     "note": "Note",
-    "language": "Language"
+    "language": "Language",
+    "server_failed": "Something failed on our side. Try again in a moment."
   },
   "time": {
     "just_now": "just now",
@@ -109,6 +110,9 @@
       "hint": "That way we know how best to help you.",
       "with_me": "Yes, it's with me",
       "only_saw": "No, I only saw it"
+    },
+    "demo": {
+      "reset": "Reset the demo"
     }
   },
   "case": {

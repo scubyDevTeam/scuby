@@ -25,6 +25,9 @@ function optional(key: string): string | undefined {
  */
 export const API_MOCK = import.meta.env.VITE_API_MOCK === 'true'
 
+/** The demo's «Restablecer»: a screen asks, main.tsx (which owns the emulated backend) does it. */
+export const RESET_DEMO_EVENT = 'app:reset-demo'
+
 export const env = {
   brandName: required('VITE_BRAND_NAME'),
   brandShortName: required('VITE_BRAND_SHORT_NAME'),
