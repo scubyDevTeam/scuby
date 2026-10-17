@@ -31,8 +31,11 @@ export class ProfilePage {
   activateAlerts(radiusKm: 1 | 2 | 5) {
     return step(`Turn on nearby alerts, ${radiusKm} km around`, async () => {
       await this.page.getByRole('button', { name: 'Activar alertas' }).click()
-      // The browser's permission is the first step; the zone is what is under test, so «Ahora no».
-      await this.page.getByRole('button', { name: 'Ahora no' }).click()
+      // The browser's permission is a step only where it can still be asked (a browser that
+      // already answered goes straight to the zone); the zone is what is under test.
+      const skip = this.page.getByRole('button', { name: 'Ahora no' })
+      await expect(skip.or(this.page.getByRole('button', { name: 'Listo, avísame' }))).toBeVisible()
+      if (await skip.isVisible()) await skip.click()
       await new MapPicker(this.page).mark()
       await this.page.getByRole('button', { name: `${radiusKm} km`, exact: true }).click()
       await this.page.getByRole('button', { name: 'Listo, avísame' }).click()
