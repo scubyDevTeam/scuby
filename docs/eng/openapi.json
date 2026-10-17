@@ -8383,6 +8383,94 @@
         }
       }
     },
+    "/cases/{code}/shares": {
+      "post": {
+        "operationId": "recordShare",
+        "summary": "`share.opened` (10 §5): someone opened a way to share the case — the system sheet, WhatsApp or a download. Anonymous; an unknown code is ignored. The client never waits for it.",
+        "tags": [
+          "cases"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "system",
+                      "whatsapp",
+                      "download"
+                    ]
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "square",
+                      "story",
+                      "print",
+                      "text"
+                    ]
+                  }
+                },
+                "required": [
+                  "channel",
+                  "format"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/reports": {
       "post": {
         "operationId": "sendReport",
