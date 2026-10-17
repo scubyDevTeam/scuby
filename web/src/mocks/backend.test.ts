@@ -5,6 +5,7 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, call } from '../api-client/http'
 import { parseInterest } from '../contracts/adoption'
+import { parseNearbyAlerts } from '../contracts/alerts'
 import { api } from '../contracts/api'
 import { parseCase } from '../contracts/case'
 import { parseConversation, parseConversations, parseStarted } from '../contracts/conversations'
@@ -1614,5 +1615,48 @@ describe('your own sighting (04 · Second pin, Correction window)', () => {
       ).code,
     ).toBe('forbidden')
     expect((await failure(correct('s-nope'))).code).toBe('not_found')
+  })
+})
+
+describe('«Mascotas perdidas cerca de mí» (08)', () => {
+  const get = () => call(api.getNearbyAlerts, {}, parseNearbyAlerts)
+  const set = (body: {
+    enabled: boolean
+    center: { lat: number; lng: number } | null
+    radius_km: 1 | 2 | 5
+  }) => call(api.setNearbyAlerts, { body }, parseNearbyAlerts)
+  const laureles = { lat: 6.2447, lng: -75.5916 }
+
+  it('is off until a zone is confirmed, and needs an account', async () => {
+    expect((await failure(call(api.getNearbyAlerts, {}, asIs))).code).toBe('unauthorized')
+    await asCarolina()
+    expect(await get()).toMatchObject({
+      enabled: false,
+      center: null,
+      radiusKm: 2,
+      placeName: null,
+    })
+  })
+
+  it('turns on with a point and a radius, and names the neighbourhood', async () => {
+    await asCarolina()
+    const on = await set({ enabled: true, center: laureles, radius_km: 5 })
+    expect(on).toMatchObject({ enabled: true, radiusKm: 5, center: laureles })
+    expect(on.placeName).toBeTruthy()
+    expect(await get()).toEqual(on)
+  })
+
+  it('cannot be on without a place', async () => {
+    await asCarolina()
+    expect((await failure(set({ enabled: true, center: null, radius_km: 2 }))).code).toBe(
+      'validation_failed',
+    )
+  })
+
+  it('turning it off keeps the zone for next time', async () => {
+    await asCarolina()
+    await set({ enabled: true, center: laureles, radius_km: 1 })
+    const off = await set({ enabled: false, center: laureles, radius_km: 1 })
+    expect(off).toMatchObject({ enabled: false, center: laureles, radiusKm: 1 })
   })
 })

@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test'
-import { SignIn } from './parts.ts'
+import { expect } from '@playwright/test'
+import { MapPicker, SignIn } from './parts.ts'
 import { step } from './step.ts'
 
 type Journey = 'Mascotas perdidas' | 'Mascotas encontradas' | 'Adopción' | 'Pedidos de ayuda'
@@ -20,6 +21,34 @@ export class ProfilePage {
     this.cityField = page.getByLabel(/^Ciudad/)
     this.bioField = page.getByLabel(/^Sobre ti/)
     this.saved = page.getByText('Guardamos tus cambios.')
+  }
+
+  /** «Mascotas perdidas cerca de mí»: the profile's switch for the zone (08). */
+  get alertsOn() {
+    return this.page.getByText(/Te avisamos de mascotas perdidas cerca de .+, unos \d km alrededor/)
+  }
+
+  activateAlerts(radiusKm: 1 | 2 | 5) {
+    return step(`Turn on nearby alerts, ${radiusKm} km around`, async () => {
+      await this.page.getByRole('button', { name: 'Activar alertas' }).click()
+      // The browser's permission is the first step; the zone is what is under test, so «Ahora no».
+      await this.page.getByRole('button', { name: 'Ahora no' }).click()
+      await new MapPicker(this.page).mark()
+      await this.page.getByRole('button', { name: `${radiusKm} km`, exact: true }).click()
+      await this.page.getByRole('button', { name: 'Listo, avísame' }).click()
+      await expect(this.page.getByText('Listo, te avisaremos.')).toBeVisible()
+      await this.page.getByRole('button', { name: 'Listo', exact: true }).click()
+    })
+  }
+
+  turnOffAlerts() {
+    return step('Turn off nearby alerts', () =>
+      this.page.getByRole('button', { name: 'Apagar alertas' }).click(),
+    )
+  }
+
+  get alertsOffer() {
+    return this.page.getByRole('button', { name: 'Activar alertas' })
   }
 
   open() {

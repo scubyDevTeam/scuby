@@ -31,3 +31,31 @@ test(
     })
   },
 )
+
+test(
+  'turn on «Mascotas perdidas cerca de mí»: confirm the zone, find it after a reload, turn it off',
+  tags('@profile', '@PROFILE-002'),
+  async ({ profile }) => {
+    await profile.open()
+    await profile.signIn.withEmailCode('ana.gomez@correo.co')
+
+    await test.step('it starts off, with the offer', async () => {
+      await expect(profile.alertsOffer).toBeVisible()
+    })
+
+    await test.step('marking the zone and a radius turns it on', async () => {
+      await profile.activateAlerts(5)
+      await expect(profile.alertsOn).toContainText('unos 5 km')
+    })
+
+    await test.step('the zone is still there after a reload', async () => {
+      await profile.reload()
+      await expect(profile.alertsOn).toBeVisible()
+    })
+
+    await test.step('turning it off brings back the offer', async () => {
+      await profile.turnOffAlerts()
+      await expect(profile.alertsOffer).toBeVisible()
+    })
+  },
+)
