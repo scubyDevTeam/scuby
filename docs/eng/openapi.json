@@ -4240,7 +4240,7 @@
     "/cases/{code}/sightings": {
       "post": {
         "operationId": "reportSighting",
-        "summary": "«Lo vi»: a pin on a lost or found case. Visible at once; rate-limited per reporter.",
+        "summary": "«Lo vi»: a pin on a lost or found case. Visible at once; rate-limited per reporter. A repeated `client_id` on the same case answers the sighting it created, before any limit.",
         "tags": [
           "cases"
         ],
@@ -4315,6 +4315,11 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 64
                   }
                 },
                 "required": [
@@ -4959,6 +4964,298 @@
         }
       }
     },
+    "/checkin-links/{token}": {
+      "get": {
+        "operationId": "openCheckinLink",
+        "summary": "What an email button is: the case, the answer it carries and the state of the link. A safe answer («sigue perdida») is applied by this GET and comes back `applied`; a consequential one («ya apareció») never is — it comes back `confirm` until the POST. Opening a link again changes nothing (`used`); a question answered elsewhere is `already_answered`.",
+        "tags": [
+          "checkin-links"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "case_code": {
+                      "type": "string"
+                    },
+                    "vertical": {
+                      "type": "string",
+                      "enum": [
+                        "lost",
+                        "found",
+                        "adoption",
+                        "help"
+                      ]
+                    },
+                    "pet_name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "photo_url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "response": {
+                      "type": "string",
+                      "enum": [
+                        "still_lost",
+                        "reunited",
+                        "delete",
+                        "claim_confirmed",
+                        "claim_dismissed",
+                        "still_verifying",
+                        "still_available",
+                        "adopted",
+                        "still_needed",
+                        "no_longer_needed"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "safe",
+                        "consequential"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "confirm",
+                        "applied",
+                        "used",
+                        "already_answered",
+                        "expired"
+                      ]
+                    },
+                    "decline_token": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "case_code",
+                    "vertical",
+                    "pet_name",
+                    "photo_url",
+                    "response",
+                    "kind",
+                    "state",
+                    "decline_token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "confirmCheckinLink",
+        "summary": "The confirm page’s one button: applies the link’s answer — the same effect as answering the check-in in the app, with the defaults the app would ask for («¿quién te ayudó?» → `unknown`, the delete’s reason → `false_alarm`, «ya no necesita ayuda» → `need_ended`). Single use: a link that already answered, or a question answered elsewhere, answers its state and acts no more.",
+        "tags": [
+          "checkin-links"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "case_code": {
+                      "type": "string"
+                    },
+                    "vertical": {
+                      "type": "string",
+                      "enum": [
+                        "lost",
+                        "found",
+                        "adoption",
+                        "help"
+                      ]
+                    },
+                    "pet_name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "photo_url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "response": {
+                      "type": "string",
+                      "enum": [
+                        "still_lost",
+                        "reunited",
+                        "delete",
+                        "claim_confirmed",
+                        "claim_dismissed",
+                        "still_verifying",
+                        "still_available",
+                        "adopted",
+                        "still_needed",
+                        "no_longer_needed"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "safe",
+                        "consequential"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "confirm",
+                        "applied",
+                        "used",
+                        "already_answered",
+                        "expired"
+                      ]
+                    },
+                    "decline_token": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "case_code",
+                    "vertical",
+                    "pet_name",
+                    "photo_url",
+                    "response",
+                    "kind",
+                    "state",
+                    "decline_token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`error.code`: `not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/me/pets": {
       "get": {
         "operationId": "listMyPets",
@@ -5170,6 +5467,18 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "pending_checkin_at": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "required": [
@@ -5180,7 +5489,8 @@
                       "place_name",
                       "photo_url",
                       "published_at",
-                      "open_claim_count"
+                      "open_claim_count",
+                      "pending_checkin_at"
                     ],
                     "additionalProperties": false
                   }

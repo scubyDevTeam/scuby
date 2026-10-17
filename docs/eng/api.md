@@ -38,6 +38,13 @@ it, so neither can use an endpoint the contract does not list.
   may be left out.
 - **Feature flags never reach the wire** ([feature-flags.md](feature-flags.md)): a response says
   the outcome — `phone_step: otp` — never the flag.
+- **Replays are idempotent where the client queues.** «Lo vi» (`POST /cases/:code/sightings`) carries
+  a `client_id` the client makes once and sends again on every retry: the same key on the same case
+  answers the sighting it already created — before any rate limit — so a send whose answer was lost
+  on the way never becomes two pins ([frontend.md](frontend.md) · Risks §6).
+- **The email's one-tap links are public** (`/checkin-links/:token`): the token is the auth — single
+  use, expiring, bound to one check-in and one answer. A GET applies only a safe answer; a
+  consequential one waits for the POST of its confirm page ([comms.md](comms.md) · The scanner rule).
 - **Server decides.** Every rule the client checks for feedback (sighting distance and time, phone
   format) the server checks again; rate limits, schedules, expiry and matching are server-only
   ([frontend.md](frontend.md) · Rule 2).
