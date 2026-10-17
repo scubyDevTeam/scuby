@@ -17,7 +17,11 @@ import { SightingTimeline } from './SightingTimeline'
 // The owner's tools load only for the owner: a stranger opening the link never pays for them.
 // Owner-only, so lazy: a stranger opening the link never downloads the owner's actions.
 const ClaimsList = lazy(() => import('./ClaimsList').then((m) => ({ default: m.ClaimsList })))
-const CheckinCard = lazy(() => import('./CheckinCard').then((m) => ({ default: m.CheckinCard })))
+const CheckinCard = lazy(
+  withMessages(['lost_forms'], () =>
+    import('./CheckinCard').then((m) => ({ default: m.CheckinCard })),
+  ),
+)
 const moderation = () => import('./SightingModeration')
 const SightingTools = lazy(() => moderation().then((m) => ({ default: m.SightingTools })))
 const HiddenSightings = lazy(() => moderation().then((m) => ({ default: m.HiddenSightings })))

@@ -7,12 +7,12 @@ import { Button, type ButtonVariant } from '@ui/Button'
 import { Notice } from '@ui/Notice'
 
 const answerLabel: Record<CheckinResponse, TextKey> = {
-  still_lost: 'lost.checkin.answers.still_lost',
-  reunited: 'lost.checkin.answers.reunited',
-  delete: 'lost.checkin.answers.delete',
-  claim_confirmed: 'lost.checkin.answers.claim_confirmed',
-  claim_dismissed: 'lost.checkin.answers.claim_dismissed',
-  still_verifying: 'lost.checkin.answers.still_verifying',
+  still_lost: 'lost_forms.checkin.answers.still_lost',
+  reunited: 'lost_forms.checkin.answers.reunited',
+  delete: 'lost_forms.checkin.answers.delete',
+  claim_confirmed: 'lost_forms.checkin.answers.claim_confirmed',
+  claim_dismissed: 'lost_forms.checkin.answers.claim_dismissed',
+  still_verifying: 'lost_forms.checkin.answers.still_verifying',
 }
 
 const answerVariant: Record<CheckinResponse, ButtonVariant> = {
@@ -63,19 +63,19 @@ export function CheckinCard({
 
   return (
     <section
-      aria-label={t('lost.checkin.label')}
+      aria-label={t('lost_forms.checkin.label')}
       className="flex flex-col gap-3 rounded-2xl border-2 border-lost bg-lost-soft p-4 text-lost-ink"
     >
       <p className="m-0">
         <strong>
-          {t(isClaim ? 'lost.checkin.claim_title' : 'lost.checkin.time_based_title', {
+          {t(isClaim ? 'lost_forms.checkin.claim_title' : 'lost_forms.checkin.time_based_title', {
             name: petName,
           })}
         </strong>{' '}
-        {t(isClaim ? 'lost.checkin.claim_body' : 'lost.checkin.time_based_body')}
+        {t(isClaim ? 'lost_forms.checkin.claim_body' : 'lost_forms.checkin.time_based_body')}
       </p>
       {isClaim && claimPhone ? (
-        <p className="m-0 text-sm">{t('lost.checkin.claim_phone', { phone: claimPhone })}</p>
+        <p className="m-0 text-sm">{t('lost_forms.checkin.claim_phone', { phone: claimPhone })}</p>
       ) : null}
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
         {answers.map((response) => (
@@ -91,7 +91,7 @@ export function CheckinCard({
         ))}
       </div>
       {answer.isError ? (
-        <Notice tone="warning" title={t('lost.checkin.failed_title')}>
+        <Notice tone="warning" title={t('lost_forms.checkin.failed_title')}>
           {t('common.try_again')}
         </Notice>
       ) : null}

@@ -17,16 +17,27 @@ import { brand } from '../../../brand'
 import { env } from '../../../env'
 
 // The forms load when their button is tapped: reading the case must not pay for them.
-const SightingForm = lazy(() =>
-  import('@features/lost/SightingForm').then((m) => ({ default: m.SightingForm })),
+// Their words come with them (`lost_forms`), as the forms' code does.
+const SightingForm = lazy(
+  withMessages(['lost_forms'], () =>
+    import('@features/lost/SightingForm').then((m) => ({ default: m.SightingForm })),
+  ),
 )
-const ClaimForm = lazy(() =>
-  import('@features/lost/ClaimForm').then((m) => ({ default: m.ClaimForm })),
+const ClaimForm = lazy(
+  withMessages(['lost_forms'], () =>
+    import('@features/lost/ClaimForm').then((m) => ({ default: m.ClaimForm })),
+  ),
 )
 const ownerForms = () => import('@features/lost/OwnerForms')
-const ReuniteForm = lazy(() => ownerForms().then((m) => ({ default: m.ReuniteForm })))
-const CancelForm = lazy(() => ownerForms().then((m) => ({ default: m.CancelForm })))
-const ReopenForm = lazy(() => ownerForms().then((m) => ({ default: m.ReopenForm })))
+const ReuniteForm = lazy(
+  withMessages(['lost_forms'], () => ownerForms().then((m) => ({ default: m.ReuniteForm }))),
+)
+const CancelForm = lazy(
+  withMessages(['lost_forms'], () => ownerForms().then((m) => ({ default: m.CancelForm }))),
+)
+const ReopenForm = lazy(
+  withMessages(['lost_forms'], () => ownerForms().then((m) => ({ default: m.ReopenForm }))),
+)
 const ReportForm = lazy(
   withMessages(['reporting'], () =>
     import('@features/reporting/ReportForm').then((m) => ({ default: m.ReportForm })),

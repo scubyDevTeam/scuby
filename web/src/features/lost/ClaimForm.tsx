@@ -33,7 +33,7 @@ export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
   const phoneError =
     !tried || e164
       ? null
-      : t(phone.trim() ? 'contact.phone_invalid' : 'lost.claim_form.phone_required')
+      : t(phone.trim() ? 'contact.phone_invalid' : 'lost_forms.claim_form.phone_required')
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -53,8 +53,8 @@ export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
     const { whatsappUrl } = claim.data
     return (
       <div className="flex flex-col gap-4">
-        <Notice tone="success" title={t('lost.claim_form.sent_title')}>
-          {t(whatsappUrl ? 'lost.claim_form.sent_write' : 'lost.claim_form.sent_wait')}
+        <Notice tone="success" title={t('lost_forms.claim_form.sent_title')}>
+          {t(whatsappUrl ? 'lost_forms.claim_form.sent_write' : 'lost_forms.claim_form.sent_wait')}
         </Notice>
         {whatsappUrl ? (
           <a
@@ -76,29 +76,29 @@ export function ClaimForm({ code, petName, onDone, onOnlySaw }: Props) {
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
-      <p className="m-0 text-muted">{t('lost.claim_form.intro')}</p>
+      <p className="m-0 text-muted">{t('lost_forms.claim_form.intro')}</p>
       <PhoneField
         label={t('contact.your_phone')}
         prefix={country?.phonePrefix ?? ''}
-        hint={t('lost.claim_form.phone_hint')}
+        hint={t('lost_forms.claim_form.phone_hint')}
         error={phoneError}
         value={phone}
         onChange={(event) => setPhone(event.target.value)}
       />
-      <Notice>{t('lost.claim_form.care')}</Notice>
+      <Notice>{t('lost_forms.claim_form.care')}</Notice>
       {claim.isError ? (
-        <Notice tone="warning" title={t('lost.claim_form.failed_title')}>
+        <Notice tone="warning" title={t('lost_forms.claim_form.failed_title')}>
           {t('common.check_connection')}
         </Notice>
       ) : null}
       <Button type="submit" variant="whatsapp" disabled={claim.isPending}>
         <WhatsAppIcon />
-        {t(claim.isPending ? 'lost.claim_form.sending' : 'lost.claim_form.submit')}
+        {t(claim.isPending ? 'lost_forms.claim_form.sending' : 'lost_forms.claim_form.submit')}
       </Button>
       <Button variant="link" className="self-center" onClick={onOnlySaw}>
-        {t('lost.claim_form.only_saw')}
+        {t('lost_forms.claim_form.only_saw')}
       </Button>
-      <p className="sr-only">{t('lost.claim_form.about', { name: petName })}</p>
+      <p className="sr-only">{t('lost_forms.claim_form.about', { name: petName })}</p>
     </form>
   )
 }

@@ -1196,8 +1196,29 @@
       "seen": "Viste a {name} · {ago}",
       "waiting": "En espera",
       "not_sent": "No se envió",
-      "dismiss": "Descartar"
+      "dismiss": "Descartar",
+      "too_soon": "Ya registraste un avistamiento hace poco."
     },
+    "claims": {
+      "label": "Posibles hallazgos",
+      "title": "Dicen que la tienen",
+      "reveals_number": "Al escribirle, esa persona verá tu número.",
+      "call": "Llamar",
+      "confirm": "Sí, es {name}",
+      "dismiss": "No era",
+      "failed_title": "No pudimos guardar tu respuesta."
+    },
+    "moderation": {
+      "highlight": "Marcar como útil",
+      "hide": "Ocultar del mapa",
+      "unhide": "Volver a mostrar",
+      "hidden_title": "Ocultos del mapa",
+      "hidden_hint": "Solo tú los ves: no salen en el mapa ni en la lista de nadie más.",
+      "hidden_label": "Avistamientos ocultos",
+      "failed_title": "No pudimos guardar el cambio."
+    }
+  },
+  "lost_forms": {
     "sighting_form": {
       "when": {
         "now": "Ahora",
@@ -1220,7 +1241,6 @@
       "note_placeholder": "Hacia dónde iba, cómo se veía…",
       "phone_hint": "Su familia va a querer preguntarte en qué esquina exactamente. Solo ella lo ve.",
       "failed_title": "No pudimos enviar tu avistamiento.",
-      "too_soon": "Ya registraste un avistamiento hace poco.",
       "sending": "Enviando…",
       "submit": "Enviar avistamiento",
       "offline": "Sin conexión",
@@ -1250,41 +1270,6 @@
       "submit": "Avisar y abrir WhatsApp",
       "only_saw": "Solo la vi, no la tengo",
       "about": "Sobre {name}"
-    },
-    "claims": {
-      "label": "Posibles hallazgos",
-      "title": "Dicen que la tienen",
-      "reveals_number": "Al escribirle, esa persona verá tu número.",
-      "call": "Llamar",
-      "confirm": "Sí, es {name}",
-      "dismiss": "No era",
-      "failed_title": "No pudimos guardar tu respuesta."
-    },
-    "checkin": {
-      "label": "Pregunta pendiente",
-      "time_based_title": "El aviso de {name} sigue publicado.",
-      "time_based_body": "Si no nos confirmas, lo archivaremos y dejará de llegarles a los vecinos.",
-      "claim_title": "Alguien dice que tiene a {name}.",
-      "claim_body": "Si no nos confirmas, quitaremos el aviso de posible hallazgo. La búsqueda sigue igual.",
-      "claim_phone": "Dejó su número: {phone}",
-      "answers": {
-        "still_lost": "Sigue perdida",
-        "reunited": "Ya apareció 🎉",
-        "delete": "Eliminar",
-        "claim_confirmed": "Sí, es {name} 🎉",
-        "claim_dismissed": "No es {name}",
-        "still_verifying": "Aún verificando"
-      },
-      "failed_title": "No pudimos guardar tu respuesta."
-    },
-    "moderation": {
-      "highlight": "Marcar como útil",
-      "hide": "Ocultar del mapa",
-      "unhide": "Volver a mostrar",
-      "hidden_title": "Ocultos del mapa",
-      "hidden_hint": "Solo tú los ves: no salen en el mapa ni en la lista de nadie más.",
-      "hidden_label": "Avistamientos ocultos",
-      "failed_title": "No pudimos guardar el cambio."
     },
     "owner_forms": {
       "attribution": {
@@ -1338,6 +1323,23 @@
       "submit": "Publicar y avisar a los vecinos",
       "ownership": "Al publicar confirmas que {name} es tu mascota.",
       "ownership_unnamed": "Al publicar confirmas que esta es tu mascota."
+    },
+    "checkin": {
+      "label": "Pregunta pendiente",
+      "time_based_title": "El aviso de {name} sigue publicado.",
+      "time_based_body": "Si no nos confirmas, lo archivaremos y dejará de llegarles a los vecinos.",
+      "claim_title": "Alguien dice que tiene a {name}.",
+      "claim_body": "Si no nos confirmas, quitaremos el aviso de posible hallazgo. La búsqueda sigue igual.",
+      "claim_phone": "Dejó su número: {phone}",
+      "answers": {
+        "still_lost": "Sigue perdida",
+        "reunited": "Ya apareció 🎉",
+        "delete": "Eliminar",
+        "claim_confirmed": "Sí, es {name} 🎉",
+        "claim_dismissed": "No es {name}",
+        "still_verifying": "Aún verificando"
+      },
+      "failed_title": "No pudimos guardar tu respuesta."
     }
   },
   "map_pin": {

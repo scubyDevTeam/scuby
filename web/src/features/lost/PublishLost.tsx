@@ -30,9 +30,9 @@ import { Notice } from '@ui/Notice'
 import { type FormEvent, type ReactNode, useState } from 'react'
 
 const titles: Record<Step, TextKey> = {
-  1: 'lost.publish.step_1',
-  2: 'lost.publish.step_2',
-  3: 'lost.publish.step_3',
+  1: 'lost_forms.publish.step_1',
+  2: 'lost_forms.publish.step_2',
+  3: 'lost_forms.publish.step_3',
 }
 
 type Props = {
@@ -117,19 +117,22 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
     const { code } = publish.data
     return (
       <Published
-        title={t('lost.publish.published_title')}
+        title={t('lost_forms.publish.published_title')}
         notice={
-          <Notice tone="success" title={t('lost.publish.searching', { name: draft.name.trim() })}>
-            {t('lost.publish.neighbours_see')}
+          <Notice
+            tone="success"
+            title={t('lost_forms.publish.searching', { name: draft.name.trim() })}
+          >
+            {t('lost_forms.publish.neighbours_see')}
           </Notice>
         }
         link={caseLink(
           code,
-          t('lost.publish.see_mine'),
+          t('lost_forms.publish.see_mine'),
           'flex min-h-12 items-center justify-center rounded-2xl bg-brand px-5 font-bold text-white no-underline',
         )}
       >
-        <p className="m-0 text-muted">{t('lost.publish.share_it')}</p>
+        <p className="m-0 text-muted">{t('lost_forms.publish.share_it')}</p>
       </Published>
     )
   }
@@ -150,12 +153,12 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
       {step === 1 ? (
         <>
           {pets.length > 0 ? (
-            <Section title={t('lost.publish.which_pet')}>
+            <Section title={t('lost_forms.publish.which_pet')}>
               <Chips
-                label={t('lost.publish.which_pet')}
+                label={t('lost_forms.publish.which_pet')}
                 options={[
                   ...pets.map((pet) => ({ value: pet.id, label: pet.name })),
-                  { value: 'new', label: t('lost.publish.other_pet') },
+                  { value: 'new', label: t('lost_forms.publish.other_pet') },
                 ]}
                 value={draft.petId ?? 'new'}
                 onChange={(id) => {
@@ -170,11 +173,11 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
               {blockedPet?.activeCaseCode ? (
                 <Notice
                   tone="warning"
-                  title={t('lost.publish.already_active', { name: blockedPet.name })}
+                  title={t('lost_forms.publish.already_active', { name: blockedPet.name })}
                 >
                   {caseLink(
                     blockedPet.activeCaseCode,
-                    t('lost.publish.see_that'),
+                    t('lost_forms.publish.see_that'),
                     'font-bold text-lost-ink underline',
                   )}
                 </Notice>
@@ -182,7 +185,7 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
             </Section>
           ) : null}
           <TextField
-            label={t('lost.publish.name')}
+            label={t('lost_forms.publish.name')}
             autoComplete="off"
             error={errorFor('name_required')}
             value={draft.name}
@@ -192,13 +195,13 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
             animal={draft}
             onChange={set}
             errorFor={errorFor}
-            marksLabel={t('lost.publish.marks')}
+            marksLabel={t('lost_forms.publish.marks')}
           />
           <TextField
             label={t('pet.microchip')}
             optional
             inputMode="numeric"
-            hint={t('lost.publish.chip_hint')}
+            hint={t('lost_forms.publish.chip_hint')}
             value={draft.chipNumber}
             onChange={(event) => set({ chipNumber: event.target.value })}
           />
@@ -214,7 +217,7 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
           mapStyleUrl={mapStyleUrl}
           onChange={set}
           errorFor={errorFor}
-          whenTitle={t('lost.publish.when_title')}
+          whenTitle={t('lost_forms.publish.when_title')}
         />
       ) : null}
 
@@ -233,11 +236,11 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
           />
           <p className="m-0 text-sm text-muted">{legal}</p>
           {conflict ? (
-            <Notice tone="warning" title={t('lost.publish.conflict_title')}>
-              {t('lost.publish.conflict_body')}
+            <Notice tone="warning" title={t('lost_forms.publish.conflict_title')}>
+              {t('lost_forms.publish.conflict_body')}
             </Notice>
           ) : publish.isError && !wrongCode ? (
-            <Notice tone="warning" title={t('lost.publish.failed_title')}>
+            <Notice tone="warning" title={t('lost_forms.publish.failed_title')}>
               {t('common.check_connection')}
             </Notice>
           ) : null}
@@ -245,22 +248,22 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
       ) : null}
 
       {step < 3 ? (
-        <Button type="submit">{t('lost.publish.continue')}</Button>
+        <Button type="submit">{t('lost_forms.publish.continue')}</Button>
       ) : (
         <>
           <Button type="submit" variant="danger" disabled={publish.isPending}>
             {t(
               publish.isPending
-                ? 'lost.publish.publishing'
+                ? 'lost_forms.publish.publishing'
                 : askingCode
-                  ? 'lost.publish.confirm_code'
-                  : 'lost.publish.submit',
+                  ? 'lost_forms.publish.confirm_code'
+                  : 'lost_forms.publish.submit',
             )}
           </Button>
           <p className="m-0 text-center text-sm text-muted">
             {draft.name.trim()
-              ? t('lost.publish.ownership', { name: draft.name.trim() })
-              : t('lost.publish.ownership_unnamed')}
+              ? t('lost_forms.publish.ownership', { name: draft.name.trim() })
+              : t('lost_forms.publish.ownership_unnamed')}
           </p>
         </>
       )}

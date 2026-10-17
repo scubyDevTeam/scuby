@@ -24,8 +24,10 @@ const OwnershipClaimForm = lazy(() =>
 const ResolveForm = lazy(() =>
   import('@features/found/CustodianForms').then((m) => ({ default: m.ResolveForm })),
 )
-const ReopenForm = lazy(() =>
-  import('@features/lost/OwnerForms').then((m) => ({ default: m.ReopenForm })),
+const ReopenForm = lazy(
+  withMessages(['lost_forms'], () =>
+    import('@features/lost/OwnerForms').then((m) => ({ default: m.ReopenForm })),
+  ),
 )
 const ReportForm = lazy(
   withMessages(['reporting'], () =>
