@@ -307,6 +307,17 @@ export class CasePage {
     })
   }
 
+  /** «Editar aviso»: corrects the signs and saves; the neighbours are not told again. */
+  editNotice(marks: string) {
+    return step(`Edit the notice: signs «${marks}»`, async () => {
+      await this.page.getByRole('button', { name: 'Editar aviso' }).click()
+      await this.page.getByLabel(/Señas/).fill(marks)
+      await this.page.getByRole('button', { name: 'Guardar cambios' }).click()
+      await expect(this.page.getByText('Listo, guardamos los cambios.')).toBeVisible()
+      await this.page.getByRole('button', { name: 'Listo' }).click()
+    })
+  }
+
   closePinSheet() {
     return step('Close the pin sheet with Escape', () => this.page.keyboard.press('Escape'))
   }

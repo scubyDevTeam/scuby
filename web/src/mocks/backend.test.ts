@@ -1660,3 +1660,55 @@ describe('«Mascotas perdidas cerca de mí» (08)', () => {
     expect(off).toMatchObject({ enabled: false, center: laureles, radiusKm: 1 })
   })
 })
+
+describe('editing a published lost case (04)', () => {
+  const edit = (body: Record<string, unknown>, code = '7K3PQ') =>
+    call(api.editLost, { params: { code }, body }, asIs)
+  const luna = async () => {
+    const found = await caseOf('7K3PQ')
+    if (found.vertical !== 'lost') throw new Error('expected lost')
+    return found
+  }
+
+  it('the owner corrects the signs, the photos and where and when it was last seen', async () => {
+    await asCarolina()
+    await edit({
+      marks: 'Collar azul',
+      photo_urls: ['data:image/png;base64,AAAA'],
+      last_seen_point: { lat: 6.25, lng: -75.58 },
+      last_seen_radius_m: 500,
+      last_seen_at: new Date(Date.now() - 3 * HOUR).toISOString(),
+    })
+    const after = await luna()
+    expect(after.pet.marks).toBe('Collar azul')
+    expect(after.pet.photoUrls).toEqual(['data:image/png;base64,AAAA'])
+    expect(after.lastSeen).toMatchObject({ radiusM: 500, center: { lat: 6.25, lng: -75.58 } })
+  })
+
+  it('fields left out stay as they are, and it tells no one', async () => {
+    await asCarolina()
+    const before = await luna()
+    const sent = db.notifications.length
+    await edit({ marks: null })
+    const after = await luna()
+    expect(after.pet.marks).toBeNull()
+    expect(after.lastSeen).toEqual(before.lastSeen)
+    expect(db.notifications).toHaveLength(sent)
+  })
+
+  it('only the owner, only while the case is active', async () => {
+    expect((await failure(edit({ marks: 'x' }))).code).toBe('unauthorized')
+    await asCarolina()
+    expect((await failure(edit({ marks: 'x' }, 'M2TQ4'))).code).toBe('forbidden')
+    expect((await failure(edit({ marks: 'x' }, 'NOPE1'))).code).toBe('not_found')
+    handTo('M2TQ4', DEMO_OWNER_ID_FOR_TESTS, { status: 'reunited' })
+    expect((await failure(edit({ marks: 'x' }, 'M2TQ4'))).code).toBe('invalid_transition')
+  })
+
+  it('a time in the future is refused', async () => {
+    await asCarolina()
+    expect(
+      (await failure(edit({ last_seen_at: new Date(Date.now() + DAY).toISOString() }))).code,
+    ).toBe('validation_failed')
+  })
+})

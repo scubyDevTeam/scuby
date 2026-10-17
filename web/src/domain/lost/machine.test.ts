@@ -59,6 +59,14 @@ describe('10 §1 — what the page offers by status', () => {
     expect(actions).not.toContain('confirm_reunited')
   })
 
+  it('only the owner edits an active case, and only while it is active', () => {
+    expect(availableActions(active, 'owner', now)).toContain('edit')
+    expect(availableActions(active, 'public', now)).not.toContain('edit')
+    for (const status of ['reunited', 'cancelled'] as const) {
+      expect(availableActions(closed(status), 'owner', now)).not.toContain('edit')
+    }
+  })
+
   it('only the owner can close an active case', () => {
     expect(availableActions(active, 'owner', now)).toContain('confirm_reunited')
   })

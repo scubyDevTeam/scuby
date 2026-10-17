@@ -80,6 +80,17 @@ describe('LostCasePage — photos', () => {
 })
 
 describe('LostCasePage — the owner', () => {
+  it('can edit an active case, and a helper cannot', () => {
+    const onAction = show(lostCase('7K3PQ', { viewer: 'owner' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Editar aviso' }))
+    expect(onAction).toHaveBeenCalledWith('edit')
+  })
+
+  it('a helper has no edit', () => {
+    show(lostCase('7K3PQ'))
+    expect(screen.queryByRole('button', { name: 'Editar aviso' })).toBeNull()
+  })
+
   it('can close an active case as reunited', () => {
     const onAction = show(lostCase('7K3PQ', { viewer: 'owner' }))
     fireEvent.click(screen.getByRole('button', { name: 'Ya apareció' }))
