@@ -444,7 +444,8 @@
       "uploading": "Uploading…",
       "add": "Add photo",
       "failed": "We couldn't upload that photo. Try again.",
-      "first_on_poster": "The first one goes on the poster."
+      "first_on_poster": "The first one goes on the poster.",
+      "failed_heic": "That’s an iPhone photo (HEIC) and this browser can’t open it. Pick it from Photos via «Share → Save as JPEG», or take a screenshot."
     },
     "doors": {
       "title": "What happened?",

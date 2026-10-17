@@ -444,7 +444,8 @@
       "uploading": "Subiendo…",
       "add": "Agregar foto",
       "failed": "No pudimos subir esa foto. Inténtalo de nuevo.",
-      "first_on_poster": "La primera va en el afiche."
+      "first_on_poster": "La primera va en el afiche.",
+      "failed_heic": "Esa foto es de iPhone (HEIC) y este navegador no la abre. Elígela desde Fotos con «Compartir → Guardar como JPG», o toma una captura de pantalla."
     },
     "doors": {
       "title": "¿Qué pasó?",

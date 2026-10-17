@@ -48,6 +48,8 @@
   a[href],
   summary,
   label:has(input),
+  /* A file picker's visible label sits beside its hidden input, not around it. */
+  label:has(+ input[type="file"]),
   [role="button"] {
     cursor: pointer;
   }

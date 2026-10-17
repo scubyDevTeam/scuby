@@ -1,5 +1,5 @@
 import { useUploadPhoto } from '@api-client/owner'
-import { fitWithin, PHOTO_JPEG_QUALITY } from '@domain/shared/image'
+import { fitWithin, isHeic, PHOTO_JPEG_QUALITY } from '@domain/shared/image'
 import { useI18n } from '@i18n/react'
 import { prepareImage } from '@platform/image'
 import { Plus, X } from 'lucide-react'
@@ -18,18 +18,18 @@ export function PhotoPicker({
   const { t } = useI18n()
   const id = useId()
   const upload = useUploadPhoto()
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState<'heic' | 'other' | null>(null)
 
   async function add(files: FileList | null) {
     const file = files?.[0]
     if (!file) return
-    setFailed(false)
+    setFailed(null)
     try {
       const prepared = await prepareImage(file, fitWithin, PHOTO_JPEG_QUALITY)
       const url = await upload.mutateAsync(prepared)
       onChange([...urls, url])
     } catch {
-      setFailed(true)
+      setFailed(isHeic(file) ? 'heic' : 'other')
     }
   }
 
@@ -57,7 +57,7 @@ export function PhotoPicker({
           <li>
             <label
               htmlFor={id}
-              className="flex aspect-square w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-field text-sm text-muted"
+              className="flex aspect-square w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-field p-1 text-center text-xs leading-tight text-muted"
             >
               <Plus aria-hidden="true" />
               {t(upload.isPending ? 'publish.photos.uploading' : 'publish.photos.add')}
@@ -78,7 +78,7 @@ export function PhotoPicker({
       </ul>
       {failed ? (
         <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
-          {t('publish.photos.failed')}
+          {t(failed === 'heic' ? 'publish.photos.failed_heic' : 'publish.photos.failed')}
         </p>
       ) : (
         <p className="m-0 text-sm text-muted">{t('publish.photos.first_on_poster')}</p>
