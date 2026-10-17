@@ -16,7 +16,8 @@
     "demo_mode": "Modo demostración.",
     "day": "Día",
     "note": "Nota",
-    "language": "Idioma"
+    "language": "Idioma",
+    "server_failed": "Algo falló de nuestro lado. Inténtalo de nuevo en un momento."
   },
   "time": {
     "just_now": "hace un momento",
@@ -109,6 +110,9 @@
       "hint": "Así sabemos cómo ayudarte mejor.",
       "with_me": "Sí, lo tengo conmigo",
       "only_saw": "No, solo lo vi"
+    },
+    "demo": {
+      "reset": "Restablecer la demostración"
     }
   },
   "case": {

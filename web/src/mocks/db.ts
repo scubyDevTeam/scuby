@@ -5,20 +5,28 @@ import type { Tables } from './tables'
 
 export type * from './tables'
 
-// Kept for the life of the tab, so a reload does not wipe what was published — a real backend
-// would not forget either. A new tab starts from the fixtures again.
-const KEY = 'mock-db'
+// Kept on this browser, shared by its tabs: a reload, a new tab or a link opened from the inbox
+// sees what was published — a real backend would not forget either. «Restablecer» (resetDb) goes
+// back to the fixtures.
+export const DB_KEY = 'mock-db'
+const KEY = DB_KEY
 const VERSION = 6
 
 function load(): Tables {
-  const stored = read<{ version: number; tables: Tables }>('session', KEY)
+  const stored = read<{ version: number; tables: Tables }>('local', KEY)
   return stored?.version === VERSION ? stored.tables : seed()
 }
 
 export const db: Tables = load()
 
+/** Another tab changed the tables: this one adopts them before answering anything else. */
+export function adoptStored() {
+  const stored = read<{ version: number; tables: Tables }>('local', KEY)
+  if (stored?.version === VERSION) Object.assign(db, stored.tables)
+}
+
 export function persist() {
-  write('session', KEY, { version: VERSION, tables: db })
+  write('local', KEY, { version: VERSION, tables: db })
 }
 
 export const snapshot = () => JSON.stringify(db)
