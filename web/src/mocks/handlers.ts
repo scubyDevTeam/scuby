@@ -2,6 +2,7 @@
 // and answers are checked against the contract. Swap it for the real backend by setting
 // VITE_API_MOCK=false and VITE_API_URL — nothing else in the app changes (docs/eng/api.md).
 import { adoption } from './api/adoption'
+import { alerts } from './api/alerts'
 import { auth } from './api/auth'
 import { conversations } from './api/conversations'
 import { found } from './api/found'
@@ -23,4 +24,5 @@ export const handlers = [
   ...help,
   ...links,
   ...conversations,
+  ...alerts,
 ]

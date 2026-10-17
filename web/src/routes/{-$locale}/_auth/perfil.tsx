@@ -1,6 +1,7 @@
 import { useSession } from '@api-client/session'
 import { Profile } from '@features/auth/Profile'
 import { createFileRoute } from '@tanstack/react-router'
+import { env } from '../../../env'
 import { LanguageLinks } from '../../-i18n'
 
 export const Route = createFileRoute('/{-$locale}/_auth/perfil')({ component: ProfileScreen })
@@ -10,7 +11,7 @@ function ProfileScreen() {
   if (!useSession().data) return null
   return (
     <>
-      <Profile />
+      <Profile mapStyleUrl={env.mapStyleUrl} />
       <div className="mx-auto max-w-lg px-5 pb-8">
         <LanguageLinks className="font-bold text-brand-deep" />
       </div>

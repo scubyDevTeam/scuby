@@ -24,6 +24,8 @@ export type PersonRow = {
   city: string | null
   bio: string | null
   notification_prefs: { lost: boolean; found: boolean; adoption: boolean; help: boolean }
+  /** «Mascotas perdidas cerca de mí» (08): off until a zone is confirmed. */
+  nearby_alerts?: { enabled: boolean; center: Point | null; radius_km: 1 | 2 | 5 }
   /** «miembro hace 8 meses»: a fact the adoption lister reads next to a name (06). */
   joined_at: string
 }

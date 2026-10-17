@@ -564,7 +564,40 @@
       "save": "Guardar cambios",
       "saving": "Guardando…",
       "saved": "Guardamos tus cambios.",
-      "sign_out": "Cerrar sesión"
+      "sign_out": "Cerrar sesión",
+      "alerts": {
+        "title": "Mascotas perdidas cerca de mí",
+        "off_hint": "Te avisamos solo si importa: una notificación por cada mascota perdida cerca.",
+        "activate": "Activar alertas",
+        "on_summary": "Te avisamos de mascotas perdidas cerca de {place}, unos {km} km alrededor.",
+        "change_zone": "Cambiar la zona",
+        "turn_off": "Apagar alertas",
+        "loading": "Cargando tus alertas",
+        "load_failed": "No pudimos cargar tus alertas.",
+        "off_failed": "No pudimos apagarlas. Inténtalo de nuevo.",
+        "sheet": {
+          "permission_title": "Te avisamos solo si importa",
+          "permission_body": "Una notificación por cada mascota perdida cerca. Entre 10 p. m. y 7 a. m., solo lo urgente.",
+          "allow": "Permitir notificaciones",
+          "enabling": "Pidiendo permiso…",
+          "skip": "Ahora no",
+          "denied": "Las notificaciones están bloqueadas en tu navegador. Igual verás los avisos en tu Bandeja.",
+          "failed": "No pudimos activar las notificaciones. Igual verás los avisos en tu Bandeja.",
+          "continue": "Seguir",
+          "zone_title": "Confirma tu zona",
+          "step": "Paso {n} de {total}",
+          "zone_pick": "Marca el centro de tu zona",
+          "zone_hint": "Unos {km} km alrededor. Puedes cambiarlo cuando quieras en Perfil.",
+          "radius_label": "Radio de la zona",
+          "radius_option": "{km} km",
+          "confirm": "Listo, avísame",
+          "saving": "Guardando…",
+          "save_failed": "No pudimos guardar tu zona. Inténtalo de nuevo.",
+          "need_point": "Marca tu zona en el mapa o usa tu ubicación.",
+          "done_title": "Listo, te avisaremos.",
+          "done_body": "Solo si importa: una notificación por cada mascota perdida cerca."
+        }
+      }
     }
   },
   "mine": {

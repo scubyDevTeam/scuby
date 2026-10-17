@@ -3,6 +3,7 @@
 // `api.getCase` (api.ts); conventions: docs/eng/api.md.
 export * from './endpoints/account'
 export * from './endpoints/adoption'
+export * from './endpoints/alerts'
 export * from './endpoints/conversations'
 export * from './endpoints/found'
 export * from './endpoints/help'
