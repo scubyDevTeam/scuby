@@ -29,6 +29,12 @@ export const helpers = [
   route(api.reportSighting, ({ params, body, user, reporterKey }) => {
     const row = findCase(params.code) ?? fail('not_found')
     if (row.vertical !== 'lost' && row.vertical !== 'found') fail('not_found')
+    // A replay (the offline queue retrying a send whose answer never arrived) is the sighting it
+    // already made: the same id, no second row, no rate limit — and whatever the case did since.
+    const replayed = body.client_id
+      ? db.sightings.find((s) => s.case_code === row.code && s.client_id === body.client_id)
+      : undefined
+    if (replayed) return { id: replayed.id }
     if (row.status !== 'active') fail('invalid_transition')
     const area = row.vertical === 'lost' ? row.last_seen : row.found
 
@@ -55,6 +61,7 @@ export const helpers = [
       contact_phone: body.contact_phone,
       status: 'visible',
       highlighted_by_owner: false,
+      ...(body.client_id ? { client_id: body.client_id } : {}),
     })
     if (row.vertical === 'lost') {
       const name = db.pets.find((p) => p.id === row.pet_id)?.name ?? 'tu mascota'

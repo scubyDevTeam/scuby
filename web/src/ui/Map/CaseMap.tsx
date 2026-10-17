@@ -12,13 +12,17 @@ type Props = {
   area: MapArea
   areaLabel: string
   pins: readonly MapPin[]
+  /** A pin tapped: the page opens its sheet (04 · Display rules 3). */
+  onSelectPin?: (id: string) => void
 }
 
 /** The area, the sighting pins and their trajectory — on a real map when the device can. */
-export function CaseMap({ styleUrl, area, areaLabel, pins }: Props) {
+export function CaseMap({ styleUrl, area, areaLabel, pins, onSelectPin }: Props) {
   const [failed, setFailed] = useState(false)
   const [holder, ready] = useWhenSettledAndNear()
-  const schematic = <SchematicMap area={area} areaLabel={areaLabel} pins={pins} />
+  const schematic = (
+    <SchematicMap area={area} areaLabel={areaLabel} pins={pins} onSelectPin={onSelectPin} />
+  )
   if (!styleUrl || failed) return schematic
   // The drawing holds the place until the page has painted and the map is about to be seen: the
   // ~250 KB of MapLibre and its tiles never compete with the case for the first paint.
@@ -32,6 +36,7 @@ export function CaseMap({ styleUrl, area, areaLabel, pins }: Props) {
             styleUrl={styleUrl}
             area={area}
             pins={pins}
+            onSelectPin={onSelectPin}
             onError={() => setFailed(true)}
           />
           <figcaption className="px-4 py-3 text-sm font-semibold text-lost-ink">

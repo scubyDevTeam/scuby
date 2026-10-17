@@ -1,14 +1,39 @@
+import { useSession } from '@api-client/session'
 import { FeedPage } from '@features/feed/FeedPage'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { withMessages } from '@i18n/locales'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { lazy, Suspense } from 'react'
 import { brand } from '../../brand'
 import { env } from '../../env'
 
 export const Route = createFileRoute('/{-$locale}/')({ component: Home })
 
+// Only a signed-in person can owe an answer: nobody else downloads the banner or its words.
+const PendingCheckinBanner = lazy(
+  withMessages(['checkin_banner'], () =>
+    import('@features/mine/PendingCheckinBanner').then((m) => ({
+      default: m.PendingCheckinBanner,
+    })),
+  ),
+)
+
 function Home() {
-  const navigate = useNavigate()
+  const session = useSession()
   return (
     <FeedPage
+      banner={
+        session.data ? (
+          <Suspense fallback={null}>
+            <PendingCheckinBanner
+              caseLink={(code, children, className) => (
+                <Link to="/{-$locale}/c/$code" params={{ code }} className={className}>
+                  {children}
+                </Link>
+              )}
+            />
+          </Suspense>
+        ) : null
+      }
       brandName={brand.name}
       brandMarkUrl={brand.markUrl}
       mapStyleUrl={env.mapStyleUrl}
@@ -21,7 +46,6 @@ function Home() {
           {children}
         </Link>
       )}
-      onOpenCase={(code) => navigate({ to: '/{-$locale}/c/$code', params: { code } })}
     />
   )
 }

@@ -1,7 +1,7 @@
 import { expect, tags, test } from './test.ts'
 
 test(
-  '«Yo ayudo»: a neighbour offers a ride, verifies their number and reaches whoever asks',
+  '«Yo ayudo»: a neighbour offers a foster home, verifies their number and reaches whoever asks',
   tags('@help-request', '@HREQ-001'),
   async ({ help }) => {
     await test.step('a stranger opens Max’s request: what it needs, and how far each got', async () => {

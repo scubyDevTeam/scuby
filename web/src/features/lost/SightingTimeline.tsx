@@ -8,10 +8,13 @@ import { formatSeenAt } from './copy'
 export function SightingTimeline({
   sightings,
   now,
+  onOpen,
   tools,
 }: {
   sightings: readonly PlacedSighting<Sighting>[]
   now: Date
+  /** Its number opens the pin's sheet: the way to it without a pointer, as GL pins take no focus. */
+  onOpen: (id: string) => void
   /** The owner's hide / highlight under each item (display rule 3); nothing for anyone else. */
   tools?: (sighting: Sighting) => ReactNode
 }) {
@@ -27,13 +30,16 @@ export function SightingTimeline({
             sighting.isLatest ? 'border-2 border-brand bg-surface' : 'bg-brand-mist'
           }`}
         >
-          <span
+          <button
+            type="button"
+            aria-label={t('map_pin.open_sighting', { n: sighting.order })}
+            onClick={() => onOpen(sighting.id)}
             className={`flex size-9 shrink-0 items-center justify-center rounded-full font-bold ${
               sighting.isLatest ? 'bg-brand text-white' : 'bg-brand-ice text-brand-deep'
             }`}
           >
             {sighting.order}
-          </span>
+          </button>
           <div className="min-w-0 flex-1">
             <p className="m-0 font-bold">
               {formatSeenAt(i18n, sighting.seenAt, now)} · {i18n.relative(sighting.seenAt, now)}

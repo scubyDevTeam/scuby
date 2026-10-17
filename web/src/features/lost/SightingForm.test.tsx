@@ -1,12 +1,23 @@
 // @vitest-environment jsdom
+import { onlineManager } from '@tanstack/react-query'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithQuery, stubApi } from '../../test-utils'
 import { SightingForm } from './SightingForm'
 
 const lastSeenPoint = { lat: 6.2447, lng: -75.5916 }
 const nearby = { latitude: 6.2467, longitude: -75.5916 }
 const bogota = { latitude: 4.711, longitude: -74.0721 }
+
+// The queue keeps unsent sightings in this device's storage: each test starts with none.
+beforeEach(() => localStorage.clear())
+afterEach(() => onlineManager.setOnline(true))
+
+/** The device's radio: `navigator.onLine` and the event the browser fires with it. */
+function signal(online: boolean) {
+  vi.stubGlobal('navigator', { ...navigator, onLine: online })
+  window.dispatchEvent(new Event(online ? 'online' : 'offline'))
+}
 
 /** Without map tiles the form places the pin from the device's location. */
 function show(coords: typeof nearby | null, routes: Parameters<typeof stubApi>[0] = {}) {
@@ -123,5 +134,29 @@ describe('SightingForm — 04 · only the pin is required', () => {
     await screen.findByText('Punto marcado.')
     send()
     expect(await screen.findByText('Ya registraste un avistamiento hace poco.')).toBeTruthy()
+  })
+
+  it('with no signal it is kept, calmly — «Guardamos tu avistamiento» — and goes by itself', async () => {
+    const calls = show(nearby)
+    await locate()
+    await screen.findByText('Punto marcado.')
+    signal(false)
+    send()
+
+    expect(await screen.findByText('Guardamos tu avistamiento')).toBeTruthy()
+    expect(screen.getByText(/No tienes que repetirlo/)).toBeTruthy()
+    expect(screen.getByText('Sin conexión')).toBeTruthy()
+    expect(screen.getByText(/^Viste a Luna · /)).toBeTruthy()
+    expect(screen.getByText('En espera')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Volver al aviso de Luna' })).toBeTruthy()
+    expect(screen.queryByText('No pudimos enviar tu avistamiento.')).toBeNull()
+    expect(posted(calls)).toEqual([])
+
+    signal(true)
+    expect(await screen.findByText('¡Gracias!')).toBeTruthy()
+    expect(posted(calls)).toHaveLength(1)
+    expect((posted(calls)[0]?.body as Record<string, unknown> | undefined)?.client_id).toEqual(
+      expect.any(String),
+    )
   })
 })

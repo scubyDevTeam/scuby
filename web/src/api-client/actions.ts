@@ -6,8 +6,6 @@ import {
   type ReportInput,
   recoveryClaimBody,
   reportBody,
-  type SightingInput,
-  sightingBody,
 } from '../contracts/actions'
 import { parseConfig } from '../contracts/config'
 import * as helpersEndpoints from '../contracts/endpoints/helpers'
@@ -25,19 +23,7 @@ export function useConfig() {
   return useQuery(configQuery)
 }
 
-/** A new sighting changes the case's map and timeline, so the case is fetched again. */
-export function useReportSighting(code: string) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (input: SightingInput) =>
-      call(
-        helpersEndpoints.reportSighting,
-        { params: { code }, body: sightingBody(input) },
-        parseCreated,
-      ),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['case', code] }),
-  })
-}
+// «Lo vi» is `sighting-replay.ts`: the one mutation with a persisted retry queue.
 
 /** The claim row is created first; only its answer carries the channel to the owner. */
 export function useClaimRecovery(code: string) {

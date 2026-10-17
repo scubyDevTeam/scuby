@@ -1,5 +1,7 @@
 import { queryClient } from '@api-client/query-client'
+import { SIGHTING_QUEUE_STORAGE } from '@api-client/sighting-pending'
 import { startErrorReporting } from '@platform/errors'
+import { readStored } from '@platform/storage'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
@@ -36,6 +38,11 @@ async function start() {
     await startMocks()
   } else {
     registerAppWorker()
+  }
+  // A «Lo vi» that could not leave last time goes now, whatever page opened (frontend.md · Risks §6).
+  // Only then is the queue's code downloaded.
+  if (readStored(SIGHTING_QUEUE_STORAGE)) {
+    void import('@features/lost/sighting-queue').then((queue) => queue.startQueue(queryClient))
   }
   createRoot(document.getElementById('root')!).render(
     <StrictMode>

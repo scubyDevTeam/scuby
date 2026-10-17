@@ -20,6 +20,7 @@ import { Route as Char123LocaleChar125AuthPerfilRouteImport } from './routes/{-$
 import { Route as Char123LocaleChar125CCodeRouteImport } from './routes/{-$locale}/c.$code'
 import { Route as Char123LocaleChar125PublicarIndexRouteImport } from './routes/{-$locale}/publicar.index'
 import { Route as Char123LocaleChar125PublicarTipoRouteImport } from './routes/{-$locale}/publicar.$tipo'
+import { Route as Char123LocaleChar125RTokenRouteImport } from './routes/{-$locale}/r.$token'
 import { Route as Char123LocaleChar125AuthPublicarAdopcionRouteImport } from './routes/{-$locale}/_auth/publicar.adopcion'
 import { Route as Char123LocaleChar125AuthPublicarAyudaRouteImport } from './routes/{-$locale}/_auth/publicar.ayuda'
 import { Route as Char123LocaleChar125AuthPublicarPerdidoRouteImport } from './routes/{-$locale}/_auth/publicar.perdido'
@@ -92,6 +93,12 @@ const Char123LocaleChar125PublicarTipoRoute =
     path: '/publicar/$tipo',
     getParentRoute: () => Char123LocaleChar125RouteRoute,
   } as any)
+const Char123LocaleChar125RTokenRoute =
+  Char123LocaleChar125RTokenRouteImport.update({
+    id: '/r/$token',
+    path: '/r/$token',
+    getParentRoute: () => Char123LocaleChar125RouteRoute,
+  } as any)
 const Char123LocaleChar125AuthPublicarAdopcionRoute =
   Char123LocaleChar125AuthPublicarAdopcionRouteImport.update({
     id: '/publicar/adopcion',
@@ -139,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/{-$locale}/perfil': typeof Char123LocaleChar125AuthPerfilRoute
   '/{-$locale}/c/$code': typeof Char123LocaleChar125CCodeRoute
   '/{-$locale}/publicar/$tipo': typeof Char123LocaleChar125PublicarTipoRoute
+  '/{-$locale}/r/$token': typeof Char123LocaleChar125RTokenRoute
   '/{-$locale}/publicar/': typeof Char123LocaleChar125PublicarIndexRoute
   '/{-$locale}/publicar/adopcion': typeof Char123LocaleChar125AuthPublicarAdopcionRoute
   '/{-$locale}/publicar/ayuda': typeof Char123LocaleChar125AuthPublicarAyudaRoute
@@ -156,6 +164,7 @@ export interface FileRoutesByTo {
   '/{-$locale}/perfil': typeof Char123LocaleChar125AuthPerfilRoute
   '/{-$locale}/c/$code': typeof Char123LocaleChar125CCodeRoute
   '/{-$locale}/publicar/$tipo': typeof Char123LocaleChar125PublicarTipoRoute
+  '/{-$locale}/r/$token': typeof Char123LocaleChar125RTokenRoute
   '/{-$locale}/publicar': typeof Char123LocaleChar125PublicarIndexRoute
   '/{-$locale}/publicar/adopcion': typeof Char123LocaleChar125AuthPublicarAdopcionRoute
   '/{-$locale}/publicar/ayuda': typeof Char123LocaleChar125AuthPublicarAyudaRoute
@@ -176,6 +185,7 @@ export interface FileRoutesById {
   '/{-$locale}/_auth/perfil': typeof Char123LocaleChar125AuthPerfilRoute
   '/{-$locale}/c/$code': typeof Char123LocaleChar125CCodeRoute
   '/{-$locale}/publicar/$tipo': typeof Char123LocaleChar125PublicarTipoRoute
+  '/{-$locale}/r/$token': typeof Char123LocaleChar125RTokenRoute
   '/{-$locale}/publicar/': typeof Char123LocaleChar125PublicarIndexRoute
   '/{-$locale}/_auth/publicar/adopcion': typeof Char123LocaleChar125AuthPublicarAdopcionRoute
   '/{-$locale}/_auth/publicar/ayuda': typeof Char123LocaleChar125AuthPublicarAyudaRoute
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/{-$locale}/perfil'
     | '/{-$locale}/c/$code'
     | '/{-$locale}/publicar/$tipo'
+    | '/{-$locale}/r/$token'
     | '/{-$locale}/publicar/'
     | '/{-$locale}/publicar/adopcion'
     | '/{-$locale}/publicar/ayuda'
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
     | '/{-$locale}/perfil'
     | '/{-$locale}/c/$code'
     | '/{-$locale}/publicar/$tipo'
+    | '/{-$locale}/r/$token'
     | '/{-$locale}/publicar'
     | '/{-$locale}/publicar/adopcion'
     | '/{-$locale}/publicar/ayuda'
@@ -232,6 +244,7 @@ export interface FileRouteTypes {
     | '/{-$locale}/_auth/perfil'
     | '/{-$locale}/c/$code'
     | '/{-$locale}/publicar/$tipo'
+    | '/{-$locale}/r/$token'
     | '/{-$locale}/publicar/'
     | '/{-$locale}/_auth/publicar/adopcion'
     | '/{-$locale}/_auth/publicar/ayuda'
@@ -324,6 +337,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char123LocaleChar125PublicarTipoRouteImport
       parentRoute: typeof Char123LocaleChar125RouteRoute
     }
+    '/{-$locale}/r/$token': {
+      id: '/{-$locale}/r/$token'
+      path: '/r/$token'
+      fullPath: '/{-$locale}/r/$token'
+      preLoaderRoute: typeof Char123LocaleChar125RTokenRouteImport
+      parentRoute: typeof Char123LocaleChar125RouteRoute
+    }
     '/{-$locale}/_auth/publicar/adopcion': {
       id: '/{-$locale}/_auth/publicar/adopcion'
       path: '/publicar/adopcion'
@@ -407,6 +427,7 @@ interface Char123LocaleChar125RouteRouteChildren {
   Char123LocaleChar125IndexRoute: typeof Char123LocaleChar125IndexRoute
   Char123LocaleChar125CCodeRoute: typeof Char123LocaleChar125CCodeRoute
   Char123LocaleChar125PublicarTipoRoute: typeof Char123LocaleChar125PublicarTipoRoute
+  Char123LocaleChar125RTokenRoute: typeof Char123LocaleChar125RTokenRoute
   Char123LocaleChar125PublicarIndexRoute: typeof Char123LocaleChar125PublicarIndexRoute
   Char123LocaleChar125PublicarEncontradoVistoRoute: typeof Char123LocaleChar125PublicarEncontradoVistoRoute
   Char123LocaleChar125PublicarEncontradoIndexRoute: typeof Char123LocaleChar125PublicarEncontradoIndexRoute
@@ -421,6 +442,7 @@ const Char123LocaleChar125RouteRouteChildren: Char123LocaleChar125RouteRouteChil
     Char123LocaleChar125CCodeRoute: Char123LocaleChar125CCodeRoute,
     Char123LocaleChar125PublicarTipoRoute:
       Char123LocaleChar125PublicarTipoRoute,
+    Char123LocaleChar125RTokenRoute: Char123LocaleChar125RTokenRoute,
     Char123LocaleChar125PublicarIndexRoute:
       Char123LocaleChar125PublicarIndexRoute,
     Char123LocaleChar125PublicarEncontradoVistoRoute:

@@ -6,7 +6,7 @@ import { needsWords } from '../../-i18n'
 import { LegalLine } from '../../-legal'
 
 export const Route = createFileRoute('/{-$locale}/_auth/publicar/encontrado/aviso')({
-  beforeLoad: needsWords('publish', 'push'),
+  beforeLoad: needsWords('publish', 'push', 'found'),
   component: PublishFoundScreen,
 })
 

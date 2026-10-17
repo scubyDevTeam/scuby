@@ -17,10 +17,19 @@ export const DEFERRED_NAMESPACES = [
   // publishing one wait for those forms.
   'adoption',
   'adoption_forms',
+  // The found page's words with its screen too; reporting a find and the witness page wait for
+  // their own routes.
+  'found',
   // The same for a help request: its page's words with its screen, offering help and the
   // beneficiary's side with those forms.
   'help',
   'help_forms',
+  // What a tapped map pin shows: its words come with the sheet, after the tap.
+  'map_sheet',
+  // The pages behind the email's one-tap links (/r/<token>), and home's «pregunta pendiente»
+  // banner, which only a signed-in person with a question waiting downloads.
+  'links',
+  'checkin_banner',
 ] as const
 
 export type DeferredNamespace = (typeof DEFERRED_NAMESPACES)[number]

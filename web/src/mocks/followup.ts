@@ -16,6 +16,8 @@ const LISTING_CADENCE = 14 * DAY
 /** A help request: T+7 d, then every 14 d — or the day after a `needed_by`, if sooner (07). */
 const HELP_FIRST_CHECKIN = 7 * DAY
 const HELP_CADENCE = 14 * DAY
+/** An archived request can be reopened for 30 days (07 · The follow-up loop, as in 04). */
+const HELP_REOPEN_WINDOW = 30 * DAY
 
 function schedule(
   code: string,
@@ -207,7 +209,7 @@ function advanceHelp(row: HelpRow, at: number) {
     notify(
       row.created_by,
       'help_request.expired',
-      `Archivamos la solicitud de ${name}. Puedes reactivarla con un toque durante 30 días.`,
+      `Archivamos la solicitud de ayuda de ${name}. Puedes reactivarla con un toque hasta el ${dayMonth(at + HELP_REOPEN_WINDOW)}.`,
       row.code,
     )
   }

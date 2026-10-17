@@ -1,5 +1,8 @@
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { step } from './step.ts'
+
+/** What the feed map has on screen, as it writes it on `data-pins` once it settles. */
+export type MapPinOnScreen = { id?: string; count?: number; tone: string; x: number; y: number }
 
 /** `/`: open cases near the viewer, as a list or a map (docs/product/00 · Geography). */
 export class FeedPage {
@@ -10,6 +13,9 @@ export class FeedPage {
   readonly map: Locator
   readonly mainNavigation: Locator
   readonly publishLink: Locator
+  /** The card a tapped pin opens over the map. */
+  readonly pinCard: Locator
+  readonly pinCardTitle: Locator
 
   constructor(page: Page) {
     this.page = page
@@ -19,6 +25,8 @@ export class FeedPage {
     this.map = page.getByTestId('feed-map')
     this.mainNavigation = page.getByRole('navigation', { name: 'Principal' })
     this.publishLink = page.getByRole('link', { name: 'Publicar aviso' })
+    this.pinCard = this.map.locator('..').getByRole('dialog')
+    this.pinCardTitle = this.pinCard.getByRole('heading')
   }
 
   open() {
@@ -38,10 +46,13 @@ export class FeedPage {
     )
   }
 
-  /** Desktop width: the layout where list and map sit side by side. */
-  onDesktop() {
-    return step('Use a desktop-sized window', () =>
-      this.page.setViewportSize({ width: 1280, height: 900 }),
+  /**
+   * Desktop width: the layout where list and map sit side by side. A short window shows the same
+   * cases on a smaller map, where they crowd.
+   */
+  onDesktop(height = 900) {
+    return step(`Use a desktop-sized window, ${height} px tall`, () =>
+      this.page.setViewportSize({ width: 1280, height }),
     )
   }
 
@@ -51,5 +62,41 @@ export class FeedPage {
 
   openOnlyCard() {
     return step('Open the only card left', () => this.cards.getByRole('link').click())
+  }
+
+  // --- The map's pins: GL layers, so a tap is a position on the canvas ---
+
+  /** Groups and single cases on screen, once the map has settled. */
+  async pinsOnScreen(): Promise<MapPinOnScreen[]> {
+    await expect(this.map).toHaveAttribute('data-pins', /\[/)
+    return JSON.parse((await this.map.getAttribute('data-pins')) ?? '[]')
+  }
+
+  /** Taps the biggest group: the map zooms into it. */
+  tapBiggestGroup() {
+    return step('Tap the biggest group of pins', async () => {
+      const groups = (await this.pinsOnScreen()).filter((pin) => pin.count)
+      const biggest = groups.sort((a, b) => (b.count ?? 0) - (a.count ?? 0))[0]
+      if (!biggest) throw new Error('No group of pins on the map')
+      const before = await this.map.getAttribute('data-pins')
+      await this.map.click({ position: { x: biggest.x, y: biggest.y } })
+      // The zoom has landed when the map has settled on something else.
+      await expect(this.map).not.toHaveAttribute('data-pins', before ?? '')
+    })
+  }
+
+  /** Taps the pin of one case, by its code. */
+  tapCasePin(code: string) {
+    return step(`Tap the pin of case ${code}`, async () => {
+      const pin = (await this.pinsOnScreen()).find((p) => p.id === code)
+      if (!pin) throw new Error(`No pin for ${code} on the map`)
+      await this.map.click({ position: { x: pin.x, y: pin.y } })
+    })
+  }
+
+  openCaseFromPinCard() {
+    return step('Open the case from its pin card', () =>
+      this.pinCard.getByRole('link', { name: 'Ver' }).click(),
+    )
   }
 }

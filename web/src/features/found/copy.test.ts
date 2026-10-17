@@ -4,7 +4,7 @@ import { createI18n } from '@i18n/react'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { describeFound } from './copy'
 
-beforeAll(() => loadMessages('en'))
+beforeAll(() => loadMessages('en', ['found']))
 
 const pet: FoundCase['pet'] = {
   species: 'cat',

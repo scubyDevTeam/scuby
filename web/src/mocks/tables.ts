@@ -184,6 +184,8 @@ export type SightingRow = {
   contact_phone: string | null
   status: 'visible' | 'hidden_by_owner'
   highlighted_by_owner: boolean
+  /** The client's replay key, when it sent one: a retry of the same sighting finds this row. */
+  client_id?: string
 }
 
 export type RecoveryClaimRow = {

@@ -1,7 +1,15 @@
 // Adoption (docs/product/06): publishing a listing — or converting a found case into one — «Me
 // interesa», the lister's moves on the interests, and the listing's endings.
 import { api } from '../../contracts/api'
-import { type AdoptionRow, db, findCase, newCode, newId, type PersonRow } from '../db'
+import {
+  type AdoptionInterestRow,
+  type AdoptionRow,
+  db,
+  findCase,
+  newCode,
+  newId,
+  type PersonRow,
+} from '../db'
 import { closeCheckins, onListerInteraction, onListingPublished } from '../followup'
 import { notify } from '../notify'
 import { fail, route } from '../route'
@@ -22,6 +30,35 @@ function interestOf(row: AdoptionRow, id: string) {
   return (
     db.adoptionInterests.find((i) => i.id === id && i.case_code === row.code) ?? fail('not_found')
   )
+}
+
+/**
+ * Ends a listing as adopted: by an interest (`adopted_in_app`, the responsibility moves to that
+ * person) or off the platform. Also the email's «ya fue adoptado» (api/links.ts).
+ */
+export function adopt(row: AdoptionRow, adopter: AdoptionInterestRow | null) {
+  const pet = db.pets.find((p) => p.id === row.pet_id)
+  row.status = 'adopted'
+  row.resolution = adopter ? 'adopted_in_app' : 'adopted_offline'
+  row.resolved_at = iso(Date.now())
+  closeCheckins(row.code)
+  if (pet) {
+    // The lister's link closes. In the app, a new owner link opens for the adopter; off the
+    // platform there is no link to open, and none is faked with a placeholder person.
+    pet.owner_id = adopter ? adopter.person_id : null
+    pet.custody_state = 'claimed'
+  }
+  if (adopter) adopter.status = 'chosen'
+  // Closure to everyone else still waiting — a declined interest reads as open to its person.
+  for (const other of db.adoptionInterests) {
+    if (other.case_code !== row.code || other === adopter || other.status === 'withdrawn') continue
+    notify(
+      other.person_id,
+      'adoption_case.adopted',
+      `${petName(row)} ya fue adoptado. Gracias por interesarte.`,
+      row.code,
+    )
+  }
 }
 
 export const adoption = [
@@ -189,29 +226,7 @@ export const adoption = [
     if (row.status !== 'active') fail('invalid_transition')
     const adopter = body.interest_id ? interestOf(row, body.interest_id) : null
     if (adopter?.status === 'withdrawn') fail('invalid_transition')
-    const pet = db.pets.find((p) => p.id === row.pet_id)
-    row.status = 'adopted'
-    row.resolution = adopter ? 'adopted_in_app' : 'adopted_offline'
-    row.resolved_at = iso(Date.now())
-    closeCheckins(row.code)
-    if (pet) {
-      // The lister's link closes. In the app, a new owner link opens for the adopter; off the
-      // platform there is no link to open, and none is faked with a placeholder person.
-      pet.owner_id = adopter ? adopter.person_id : null
-      pet.custody_state = 'claimed'
-    }
-    if (adopter) adopter.status = 'chosen'
-    // Closure to everyone else still waiting — a declined interest reads as open to its person.
-    for (const other of db.adoptionInterests) {
-      if (other.case_code !== row.code || other === adopter || other.status === 'withdrawn')
-        continue
-      notify(
-        other.person_id,
-        'adoption_case.adopted',
-        `${petName(row)} ya fue adoptado. Gracias por interesarte.`,
-        row.code,
-      )
-    }
+    adopt(row, adopter)
     return { id: row.code }
   }),
 

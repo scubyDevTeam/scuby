@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { PosterPage } from './PosterPage.ts'
 import { MapPicker, SignIn, whatsappFrom } from './parts.ts'
+import { Signal } from './Signal.ts'
 import { step } from './step.ts'
 
 /** `/c/:code`: a case as anyone opening its link sees it — and, for its owner, their side of it. */
@@ -22,6 +23,11 @@ export class CasePage {
   readonly backWithOwner: Locator
   readonly unavailable: Locator
   readonly linkCopied: Locator
+  /** The phone's signal, for «Lo vi» sent from where there is none (frontend.md · Risks §6). */
+  readonly signal: Signal
+  /** This device's own sightings that have not reached the server: «En espera». */
+  readonly queued: Locator
+  readonly keptTitle: Locator
 
   constructor(page: Page) {
     this.page = page
@@ -43,6 +49,11 @@ export class CasePage {
     this.unavailable = page.getByRole('heading', { name: 'Este aviso ya no está disponible' })
     // Without a share sheet, «Compartir» downloads the image and copies the message with the link.
     this.linkCopied = this.poster.saved
+    this.signal = new Signal(page)
+    this.queued = page
+      .getByRole('list', { name: 'Tus avistamientos sin enviar' })
+      .getByRole('listitem')
+    this.keptTitle = page.getByRole('heading', { name: 'Guardamos tu avistamiento' })
   }
 
   open(code: string) {
@@ -105,6 +116,29 @@ export class CasePage {
       await expect(this.page.getByText('¡Gracias!')).toBeVisible()
       await this.page.getByRole('button', { name: 'Listo' }).click()
     })
+  }
+
+  /** «La vi», filled in up to the send: the spot and a note. */
+  startSighting(note: string) {
+    return step(`Start a sighting: «${note}»`, async () => {
+      await this.sawIt.click()
+      await new MapPicker(this.page).mark()
+      await expect(this.page.getByText('Punto marcado.')).toBeVisible()
+      await this.page.getByLabel(/Nota/).fill(note)
+    })
+  }
+
+  sendSighting() {
+    return step('Send the sighting', () =>
+      this.page.getByRole('button', { name: 'Enviar avistamiento' }).click(),
+    )
+  }
+
+  /** From the form's «Guardamos tu avistamiento» back to the case. */
+  backToCase() {
+    return step('Go back to the case', () =>
+      this.page.getByRole('button', { name: /^Volver al aviso de/ }).click(),
+    )
   }
 
   /** «La tengo conmigo»: answers the WhatsApp URL the claim opened. */
@@ -217,6 +251,28 @@ export class CasePage {
         .getByRole('button', { name: 'Volver a mostrar' })
         .click(),
     )
+  }
+
+  // --- A pin's sheet (docs/product/04 · Display rules 3) ---
+
+  /** The sheet a sighting pin opens. */
+  get pinSheet() {
+    return this.page.getByRole('dialog').filter({ has: this.page.getByRole('heading') })
+  }
+
+  /** The keyboard's way to a pin: its number in the timeline (GL pins take no focus). */
+  openSightingSheet(order: number) {
+    return step(`Open sighting ${order}'s sheet from the timeline`, async () => {
+      const number = this.page.getByRole('button', {
+        name: `Abrir la ficha del avistamiento ${order}`,
+      })
+      await number.focus()
+      await this.page.keyboard.press('Enter')
+    })
+  }
+
+  closePinSheet() {
+    return step('Close the pin sheet with Escape', () => this.page.keyboard.press('Escape'))
   }
 
   deleteAs(reason: string) {

@@ -83,7 +83,9 @@ function words(i18n: Translator, wire: CaseWire) {
         : t(`preview.description.adoption_${wire.status}`, { name })
     return { label, name, place: wire.location.place_name, description }
   }
-  const label = t(`preview.label.help.${wire.status}`)
+  // «YA TIENE AYUDA» only when every need was covered; any other ending says just that it ended.
+  const covered = wire.status === 'closed' && wire.resolution === 'covered'
+  const label = t(`preview.label.help.${covered ? 'covered' : wire.status}`)
   const { name } = wire.pet
   // What is still asked, named in the page's language: the needs are keys on the wire.
   const open = wire.needs
@@ -93,10 +95,16 @@ function words(i18n: Translator, wire: CaseWire) {
     open.length > 1
       ? `${open.slice(0, -1).join(', ')}${t('preview.need.and')}${open.at(-1)}`
       : (open[0] ?? '')
+  const ending =
+    wire.status === 'active' || covered
+      ? 'closed'
+      : wire.status === 'closed'
+        ? 'ended'
+        : wire.status
   const description =
     wire.status === 'active' && needs
       ? t('preview.description.help_active', { name, needs })
-      : t(`preview.description.help_${wire.status === 'active' ? 'closed' : wire.status}`, { name })
+      : t(`preview.description.help_${ending}`, { name })
   return { label, name, place: wire.location.place_name, description }
 }
 

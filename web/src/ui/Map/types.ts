@@ -15,9 +15,11 @@ export type MapPin = {
   label?: string
 }
 
+export type MapTone = 'lost' | 'found' | 'adoption' | 'help'
+
 /** A case on the feed map, coloured by its vertical. */
 export type MapMarker = {
   id: string
   point: MapPoint
-  tone: 'lost' | 'found' | 'adoption' | 'help'
+  tone: MapTone
 }

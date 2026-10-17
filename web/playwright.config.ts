@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = 4173
+// E2E_PORT lets parallel runs (several worktrees or agents) build and serve side by side.
+const PORT = Number(process.env.E2E_PORT ?? 4173)
+const OUT = process.env.E2E_PORT ? `dist-e2e-${PORT}` : 'dist-e2e'
 
 // Happy paths only (docs/eng/frontend.md · Testing): one per feature, against the mocked API.
 export default defineConfig({
@@ -21,7 +23,7 @@ export default defineConfig({
   webServer: {
     // The built app, not the dev server: what ships is what is tested, and no dependency
     // pre-bundling can reload the page mid-test.
-    command: `pnpm exec vite build --outDir dist-e2e && pnpm exec vite preview --outDir dist-e2e --port ${PORT} --strictPort`,
+    command: `pnpm exec vite build --outDir ${OUT} && pnpm exec vite preview --outDir ${OUT} --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     // Always its own server: it runs with test-only env, which a dev server would not have.
     reuseExistingServer: false,

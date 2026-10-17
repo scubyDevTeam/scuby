@@ -265,3 +265,40 @@ describe('LostCasePage — the owner’s hand on the pins (04 · Display rules 3
     expect(screen.queryByText('Ocultos del mapa')).toBeNull()
   })
 })
+
+describe('LostCasePage — a pin’s sheet (04 · Display rules 3)', () => {
+  it('opens from the timeline’s number, the way to it without a pointer', async () => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true
+    }
+    const onAction = show(lostCase('7K3PQ'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir la ficha del avistamiento 2' }))
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByRole('heading', { name: 'Avistamiento 2' })).toBeTruthy()
+
+    fireEvent.click(within(sheet).getByRole('button', { name: 'La vi aquí también' }))
+    expect(onAction).toHaveBeenCalledWith('report_sighting')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('opens from a pin of the tile-less map too', async () => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true
+    }
+    const { container } = renderWithQuery(
+      <LostCasePage
+        lostCase={lostCase('7K3PQ', { viewer: 'owner' })}
+        now={now}
+        shortUrl="example.test/c/7K3PQ"
+        backLink={<a href="/">Volver</a>}
+        mapStyleUrl={undefined}
+        onAction={vi.fn()}
+      />,
+    )
+    fireEvent.click(container.querySelector('[data-pin="s2"]')!)
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByText('+573156677889')).toBeTruthy()
+    expect(within(sheet).queryByRole('button', { name: 'La vi aquí también' })).toBeNull()
+  })
+})

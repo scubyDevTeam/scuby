@@ -454,6 +454,35 @@ export function seed(): Tables {
         need('need-nala-sand', 'supplies', 'Bultos de arena para gato', 3),
       ],
     }),
+    // A request that got what it asked: the ride happened, Sofía said so, and it closed by itself.
+    help('CH5PA', {
+      pet_id: 'pet-chispa',
+      created_by: 'user-sofia',
+      published_at: ago(12 * DAY),
+      contact_phone: '+573000000005',
+      story:
+        'A Chispa la esterilizaron y no puede ir en bus. Necesitaba que alguien la llevara al control.',
+      location: {
+        center: offset(1500, -1100),
+        radius_m: 500,
+        at: ago(12 * DAY),
+        place_name: 'Belén',
+      },
+      needs: [
+        {
+          ...need(
+            'need-chispa-ride',
+            'transport',
+            'De Belén a la clínica en El Poblado, jueves 9 a. m.',
+            1,
+          ),
+          status: 'covered',
+        },
+      ],
+      status: 'closed',
+      resolution: 'covered',
+      resolved_at: ago(9 * DAY),
+    }),
   ]
 
   return {
@@ -563,6 +592,15 @@ export function seed(): Tables {
         colors: ['orange', 'white'],
         marks: 'Le cuesta apoyar la pata delantera derecha.',
         photo_urls: [mockPhoto('#d9893c')],
+      }),
+      pet({
+        id: 'pet-chispa',
+        owner_id: 'user-sofia',
+        name: 'Chispa',
+        species: 'cat',
+        size: 'small',
+        colors: ['black', 'white'],
+        photo_urls: [mockPhoto('#3a3a3a')],
       }),
       pet({
         id: 'pet-nube',
@@ -722,7 +760,7 @@ export function seed(): Tables {
         id: 'n-help-1',
         person_id: DEMO_OWNER_ID,
         event: 'help_pledge.created',
-        body: 'Marcela T. ofreció un hogar temporal para Nala.',
+        body: 'Marcela T. ofrece un hogar temporal para Nala. Escríbele para coordinar.',
         case_code: 'NA7LA',
         created_at: ago(5 * HOUR),
         read_at: null,
@@ -776,6 +814,12 @@ export function seed(): Tables {
         status: 'confirmed',
         created_at: ago(DAY),
         confirmed_at: ago(20 * HOUR),
+      }),
+      // Chispa: the ride Camilo offered, confirmed by Sofía — it covered the only need.
+      pledge('pl-chispa-ride', 'CH5PA', 'need-chispa-ride', 'user-camilo', '+573000000004', {
+        status: 'confirmed',
+        created_at: ago(11 * DAY),
+        confirmed_at: ago(9 * DAY),
       }),
     ],
     pushSubscriptions: [],

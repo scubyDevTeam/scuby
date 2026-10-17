@@ -24,10 +24,13 @@ export function SchematicMap({
   area,
   areaLabel,
   pins,
+  onSelectPin,
 }: {
   area: MapArea
   areaLabel: string
   pins: readonly MapPin[]
+  /** A pin tapped. The timeline under the map is the way to the same sheet without a pointer. */
+  onSelectPin?: (id: string) => void
 }) {
   const local = pins.map((pin) => ({ pin, ...metres(area.center, pin.point) }))
   const reach = Math.max(area.radiusM, ...local.map((p) => Math.max(Math.abs(p.x), Math.abs(p.y))))
@@ -39,7 +42,7 @@ export function SchematicMap({
   return (
     <figure className="m-0 overflow-hidden rounded-2xl bg-soft">
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="block w-full" role="img">
-        <title>{`${areaLabel}. ${pins.length} avistamientos.`}</title>
+        <title>{areaLabel}</title>
         <circle
           cx={px(0)}
           cy={py(0)}
@@ -60,7 +63,14 @@ export function SchematicMap({
         {ordered.map(({ pin, x, y }) => {
           const style = pin.emphasized ? { r: 16, opacity: 1 } : bandStyle[pin.band]
           return (
-            <g key={pin.id} opacity={style.opacity}>
+            // biome-ignore lint/a11y/noStaticElementInteractions: a pointer shortcut; the timeline is the keyboard's way to the same sheet
+            <g
+              key={pin.id}
+              opacity={style.opacity}
+              data-pin={pin.id}
+              onClick={onSelectPin && (() => onSelectPin(pin.id))}
+              className={onSelectPin && 'cursor-pointer'}
+            >
               <circle
                 cx={px(x)}
                 cy={py(y)}

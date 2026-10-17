@@ -4,8 +4,8 @@
     "includes": [
       "**",
       "!dist",
-      "!dist-e2e",
-      "!dist-size",
+      "!dist-e2e*",
+      "!dist-size*",
       "!test-results",
       "!playwright-report",
       "!.lighthouseci",

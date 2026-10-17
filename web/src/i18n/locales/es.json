@@ -378,176 +378,6 @@
       "view": "Ver la publicación"
     }
   },
-  "help": {
-    "band": {
-      "active": "Necesita ayuda",
-      "closed": "Solicitud cerrada",
-      "expired": "Solicitud archivada",
-      "removed": "Solicitud retirada"
-    },
-    "page": {
-      "photo_alt": "Foto de {name}",
-      "line": "Necesita ayuda en {place} · publicado {ago}",
-      "needs_title": "Lo que necesita",
-      "story_title": "Qué pasó",
-      "where_title": "Dónde se necesita",
-      "area_label": "Zona donde se necesita la ayuda (aproximada)",
-      "beneficiary": "Lo pide {name}",
-      "tier_unverified": "Sin verificar — la plataforma no ha revisado quién pide.",
-      "tier_verified": "Revisado — un operador revisó quién pide. No es una garantía.",
-      "no_money": "Aquí se ayuda en persona: nadie te va a pedir dinero, y si alguien lo hace, repórtalo.",
-      "safety": "Para entregas, encuéntrense en un lugar público. Un hogar temporal es un acuerdo entre personas: quien pide sigue siendo responsable del animal.",
-      "pledge": "Yo ayudo",
-      "pledge_hint": "Te pediremos entrar y un celular",
-      "closed_title": "{name} ya tiene la ayuda que necesitaba.",
-      "closed_body": "Gracias a quienes ayudaron.",
-      "ended_title": "Esta solicitud se cerró.",
-      "removed_title": "Esta solicitud ya no está activa.",
-      "archived_title": "Esta solicitud fue archivada.",
-      "archived_can_reopen": "Puedes reactivarla con un toque.",
-      "archived_beneficiary_can_reopen": "Quien la publicó puede reactivarla.",
-      "reopen": "Reactivar solicitud",
-      "close": "Ya no necesita ayuda",
-      "share": "Compartir solicitud",
-      "report": "Reportar"
-    },
-    "need": {
-      "kind": {
-        "foster": "Hogar temporal",
-        "transport": "Transporte",
-        "supplies": "Insumos"
-      },
-      "needed_by": "Para el {date}",
-      "progress_target": "{confirmed} de {target} confirmado · {pledged} prometido",
-      "progress_open": "{confirmed} confirmado · {pledged} prometido",
-      "nobody_yet": "Nadie se ha ofrecido todavía.",
-      "covered": "Cubierto",
-      "closed": "Cerrado",
-      "offer": "Yo ayudo con esto"
-    },
-    "mine": {
-      "offered": "Ofreciste: {detail}",
-      "waiting": "Esperando que {name} confirme que llegó.",
-      "confirmed": "{name} confirmó que llegó. ¡Gracias!",
-      "declined": "{name} dijo que esta vez no hizo falta.",
-      "withdrawn": "Retiraste tu oferta.",
-      "write": "Escribirle",
-      "withdraw": "Ya no puedo"
-    },
-    "sheet": {
-      "pledge_title": "¿Cómo ayudas a {name}?",
-      "conversation_title": "Escríbele a {name}",
-      "close_title": "¿{name} ya no necesita ayuda?",
-      "checkin_title": "¿{name} sigue necesitando ayuda?"
-    },
-    "checkin": {
-      "title": "¿{name} sigue necesitando ayuda?",
-      "body": "Si no nos confirmas, archivaremos la solicitud en 5 días. Marca abajo lo que ya llegó.",
-      "still": "Sí, sigue",
-      "ended": "Ya no necesita ayuda"
-    },
-    "poster": {
-      "label": "Necesita ayuda",
-      "line": "Necesita ayuda en {place} · desde el {date}",
-      "message": "🤝 {label}: {title} — {place}. {needs}. Ayuda en persona, sin dinero: {link}",
-      "owner_hint": "Compártela en los grupos del barrio: un hogar, un viaje o un bulto de comida suelen estar a pocas cuadras."
-    }
-  },
-  "help_forms": {
-    "pledge": {
-      "intro": "Ofrece lo que puedas dar en persona. {name} confirma cuando llegue.",
-      "need_legend": "¿Con qué ayudas?",
-      "quantity_label": "¿Cuántos?",
-      "note_label": "Un mensaje para {name}",
-      "note_placeholder": "Cuándo puedes, desde dónde…",
-      "phone_hint": "{name} te va a escribir a este número para coordinar.",
-      "submit": "Ofrecer y escribirle",
-      "sending": "Enviando…",
-      "confirm_code": "Confirmar código y ofrecer",
-      "failed": "No pudimos enviar tu oferta.",
-      "sent_title": "Le avisamos a {name}",
-      "sent_whatsapp": "Escríbele por WhatsApp para coordinar.",
-      "sent_in_app": "Te va a escribir por aquí para coordinar.",
-      "write_whatsapp": "Escribirle por WhatsApp",
-      "errors": {
-        "quantity_invalid": "Escribe un número entre 1 y 99"
-      }
-    },
-    "beneficiary": {
-      "title": "Quienes ofrecieron ayuda",
-      "none": "Todavía nadie se ofreció. Comparte la solicitud en los grupos del barrio.",
-      "offered": "Ofreció: {quantity}",
-      "confirm": "Llegó",
-      "decline": "No llegó",
-      "confirmed": "Confirmado",
-      "declined": "No llegó",
-      "call": "Llamar",
-      "whatsapp": "Abrir WhatsApp",
-      "cover": "Ya tengo lo que necesitaba",
-      "answer_failed": "No pudimos guardar tu respuesta."
-    },
-    "close": {
-      "intro": "Quienes ofrecieron ayuda y aún no la entregaron recibirán un aviso.",
-      "legend": "¿Por qué?",
-      "reason": {
-        "need_ended": "Ya no necesita ayuda",
-        "pet_deceased": "Falleció"
-      },
-      "submit": "Cerrar solicitud",
-      "closing": "Cerrando…",
-      "failed": "No pudimos cerrar la solicitud.",
-      "choose": "Elige una opción"
-    },
-    "publish": {
-      "title_pet": "¿Para quién es la ayuda?",
-      "title_needs": "¿Qué necesita?",
-      "title_place": "¿Dónde y qué pasó?",
-      "pet_legend": "¿Para cuál de tus mascotas?",
-      "other_pet": "Otra mascota",
-      "name_label": "Nombre",
-      "marks_label": "Cómo es",
-      "needs_hint": "Pide algo concreto que se pueda dar en persona, entre 1 y 3 cosas. Aquí no se pide dinero.",
-      "add_need": "Agregar {kind}",
-      "remove_need": "Quitar",
-      "detail_label": {
-        "foster": "¿Por cuánto tiempo y para qué?",
-        "transport": "¿De dónde a dónde y cuándo?",
-        "supplies": "¿Qué exactamente?"
-      },
-      "detail_placeholder": {
-        "foster": "2 semanas, mientras se recupera de la cirugía",
-        "transport": "De Envigado a la clínica en Laureles, martes 8 a. m.",
-        "supplies": "Concentrado para gato adulto, bultos de 8 kg"
-      },
-      "target_label": {
-        "foster": "¿Cuántos hogares?",
-        "transport": "¿Cuántos viajes?",
-        "supplies": "¿Cuántas unidades?"
-      },
-      "target_hint": "Déjalo vacío si es «lo que puedan».",
-      "needed_by_label": "¿Para cuándo?",
-      "story_label": "Cuéntales a tus vecinos qué pasó",
-      "story_hint": "Sin números de cuenta ni enlaces de pago: aquí no se pide dinero.",
-      "unverified_note": "Se publica de inmediato, marcada «Sin verificar».",
-      "continue": "Continuar",
-      "publishing": "Publicando…",
-      "submit": "Publicar solicitud",
-      "confirm_code": "Confirmar código y publicar",
-      "publish_failed": "No pudimos publicar la solicitud.",
-      "published_title": "¡Solicitud publicada!",
-      "published_notice_title": "Tus vecinos ya pueden ver lo que necesita {name}.",
-      "published_notice_body": "Te avisamos cada vez que alguien ofrezca ayuda.",
-      "view": "Ver mi solicitud",
-      "errors": {
-        "needs_required": "Elige al menos una cosa que necesite",
-        "too_many_needs": "Pide máximo 3 cosas",
-        "need_detail_required": "Di exactamente qué necesita en cada una",
-        "need_target_invalid": "La cantidad debe ser un número entero, o déjala vacía",
-        "needed_by_past": "Esa fecha ya pasó",
-        "story_required": "Cuéntales qué pasó"
-      }
-    }
-  },
   "publish": {
     "errors": {
       "name_required": "Dinos cómo se llama",
@@ -962,6 +792,177 @@
       "submit": "Enviar reporte"
     }
   },
+  "help": {
+    "band": {
+      "active": "Necesita ayuda",
+      "covered": "Ya tiene ayuda",
+      "closed": "Solicitud cerrada",
+      "expired": "Solicitud archivada",
+      "removed": "Solicitud retirada"
+    },
+    "page": {
+      "photo_alt": "Foto de {name}",
+      "line": "Necesita ayuda en {place} · publicado {ago}",
+      "needs_title": "Lo que necesita",
+      "story_title": "Qué pasó",
+      "where_title": "Dónde se necesita",
+      "area_label": "Zona donde se necesita la ayuda (aproximada)",
+      "beneficiary": "Lo pide {name}",
+      "tier_unverified": "Sin verificar — la plataforma no ha revisado quién pide.",
+      "tier_verified": "Revisado — un operador revisó quién pide. No es una garantía.",
+      "no_money": "Aquí se ayuda en persona: nadie te va a pedir dinero, y si alguien lo hace, repórtalo.",
+      "safety": "Para entregas, encuéntrense en un lugar público. Un hogar temporal es un acuerdo entre personas: quien pide sigue siendo responsable del animal.",
+      "pledge": "Yo ayudo",
+      "pledge_hint": "Te pediremos entrar y un celular",
+      "closed_title": "{name} ya tiene la ayuda que necesitaba.",
+      "closed_body": "Gracias a quienes ayudaron.",
+      "ended_title": "Esta solicitud se cerró.",
+      "removed_title": "Esta solicitud ya no está activa.",
+      "archived_title": "Esta solicitud fue archivada.",
+      "archived_can_reopen": "Puedes reactivarla con un toque.",
+      "archived_beneficiary_can_reopen": "Quien la publicó puede reactivarla.",
+      "reopen": "Reactivar solicitud",
+      "close": "Ya no necesita ayuda",
+      "share": "Compartir solicitud",
+      "report": "Reportar"
+    },
+    "need": {
+      "kind": {
+        "foster": "Hogar temporal",
+        "transport": "Transporte",
+        "supplies": "Insumos"
+      },
+      "needed_by": "Para el {date}",
+      "progress_target": "{confirmed} de {target} confirmado · {pledged} prometido",
+      "progress_open": "{confirmed} confirmado · {pledged} prometido",
+      "nobody_yet": "Nadie se ha ofrecido todavía.",
+      "covered": "Cubierto",
+      "closed": "Cerrado",
+      "offer": "Yo ayudo con esto"
+    },
+    "mine": {
+      "offered": "Ofreciste: {detail}",
+      "waiting": "Esperando que {name} confirme que llegó.",
+      "confirmed": "{name} confirmó que llegó. ¡Gracias!",
+      "declined": "{name} dijo que esta vez no hizo falta.",
+      "withdrawn": "Retiraste tu oferta.",
+      "write": "Escribirle",
+      "withdraw": "Ya no puedo"
+    },
+    "sheet": {
+      "pledge_title": "¿Cómo ayudas a {name}?",
+      "conversation_title": "Escríbele a {name}",
+      "close_title": "¿{name} ya no necesita ayuda?",
+      "checkin_title": "¿{name} sigue necesitando ayuda?"
+    },
+    "checkin": {
+      "title": "¿{name} sigue necesitando ayuda?",
+      "body": "Si no nos confirmas, archivaremos la solicitud en 5 días. Marca abajo lo que ya llegó.",
+      "still": "Sí, sigue",
+      "ended": "Ya no necesita ayuda"
+    },
+    "poster": {
+      "label": "Necesita ayuda",
+      "line": "Necesita ayuda en {place} · desde el {date}",
+      "message": "🤝 {label}: {title} — {place}. {needs}. Ayuda en persona, sin dinero: {link}",
+      "owner_hint": "Compártela en los grupos del barrio: un hogar, un viaje o un bulto de comida suelen estar a pocas cuadras."
+    }
+  },
+  "help_forms": {
+    "pledge": {
+      "intro": "Ofrece lo que puedas dar en persona. {name} confirma cuando llegue.",
+      "need_legend": "¿Con qué ayudas?",
+      "quantity_label": "¿Cuántos?",
+      "note_label": "Un mensaje para {name}",
+      "note_placeholder": "Cuándo puedes, desde dónde…",
+      "phone_hint": "{name} te va a escribir a este número para coordinar.",
+      "submit": "Ofrecer y escribirle",
+      "sending": "Enviando…",
+      "confirm_code": "Confirmar código y ofrecer",
+      "failed": "No pudimos enviar tu oferta.",
+      "sent_title": "Le avisamos a {name}",
+      "sent_whatsapp": "Escríbele por WhatsApp para coordinar.",
+      "sent_in_app": "Te va a escribir por aquí para coordinar.",
+      "write_whatsapp": "Escribirle por WhatsApp",
+      "errors": {
+        "quantity_invalid": "Escribe un número entre 1 y 99"
+      }
+    },
+    "beneficiary": {
+      "title": "Quienes ofrecieron ayuda",
+      "none": "Todavía nadie se ofreció. Comparte la solicitud en los grupos del barrio.",
+      "offered": "Ofreció: {quantity}",
+      "confirm": "Llegó",
+      "decline": "No llegó",
+      "confirmed": "Confirmado",
+      "declined": "No llegó",
+      "call": "Llamar",
+      "whatsapp": "Abrir WhatsApp",
+      "cover": "Ya tengo lo que necesitaba",
+      "answer_failed": "No pudimos guardar tu respuesta."
+    },
+    "close": {
+      "intro": "Quienes ofrecieron ayuda y aún no la entregaron recibirán un aviso.",
+      "legend": "¿Por qué?",
+      "reason": {
+        "need_ended": "Ya no necesita ayuda",
+        "pet_deceased": "Falleció"
+      },
+      "submit": "Cerrar solicitud",
+      "closing": "Cerrando…",
+      "failed": "No pudimos cerrar la solicitud.",
+      "choose": "Elige una opción"
+    },
+    "publish": {
+      "title_pet": "¿Para quién es la ayuda?",
+      "title_needs": "¿Qué necesita?",
+      "title_place": "¿Dónde y qué pasó?",
+      "pet_legend": "¿Para cuál de tus mascotas?",
+      "other_pet": "Otra mascota",
+      "name_label": "Nombre",
+      "marks_label": "Cómo es",
+      "needs_hint": "Pide algo concreto que se pueda dar en persona, entre 1 y 3 cosas. Aquí no se pide dinero.",
+      "add_need": "Agregar {kind}",
+      "remove_need": "Quitar",
+      "detail_label": {
+        "foster": "¿Por cuánto tiempo y para qué?",
+        "transport": "¿De dónde a dónde y cuándo?",
+        "supplies": "¿Qué exactamente?"
+      },
+      "detail_placeholder": {
+        "foster": "2 semanas, mientras se recupera de la cirugía",
+        "transport": "De Envigado a la clínica en Laureles, martes 8 a. m.",
+        "supplies": "Concentrado para gato adulto, bultos de 8 kg"
+      },
+      "target_label": {
+        "foster": "¿Cuántos hogares?",
+        "transport": "¿Cuántos viajes?",
+        "supplies": "¿Cuántas unidades?"
+      },
+      "target_hint": "Déjalo vacío si es «lo que puedan».",
+      "needed_by_label": "¿Para cuándo?",
+      "story_label": "Cuéntales a tus vecinos qué pasó",
+      "story_hint": "Sin números de cuenta ni enlaces de pago: aquí no se pide dinero.",
+      "unverified_note": "Se publica de inmediato, marcada «Sin verificar».",
+      "continue": "Continuar",
+      "publishing": "Publicando…",
+      "submit": "Publicar solicitud",
+      "confirm_code": "Confirmar código y publicar",
+      "publish_failed": "No pudimos publicar la solicitud.",
+      "published_title": "¡Solicitud publicada!",
+      "published_notice_title": "Tus vecinos ya pueden ver lo que necesita {name}.",
+      "published_notice_body": "Te avisamos cada vez que alguien ofrezca ayuda.",
+      "view": "Ver mi solicitud",
+      "errors": {
+        "needs_required": "Elige al menos una cosa que necesite",
+        "too_many_needs": "Pide máximo 3 cosas",
+        "need_detail_required": "Di exactamente qué necesita en cada una",
+        "need_target_invalid": "La cantidad debe ser un número entero, o déjala vacía",
+        "needed_by_past": "Esa fecha ya pasó",
+        "story_required": "Cuéntales qué pasó"
+      }
+    }
+  },
   "inbox": {
     "title": "Bandeja",
     "list_label": "Avisos",
@@ -1023,6 +1024,125 @@
       "consent_body": "Al crear tu cuenta o dejar tus datos en un aviso autorizas este tratamiento."
     }
   },
+  "links": {
+    "loading": "Abriendo el enlace",
+    "unnamed": "el animal",
+    "not_found_title": "Este enlace no existe",
+    "not_found_body": "Puede que se haya copiado incompleto. Si te llegó por correo, ábrelo otra vez desde el botón.",
+    "go_home": "Ver avisos cerca de mí",
+    "load_failed": "No pudimos abrir el enlace",
+    "confirm_failed": "No pudimos guardar tu respuesta.",
+    "view_case": {
+      "lost": "Ver el aviso",
+      "found": "Ver el aviso",
+      "adoption": "Ver la publicación",
+      "help": "Ver la solicitud"
+    },
+    "thanks": {
+      "still_lost": {
+        "title": "Gracias, seguimos buscando",
+        "body": "Dejamos el aviso de {name} activo. Te volvemos a preguntar en una semana."
+      },
+      "reunited": {
+        "title": "¡{name} ya está en casa!",
+        "body": "Cerramos el aviso y les contamos a quienes ayudaron."
+      },
+      "delete": {
+        "title": "Eliminamos el aviso",
+        "body": "El aviso de {name} ya no se muestra ni le llega a nadie más."
+      },
+      "claim_confirmed": {
+        "title": "¡{name} vuelve a casa!",
+        "body": "Cerramos el aviso. Gracias a quien la encontró y avisó."
+      },
+      "claim_dismissed": {
+        "title": "Listo, no era {name}",
+        "body": "Quitamos el aviso de posible hallazgo. La búsqueda sigue igual."
+      },
+      "still_verifying": {
+        "title": "Gracias, lo dejamos abierto",
+        "body": "El aviso de posible hallazgo sigue 3 días más. Te volvemos a preguntar entonces."
+      },
+      "still_available": {
+        "title": "Gracias, sigue publicada",
+        "body": "La publicación de {name} sigue activa. Te volvemos a preguntar en dos semanas."
+      },
+      "adopted": {
+        "title": "¡{name} ya tiene hogar!",
+        "body": "Cerramos la publicación y les avisamos a quienes preguntaron."
+      },
+      "still_needed": {
+        "title": "Gracias, la solicitud sigue",
+        "body": "La solicitud de {name} sigue activa. Cuando algo llegue, márcalo en la solicitud."
+      },
+      "no_longer_needed": {
+        "title": "Cerramos la solicitud",
+        "body": "Les contamos a quienes ofrecieron ayuda. Gracias por avisarnos."
+      }
+    },
+    "confirm": {
+      "reunited": {
+        "title": "¿Confirmas que {name} ya apareció?",
+        "body": "Cerramos el aviso y les contamos a quienes ayudaron. Un toque y listo.",
+        "button": "Sí, ya apareció",
+        "decline": "No, sigue perdida"
+      },
+      "delete": {
+        "title": "¿Eliminamos el aviso de {name}?",
+        "body": "Deja de mostrarse y nadie más recibe la alerta.",
+        "button": "Sí, eliminar el aviso",
+        "decline": "No, sigue perdida"
+      },
+      "claim_confirmed": {
+        "title": "¿Confirmas que es {name}?",
+        "body": "Cerramos el aviso: {name} vuelve a casa gracias a quien avisó.",
+        "button": "Sí, es {name}",
+        "decline": "Aún verificando"
+      },
+      "claim_dismissed": {
+        "title": "¿Confirmas que no es {name}?",
+        "body": "Quitamos el aviso de posible hallazgo. La búsqueda sigue igual.",
+        "button": "No es {name}",
+        "decline": "Aún verificando"
+      },
+      "adopted": {
+        "title": "¿Confirmas que {name} ya fue adoptado?",
+        "body": "Cerramos la publicación y les avisamos a quienes preguntaron.",
+        "button": "Sí, ya fue adoptado",
+        "decline": "No, sigue disponible"
+      },
+      "no_longer_needed": {
+        "title": "¿{name} ya no necesita ayuda?",
+        "body": "Cerramos la solicitud y les avisamos a quienes ofrecieron ayuda.",
+        "button": "Sí, cerrar la solicitud",
+        "decline": "No, sigue"
+      }
+    },
+    "used": {
+      "title": "Ya tenemos tu respuesta",
+      "body": "La registramos para {name}. No tienes que hacer nada más."
+    },
+    "already_answered": {
+      "title": "Esta pregunta ya tiene respuesta",
+      "body": "Se respondió desde la app o con otro botón del correo. Abre el aviso para ver cómo sigue."
+    },
+    "expired": {
+      "title": "Este enlace venció",
+      "body": "Los botones del correo duran una semana. Si la pregunta sigue abierta, respóndela desde el aviso."
+    }
+  },
+  "checkin_banner": {
+    "label": "Pregunta pendiente",
+    "title": {
+      "lost": "El aviso de {name} espera tu respuesta.",
+      "found": "El aviso de {name} espera tu respuesta.",
+      "adoption": "La publicación de {name} espera tu respuesta.",
+      "help": "La solicitud de {name} espera tu respuesta."
+    },
+    "body": "Si no respondes, se archiva.",
+    "more": "Y {count} más en «Mis casos».",
+    "answer": "Responder"
+  },
   "lost": {
     "pet": {
       "species_other": "Mascota"
@@ -1069,6 +1189,13 @@
       "anonymous": "anónimo",
       "note": "«{note}»"
     },
+    "queued": {
+      "label": "Tus avistamientos sin enviar",
+      "seen": "Viste a {name} · {ago}",
+      "waiting": "En espera",
+      "not_sent": "No se envió",
+      "dismiss": "Descartar"
+    },
     "sighting_form": {
       "when": {
         "now": "Ahora",
@@ -1093,7 +1220,11 @@
       "failed_title": "No pudimos enviar tu avistamiento.",
       "too_soon": "Ya registraste un avistamiento hace poco.",
       "sending": "Enviando…",
-      "submit": "Enviar avistamiento"
+      "submit": "Enviar avistamiento",
+      "offline": "Sin conexión",
+      "queued_title": "Guardamos tu avistamiento",
+      "queued_body": "Se envía solo apenas vuelva la señal. No tienes que repetirlo.",
+      "back_to_case": "Volver al aviso de {name}"
     },
     "claim_form": {
       "phone_required": "Escribe tu número de celular",
@@ -1198,6 +1329,24 @@
       "ownership_unnamed": "Al publicar confirmas que esta es tu mascota."
     }
   },
+  "map_pin": {
+    "open_sighting": "Abrir la ficha del avistamiento {n}"
+  },
+  "map_sheet": {
+    "feed": {
+      "view": "Ver"
+    },
+    "sighting": {
+      "title": "Avistamiento {n}",
+      "distance": "a {distance} de donde se perdió",
+      "by_registered": "Reportado por alguien con cuenta",
+      "by_anonymous": "Reportado por alguien anónimo",
+      "photo_alt": "Foto del avistamiento",
+      "write": "Escribirle",
+      "call": "Llamar",
+      "saw_it_too": "La vi aquí también"
+    }
+  },
   "preview": {
     "label": {
       "lost": {
@@ -1223,6 +1372,7 @@
       },
       "help": {
         "active": "Necesita ayuda",
+        "covered": "Ya tiene ayuda",
         "closed": "Solicitud cerrada",
         "expired": "Solicitud archivada",
         "removed": "Solicitud retirada"
@@ -1246,6 +1396,7 @@
       "closed": "Este aviso ya terminó.",
       "help_active": "{name} necesita {needs}. Ayuda en persona, nunca dinero.",
       "help_closed": "{name} ya tiene la ayuda que necesitaba. Gracias a quienes ayudaron.",
+      "help_ended": "Quien la publicó cerró esta solicitud.",
       "help_expired": "Esta solicitud fue archivada.",
       "help_removed": "Esta solicitud ya no está activa."
     },

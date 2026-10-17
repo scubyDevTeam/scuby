@@ -1,6 +1,8 @@
 // The owner of a lost case: publishing, the case's endings, claims, pins, check-ins, the inbox
 // (docs/product/04 · Publishing, state machine, The follow-up loop; 08).
+import type * as z from 'zod/mini'
 import { api } from '../../contracts/api'
+import type { answerCheckinRequest } from '../../contracts/owner'
 import { db, findCase, type LostRow, newCode, newId, type PersonRow } from '../db'
 import {
   closeCheckins,
@@ -93,6 +95,103 @@ function answerClaim(row: LostRow, claimId: string, status: 'confirmed' | 'dismi
 }
 
 const TIME_BASED = ['still_lost', 'reunited', 'delete']
+
+/**
+ * Answers a check-in as the person responsible for the case: the app's buttons, and the email's
+ * one-tap links (api/links.ts), which act as that person because the token is the auth.
+ */
+export function answerCheckinAs(
+  user: PersonRow,
+  params: { code: string; checkinId: string },
+  body: z.output<typeof answerCheckinRequest>,
+) {
+  const listing = findCase(params.code)
+  if (listing?.vertical === 'adoption') {
+    // «Sigue disponible» is the one-tap answer (06); the endings have their own endpoints.
+    if (listing.created_by !== user.id) fail('forbidden')
+    const checkin = db.checkins.find(
+      (c) => c.id === params.checkinId && c.case_code === listing.code,
+    )
+    if (!checkin) fail('not_found')
+    if (checkin.responded_at || checkin.cancelled_at || listing.status !== 'active') {
+      fail('invalid_transition')
+    }
+    if (body.response !== 'still_available') {
+      throw new Fail('validation_failed', undefined, {
+        response: `«${body.response}» does not answer an adoption check-in`,
+      })
+    }
+    checkin.responded_at = iso(Date.now())
+    checkin.response = body.response
+    onListerInteraction(listing.code)
+    return { id: checkin.id }
+  }
+  if (listing?.vertical === 'help') {
+    // «Sigue» is the one-tap answer (07); «ya no necesita ayuda» is closeHelp, which ends it.
+    if (listing.created_by !== user.id) fail('forbidden')
+    const checkin = db.checkins.find(
+      (c) => c.id === params.checkinId && c.case_code === listing.code,
+    )
+    if (!checkin) fail('not_found')
+    if (checkin.responded_at || checkin.cancelled_at || listing.status !== 'active') {
+      fail('invalid_transition')
+    }
+    if (body.response !== 'still_needed') {
+      throw new Fail('validation_failed', undefined, {
+        response: `«${body.response}» does not answer a help request's check-in`,
+      })
+    }
+    checkin.responded_at = iso(Date.now())
+    checkin.response = body.response
+    onBeneficiaryInteraction(listing.code)
+    return { id: checkin.id }
+  }
+  const row = ownedLost(params.code, user)
+  const checkin = db.checkins.find((c) => c.id === params.checkinId && c.case_code === row.code)
+  if (!checkin) fail('not_found')
+  if (checkin.responded_at || checkin.cancelled_at || row.status !== 'active') {
+    fail('invalid_transition')
+  }
+  const fitsTrigger =
+    body.response !== 'still_available' &&
+    body.response !== 'still_needed' &&
+    TIME_BASED.includes(body.response) === (checkin.trigger === 'time_based')
+  if (!fitsTrigger) {
+    throw new Fail('validation_failed', undefined, {
+      response: `«${body.response}» does not answer a ${checkin.trigger} check-in`,
+    })
+  }
+  checkin.responded_at = iso(Date.now())
+  checkin.response = body.response
+
+  const claimId = checkin.claim_id ?? ''
+  switch (body.response) {
+    case 'still_lost':
+      break
+    case 'reunited':
+      reunite(row, body.resolution_attribution ?? 'unknown')
+      break
+    case 'delete':
+      cancel(row, body.resolution ?? 'false_alarm')
+      break
+    case 'claim_confirmed':
+      // «Sí, es ella» confirms the claim and resolves the case (04 · The follow-up loop).
+      answerClaim(row, claimId, 'confirmed')
+      reunite(row, 'platform_claim')
+      break
+    case 'claim_dismissed':
+      answerClaim(row, claimId, 'dismissed')
+      break
+    case 'still_verifying': {
+      const claim = db.recoveryClaims.find((c) => c.id === claimId)
+      if (claim) claim.stale_at = iso(ms(claim.stale_at) + 3 * DAY)
+      onStillVerifying(row.code, claimId)
+      break
+    }
+  }
+  if (row.status === 'active') onOwnerInteraction(row.code)
+  return { id: checkin.id }
+}
 
 export const owner = [
   route(api.listMyPets, ({ user }) => petsView(db, user.id)),
@@ -212,94 +311,7 @@ export const owner = [
     return { id: sighting.id }
   }),
 
-  route(api.answerCheckin, ({ params, user, body }) => {
-    const listing = findCase(params.code)
-    if (listing?.vertical === 'adoption') {
-      // «Sigue disponible» is the one-tap answer (06); the endings have their own endpoints.
-      if (listing.created_by !== user.id) fail('forbidden')
-      const checkin = db.checkins.find(
-        (c) => c.id === params.checkinId && c.case_code === listing.code,
-      )
-      if (!checkin) fail('not_found')
-      if (checkin.responded_at || checkin.cancelled_at || listing.status !== 'active') {
-        fail('invalid_transition')
-      }
-      if (body.response !== 'still_available') {
-        throw new Fail('validation_failed', undefined, {
-          response: `«${body.response}» does not answer an adoption check-in`,
-        })
-      }
-      checkin.responded_at = iso(Date.now())
-      checkin.response = body.response
-      onListerInteraction(listing.code)
-      return { id: checkin.id }
-    }
-    if (listing?.vertical === 'help') {
-      // «Sigue» is the one-tap answer (07); «ya no necesita ayuda» is closeHelp, which ends it.
-      if (listing.created_by !== user.id) fail('forbidden')
-      const checkin = db.checkins.find(
-        (c) => c.id === params.checkinId && c.case_code === listing.code,
-      )
-      if (!checkin) fail('not_found')
-      if (checkin.responded_at || checkin.cancelled_at || listing.status !== 'active') {
-        fail('invalid_transition')
-      }
-      if (body.response !== 'still_needed') {
-        throw new Fail('validation_failed', undefined, {
-          response: `«${body.response}» does not answer a help request's check-in`,
-        })
-      }
-      checkin.responded_at = iso(Date.now())
-      checkin.response = body.response
-      onBeneficiaryInteraction(listing.code)
-      return { id: checkin.id }
-    }
-    const row = ownedLost(params.code, user)
-    const checkin = db.checkins.find((c) => c.id === params.checkinId && c.case_code === row.code)
-    if (!checkin) fail('not_found')
-    if (checkin.responded_at || checkin.cancelled_at || row.status !== 'active') {
-      fail('invalid_transition')
-    }
-    const fitsTrigger =
-      body.response !== 'still_available' &&
-      body.response !== 'still_needed' &&
-      TIME_BASED.includes(body.response) === (checkin.trigger === 'time_based')
-    if (!fitsTrigger) {
-      throw new Fail('validation_failed', undefined, {
-        response: `«${body.response}» does not answer a ${checkin.trigger} check-in`,
-      })
-    }
-    checkin.responded_at = iso(Date.now())
-    checkin.response = body.response
-
-    const claimId = checkin.claim_id ?? ''
-    switch (body.response) {
-      case 'still_lost':
-        break
-      case 'reunited':
-        reunite(row, body.resolution_attribution ?? 'unknown')
-        break
-      case 'delete':
-        cancel(row, body.resolution ?? 'false_alarm')
-        break
-      case 'claim_confirmed':
-        // «Sí, es ella» confirms the claim and resolves the case (04 · The follow-up loop).
-        answerClaim(row, claimId, 'confirmed')
-        reunite(row, 'platform_claim')
-        break
-      case 'claim_dismissed':
-        answerClaim(row, claimId, 'dismissed')
-        break
-      case 'still_verifying': {
-        const claim = db.recoveryClaims.find((c) => c.id === claimId)
-        if (claim) claim.stale_at = iso(ms(claim.stale_at) + 3 * DAY)
-        onStillVerifying(row.code, claimId)
-        break
-      }
-    }
-    if (row.status === 'active') onOwnerInteraction(row.code)
-    return { id: checkin.id }
-  }),
+  route(api.answerCheckin, ({ params, user, body }) => answerCheckinAs(user, params, body)),
 
   route(api.listNotifications, ({ user }) => notificationsView(db, user.id)),
 

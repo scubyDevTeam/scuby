@@ -5,7 +5,7 @@ import { needsWords } from '../-i18n'
 
 // No account: a witness report must be as cheap to file as possible.
 export const Route = createFileRoute('/{-$locale}/publicar/encontrado/visto')({
-  beforeLoad: needsWords('publish'),
+  beforeLoad: needsWords('publish', 'found'),
   component: Witness,
 })
 

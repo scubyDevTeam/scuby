@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 
 setWorkerUrl(workerUrl)
 
-export { type GeoJSONSource, Map as GlMap } from 'maplibre-gl'
+export { type GeoJSONSource, Map as GlMap, type MapGeoJSONFeature } from 'maplibre-gl'
 
 export const cssColor = (name: string) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim()

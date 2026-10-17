@@ -6,9 +6,19 @@ import { auth } from './api/auth'
 import { found } from './api/found'
 import { help } from './api/help'
 import { helpers } from './api/helpers'
+import { links } from './api/links'
 import { owner } from './api/owner'
 import { reads } from './api/reads'
 
 export { DEMO_CODE } from './api/auth'
 
-export const handlers = [...auth, ...reads, ...helpers, ...owner, ...found, ...adoption, ...help]
+export const handlers = [
+  ...auth,
+  ...reads,
+  ...helpers,
+  ...owner,
+  ...found,
+  ...adoption,
+  ...help,
+  ...links,
+]
