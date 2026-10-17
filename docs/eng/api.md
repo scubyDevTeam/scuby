@@ -107,7 +107,7 @@ Simplified on purpose — the real backend must do better:
 | A claim or an interest opens its thread with an automatic first message (evidence / introduction); chat threads in a table, polled every 15 s while a thread is open; closed = its case is no longer active | Twilio Conversations behind the same endpoints: lazy creation at the first message, `state=closed` on resolution, purge by `DELETE` ([comms.md](comms.md)) |
 | Display text composed in Spanish, whatever `Accept-Language` says | Composed in the request's language |
 
-Not in the contract yet: found-case check-ins (the custodian's «¿sigues con él?»), purge after 30
+Not in the contract yet: purge after 30
 days, and `«Lo tengo»` on an expired case (O3).
 From help ([07](../product/07-help-workflow.md)): photos on a request beyond the pet's own, a
 request for a custodian's found animal opened from its found case, and operator review into
