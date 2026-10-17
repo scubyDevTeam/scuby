@@ -564,7 +564,40 @@
       "save": "Save changes",
       "saving": "Saving…",
       "saved": "Your changes are saved.",
-      "sign_out": "Sign out"
+      "sign_out": "Sign out",
+      "alerts": {
+        "title": "Lost pets near me",
+        "off_hint": "We only tell you what matters: one notification for each lost pet nearby.",
+        "activate": "Turn on alerts",
+        "on_summary": "We’ll tell you about lost pets near {place}, about {km} km around.",
+        "change_zone": "Change the zone",
+        "turn_off": "Turn off alerts",
+        "loading": "Loading your alerts",
+        "load_failed": "We couldn’t load your alerts.",
+        "off_failed": "We couldn’t turn them off. Try again.",
+        "sheet": {
+          "permission_title": "We only tell you what matters",
+          "permission_body": "One notification for each lost pet nearby. Between 10 p.m. and 7 a.m., only what’s urgent.",
+          "allow": "Allow notifications",
+          "enabling": "Asking for permission…",
+          "skip": "Not now",
+          "denied": "Notifications are blocked in your browser. You’ll still see the alerts in your Inbox.",
+          "failed": "We couldn’t turn notifications on. You’ll still see the alerts in your Inbox.",
+          "continue": "Continue",
+          "zone_title": "Confirm your zone",
+          "step": "Step {n} of {total}",
+          "zone_pick": "Mark the center of your zone",
+          "zone_hint": "About {km} km around. You can change it anytime in Profile.",
+          "radius_label": "Zone radius",
+          "radius_option": "{km} km",
+          "confirm": "Done, tell me",
+          "saving": "Saving…",
+          "save_failed": "We couldn’t save your zone. Try again.",
+          "need_point": "Mark your zone on the map or use your location.",
+          "done_title": "Done, we’ll tell you.",
+          "done_body": "Only what matters: one notification for each lost pet nearby."
+        }
+      }
     }
   },
   "mine": {

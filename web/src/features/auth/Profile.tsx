@@ -11,6 +11,7 @@ import { Notice } from '@ui/Notice'
 import { Message, Skeleton } from '@ui/States'
 import { WifiOff } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
+import { NearbyAlerts } from './NearbyAlerts'
 
 /** The contract's limit on the name and the city (`profileUpdateRequest`). */
 const SHORT_TEXT_MAX = 80
@@ -35,7 +36,7 @@ const errorCopy: Record<ProfileError, TextKey> = {
  * email is the login identity and is not editable in v1; the phone is shown, and changed at the
  * next publish (the phone step re-verifies it).
  */
-export function Profile() {
+export function Profile({ mapStyleUrl }: { mapStyleUrl?: string }) {
   const { t } = useI18n()
   const profile = useProfile()
   const signOut = useSignOut()
@@ -64,6 +65,7 @@ export function Profile() {
             <h1 className="m-0 text-3xl font-extrabold">{profile.data.displayName}</h1>
           </header>
           <Account profile={profile.data} />
+          <NearbyAlerts mapStyleUrl={mapStyleUrl} />
           <ProfileForm profile={profile.data} />
         </>
       )}
