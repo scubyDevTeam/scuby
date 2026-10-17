@@ -246,6 +246,11 @@ export function AdoptionCasePage({
           {t('adoption.page.withdraw_interest')}
         </Button>
       ) : null}
+      {can('edit') ? (
+        <Button variant="outline" onClick={() => onAction('edit')}>
+          {t('adoption.page.edit')}
+        </Button>
+      ) : null}
       {can('reopen') ? (
         <Button onClick={() => onAction('reopen')}>{t('adoption.page.reopen')}</Button>
       ) : null}

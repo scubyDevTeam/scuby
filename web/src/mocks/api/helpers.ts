@@ -6,7 +6,7 @@ import { onClaimOpened } from '../followup'
 import { notify } from '../notify'
 import { fail, route } from '../route'
 import { ago, DAY, distance, HOUR, iso, metres, ms } from '../rules'
-import { ownership } from '../serialize'
+import { EDIT_WINDOW, ownership } from '../serialize'
 
 const MAX_DISTANCE_M = 30_000
 const BEFORE_CASE = DAY
@@ -18,8 +18,13 @@ function rateLimit(reporter: { id: string | null; key: string }, caseCode: strin
   )
   const since = (window: number) => mine.filter((s) => Date.now() - ms(s.created_at) < window)
   const here = (rows: SightingRow[]) => rows.filter((s) => s.case_code === caseCode)
+  // «Lo vi otra vez» (04 · Second pin): while the earlier pin can still be corrected, a new one is
+  // not «hace poco» — the 15-minute rule would always refuse the question's own answer. The daily
+  // caps still hold.
+  const lastHere = here(mine).sort((a, b) => ms(b.created_at) - ms(a.created_at))[0]
+  const askedAbout = lastHere !== undefined && Date.now() - ms(lastHere.created_at) < EDIT_WINDOW
   if (
-    (caseCode && here(since(15 * 60_000)).length >= 1) ||
+    (caseCode && !askedAbout && here(since(15 * 60_000)).length >= 1) ||
     (caseCode && here(since(DAY)).length >= 5) ||
     since(DAY).length >= 20
   ) {

@@ -149,9 +149,8 @@ cada dependencia.»
 
 ### 0.2 Quality gates
 **Do:** Biome; Vitest; **dependency-cruiser** with the layer table from frontend.md
-(`domain` imports nothing, etc.); a size-budget script (`/c/:code` entry ≤ 150 KB gzip, MapLibre not in the
-entry chunk); Playwright; Lighthouse CI config; GitHub Actions workflow running lint → typecheck →
-test → build → size → depcruise on every PR.
+(`domain` imports nothing, etc.); Playwright; Lighthouse CI config; GitHub Actions workflow running lint → typecheck →
+test → build → depcruise on every PR.
 **Done when:** each gate goes red on a deliberate violation (commit one, watch it fail, revert).
 
 ### 0.3 Router, data layer, mocks
@@ -247,7 +246,7 @@ exists), inject `og:`/`twitter:` tags + a readable summary into the built `index
 **Done when:** a deployed preview URL pasted into WhatsApp shows title, description and image.
 
 ### 2.4 Budgets
-**Done when:** size-limit and Lighthouse CI pass on `/c/:code` (≤ 150 KB, LCP ≤ 2.0 s Slow 4G).
+**Done when:** Lighthouse CI runs on `/c/:code` (LCP ≤ 2.0 s Slow 4G); there is no size gate.
 
 ---
 

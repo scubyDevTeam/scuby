@@ -11,6 +11,7 @@ export type AdoptionAction =
   | 'report_content'
   | 'record_adoption' // «Ya fue adoptado»
   | 'withdraw_listing' // «Ya no está disponible»
+  | 'edit' // «Editar aviso»
   | 'reopen'
 
 export type AdoptionPageMode = 'open' | 'closed' | 'archived'
@@ -30,7 +31,7 @@ export function availableActions(
   now: Date,
 ): AdoptionAction[] {
   if (state.status === 'active') {
-    if (viewer === 'lister') return ['record_adoption', 'withdraw_listing', 'share']
+    if (viewer === 'lister') return ['record_adoption', 'edit', 'withdraw_listing', 'share']
     // One interest per person: tapping again reopens the conversation it opened.
     const interested = mine !== null && mine.status !== 'withdrawn'
     return interested

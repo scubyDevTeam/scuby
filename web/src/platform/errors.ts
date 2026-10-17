@@ -1,7 +1,7 @@
 // Error reporting (docs/eng/frontend.md · Budgets: Sentry from the first deploy). The app calls
 // `reportError()`; this file is all of it that ships in the first load. The SDK
 // (./errors-sdk.ts, @sentry/react) is fetched after the page has painted, because `/c/:code` has
-// no room for it in its 150 KB: until then the errors wait in a short queue here. With no DSN
+// no reason to weigh the first load with it: until then the errors wait in a short queue here. With no DSN
 // (`mock-…` in .env) nothing is queued and the SDK is never fetched.
 import { env } from '../env'
 

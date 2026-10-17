@@ -178,7 +178,8 @@
       "where_title": "Dónde está",
       "area_label": "Zona donde está (aproximada)",
       "share": "Compartir publicación",
-      "report": "Reportar"
+      "report": "Reportar",
+      "edit": "Editar aviso"
     },
     "temperament": {
       "good_with_kids": "Bien con niños",
@@ -728,7 +729,8 @@
       "where_title": "Dónde se encontró",
       "area_label": "Zona donde se encontró (aproximada)",
       "see_listing": "Ver su publicación de adopción",
-      "write_chat": "Escribirle por chat"
+      "write_chat": "Escribirle por chat",
+      "edit": "Editar aviso"
     },
     "custodian": {
       "offer_label": "Quince días sin dueño",
@@ -860,7 +862,8 @@
       "reopen": "Reactivar solicitud",
       "close": "Ya no necesita ayuda",
       "share": "Compartir solicitud",
-      "report": "Reportar"
+      "report": "Reportar",
+      "edit": "Editar aviso"
     },
     "need": {
       "kind": {
@@ -1604,5 +1607,20 @@
       "one": "1 mensaje sin leer",
       "other": "{count} mensajes sin leer"
     }
+  },
+  "edit_case": {
+    "title": "Editar aviso de {name}",
+    "intro": "Corrige lo que cambió. No volvemos a avisar a nadie.",
+    "marks": "Señas",
+    "story": "Historia",
+    "story_required": "Cuenta algo para que te entiendan.",
+    "photos_required": "Deja al menos una foto.",
+    "temperament": "Carácter",
+    "requirements": "Requisitos para adoptar",
+    "save": "Guardar cambios",
+    "saving": "Guardando…",
+    "saved_title": "Listo, guardamos los cambios.",
+    "saved_body": "El aviso ya muestra lo nuevo.",
+    "failed": "No pudimos guardar los cambios. Inténtalo de nuevo."
   }
 }

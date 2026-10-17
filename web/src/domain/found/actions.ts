@@ -12,6 +12,7 @@ export type FoundAction =
   | 'keep' // «Me lo quedo»
   | 'transfer_to_org' // «Lo entregué a una fundación»
   | 'cancel'
+  | 'edit' // «Editar aviso»
   | 'reopen'
 
 export type FoundPageMode = 'open' | 'closed' | 'archived'
@@ -28,7 +29,7 @@ export function availableActions(
 ): FoundAction[] {
   if (state.status === 'active') {
     return viewer === 'custodian'
-      ? ['confirm_reunited', 'keep', 'transfer_to_org', 'cancel', 'share']
+      ? ['confirm_reunited', 'keep', 'transfer_to_org', 'edit', 'cancel', 'share']
       : ['claim_ownership', 'contact_custodian', 'share', 'report_content']
   }
   if (state.status === 'expired') {

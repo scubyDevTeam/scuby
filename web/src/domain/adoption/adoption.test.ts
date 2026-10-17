@@ -67,6 +67,7 @@ describe('06 · Identity ladder — what each viewer is offered', () => {
   it('the lister: the outcome, taking it down, sharing — never «Me interesa»', () => {
     expect(availableActions(active, 'lister', null, now)).toEqual([
       'record_adoption',
+      'edit',
       'withdraw_listing',
       'share',
     ])

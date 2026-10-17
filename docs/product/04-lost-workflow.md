@@ -197,7 +197,7 @@ saved yet. After submit, the reporter can edit or delete their own sighting unti
 | Distance from `last_seen_point` | ≤ 30 km | FE + BE | «Ese punto está muy lejos del último lugar donde se vio a Luna» |
 | `seen_at` in the future | reject | FE + BE | «La hora no puede ser en el futuro» |
 | `seen_at` before the case | ≥ `last_seen_at − 24h` | FE + BE | «Luna se perdió después de esa hora» |
-| Rate, per reporter per case | 1 per 15 min, 5 per day | BE only | «Ya registraste un avistamiento hace poco» |
+| Rate, per reporter per case | 1 per 15 min, 5 per day — **the 15-minute rule is waived while the reporter's earlier pin is still inside its correction window**, so «Lo vi otra vez» is never refused as «hace poco» | BE only | «Ya registraste un avistamiento hace poco» |
 | Rate, per reporter global | 20 per day | BE only | same |
 
 **FE validates for feedback, BE enforces.** The distance and time checks are trivial math, so the

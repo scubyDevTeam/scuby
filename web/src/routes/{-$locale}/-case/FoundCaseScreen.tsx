@@ -40,6 +40,11 @@ const PosterSheet = lazy(
     import('@features/poster/PosterSheet').then((m) => ({ default: m.PosterSheet })),
   ),
 )
+const EditCase = lazy(
+  withMessages(['edit_case', 'adoption', 'publish'], () =>
+    import('@features/edit/EditCase').then((m) => ({ default: m.EditCase })),
+  ),
+)
 const StartChat = lazy(
   withMessages(['chat'], () =>
     import('@features/chat/StartChat').then((m) => ({ default: m.StartChat })),
@@ -64,6 +69,7 @@ type Open =
   | 'reopen'
   | 'share'
   | 'chat'
+  | 'edit'
   | null
 
 const sheetFor: Partial<Record<FoundAction, NonNullable<Open>>> = {
@@ -76,6 +82,7 @@ const sheetFor: Partial<Record<FoundAction, NonNullable<Open>>> = {
   reopen: 'reopen',
   share: 'share',
   contact_custodian: 'chat',
+  edit: 'edit',
 }
 
 const titles: Record<NonNullable<Open>, TextKey> = {
@@ -88,6 +95,7 @@ const titles: Record<NonNullable<Open>, TextKey> = {
   reopen: 'case.reopen_title',
   share: 'case.share_title',
   chat: 'chat.start.title',
+  edit: 'edit_case.title',
 }
 
 export function FoundCaseScreen({ found }: { found: FoundCase }) {
@@ -153,7 +161,9 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
       <Sheet
         open={sheet !== null}
         onClose={close}
-        title={sheet ? t(titles[sheet]) : ''}
+        title={
+          sheet === 'edit' ? t('edit_case.title', { name: title }) : sheet ? t(titles[sheet]) : ''
+        }
         size={sheet === 'share' ? 'full' : 'auto'}
       >
         <Suspense fallback={<Skeleton className="h-40" />}>
@@ -193,6 +203,16 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
                 legal={<LegalLine />}
               />
             )
+          ) : null}
+          {sheet === 'edit' ? (
+            <EditCase
+              editable={{
+                code: found.code,
+                photoUrls: found.pet.photoUrls,
+                marks: found.pet.marks,
+              }}
+              onDone={close}
+            />
           ) : null}
           {sheet === 'report' ? (
             <ReportForm targetType="found_case" targetCode={found.code} onDone={close} />

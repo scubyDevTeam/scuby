@@ -55,7 +55,13 @@ const SignIn = lazy(
 /** The code the emulated backend accepts (src/mocks/handlers.ts). */
 const DEMO_CODE = '123456'
 
-type Open = 'interest' | 'conversation' | 'record' | 'withdraw' | 'report' | 'share' | null
+const EditCase = lazy(
+  withMessages(['edit_case', 'adoption', 'publish'], () =>
+    import('@features/edit/EditCase').then((m) => ({ default: m.EditCase })),
+  ),
+)
+
+type Open = 'edit' | 'interest' | 'conversation' | 'record' | 'withdraw' | 'report' | 'share' | null
 
 export function AdoptionCaseScreen({ found }: { found: AdoptionCase }) {
   const { t } = useI18n()
@@ -71,6 +77,7 @@ export function AdoptionCaseScreen({ found }: { found: AdoptionCase }) {
   const demoCode = env.apiMock ? DEMO_CODE : undefined
 
   function handle(action: AdoptionAction) {
+    if (action === 'edit') return setSheet('edit')
     if (action === 'express_interest') return setSheet('interest')
     if (action === 'open_conversation') return setSheet('conversation')
     if (action === 'record_adoption') return setSheet('record')
@@ -85,6 +92,7 @@ export function AdoptionCaseScreen({ found }: { found: AdoptionCase }) {
   }
 
   const titles: Record<NonNullable<Open>, string> = {
+    edit: t('edit_case.title', { name }),
     interest: t('adoption.sheet.interest_title', { name }),
     conversation: t('adoption.sheet.conversation_title', { name: found.listerName }),
     record: t('adoption.sheet.record_title', { name }),
@@ -156,6 +164,18 @@ export function AdoptionCaseScreen({ found }: { found: AdoptionCase }) {
           ) : null}
           {sheet === 'record' ? <RecordAdoptionForm listing={found} onDone={close} /> : null}
           {sheet === 'withdraw' ? <WithdrawListingForm code={found.code} onDone={close} /> : null}
+          {sheet === 'edit' ? (
+            <EditCase
+              editable={{
+                code: found.code,
+                photoUrls: found.pet.photoUrls,
+                story: found.story,
+                temperament: found.temperament,
+                requirements: found.requirements,
+              }}
+              onDone={close}
+            />
+          ) : null}
           {sheet === 'report' ? (
             <ReportForm targetType="adoption_case" targetCode={found.code} onDone={close} />
           ) : null}
