@@ -8,6 +8,7 @@ import {
   closeCheckins,
   closeClaimCheckins,
   onBeneficiaryInteraction,
+  onCustodianInteraction,
   onListerInteraction,
   onOwnerInteraction,
   onPublished,
@@ -126,6 +127,26 @@ export function answerCheckinAs(
     onListerInteraction(listing.code)
     return { id: checkin.id }
   }
+  if (listing?.vertical === 'found') {
+    // «Sigo con él» is the one-tap answer (05); the endings go through resolveFound, which ends it.
+    if (listing.created_by !== user.id) fail('forbidden')
+    const checkin = db.checkins.find(
+      (c) => c.id === params.checkinId && c.case_code === listing.code,
+    )
+    if (!checkin) fail('not_found')
+    if (checkin.responded_at || checkin.cancelled_at || listing.status !== 'active') {
+      fail('invalid_transition')
+    }
+    if (body.response !== 'still_holding') {
+      throw new Fail('validation_failed', undefined, {
+        response: `«${body.response}» does not answer a found case's check-in`,
+      })
+    }
+    checkin.responded_at = iso(Date.now())
+    checkin.response = body.response
+    onCustodianInteraction(listing.code)
+    return { id: checkin.id }
+  }
   if (listing?.vertical === 'help') {
     // «Sigue» is the one-tap answer (07); «ya no necesita ayuda» is closeHelp, which ends it.
     if (listing.created_by !== user.id) fail('forbidden')
@@ -155,6 +176,7 @@ export function answerCheckinAs(
   const fitsTrigger =
     body.response !== 'still_available' &&
     body.response !== 'still_needed' &&
+    body.response !== 'still_holding' &&
     TIME_BASED.includes(body.response) === (checkin.trigger === 'time_based')
   if (!fitsTrigger) {
     throw new Fail('validation_failed', undefined, {

@@ -1,7 +1,7 @@
 // The follow-up loop of a lost case (docs/product/04 · Schedule), an adoption listing
 // (docs/product/06 · The follow-up loop) and a help request (docs/product/07): check-ins, stale claims, expiry. The real backend runs
 // this as a job; the emulation runs it before answering each request.
-import { type AdoptionRow, db, type HelpRow, type LostRow, newId } from './db'
+import { type AdoptionRow, db, type FoundRow, type HelpRow, type LostRow, newId } from './db'
 import { notify } from './notify'
 import { DAY, HOUR, iso, ms } from './rules'
 
@@ -16,6 +16,9 @@ const LISTING_CADENCE = 14 * DAY
 /** A help request: T+7 d, then every 14 d — or the day after a `needed_by`, if sooner (07). */
 const HELP_FIRST_CHECKIN = 7 * DAY
 const HELP_CADENCE = 14 * DAY
+/** Custody facts change fast (05 · Schedule): the first «¿sigues con él?» at +48 h, then every 5 days. */
+const FOUND_FIRST_CHECKIN = 48 * HOUR
+const FOUND_CADENCE = 5 * DAY
 /** An archived request can be reopened for 30 days (07 · The follow-up loop, as in 04). */
 const HELP_REOPEN_WINDOW = 30 * DAY
 
@@ -103,6 +106,18 @@ export function onBeneficiaryInteraction(code: string, at = Date.now()) {
     if (c.case_code === code && c.trigger === 'time_based' && open(c)) c.cancelled_at = iso(at)
   }
   schedule(code, at + HELP_CADENCE, 'time_based')
+}
+
+export function onFoundPublished(code: string, at = Date.now()) {
+  schedule(code, at + FOUND_FIRST_CHECKIN, 'time_based')
+}
+
+/** «Sigo con él», or any explicit move on the case: the custodian spoke, the clock resets to +5 d. */
+export function onCustodianInteraction(code: string, at = Date.now()) {
+  for (const c of db.checkins) {
+    if (c.case_code === code && c.trigger === 'time_based' && open(c)) c.cancelled_at = iso(at)
+  }
+  schedule(code, at + FOUND_CADENCE, 'time_based')
 }
 
 /** A case that ended asks nothing more. */
@@ -215,6 +230,36 @@ function advanceHelp(row: HelpRow, at: number) {
   }
 }
 
+function advanceFound(row: FoundRow, at: number) {
+  const latest = db.checkins
+    .filter((c) => c.case_code === row.code && c.trigger === 'time_based')
+    .sort((a, b) => ms(b.scheduled_at) - ms(a.scheduled_at))[0]
+  // A case with no clock yet (seeded before the loop existed) starts it now, not in the past.
+  if (!latest) {
+    onFoundPublished(row.code, at)
+  } else if (ms(latest.scheduled_at) <= at && !latest.cancelled_at) {
+    let next = ms(latest.scheduled_at) + FOUND_CADENCE
+    while (next <= at) {
+      schedule(row.code, next, 'time_based')
+      next += FOUND_CADENCE
+    }
+    schedule(row.code, next, 'time_based')
+  }
+  // Two unanswered: soft expiry. The copy never threatened the post (05); the inbox says it plainly.
+  if (unansweredStreak(row.code, at) >= 2) {
+    row.status = 'expired'
+    row.resolution = 'no_response'
+    row.resolved_at = iso(at)
+    closeCheckins(row.code, at)
+    notify(
+      row.created_by,
+      'found_case.expired',
+      `Archivamos tu aviso del animal que encontraste. Puedes reactivarlo hasta el ${dayMonth(at + 30 * DAY)}.`,
+      row.code,
+    )
+  }
+}
+
 export function tick(at = Date.now()) {
   for (const claim of db.recoveryClaims) {
     if (claim.status === 'open' && ms(claim.stale_at) <= at) {
@@ -226,5 +271,6 @@ export function tick(at = Date.now()) {
     if (row.vertical === 'lost' && row.status === 'active') advance(row, at)
     if (row.vertical === 'adoption' && row.status === 'active') advanceListing(row, at)
     if (row.vertical === 'help' && row.status === 'active') advanceHelp(row, at)
+    if (row.vertical === 'found' && row.status === 'active') advanceFound(row, at)
   }
 }

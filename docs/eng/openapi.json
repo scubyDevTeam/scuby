@@ -4531,6 +4531,46 @@
                             "null"
                           ]
                         },
+                        "pending_checkin": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "trigger": {
+                                  "type": "string",
+                                  "enum": [
+                                    "time_based",
+                                    "post_recovery_claim"
+                                  ]
+                                },
+                                "claim_id": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "asked_at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "trigger",
+                                "claim_id",
+                                "asked_at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "contact": {
                           "anyOf": [
                             {
@@ -4573,6 +4613,7 @@
                         "withheld_detail",
                         "ownership_claims",
                         "successor_case_code",
+                        "pending_checkin",
                         "contact"
                       ],
                       "additionalProperties": false
@@ -10375,7 +10416,8 @@
                       "claim_dismissed",
                       "still_verifying",
                       "still_available",
-                      "still_needed"
+                      "still_needed",
+                      "still_holding"
                     ]
                   },
                   "resolution_attribution": {

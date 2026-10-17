@@ -1885,3 +1885,83 @@ describe('the profile: photo and changing the phone (auth.md · Profile, Phone)'
     expect(cleared.photoUrl).toBeNull()
   })
 })
+
+describe('the custodian’s follow-up loop (05 · The follow-up loop, Schedule)', () => {
+  const dog = async () => {
+    const found = await caseOf('C4STD')
+    if (found.vertical !== 'found') throw new Error('expected found')
+    return found
+  }
+
+  it('the custodian sees «¿sigues con él?» when it is due; a stranger never does', async () => {
+    expect((await dog()).pendingCheckin).toBeNull()
+    await asCarolina()
+    expect((await dog()).pendingCheckin?.id).toBe('ck-dog-1')
+  })
+
+  it('«Sigo con él» answers it and the next one comes five days later', async () => {
+    await asCarolina()
+    await call(
+      api.answerCheckin,
+      { params: { code: 'C4STD', checkinId: 'ck-dog-1' }, body: { response: 'still_holding' } },
+      asIs,
+    )
+    expect((await dog()).pendingCheckin).toBeNull()
+    later(5 * DAY + HOUR)
+    expect((await dog()).pendingCheckin).not.toBeNull()
+  })
+
+  it('a found case only takes «sigo con él» as a one-tap answer', async () => {
+    await asCarolina()
+    expect(
+      (
+        await failure(
+          call(
+            api.answerCheckin,
+            { params: { code: 'C4STD', checkinId: 'ck-dog-1' }, body: { response: 'still_lost' } },
+            asIs,
+          ),
+        )
+      ).code,
+    ).toBe('validation_failed')
+  })
+
+  it('two unanswered in a row archive the case softly, and the custodian is told', async () => {
+    later(6 * DAY)
+    await asCarolina()
+    expect((await dog()).status).toBe('expired')
+    expect(db.notifications.some((n) => n.event === 'found_case.expired')).toBe(true)
+  })
+
+  it('a newly published found case asks first after 48 hours', async () => {
+    await asCarolina()
+    const before = db.checkins.length
+    await call(
+      api.publishFound,
+      {
+        body: {
+          pet: {
+            species: 'cat',
+            size: 'small',
+            colors: ['white'],
+            marks: null,
+            photo_urls: ['data:image/png;base64,AAAA'],
+          },
+          found_point: { lat: 6.2447, lng: -75.5916 },
+          found_radius_m: 200,
+          found_at: new Date().toISOString(),
+          holding_where: 'home',
+          withheld_detail: null,
+          phone: '+573001112233',
+          phone_has_whatsapp: true,
+          contact_prefs: { expose_whatsapp: true, expose_email: false, in_app_only: false },
+          otp_code: DEMO_CODE,
+        },
+      },
+      asIs,
+    )
+    const added = db.checkins.slice(before)
+    expect(added).toHaveLength(1)
+    expect(new Date(added[0]!.scheduled_at).getTime() - Date.now()).toBe(48 * HOUR)
+  })
+})

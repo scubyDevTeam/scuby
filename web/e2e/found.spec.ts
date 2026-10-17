@@ -64,3 +64,21 @@ test(
     })
   },
 )
+
+test(
+  'the custodian answers «¿sigues con él?» with one tap',
+  tags('@found', '@FOUND-004'),
+  async ({ myCases, casePage }) => {
+    await myCases.openAsDemoOwner()
+    await myCases.openCase('Perro café, mediano')
+
+    await test.step('the question waits on the case', async () => {
+      await expect(casePage.foundCheckin).toBeVisible()
+    })
+
+    await test.step('«Sigo con él» answers it and it goes away', async () => {
+      await casePage.answerStillHolding()
+      await expect(casePage.foundCheckin).toHaveCount(0)
+    })
+  },
+)

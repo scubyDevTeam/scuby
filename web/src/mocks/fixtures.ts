@@ -773,6 +773,8 @@ export function seed(): Tables {
       ),
       // Milo's first check-in fell due an hour ago: his owner has a question waiting.
       checkin('ck-milo-1', 'M2TQ4', null, 'time_based', ago(HOUR)),
+      // The dog Carolina holds: «¿sigues con él?» fell due two hours ago.
+      checkin('ck-dog-1', 'C4STD', null, 'time_based', ago(2 * HOUR)),
       // Misha's first «¿sigue disponible?» (T+7 d) fell due yesterday.
       checkin('ck-misha-1', 'M1SHI', null, 'time_based', ago(DAY)),
     ],

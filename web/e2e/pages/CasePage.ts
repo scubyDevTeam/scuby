@@ -329,6 +329,17 @@ export class CasePage {
     })
   }
 
+  /** «¿Sigues con el animal que encontraste?», for the custodian. */
+  get foundCheckin() {
+    return this.page.getByRole('region', { name: '¿Sigues con él?' })
+  }
+
+  answerStillHolding() {
+    return step('Answer «Sigo con él»', () =>
+      this.foundCheckin.getByRole('button', { name: 'Sigo con él' }).click(),
+    )
+  }
+
   closePinSheet() {
     return step('Close the pin sheet with Escape', () => this.page.keyboard.press('Escape'))
   }

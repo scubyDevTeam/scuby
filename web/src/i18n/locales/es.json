@@ -864,6 +864,16 @@
       "note_placeholder": "Hacia dónde iba, cómo se veía…",
       "phone_hint": "Por si su familia quiere preguntarte algo. Solo ella lo ve.",
       "submit": "Enviar reporte"
+    },
+    "checkin": {
+      "label": "¿Sigues con él?",
+      "question": "¿Sigues con el animal que encontraste?",
+      "why": "Así su familia sabe que sigue a salvo y dónde buscarlo.",
+      "still_holding": "Sigo con él",
+      "reunited": "Ya está con su dueño 🎉",
+      "kept": "Me lo quedo",
+      "transferred": "Lo entregué a una fundación",
+      "failed": "No pudimos guardar tu respuesta. Inténtalo de nuevo."
     }
   },
   "help": {
