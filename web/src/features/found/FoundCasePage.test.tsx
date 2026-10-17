@@ -78,6 +78,41 @@ describe('FoundCasePage — seen by anyone', () => {
   })
 })
 
+describe('FoundCasePage — «¿sigues con él?» (05 · The follow-up loop)', () => {
+  const due = { id: 'ck-1', askedAt: new Date() }
+
+  it('asks the custodian, and «Sigo con él» answers it', async () => {
+    const { calls } = show(foundCase('C4STD', { viewer: 'custodian', pendingCheckin: due }), {
+      'POST /cases/C4STD/checkins/ck-1/answer': { body: { id: 'ck-1' } },
+    })
+    expect(screen.getByText('¿Sigues con el animal que encontraste?')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Sigo con él' }))
+    await waitFor(() =>
+      expect(
+        calls.find((c) => c.key === 'POST /cases/C4STD/checkins/ck-1/answer')?.body,
+      ).toMatchObject({
+        response: 'still_holding',
+      }),
+    )
+  })
+
+  it('the endings continue in their own forms', () => {
+    const { onKeep, onConfirmed } = show(
+      foundCase('C4STD', { viewer: 'custodian', pendingCheckin: due }),
+    )
+    const card = within(screen.getByRole('region', { name: '¿Sigues con él?' }))
+    fireEvent.click(card.getByRole('button', { name: 'Me lo quedo' }))
+    fireEvent.click(card.getByRole('button', { name: /Ya está con su dueño/ }))
+    expect(onKeep).toHaveBeenCalled()
+    expect(onConfirmed).toHaveBeenCalled()
+  })
+
+  it('nothing is asked when nothing is due', () => {
+    show(foundCase('C4STD', { viewer: 'custodian', pendingCheckin: null }))
+    expect(screen.queryByText('¿Sigues con el animal que encontraste?')).toBeNull()
+  })
+})
+
 describe('FoundCasePage — the custodian (05)', () => {
   const mine = () => foundCase('C4STD', { viewer: 'custodian' })
 
