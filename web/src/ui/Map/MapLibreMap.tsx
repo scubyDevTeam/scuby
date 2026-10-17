@@ -10,6 +10,7 @@ type Props = {
   styleUrl: string
   area: MapArea
   pins: readonly MapPin[]
+  onSelectPin?: (id: string) => void
   onError: () => void
 }
 
@@ -90,11 +91,11 @@ function draw(map: GlMap, area: MapArea, pins: readonly MapPin[]) {
   })
 }
 
-export default function MapLibreMap({ styleUrl, area, pins, onError }: Props) {
+export default function MapLibreMap({ styleUrl, area, pins, onSelectPin, onError }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<GlMap | null>(null)
-  const latest = useRef({ area, pins, onError })
-  latest.current = { area, pins, onError }
+  const latest = useRef({ area, pins, onSelectPin, onError })
+  latest.current = { area, pins, onSelectPin, onError }
 
   useEffect(() => {
     const element = container.current
@@ -168,6 +169,16 @@ export default function MapLibreMap({ styleUrl, area, pins, onError }: Props) {
           'icon-offset': [0, -44],
           'icon-allow-overlap': true,
         },
+      })
+      map.on('click', 'pins', (event) => {
+        const id = event.features?.[0]?.properties?.id
+        if (typeof id === 'string') latest.current.onSelectPin?.(id)
+      })
+      map.on('mouseenter', 'pins', () => {
+        if (latest.current.onSelectPin) map.getCanvas().style.cursor = 'pointer'
+      })
+      map.on('mouseleave', 'pins', () => {
+        map.getCanvas().style.cursor = ''
       })
       mapRef.current = map
       draw(map, latest.current.area, latest.current.pins)

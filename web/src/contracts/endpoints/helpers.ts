@@ -12,7 +12,9 @@ import { createdWire } from '../primitives'
 export const reportSighting = endpoint({
   method: 'POST',
   path: '/cases/:code/sightings',
-  summary: '«Lo vi»: a pin on a lost or found case. Visible at once; rate-limited per reporter.',
+  summary:
+    '«Lo vi»: a pin on a lost or found case. Visible at once; rate-limited per reporter. A ' +
+    'repeated `client_id` on the same case answers the sighting it created, before any limit.',
   auth: 'public',
   body: sightingRequest,
   status: 201,

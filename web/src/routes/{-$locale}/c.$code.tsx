@@ -14,8 +14,10 @@ export const Route = createFileRoute('/{-$locale}/c/$code')({ component: CaseScr
 const LostCaseScreen = lazy(() =>
   import('./-case/LostCaseScreen').then((m) => ({ default: m.LostCaseScreen })),
 )
-const FoundCaseScreen = lazy(() =>
-  import('./-case/FoundCaseScreen').then((m) => ({ default: m.FoundCaseScreen })),
+const FoundCaseScreen = lazy(
+  withMessages(['found'], () =>
+    import('./-case/FoundCaseScreen').then((m) => ({ default: m.FoundCaseScreen })),
+  ),
 )
 // Its words come with it: they are not part of the first paint of every other case.
 const AdoptionCaseScreen = lazy(

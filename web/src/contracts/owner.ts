@@ -67,6 +67,11 @@ const myCaseWire = z.object({
   photo_url: z.nullable(z.string()),
   published_at: timestamp,
   open_claim_count: z.int().check(z.nonnegative()),
+  /**
+   * When the oldest question the caller owes an answer to on this case was asked, or null: home
+   * shows it as a banner until it is answered (docs/eng/comms.md · Actionable check-ins).
+   */
+  pending_checkin_at: z._default(z.nullable(timestamp), null),
 })
 export const myCasesWire = z.array(myCaseWire)
 
@@ -79,6 +84,7 @@ export type MyCase = {
   photoUrl: string | null
   publishedAt: Date
   openClaimCount: number
+  pendingCheckinAt: Date | null
 }
 
 export function parseMyCases(raw: unknown): MyCase[] {
@@ -91,6 +97,7 @@ export function parseMyCases(raw: unknown): MyCase[] {
     photoUrl: item.photo_url,
     publishedAt: new Date(item.published_at),
     openClaimCount: item.open_claim_count,
+    pendingCheckinAt: item.pending_checkin_at ? new Date(item.pending_checkin_at) : null,
   }))
 }
 

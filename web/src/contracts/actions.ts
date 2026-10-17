@@ -9,6 +9,11 @@ export const sightingRequest = z.object({
   note: z.nullable(z.string().check(z.maxLength(500))),
   photo_urls: z._default(z.array(photoUrl).check(z.maxLength(3)), []),
   contact_phone: z.nullable(phone),
+  /**
+   * Made by the client once per sighting and sent again on every retry: the same key on the same
+   * case answers the sighting it already created (docs/eng/api.md · Conventions, replays).
+   */
+  client_id: z.optional(z.string().check(z.minLength(8), z.maxLength(64))),
 })
 
 export type SightingInput = {
@@ -18,14 +23,19 @@ export type SightingInput = {
   photoUrls?: string[]
   /** E.164, or null: contact is optional on a sighting (docs/product/04, decision #13). */
   contactPhone: string | null
+  /** The replay key (`client_id`): the queue sends the same one until the server answers. */
+  clientId?: string
 }
 
-export const sightingBody = (input: SightingInput): z.input<typeof sightingRequest> => ({
+export type SightingBody = z.input<typeof sightingRequest>
+
+export const sightingBody = (input: SightingInput): SightingBody => ({
   point: input.point,
   seen_at: input.seenAt.toISOString(),
   note: input.note,
   photo_urls: input.photoUrls ?? [],
   contact_phone: input.contactPhone,
+  ...(input.clientId ? { client_id: input.clientId } : {}),
 })
 
 /** The phone is the whole value of a claim, so it is required (docs/product/04 · recovery_claim). */

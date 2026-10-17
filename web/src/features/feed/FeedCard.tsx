@@ -5,14 +5,14 @@ import { Badge, type BadgeTone } from '@ui/Badge'
 import type { ReactNode } from 'react'
 
 // The badge reads `feed.badge.<vertical>`.
-const verticalTone: Record<FeedItem['vertical'], BadgeTone> = {
+export const verticalTone: Record<FeedItem['vertical'], BadgeTone> = {
   lost: 'lost',
   found: 'found',
   adoption: 'adoption',
   help: 'help',
 }
 
-function secondLine(i18n: Translator, item: FeedItem, now: Date): string {
+export function secondLine(i18n: Translator, item: FeedItem, now: Date): string {
   if (item.detail) return `${item.placeName} · ${item.detail}`
   return `${item.placeName} · ${i18n.relative(item.happenedAt, now)}`
 }

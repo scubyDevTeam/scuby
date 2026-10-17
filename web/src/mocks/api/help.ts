@@ -48,8 +48,14 @@ function end(row: HelpRow, resolution: HelpRow['resolution']) {
   tellOpenPledgers(
     row,
     'help_request.closed',
-    `La solicitud de ${petName(row)} ya no está activa. Gracias por ofrecer tu ayuda.`,
+    `La solicitud de ${petName(row)} ya no está activa. Gracias por ofrecer.`,
   )
+}
+
+/** «Ya no necesita ayuda»: what is still open closes with it. Also the email's link (api/links.ts). */
+export function closeRequest(row: HelpRow, resolution: HelpRow['resolution']) {
+  for (const need of row.needs) if (need.status === 'open') need.status = 'closed'
+  end(row, resolution)
 }
 
 /** A need is covered when confirmations reach its target; every need covered ends the request. */
@@ -153,7 +159,7 @@ export const help = [
     notify(
       row.created_by,
       'help_pledge.created',
-      `${publicName(user.display_name)} ofreció ${NEED_NAMES[need.kind]} para ${petName(row)}.`,
+      `${publicName(user.display_name)} ofrece ${NEED_NAMES[need.kind]} para ${petName(row)}. Escríbele para coordinar.`,
       row.code,
     )
     return { id, whatsapp_url: beneficiaryChannel(row) }
@@ -185,7 +191,7 @@ export const help = [
       notify(
         pledge.person_id,
         'help_pledge.confirmed',
-        `Llegó tu ayuda para ${petName(row)}. ¡Gracias!`,
+        `Llegó lo que ofreciste para ${petName(row)}. Gracias.`,
         row.code,
       )
     }
@@ -210,8 +216,7 @@ export const help = [
   route(api.closeHelp, ({ params, user, body }) => {
     const row = own(params.code, user)
     if (row.status !== 'active') fail('invalid_transition')
-    for (const need of row.needs) if (need.status === 'open') need.status = 'closed'
-    end(row, body.resolution)
+    closeRequest(row, body.resolution)
     return { id: row.code }
   }),
 ]

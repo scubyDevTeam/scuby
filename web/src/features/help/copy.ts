@@ -2,10 +2,17 @@
 import type { HelpCase, HelpNeed } from '@contracts/help-case'
 import type { Translator } from '@i18n/translate'
 
-/** The status strip: «NECESITA AYUDA», «YA TIENE AYUDA»… in the help colour. */
-export function bandFor(i18n: Translator, request: HelpCase) {
-  const className = request.status === 'active' ? 'bg-help' : 'bg-muted'
-  return { label: i18n.t(`help.band.${request.status}`), className }
+/**
+ * The status strip (docs/product/10 §3): «NECESITA AYUDA» in the help colour; «YA TIENE AYUDA» in
+ * the resolved colour when every need was covered; plain words for any other ending.
+ */
+export function bandFor(i18n: Translator, request: Pick<HelpCase, 'status' | 'resolution'>) {
+  if (request.status === 'active')
+    return { label: i18n.t('help.band.active'), className: 'bg-help' }
+  if (request.status === 'closed' && request.resolution === 'covered') {
+    return { label: i18n.t('help.band.covered'), className: 'bg-found' }
+  }
+  return { label: i18n.t(`help.band.${request.status}`), className: 'bg-muted' }
 }
 
 /**

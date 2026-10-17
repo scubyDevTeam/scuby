@@ -1,5 +1,7 @@
-import { useConfig, useReportSighting } from '@api-client/actions'
+import { useConfig } from '@api-client/actions'
 import { ApiError } from '@api-client/http'
+import { isWaiting } from '@api-client/sighting-queue'
+import { sightingSend, useReportSighting } from '@api-client/sighting-replay'
 import { validateSighting } from '@domain/lost/sightings'
 import type { Area, Point } from '@domain/shared/geo'
 import { toE164 } from '@domain/shared/phone'
@@ -12,9 +14,11 @@ import { Chips, type Option } from '@ui/Choice'
 import { PhoneField, TextArea, TextField } from '@ui/Field'
 import { PickerMap } from '@ui/Map/PickerMap'
 import { Notice } from '@ui/Notice'
-import { LocateFixed } from 'lucide-react'
+import { Clock, LocateFixed, WifiOff } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { sightingErrorCopy } from './copy'
+import { QueuedCard } from './QueuedSightings'
+import { useOnline, useSightingQueue } from './sighting-queue'
 
 type When = 'now' | 'earlier' | 'yesterday' | 'custom'
 
@@ -58,7 +62,9 @@ export function SightingForm({
   const i18n = useI18n()
   const { t } = i18n
   const country = useConfig().data?.countries[0]
+  useSightingQueue()
   const report = useReportSighting(code)
+  const online = useOnline()
   const [point, setPoint] = useState<Point | null>(null)
   const [when, setWhen] = useState<When>('now')
   const [custom, setCustom] = useState('')
@@ -103,7 +109,7 @@ export function SightingForm({
     event.preventDefault()
     setTried(true)
     if (!point || !seenAt || ruleErrors.length > 0 || phoneError) return
-    report.mutate({ point, seenAt, note: note.trim() || null, contactPhone })
+    report.mutate(sightingSend(code, { point, seenAt, note: note.trim() || null, contactPhone }))
   }
 
   if (report.isSuccess) {
@@ -113,6 +119,37 @@ export function SightingForm({
           {t('lost.sighting_form.thanks_body')}
         </Notice>
         <Button onClick={onDone}>{t('common.done')}</Button>
+      </div>
+    )
+  }
+
+  // No signal (or no answer): calm, not an error. It goes by itself (docs/eng/frontend.md · Risks §6).
+  if (isWaiting(report) && report.variables) {
+    const { body } = report.variables
+    return (
+      <div className="flex flex-col gap-5">
+        {online ? null : (
+          <p
+            role="status"
+            className="m-0 flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 font-bold text-white"
+          >
+            <WifiOff aria-hidden="true" />
+            {t('lost.sighting_form.offline')}
+          </p>
+        )}
+        <span className="flex size-16 items-center justify-center rounded-3xl bg-brand-ice text-brand-deep">
+          <Clock aria-hidden="true" className="size-8" />
+        </span>
+        <div className="flex flex-col gap-2">
+          <h3 className="m-0 text-3xl font-extrabold">{t('lost.sighting_form.queued_title')}</h3>
+          <p className="m-0 text-muted">{t('lost.sighting_form.queued_body')}</p>
+        </div>
+        <QueuedCard
+          sighting={{ id: 0, seenAt: body.seen_at, note: body.note, rejected: null }}
+          petName={petName}
+          now={now}
+        />
+        <Button onClick={onDone}>{t('lost.sighting_form.back_to_case', { name: petName })}</Button>
       </div>
     )
   }

@@ -4,13 +4,13 @@ import { checkinAnswers, closeAnswersCheckin } from '@domain/lost/checkin'
 import { placeSightings, splitHidden } from '@domain/lost/sightings'
 import { publicArea } from '@domain/shared/geo'
 import { CaseShell } from '@features/case/CaseShell'
+import { withMessages } from '@i18n/locales'
 import { useI18n } from '@i18n/react'
-import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass } from '@ui/Button'
 import { CaseMap } from '@ui/Map/CaseMap'
 import { Notice } from '@ui/Notice'
 import { Archive, Clock, Flag, PartyPopper, Share2 } from 'lucide-react'
-import { lazy, type ReactNode, Suspense } from 'react'
+import { lazy, type ReactNode, Suspense, useState } from 'react'
 import { describePet, formatDayMonth, sightingsCount } from './copy'
 import { SightingTimeline } from './SightingTimeline'
 
@@ -21,6 +21,18 @@ const CheckinCard = lazy(() => import('./CheckinCard').then((m) => ({ default: m
 const moderation = () => import('./SightingModeration')
 const SightingTools = lazy(() => moderation().then((m) => ({ default: m.SightingTools })))
 const HiddenSightings = lazy(() => moderation().then((m) => ({ default: m.HiddenSightings })))
+// Shown only once a contact is revealed: its path data is not worth the first load.
+const WhatsAppIcon = lazy(() => import('@ui/BrandIcons').then((m) => ({ default: m.WhatsAppIcon })))
+// This device's unsent «Lo vi» (frontend.md · Risks §6): after the page paints, not with it.
+const QueuedSightings = lazy(() =>
+  import('./QueuedSightings').then((m) => ({ default: m.QueuedSightings })),
+)
+// A pin's sheet and its words arrive with the tap on it.
+const SightingSheet = lazy(
+  withMessages(['map_sheet'], () =>
+    import('./SightingSheet').then((m) => ({ default: m.SightingSheet })),
+  ),
+)
 
 type Props = {
   lostCase: LostCase
@@ -55,6 +67,9 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
   // Display rule 2: the trail is the visible pins. Hidden ones reach only the owner, set apart.
   const { visible, hidden } = splitHidden(lostCase.sightings)
   const sightings = placeSightings(visible, lastSeen.center, now)
+  // The pin whose sheet is open (display rule 3); one the owner just hid closes it.
+  const [pinId, setPinId] = useState<string | null>(null)
+  const pin = sightings.find((s) => s.id === pinId)
 
   const band =
     mode === 'open'
@@ -96,7 +111,9 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
                   rel="noreferrer"
                   className={buttonClass('whatsapp', 'lg:w-auto')}
                 >
-                  <WhatsAppIcon />
+                  <Suspense fallback={null}>
+                    <WhatsAppIcon />
+                  </Suspense>
                   {t('contact.write_on_whatsapp')}
                 </a>
               ) : null}
@@ -227,6 +244,11 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
         </Notice>
       ) : null}
 
+      {/* Whatever the case's status: a refused send is said, never dropped. */}
+      <Suspense fallback={null}>
+        <QueuedSightings code={lostCase.code} petName={pet.name} now={now} />
+      </Suspense>
+
       {mode === 'open' ? (
         <section className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between">
@@ -245,11 +267,13 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
               emphasized: s.emphasized,
               label: s.isLatest ? i18n.relative(s.seenAt, now) : undefined,
             }))}
+            onSelectPin={setPinId}
           />
           {sightings.length > 0 ? (
             <SightingTimeline
               sightings={sightings}
               now={now}
+              onOpen={setPinId}
               tools={
                 isOwner
                   ? (sighting) => (
@@ -263,6 +287,18 @@ export function LostCasePage({ lostCase, now, shortUrl, backLink, mapStyleUrl, o
           ) : isOwner && hidden.length > 0 ? null : (
             <p className="m-0 text-muted">{t('lost.page.no_sightings')}</p>
           )}
+          {pin ? (
+            <Suspense fallback={null}>
+              <SightingSheet
+                code={lostCase.code}
+                sighting={pin}
+                now={now}
+                isOwner={isOwner}
+                onClose={() => setPinId(null)}
+                onSawItToo={can('report_sighting') ? () => onAction('report_sighting') : undefined}
+              />
+            </Suspense>
+          ) : null}
           {isOwner && hidden.length > 0 ? (
             <Suspense fallback={null}>
               <HiddenSightings code={lostCase.code} sightings={hidden} now={now} />

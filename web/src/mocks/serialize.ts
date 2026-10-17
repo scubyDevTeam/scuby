@@ -444,56 +444,63 @@ export function feedView(t: Tables, near: Point | null): FeedWire {
 }
 
 export function myCasesView(t: Tables, personId: string): WireOf<typeof api.listMyCases> {
-  return Object.values(t.cases)
-    .filter((row) => row.created_by === personId)
-    .sort((a, b) => ms(b.published_at) - ms(a.published_at))
-    .map((row) => {
-      const pet = petOf(t, row.pet_id)
-      if (row.vertical === 'help') {
+  return (
+    Object.values(t.cases)
+      .filter((row) => row.created_by === personId)
+      .sort((a, b) => ms(b.published_at) - ms(a.published_at))
+      .map((row) => {
+        const pet = petOf(t, row.pet_id)
+        if (row.vertical === 'help') {
+          return {
+            code: row.code,
+            vertical: row.vertical,
+            status: row.status,
+            title: pet.name ?? lookTitle(pet),
+            place_name: row.location.place_name,
+            photo_url: pet.photo_urls[0] ?? null,
+            published_at: row.published_at,
+            // On a request, the offers waiting for the beneficiary to say whether they arrived.
+            open_claim_count: t.helpPledges.filter(
+              (p) => p.case_code === row.code && p.status === 'pledged',
+            ).length,
+          }
+        }
+        if (row.vertical === 'adoption') {
+          return {
+            code: row.code,
+            vertical: row.vertical,
+            status: row.status,
+            title: pet.name ?? lookTitle(pet),
+            place_name: row.location.place_name,
+            photo_url: pet.photo_urls[0] ?? null,
+            published_at: row.published_at,
+            // On a listing, the people waiting for an answer.
+            open_claim_count: t.adoptionInterests.filter(
+              (i) => i.case_code === row.code && i.status === 'open',
+            ).length,
+          }
+        }
+        const lost = row.vertical === 'lost'
+        const claims = lost
+          ? t.recoveryClaims.filter((c) => c.case_code === row.code)
+          : t.ownershipClaims.filter((c) => c.case_code === row.code)
         return {
           code: row.code,
           vertical: row.vertical,
           status: row.status,
-          title: pet.name ?? lookTitle(pet),
-          place_name: row.location.place_name,
+          title: lost ? (pet.name ?? lookTitle(pet)) : lookTitle(pet),
+          place_name: lost ? row.last_seen.place_name : row.found.place_name,
           photo_url: pet.photo_urls[0] ?? null,
           published_at: row.published_at,
-          // On a request, the offers waiting for the beneficiary to say whether they arrived.
-          open_claim_count: t.helpPledges.filter(
-            (p) => p.case_code === row.code && p.status === 'pledged',
-          ).length,
+          open_claim_count: claims.filter((c) => c.status === 'open').length,
         }
-      }
-      if (row.vertical === 'adoption') {
-        return {
-          code: row.code,
-          vertical: row.vertical,
-          status: row.status,
-          title: pet.name ?? lookTitle(pet),
-          place_name: row.location.place_name,
-          photo_url: pet.photo_urls[0] ?? null,
-          published_at: row.published_at,
-          // On a listing, the people waiting for an answer.
-          open_claim_count: t.adoptionInterests.filter(
-            (i) => i.case_code === row.code && i.status === 'open',
-          ).length,
-        }
-      }
-      const lost = row.vertical === 'lost'
-      const claims = lost
-        ? t.recoveryClaims.filter((c) => c.case_code === row.code)
-        : t.ownershipClaims.filter((c) => c.case_code === row.code)
-      return {
-        code: row.code,
-        vertical: row.vertical,
-        status: row.status,
-        title: lost ? (pet.name ?? lookTitle(pet)) : lookTitle(pet),
-        place_name: lost ? row.last_seen.place_name : row.found.place_name,
-        photo_url: pet.photo_urls[0] ?? null,
-        published_at: row.published_at,
-        open_claim_count: claims.filter((c) => c.status === 'open').length,
-      }
-    })
+      })
+      // The question owed on each case, for home's banner (comms.md · Actionable check-ins).
+      .map((item) => ({
+        ...item,
+        pending_checkin_at: pendingCheckin(t, item.code)?.asked_at ?? null,
+      }))
+  )
 }
 
 export function petsView(t: Tables, personId: string): WireOf<typeof api.listMyPets> {

@@ -1,14 +1,23 @@
 import { type FeedFilters, useFeed } from '@api-client/cases'
 import type { Species, Vertical } from '@contracts/case'
+import { withMessages } from '@i18n/locales'
 import { useI18n } from '@i18n/react'
 import { useIsDesktop } from '@platform/viewport'
 import { Button } from '@ui/Button'
 import { Chips, type Option, Segmented } from '@ui/Choice'
 import { FeedMap } from '@ui/Map/FeedMap'
+import { PinCard } from '@ui/Map/PinCard'
 import { Message, Skeleton } from '@ui/States'
 import { MapPinOff, SearchX, WifiOff } from 'lucide-react'
-import { type ReactNode, useState } from 'react'
+import { lazy, type ReactNode, Suspense, useMemo, useState } from 'react'
 import { FeedCard } from './FeedCard'
+
+// A tapped pin's card, and its words, arrive with the tap.
+const FeedPinCard = lazy(
+  withMessages(['map_sheet'], () =>
+    import('./FeedPinCard').then((m) => ({ default: m.FeedPinCard })),
+  ),
+)
 
 type All = 'all'
 
@@ -28,10 +37,11 @@ type Props = {
   brandMarkUrl: string
   mapStyleUrl: string | undefined
   caseLink: (code: string, children: ReactNode) => ReactNode
-  onOpenCase: (code: string) => void
+  /** Above the feed: the signed-in person's pending question, when there is one. */
+  banner?: ReactNode
 }
 
-export function FeedPage({ brandName, brandMarkUrl, mapStyleUrl, caseLink, onOpenCase }: Props) {
+export function FeedPage({ brandName, brandMarkUrl, mapStyleUrl, caseLink, banner }: Props) {
   const { t } = useI18n()
   const verticalOptions: Option<Vertical | All>[] = verticals.map((entry) => ({
     ...entry,
@@ -56,7 +66,15 @@ export function FeedPage({ brandName, brandMarkUrl, mapStyleUrl, caseLink, onOpe
   }
   const feed = useFeed(filters)
   const now = new Date()
-  const items = feed.data?.items ?? []
+  const items = feed.data?.items
+  // One array per answer, not per render: the map refits only when the cases change.
+  const markers = useMemo(
+    () => (items ?? []).map((item) => ({ id: item.code, point: item.point, tone: item.vertical })),
+    [items],
+  )
+  // The pin whose card is open; a filter that drops its case closes it.
+  const [selectedCode, setSelectedCode] = useState<string | null>(null)
+  const selected = items?.find((item) => item.code === selectedCode)
 
   return (
     <div className="mx-auto max-w-lg lg:max-w-6xl">
@@ -76,6 +94,7 @@ export function FeedPage({ brandName, brandMarkUrl, mapStyleUrl, caseLink, onOpe
       </header>
 
       <div className="flex flex-col gap-4 px-5 py-5 lg:px-8 lg:py-8">
+        {banner}
         <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
           <h1 className="order-3 m-0 text-2xl font-extrabold lg:order-1 lg:text-4xl">
             {t(feed.data?.scope === 'national' ? 'feed.title_national' : 'feed.title_local')}
@@ -118,7 +137,7 @@ export function FeedPage({ brandName, brandMarkUrl, mapStyleUrl, caseLink, onOpe
           >
             {t('common.check_connection')}
           </Message>
-        ) : items.length === 0 ? (
+        ) : !items?.length ? (
           <Message
             icon={<SearchX aria-hidden="true" className="size-10" />}
             title={t('feed.empty_title')}
@@ -145,12 +164,22 @@ export function FeedPage({ brandName, brandMarkUrl, mapStyleUrl, caseLink, onOpe
               <section aria-label={t('feed.map_label')} className="h-[70vh] lg:sticky lg:top-24">
                 <FeedMap
                   styleUrl={mapStyleUrl}
-                  markers={items.map((item) => ({
-                    id: item.code,
-                    point: item.point,
-                    tone: item.vertical,
-                  }))}
-                  onSelect={onOpenCase}
+                  markers={markers}
+                  selectedId={selected?.code ?? null}
+                  onSelect={setSelectedCode}
+                  card={
+                    selected ? (
+                      <PinCard label={selected.title} onClose={() => setSelectedCode(null)}>
+                        <Suspense fallback={null}>
+                          <FeedPinCard
+                            item={selected}
+                            now={now}
+                            link={(children) => caseLink(selected.code, children)}
+                          />
+                        </Suspense>
+                      </PinCard>
+                    ) : null
+                  }
                   unavailable={
                     <Message
                       icon={<MapPinOff aria-hidden="true" className="size-10" />}

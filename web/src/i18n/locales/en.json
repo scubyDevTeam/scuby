@@ -378,176 +378,6 @@
       "view": "See the listing"
     }
   },
-  "help": {
-    "band": {
-      "active": "Needs help",
-      "closed": "Request closed",
-      "expired": "Request archived",
-      "removed": "Request removed"
-    },
-    "page": {
-      "photo_alt": "Photo of {name}",
-      "line": "Needs help in {place} · posted {ago}",
-      "needs_title": "What it needs",
-      "story_title": "What happened",
-      "where_title": "Where it is needed",
-      "area_label": "Area where the help is needed (approximate)",
-      "beneficiary": "Asked by {name}",
-      "tier_unverified": "Unverified — the platform has not reviewed who is asking.",
-      "tier_verified": "Reviewed — an operator reviewed who is asking. Not a guarantee.",
-      "no_money": "Help here is given in person: nobody will ask you for money, and if someone does, report it.",
-      "safety": "For handovers, meet in a public place. A foster home is an arrangement between people: whoever asks stays responsible for the animal.",
-      "pledge": "I'll help",
-      "pledge_hint": "We'll ask you to sign in and for a phone",
-      "closed_title": "{name} has the help it needed.",
-      "closed_body": "Thanks to everyone who helped.",
-      "ended_title": "This request was closed.",
-      "removed_title": "This request is no longer active.",
-      "archived_title": "This request was archived.",
-      "archived_can_reopen": "You can reactivate it with one tap.",
-      "archived_beneficiary_can_reopen": "Whoever posted it can reactivate it.",
-      "reopen": "Reactivate request",
-      "close": "No longer needs help",
-      "share": "Share request",
-      "report": "Report"
-    },
-    "need": {
-      "kind": {
-        "foster": "Foster home",
-        "transport": "Transport",
-        "supplies": "Supplies"
-      },
-      "needed_by": "By {date}",
-      "progress_target": "{confirmed} of {target} confirmed · {pledged} promised",
-      "progress_open": "{confirmed} confirmed · {pledged} promised",
-      "nobody_yet": "Nobody has offered yet.",
-      "covered": "Covered",
-      "closed": "Closed",
-      "offer": "I'll help with this"
-    },
-    "mine": {
-      "offered": "You offered: {detail}",
-      "waiting": "Waiting for {name} to confirm it arrived.",
-      "confirmed": "{name} confirmed it arrived. Thank you!",
-      "declined": "{name} said it wasn't needed this time.",
-      "withdrawn": "You withdrew your offer.",
-      "write": "Write to them",
-      "withdraw": "I can't anymore"
-    },
-    "sheet": {
-      "pledge_title": "How will you help {name}?",
-      "conversation_title": "Write to {name}",
-      "close_title": "Does {name} no longer need help?",
-      "checkin_title": "Does {name} still need help?"
-    },
-    "checkin": {
-      "title": "Does {name} still need help?",
-      "body": "If you don't confirm, we'll archive the request in 5 days. Mark below what already arrived.",
-      "still": "Yes, still needed",
-      "ended": "No longer needs help"
-    },
-    "poster": {
-      "label": "Needs help",
-      "line": "Needs help in {place} · since {date}",
-      "message": "🤝 {label}: {title} — {place}. {needs}. Help in person, no money: {link}",
-      "owner_hint": "Share it in your neighbourhood groups: a home, a ride or a bag of food is usually a few blocks away."
-    }
-  },
-  "help_forms": {
-    "pledge": {
-      "intro": "Offer what you can give in person. {name} confirms when it arrives.",
-      "need_legend": "What will you help with?",
-      "quantity_label": "How many?",
-      "note_label": "A message for {name}",
-      "note_placeholder": "When you can, from where…",
-      "phone_hint": "{name} will write to you at this number to arrange it.",
-      "submit": "Offer and write to them",
-      "sending": "Sending…",
-      "confirm_code": "Confirm code and offer",
-      "failed": "We couldn't send your offer.",
-      "sent_title": "We let {name} know",
-      "sent_whatsapp": "Write to them on WhatsApp to arrange it.",
-      "sent_in_app": "They will write to you here to arrange it.",
-      "write_whatsapp": "Write on WhatsApp",
-      "errors": {
-        "quantity_invalid": "Enter a number from 1 to 99"
-      }
-    },
-    "beneficiary": {
-      "title": "People who offered help",
-      "none": "Nobody has offered yet. Share the request in your neighbourhood groups.",
-      "offered": "Offered: {quantity}",
-      "confirm": "It arrived",
-      "decline": "It didn't",
-      "confirmed": "Confirmed",
-      "declined": "Didn't arrive",
-      "call": "Call",
-      "whatsapp": "Open WhatsApp",
-      "cover": "I have what I needed",
-      "answer_failed": "We couldn't save your answer."
-    },
-    "close": {
-      "intro": "Anyone who offered help and hasn't delivered it yet will be told.",
-      "legend": "Why?",
-      "reason": {
-        "need_ended": "No longer needs help",
-        "pet_deceased": "Passed away"
-      },
-      "submit": "Close request",
-      "closing": "Closing…",
-      "failed": "We couldn't close the request.",
-      "choose": "Choose an option"
-    },
-    "publish": {
-      "title_pet": "Who is the help for?",
-      "title_needs": "What does it need?",
-      "title_place": "Where, and what happened?",
-      "pet_legend": "Which of your pets?",
-      "other_pet": "Another pet",
-      "name_label": "Name",
-      "marks_label": "What it looks like",
-      "needs_hint": "Ask for something specific that can be given in person, 1 to 3 things. No money is asked for here.",
-      "add_need": "Add {kind}",
-      "remove_need": "Remove",
-      "detail_label": {
-        "foster": "For how long, and why?",
-        "transport": "From where to where, and when?",
-        "supplies": "What exactly?"
-      },
-      "detail_placeholder": {
-        "foster": "2 weeks, while it recovers from surgery",
-        "transport": "From Envigado to the clinic in Laureles, Tuesday 8 a.m.",
-        "supplies": "Adult cat food, 8 kg bags"
-      },
-      "target_label": {
-        "foster": "How many homes?",
-        "transport": "How many rides?",
-        "supplies": "How many units?"
-      },
-      "target_hint": "Leave it empty for «whatever people can».",
-      "needed_by_label": "By when?",
-      "story_label": "Tell your neighbours what happened",
-      "story_hint": "No account numbers or payment links: no money is asked for here.",
-      "unverified_note": "It goes live right away, marked «Unverified».",
-      "continue": "Continue",
-      "publishing": "Publishing…",
-      "submit": "Publish request",
-      "confirm_code": "Confirm code and publish",
-      "publish_failed": "We couldn't publish the request.",
-      "published_title": "Request published!",
-      "published_notice_title": "Your neighbours can now see what {name} needs.",
-      "published_notice_body": "We'll let you know every time someone offers help.",
-      "view": "View my request",
-      "errors": {
-        "needs_required": "Choose at least one thing it needs",
-        "too_many_needs": "Ask for 3 things at most",
-        "need_detail_required": "Say exactly what is needed in each one",
-        "need_target_invalid": "The amount must be a whole number, or leave it empty",
-        "needed_by_past": "That date has passed",
-        "story_required": "Tell them what happened"
-      }
-    }
-  },
   "publish": {
     "errors": {
       "name_required": "Tell us its name",
@@ -962,6 +792,177 @@
       "submit": "Send report"
     }
   },
+  "help": {
+    "band": {
+      "active": "Needs help",
+      "covered": "Help arrived",
+      "closed": "Request closed",
+      "expired": "Request archived",
+      "removed": "Request removed"
+    },
+    "page": {
+      "photo_alt": "Photo of {name}",
+      "line": "Needs help in {place} · posted {ago}",
+      "needs_title": "What it needs",
+      "story_title": "What happened",
+      "where_title": "Where it is needed",
+      "area_label": "Area where the help is needed (approximate)",
+      "beneficiary": "Asked by {name}",
+      "tier_unverified": "Unverified — the platform has not reviewed who is asking.",
+      "tier_verified": "Reviewed — an operator reviewed who is asking. Not a guarantee.",
+      "no_money": "Help here is given in person: nobody will ask you for money, and if someone does, report it.",
+      "safety": "For handovers, meet in a public place. A foster home is an arrangement between people: whoever asks stays responsible for the animal.",
+      "pledge": "I'll help",
+      "pledge_hint": "We'll ask you to sign in and for a phone",
+      "closed_title": "{name} has the help it needed.",
+      "closed_body": "Thanks to everyone who helped.",
+      "ended_title": "This request was closed.",
+      "removed_title": "This request is no longer active.",
+      "archived_title": "This request was archived.",
+      "archived_can_reopen": "You can reactivate it with one tap.",
+      "archived_beneficiary_can_reopen": "Whoever posted it can reactivate it.",
+      "reopen": "Reactivate request",
+      "close": "No longer needs help",
+      "share": "Share request",
+      "report": "Report"
+    },
+    "need": {
+      "kind": {
+        "foster": "Foster home",
+        "transport": "Transport",
+        "supplies": "Supplies"
+      },
+      "needed_by": "By {date}",
+      "progress_target": "{confirmed} of {target} confirmed · {pledged} promised",
+      "progress_open": "{confirmed} confirmed · {pledged} promised",
+      "nobody_yet": "Nobody has offered yet.",
+      "covered": "Covered",
+      "closed": "Closed",
+      "offer": "I'll help with this"
+    },
+    "mine": {
+      "offered": "You offered: {detail}",
+      "waiting": "Waiting for {name} to confirm it arrived.",
+      "confirmed": "{name} confirmed it arrived. Thank you!",
+      "declined": "{name} said it wasn't needed this time.",
+      "withdrawn": "You withdrew your offer.",
+      "write": "Write to them",
+      "withdraw": "I can't anymore"
+    },
+    "sheet": {
+      "pledge_title": "How will you help {name}?",
+      "conversation_title": "Write to {name}",
+      "close_title": "Does {name} no longer need help?",
+      "checkin_title": "Does {name} still need help?"
+    },
+    "checkin": {
+      "title": "Does {name} still need help?",
+      "body": "If you don't confirm, we'll archive the request in 5 days. Mark below what already arrived.",
+      "still": "Yes, still needed",
+      "ended": "No longer needs help"
+    },
+    "poster": {
+      "label": "Needs help",
+      "line": "Needs help in {place} · since {date}",
+      "message": "🤝 {label}: {title} — {place}. {needs}. Help in person, no money: {link}",
+      "owner_hint": "Share it in your neighbourhood groups: a home, a ride or a bag of food is usually a few blocks away."
+    }
+  },
+  "help_forms": {
+    "pledge": {
+      "intro": "Offer what you can give in person. {name} confirms when it arrives.",
+      "need_legend": "What will you help with?",
+      "quantity_label": "How many?",
+      "note_label": "A message for {name}",
+      "note_placeholder": "When you can, from where…",
+      "phone_hint": "{name} will write to you at this number to arrange it.",
+      "submit": "Offer and write to them",
+      "sending": "Sending…",
+      "confirm_code": "Confirm code and offer",
+      "failed": "We couldn't send your offer.",
+      "sent_title": "We let {name} know",
+      "sent_whatsapp": "Write to them on WhatsApp to arrange it.",
+      "sent_in_app": "They will write to you here to arrange it.",
+      "write_whatsapp": "Write on WhatsApp",
+      "errors": {
+        "quantity_invalid": "Enter a number from 1 to 99"
+      }
+    },
+    "beneficiary": {
+      "title": "People who offered help",
+      "none": "Nobody has offered yet. Share the request in your neighbourhood groups.",
+      "offered": "Offered: {quantity}",
+      "confirm": "It arrived",
+      "decline": "It didn't",
+      "confirmed": "Confirmed",
+      "declined": "Didn't arrive",
+      "call": "Call",
+      "whatsapp": "Open WhatsApp",
+      "cover": "I have what I needed",
+      "answer_failed": "We couldn't save your answer."
+    },
+    "close": {
+      "intro": "Anyone who offered help and hasn't delivered it yet will be told.",
+      "legend": "Why?",
+      "reason": {
+        "need_ended": "No longer needs help",
+        "pet_deceased": "Passed away"
+      },
+      "submit": "Close request",
+      "closing": "Closing…",
+      "failed": "We couldn't close the request.",
+      "choose": "Choose an option"
+    },
+    "publish": {
+      "title_pet": "Who is the help for?",
+      "title_needs": "What does it need?",
+      "title_place": "Where, and what happened?",
+      "pet_legend": "Which of your pets?",
+      "other_pet": "Another pet",
+      "name_label": "Name",
+      "marks_label": "What it looks like",
+      "needs_hint": "Ask for something specific that can be given in person, 1 to 3 things. No money is asked for here.",
+      "add_need": "Add {kind}",
+      "remove_need": "Remove",
+      "detail_label": {
+        "foster": "For how long, and why?",
+        "transport": "From where to where, and when?",
+        "supplies": "What exactly?"
+      },
+      "detail_placeholder": {
+        "foster": "2 weeks, while it recovers from surgery",
+        "transport": "From Envigado to the clinic in Laureles, Tuesday 8 a.m.",
+        "supplies": "Adult cat food, 8 kg bags"
+      },
+      "target_label": {
+        "foster": "How many homes?",
+        "transport": "How many rides?",
+        "supplies": "How many units?"
+      },
+      "target_hint": "Leave it empty for «whatever people can».",
+      "needed_by_label": "By when?",
+      "story_label": "Tell your neighbours what happened",
+      "story_hint": "No account numbers or payment links: no money is asked for here.",
+      "unverified_note": "It goes live right away, marked «Unverified».",
+      "continue": "Continue",
+      "publishing": "Publishing…",
+      "submit": "Publish request",
+      "confirm_code": "Confirm code and publish",
+      "publish_failed": "We couldn't publish the request.",
+      "published_title": "Request published!",
+      "published_notice_title": "Your neighbours can now see what {name} needs.",
+      "published_notice_body": "We'll let you know every time someone offers help.",
+      "view": "View my request",
+      "errors": {
+        "needs_required": "Choose at least one thing it needs",
+        "too_many_needs": "Ask for 3 things at most",
+        "need_detail_required": "Say exactly what is needed in each one",
+        "need_target_invalid": "The amount must be a whole number, or leave it empty",
+        "needed_by_past": "That date has passed",
+        "story_required": "Tell them what happened"
+      }
+    }
+  },
   "inbox": {
     "title": "Inbox",
     "list_label": "Notifications",
@@ -1023,6 +1024,125 @@
       "consent_body": "By creating your account or leaving your details on a post you consent to this processing."
     }
   },
+  "links": {
+    "loading": "Opening the link",
+    "unnamed": "the animal",
+    "not_found_title": "This link doesn't exist",
+    "not_found_body": "It may have been copied incomplete. If it came by email, open it again from the button.",
+    "go_home": "See alerts near me",
+    "load_failed": "We couldn't open the link",
+    "confirm_failed": "We couldn't save your answer.",
+    "view_case": {
+      "lost": "See the alert",
+      "found": "See the alert",
+      "adoption": "See the listing",
+      "help": "See the request"
+    },
+    "thanks": {
+      "still_lost": {
+        "title": "Thanks, we keep looking",
+        "body": "{name}'s alert stays up. We'll ask you again in a week."
+      },
+      "reunited": {
+        "title": "{name} is back home!",
+        "body": "We closed the alert and told everyone who helped."
+      },
+      "delete": {
+        "title": "We deleted the alert",
+        "body": "{name}'s alert is no longer shown or sent to anyone."
+      },
+      "claim_confirmed": {
+        "title": "{name} is going home!",
+        "body": "We closed the alert. Thanks to whoever found them and spoke up."
+      },
+      "claim_dismissed": {
+        "title": "Done, it wasn't {name}",
+        "body": "We removed the possible-find notice. The search carries on the same."
+      },
+      "still_verifying": {
+        "title": "Thanks, we'll keep it open",
+        "body": "The possible-find notice stays 3 more days. We'll ask you again then."
+      },
+      "still_available": {
+        "title": "Thanks, it stays listed",
+        "body": "{name}'s listing stays up. We'll ask you again in two weeks."
+      },
+      "adopted": {
+        "title": "{name} has a home!",
+        "body": "We closed the listing and told everyone who asked."
+      },
+      "still_needed": {
+        "title": "Thanks, the request stays up",
+        "body": "{name}'s request is still active. When something arrives, mark it on the request."
+      },
+      "no_longer_needed": {
+        "title": "We closed the request",
+        "body": "We told everyone who offered help. Thanks for letting us know."
+      }
+    },
+    "confirm": {
+      "reunited": {
+        "title": "Is {name} really back?",
+        "body": "We close the alert and tell everyone who helped. One tap and done.",
+        "button": "Yes, they're back",
+        "decline": "No, still lost"
+      },
+      "delete": {
+        "title": "Delete {name}'s alert?",
+        "body": "It stops showing and nobody else gets the alert.",
+        "button": "Yes, delete the alert",
+        "decline": "No, still lost"
+      },
+      "claim_confirmed": {
+        "title": "Is it really {name}?",
+        "body": "We close the alert: {name} goes home thanks to whoever spoke up.",
+        "button": "Yes, it's {name}",
+        "decline": "Still checking"
+      },
+      "claim_dismissed": {
+        "title": "So it isn't {name}?",
+        "body": "We remove the possible-find notice. The search carries on the same.",
+        "button": "It isn't {name}",
+        "decline": "Still checking"
+      },
+      "adopted": {
+        "title": "Was {name} adopted?",
+        "body": "We close the listing and tell everyone who asked.",
+        "button": "Yes, they were adopted",
+        "decline": "No, still available"
+      },
+      "no_longer_needed": {
+        "title": "Does {name} no longer need help?",
+        "body": "We close the request and tell everyone who offered help.",
+        "button": "Yes, close the request",
+        "decline": "No, it's still needed"
+      }
+    },
+    "used": {
+      "title": "We already have your answer",
+      "body": "We saved it for {name}. There's nothing else to do."
+    },
+    "already_answered": {
+      "title": "This question is already answered",
+      "body": "It was answered in the app or with another button of the email. Open the alert to see how it's going."
+    },
+    "expired": {
+      "title": "This link has expired",
+      "body": "The email's buttons last a week. If the question is still open, answer it from the alert."
+    }
+  },
+  "checkin_banner": {
+    "label": "Question waiting",
+    "title": {
+      "lost": "{name}'s alert is waiting for your answer.",
+      "found": "{name}'s alert is waiting for your answer.",
+      "adoption": "{name}'s listing is waiting for your answer.",
+      "help": "{name}'s request is waiting for your answer."
+    },
+    "body": "If you don't answer, it gets archived.",
+    "more": "And {count} more in My cases.",
+    "answer": "Answer"
+  },
   "lost": {
     "pet": {
       "species_other": "Pet"
@@ -1069,6 +1189,13 @@
       "anonymous": "anonymous",
       "note": "“{note}”"
     },
+    "queued": {
+      "label": "Your unsent sightings",
+      "seen": "You saw {name} · {ago}",
+      "waiting": "Waiting",
+      "not_sent": "Not sent",
+      "dismiss": "Dismiss"
+    },
     "sighting_form": {
       "when": {
         "now": "Now",
@@ -1093,7 +1220,11 @@
       "failed_title": "We couldn't send your sighting.",
       "too_soon": "You already reported a sighting a moment ago.",
       "sending": "Sending…",
-      "submit": "Send sighting"
+      "submit": "Send sighting",
+      "offline": "No connection",
+      "queued_title": "We saved your sighting",
+      "queued_body": "It sends itself as soon as the signal is back. You don't need to repeat it.",
+      "back_to_case": "Back to the post for {name}"
     },
     "claim_form": {
       "phone_required": "Enter your mobile number",
@@ -1198,6 +1329,24 @@
       "ownership_unnamed": "By publishing you confirm this is your pet."
     }
   },
+  "map_pin": {
+    "open_sighting": "Open sighting {n}"
+  },
+  "map_sheet": {
+    "feed": {
+      "view": "View"
+    },
+    "sighting": {
+      "title": "Sighting {n}",
+      "distance": "{distance} from where she was lost",
+      "by_registered": "Reported by someone with an account",
+      "by_anonymous": "Reported anonymously",
+      "photo_alt": "Photo of the sighting",
+      "write": "Message them",
+      "call": "Call",
+      "saw_it_too": "I saw her here too"
+    }
+  },
   "preview": {
     "label": {
       "lost": {
@@ -1223,6 +1372,7 @@
       },
       "help": {
         "active": "Needs help",
+        "covered": "Help arrived",
         "closed": "Request closed",
         "expired": "Request archived",
         "removed": "Request removed"
@@ -1246,6 +1396,7 @@
       "closed": "This post has ended.",
       "help_active": "{name} needs {needs}. Help in person, never money.",
       "help_closed": "{name} has the help it needed. Thanks to everyone who helped.",
+      "help_ended": "Whoever posted it closed this request.",
       "help_expired": "This request was archived.",
       "help_removed": "This request is no longer active."
     },
