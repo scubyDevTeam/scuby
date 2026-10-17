@@ -17,7 +17,7 @@ const RULE_FOR_CODE: Partial<Record<string, SightingError>> = {
 
 /** Why the server refused a sighting that waited for a signal, when the words for it exist. */
 export function rejectionCopy(i18n: Translator, code: string, petName: string): string | null {
-  if (code === 'rate_limited') return i18n.t('lost.sighting_form.too_soon')
+  if (code === 'rate_limited') return i18n.t('lost.queued.too_soon')
   const rule = RULE_FOR_CODE[code]
   return rule ? sightingErrorCopy(i18n, rule, petName) : null
 }

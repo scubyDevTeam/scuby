@@ -13,16 +13,16 @@ import { Notice } from '@ui/Notice'
 import { type FormEvent, useState } from 'react'
 
 const attributionLabel: Record<Attribution, TextKey> = {
-  platform_sighting: 'lost.owner_forms.attribution.platform_sighting',
-  platform_claim: 'lost.owner_forms.attribution.platform_claim',
-  platform_share: 'lost.owner_forms.attribution.platform_share',
-  offline: 'lost.owner_forms.attribution.offline',
+  platform_sighting: 'lost_forms.owner_forms.attribution.platform_sighting',
+  platform_claim: 'lost_forms.owner_forms.attribution.platform_claim',
+  platform_share: 'lost_forms.owner_forms.attribution.platform_share',
+  offline: 'lost_forms.owner_forms.attribution.offline',
   unknown: 'common.not_sure',
 }
 
 const cancelLabel: Record<CancelReason, TextKey> = {
-  false_alarm: 'lost.owner_forms.cancel_reason.false_alarm',
-  duplicate: 'lost.owner_forms.cancel_reason.duplicate',
+  false_alarm: 'lost_forms.owner_forms.cancel_reason.false_alarm',
+  duplicate: 'lost_forms.owner_forms.cancel_reason.duplicate',
 }
 
 function Failed() {
@@ -69,9 +69,11 @@ export function ReuniteForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-      <p className="m-0 text-muted">{t('lost.owner_forms.reunite_intro', { name: petName })}</p>
+      <p className="m-0 text-muted">
+        {t('lost_forms.owner_forms.reunite_intro', { name: petName })}
+      </p>
       <RadioList
-        legend={t('lost.owner_forms.who_helped')}
+        legend={t('lost_forms.owner_forms.who_helped')}
         name="attribution"
         options={ATTRIBUTIONS.map((value) => ({ value, label: t(attributionLabel[value]) }))}
         value={attribution}
@@ -79,16 +81,18 @@ export function ReuniteForm({
       />
       {tried && !attribution ? (
         <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
-          {t('lost.owner_forms.pick_option')}
+          {t('lost_forms.owner_forms.pick_option')}
         </p>
       ) : null}
       {reunite.isError ? <Failed /> : null}
       <Button type="submit" disabled={reunite.isPending}>
         {reunite.isPending
-          ? t('lost.owner_forms.saving')
-          : t('lost.owner_forms.reunite_submit', { name: petName })}
+          ? t('lost_forms.owner_forms.saving')
+          : t('lost_forms.owner_forms.reunite_submit', { name: petName })}
       </Button>
-      <p className="m-0 text-center text-sm text-muted">{t('lost.owner_forms.reunite_footnote')}</p>
+      <p className="m-0 text-center text-sm text-muted">
+        {t('lost_forms.owner_forms.reunite_footnote')}
+      </p>
     </form>
   )
 }
@@ -120,9 +124,9 @@ export function CancelForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-      <Notice tone="warning">{t('lost.owner_forms.cancel_warning')}</Notice>
+      <Notice tone="warning">{t('lost_forms.owner_forms.cancel_warning')}</Notice>
       <RadioList
-        legend={t('lost.owner_forms.why_cancel')}
+        legend={t('lost_forms.owner_forms.why_cancel')}
         name="reason"
         options={CANCEL_REASONS.map((value) => ({ value, label: t(cancelLabel[value]) }))}
         value={reason}
@@ -130,12 +134,16 @@ export function CancelForm({
       />
       {tried && !reason ? (
         <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
-          {t('lost.owner_forms.pick_reason')}
+          {t('lost_forms.owner_forms.pick_reason')}
         </p>
       ) : null}
       {cancel.isError ? <Failed /> : null}
       <Button type="submit" variant="danger" disabled={cancel.isPending}>
-        {t(cancel.isPending ? 'lost.owner_forms.deleting' : 'lost.owner_forms.cancel_submit')}
+        {t(
+          cancel.isPending
+            ? 'lost_forms.owner_forms.deleting'
+            : 'lost_forms.owner_forms.cancel_submit',
+        )}
       </Button>
     </form>
   )
@@ -155,13 +163,19 @@ export function ReopenForm({
   const reopen = useReopenCase(code)
   return (
     <div className="flex flex-col gap-4">
-      <p className="m-0 text-muted">{t('lost.owner_forms.reopen_intro', { name: petName })}</p>
+      <p className="m-0 text-muted">
+        {t('lost_forms.owner_forms.reopen_intro', { name: petName })}
+      </p>
       {reopen.isError ? <Failed /> : null}
       <Button
         disabled={reopen.isPending}
         onClick={() => reopen.mutate(undefined, { onSuccess: onDone })}
       >
-        {t(reopen.isPending ? 'lost.owner_forms.reopening' : 'lost.owner_forms.reopen_submit')}
+        {t(
+          reopen.isPending
+            ? 'lost_forms.owner_forms.reopening'
+            : 'lost_forms.owner_forms.reopen_submit',
+        )}
       </Button>
     </div>
   )

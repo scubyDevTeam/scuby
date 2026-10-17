@@ -39,4 +39,4 @@ export const sightingsCount = (i18n: Translator, count: number) =>
 
 /** The wording docs/product/04 fixes for each rule a sighting can break. */
 export const sightingErrorCopy = (i18n: Translator, error: SightingError, petName: string) =>
-  i18n.t(`lost.sighting_form.errors.${error}`, { name: petName })
+  i18n.t(`lost_forms.sighting_form.errors.${error}`, { name: petName })

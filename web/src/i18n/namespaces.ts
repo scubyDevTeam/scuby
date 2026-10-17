@@ -20,6 +20,9 @@ export const DEFERRED_NAMESPACES = [
   // The found page's words with its screen too; reporting a find and the witness page wait for
   // their own routes.
   'found',
+  // A lost pet's forms — «La vi», «Lo tengo», the owner's endings, publishing, the check-in — wait
+  // for the button that opens them: a stranger opening the link reads the page, not its forms.
+  'lost_forms',
   // The «Mensajes» tab, a thread and the first message from a case: only with their screens.
   'chat',
   // The same for a help request: its page's words with its screen, offering help and the

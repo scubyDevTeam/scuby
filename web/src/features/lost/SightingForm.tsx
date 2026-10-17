@@ -26,10 +26,10 @@ type When = 'now' | 'earlier' | 'yesterday' | 'custom'
 
 const WHEN: readonly When[] = ['now', 'earlier', 'yesterday', 'custom']
 const whenLabel: Record<When, TextKey> = {
-  now: 'lost.sighting_form.when.now',
-  earlier: 'lost.sighting_form.when.earlier',
-  yesterday: 'lost.sighting_form.when.yesterday',
-  custom: 'lost.sighting_form.when.custom',
+  now: 'lost_forms.sighting_form.when.now',
+  earlier: 'lost_forms.sighting_form.when.earlier',
+  yesterday: 'lost_forms.sighting_form.when.yesterday',
+  custom: 'lost_forms.sighting_form.when.custom',
 }
 
 function seenAtFor(when: When, custom: string, now: Date): Date | null {
@@ -92,7 +92,7 @@ export function SightingForm({
       : []
   const placeError = !point
     ? tried
-      ? t('lost.sighting_form.place_required', { name: petName })
+      ? t('lost_forms.sighting_form.place_required', { name: petName })
       : null
     : ruleErrors.includes('too_far')
       ? sightingErrorCopy(i18n, 'too_far', petName)
@@ -100,7 +100,7 @@ export function SightingForm({
   const timeRule = ruleErrors.find((error) => error !== 'too_far')
   const timeError = !seenAt
     ? tried
-      ? t('lost.sighting_form.time_required')
+      ? t('lost_forms.sighting_form.time_required')
       : null
     : timeRule
       ? sightingErrorCopy(i18n, timeRule, petName)
@@ -138,8 +138,8 @@ export function SightingForm({
   if (correct.isSuccess) {
     return (
       <div className="flex flex-col gap-4">
-        <Notice tone="success" title={t('lost.sighting_form.corrected_title')}>
-          {t('lost.sighting_form.corrected_body')}
+        <Notice tone="success" title={t('lost_forms.sighting_form.corrected_title')}>
+          {t('lost_forms.sighting_form.corrected_body')}
         </Notice>
         <Button onClick={onDone}>{t('common.done')}</Button>
       </div>
@@ -149,13 +149,13 @@ export function SightingForm({
   if (asking && ownPin && report.isIdle && !correct.isPending) {
     return (
       <div className="flex flex-col gap-4">
-        <h3 className="m-0 text-2xl font-extrabold">{t('lost.sighting_form.ask_title')}</h3>
+        <h3 className="m-0 text-2xl font-extrabold">{t('lost_forms.sighting_form.ask_title')}</h3>
         {correct.isError ? (
-          <Notice tone="warning">{t('lost.sighting_form.correct_failed')}</Notice>
+          <Notice tone="warning">{t('lost_forms.sighting_form.correct_failed')}</Notice>
         ) : null}
-        <Button onClick={sendNew}>{t('lost.sighting_form.ask_again')}</Button>
+        <Button onClick={sendNew}>{t('lost_forms.sighting_form.ask_again')}</Button>
         <Button variant="outline" onClick={() => moveTo(ownPin.id)}>
-          {t('lost.sighting_form.ask_correct')}
+          {t('lost_forms.sighting_form.ask_correct')}
         </Button>
       </div>
     )
@@ -164,8 +164,8 @@ export function SightingForm({
   if (report.isSuccess) {
     return (
       <div className="flex flex-col gap-4">
-        <Notice tone="success" title={t('lost.sighting_form.thanks_title')}>
-          {t('lost.sighting_form.thanks_body')}
+        <Notice tone="success" title={t('lost_forms.sighting_form.thanks_title')}>
+          {t('lost_forms.sighting_form.thanks_body')}
         </Notice>
         <Button onClick={onDone}>{t('common.done')}</Button>
       </div>
@@ -183,22 +183,26 @@ export function SightingForm({
             className="m-0 flex items-center gap-2 rounded-2xl bg-brand px-4 py-3 font-bold text-white"
           >
             <WifiOff aria-hidden="true" />
-            {t('lost.sighting_form.offline')}
+            {t('lost_forms.sighting_form.offline')}
           </p>
         )}
         <span className="flex size-16 items-center justify-center rounded-3xl bg-brand-ice text-brand-deep">
           <Clock aria-hidden="true" className="size-8" />
         </span>
         <div className="flex flex-col gap-2">
-          <h3 className="m-0 text-3xl font-extrabold">{t('lost.sighting_form.queued_title')}</h3>
-          <p className="m-0 text-muted">{t('lost.sighting_form.queued_body')}</p>
+          <h3 className="m-0 text-3xl font-extrabold">
+            {t('lost_forms.sighting_form.queued_title')}
+          </h3>
+          <p className="m-0 text-muted">{t('lost_forms.sighting_form.queued_body')}</p>
         </div>
         <QueuedCard
           sighting={{ id: 0, seenAt: body.seen_at, note: body.note, rejected: null }}
           petName={petName}
           now={now}
         />
-        <Button onClick={onDone}>{t('lost.sighting_form.back_to_case', { name: petName })}</Button>
+        <Button onClick={onDone}>
+          {t('lost_forms.sighting_form.back_to_case', { name: petName })}
+        </Button>
       </div>
     )
   }
@@ -206,7 +210,7 @@ export function SightingForm({
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
       {correcting ? (
-        <p className="m-0 text-muted">{t('lost.sighting_form.correcting_intro')}</p>
+        <p className="m-0 text-muted">{t('lost_forms.sighting_form.correcting_intro')}</p>
       ) : null}
       <section className="flex flex-col gap-2">
         <p className="m-0 text-muted">{t('map.tap_to_mark')}</p>
@@ -239,16 +243,16 @@ export function SightingForm({
       </section>
 
       <section className="flex flex-col gap-2">
-        <h3 className="m-0 text-lg font-bold">{t('lost.sighting_form.when_title')}</h3>
+        <h3 className="m-0 text-lg font-bold">{t('lost_forms.sighting_form.when_title')}</h3>
         <Chips
-          label={t('lost.sighting_form.when_label')}
+          label={t('lost_forms.sighting_form.when_label')}
           options={WHEN.map((value): Option<When> => ({ value, label: t(whenLabel[value]) }))}
           value={when}
           onChange={setWhen}
         />
         {when === 'custom' ? (
           <TextField
-            label={t('lost.sighting_form.day_and_time')}
+            label={t('lost_forms.sighting_form.day_and_time')}
             type="datetime-local"
             value={custom}
             onChange={(event) => setCustom(event.target.value)}
@@ -264,7 +268,7 @@ export function SightingForm({
       <TextArea
         label={t('common.note')}
         optional
-        placeholder={t('lost.sighting_form.note_placeholder')}
+        placeholder={t('lost_forms.sighting_form.note_placeholder')}
         value={note}
         onChange={(event) => setNote(event.target.value)}
       />
@@ -275,7 +279,7 @@ export function SightingForm({
             label={t('contact.your_whatsapp')}
             optional
             prefix={country?.phonePrefix ?? ''}
-            hint={t('lost.sighting_form.phone_hint')}
+            hint={t('lost_forms.sighting_form.phone_hint')}
             error={phoneError}
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
@@ -284,13 +288,13 @@ export function SightingForm({
       )}
 
       {correct.isError ? (
-        <Notice tone="warning">{t('lost.sighting_form.correct_failed')}</Notice>
+        <Notice tone="warning">{t('lost_forms.sighting_form.correct_failed')}</Notice>
       ) : null}
       {report.isError ? (
-        <Notice tone="warning" title={t('lost.sighting_form.failed_title')}>
+        <Notice tone="warning" title={t('lost_forms.sighting_form.failed_title')}>
           {t(
             report.error instanceof ApiError && report.error.kind === 'rejected'
-              ? 'lost.sighting_form.too_soon'
+              ? 'lost.queued.too_soon'
               : 'common.check_connection',
           )}
         </Notice>
@@ -300,11 +304,11 @@ export function SightingForm({
         {t(
           correcting
             ? correct.isPending
-              ? 'lost.sighting_form.correcting'
-              : 'lost.sighting_form.correct_submit'
+              ? 'lost_forms.sighting_form.correcting'
+              : 'lost_forms.sighting_form.correct_submit'
             : report.isPending
-              ? 'lost.sighting_form.sending'
-              : 'lost.sighting_form.submit',
+              ? 'lost_forms.sighting_form.sending'
+              : 'lost_forms.sighting_form.submit',
         )}
       </Button>
       {correcting ? null : (
