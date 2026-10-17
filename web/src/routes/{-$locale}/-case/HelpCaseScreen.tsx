@@ -52,7 +52,13 @@ const SignIn = lazy(
 /** The code the emulated backend accepts (src/mocks/handlers.ts). */
 const DEMO_CODE = '123456'
 
-type Open = 'pledge' | 'close' | 'report' | 'share' | null
+const EditCase = lazy(
+  withMessages(['edit_case', 'adoption', 'publish'], () =>
+    import('@features/edit/EditCase').then((m) => ({ default: m.EditCase })),
+  ),
+)
+
+type Open = 'edit' | 'pledge' | 'close' | 'report' | 'share' | null
 
 export function HelpCaseScreen({ found }: { found: HelpCase }) {
   const { t } = useI18n()
@@ -69,6 +75,7 @@ export function HelpCaseScreen({ found }: { found: HelpCase }) {
   const demoCode = env.apiMock ? DEMO_CODE : undefined
 
   function handle(action: HelpAction) {
+    if (action === 'edit') return setSheet('edit')
     if (action === 'close_request') return setSheet('close')
     if (action === 'report_content') return setSheet('report')
     if (action === 'share') return setSheet('share')
@@ -81,6 +88,7 @@ export function HelpCaseScreen({ found }: { found: HelpCase }) {
   }
 
   const titles: Record<NonNullable<Open>, string> = {
+    edit: t('edit_case.title', { name }),
     pledge: t('help.sheet.pledge_title', { name }),
     close: t('help.sheet.close_title', { name }),
     report: t('case.report_title'),
@@ -144,6 +152,17 @@ export function HelpCaseScreen({ found }: { found: HelpCase }) {
             )
           ) : null}
           {sheet === 'close' ? <CloseHelpForm code={found.code} onDone={close} /> : null}
+          {sheet === 'edit' ? (
+            <EditCase
+              editable={{
+                code: found.code,
+                photoUrls: found.pet.photoUrls,
+                marks: found.pet.marks,
+                story: found.story,
+              }}
+              onDone={close}
+            />
+          ) : null}
           {sheet === 'report' ? (
             <ReportForm targetType="help_request" targetCode={found.code} onDone={close} />
           ) : null}

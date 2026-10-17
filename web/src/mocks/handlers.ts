@@ -5,6 +5,7 @@ import { adoption } from './api/adoption'
 import { alerts } from './api/alerts'
 import { auth } from './api/auth'
 import { conversations } from './api/conversations'
+import { edit } from './api/edit'
 import { found } from './api/found'
 import { help } from './api/help'
 import { helpers } from './api/helpers'
@@ -25,4 +26,5 @@ export const handlers = [
   ...links,
   ...conversations,
   ...alerts,
+  ...edit,
 ]

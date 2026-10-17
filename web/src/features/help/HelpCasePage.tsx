@@ -186,6 +186,11 @@ export function HelpCasePage({
             : t('help.page.archived_beneficiary_can_reopen')}
         </Notice>
       ) : null}
+      {can('edit') ? (
+        <Button variant="outline" onClick={() => onAction('edit')}>
+          {t('help.page.edit')}
+        </Button>
+      ) : null}
       {can('reopen') ? (
         <Button onClick={() => onAction('reopen')}>{t('help.page.reopen')}</Button>
       ) : null}

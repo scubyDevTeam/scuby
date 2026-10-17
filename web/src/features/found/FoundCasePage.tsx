@@ -177,6 +177,11 @@ export function FoundCasePage({
           {t('found.page.claim')}
         </Button>
       ) : null}
+      {can('edit') ? (
+        <Button variant="outline" onClick={() => onAction('edit')}>
+          {t('found.page.edit')}
+        </Button>
+      ) : null}
       {can('reopen') ? (
         <Button onClick={() => onAction('reopen')}>{t('found.page.reopen')}</Button>
       ) : null}

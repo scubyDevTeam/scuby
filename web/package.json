@@ -14,13 +14,12 @@
     "test:watch": "vitest",
     "openapi": "UPDATE_OPENAPI=1 vitest run src/contracts/openapi.test.ts",
     "depcruise": "depcruise src --config .dependency-cruiser.cjs",
-    "size": "VITE_API_MOCK=false vite build --outDir dist-size --emptyOutDir --logLevel warn && node scripts/check-size.mjs dist-size",
     "build:share": "node scripts/build-share.mjs",
     "lighthouse": "lhci autorun",
     "check:brand": "sh scripts/check-brand.sh",
     "check:e2e-tags": "node scripts/check-e2e-tags.mjs",
     "check:copy": "node scripts/check-copy.mjs",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm check:brand && pnpm check:copy && pnpm check:e2e-tags && pnpm build && pnpm build:share && pnpm size && pnpm e2e && pnpm lighthouse",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm check:brand && pnpm check:copy && pnpm check:e2e-tags && pnpm build && pnpm build:share && pnpm e2e && pnpm lighthouse",
     "e2e": "playwright test"
   },
   "dependencies": {

@@ -23,6 +23,8 @@ export const DEFERRED_NAMESPACES = [
   // A lost pet's forms — «La vi», «Lo tengo», the owner's endings, publishing, the check-in — wait
   // for the button that opens them: a stranger opening the link reads the page, not its forms.
   'lost_forms',
+  // The edit form of found, adoption and help notices.
+  'edit_case',
   // The «Mensajes» tab, a thread and the first message from a case: only with their screens.
   'chat',
   // The same for a help request: its page's words with its screen, offering help and the

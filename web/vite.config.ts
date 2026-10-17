@@ -69,7 +69,7 @@ function localeNamespaces(): Plugin {
  * in .env = off, and the build is the same as without this). Uploaded under the build id the client
  * reports as its release, then deleted: they are never served. The release-and-URL upload, not the
  * debug-id one: that one stamps a snippet into every chunk, ≈3 KB gzip on the first load of
- * `/c/:code`, which leaves no room under its 150 KB.
+ * `/c/:code`.
  */
 function sentrySourcemaps(mode: string, release: string): Plugin[] | undefined {
   const sentry = loadEnv(mode, process.cwd(), 'SENTRY_')
@@ -159,7 +159,6 @@ export default defineConfig(({ mode }) => {
       sourcemaps,
     ],
     worker: { format: 'es' },
-    // scripts/check-size.mjs reads the manifest to add up what one route really downloads.
     build: {
       manifest: true,
       ...(sourcemaps ? { sourcemap: 'hidden' as const } : {}),

@@ -178,7 +178,8 @@
       "where_title": "Where they are",
       "area_label": "Area where they are (approximate)",
       "share": "Share listing",
-      "report": "Report"
+      "report": "Report",
+      "edit": "Edit notice"
     },
     "temperament": {
       "good_with_kids": "Good with kids",
@@ -728,7 +729,8 @@
       "where_title": "Where it was found",
       "area_label": "Area where it was found (approximate)",
       "see_listing": "See their adoption listing",
-      "write_chat": "Message them"
+      "write_chat": "Message them",
+      "edit": "Edit notice"
     },
     "custodian": {
       "offer_label": "Fifteen days without an owner",
@@ -860,7 +862,8 @@
       "reopen": "Reactivate request",
       "close": "No longer needs help",
       "share": "Share request",
-      "report": "Report"
+      "report": "Report",
+      "edit": "Edit notice"
     },
     "need": {
       "kind": {
@@ -1604,5 +1607,20 @@
       "one": "1 unread message",
       "other": "{count} unread messages"
     }
+  },
+  "edit_case": {
+    "title": "Edit {name}’s notice",
+    "intro": "Correct what changed. We won’t tell anyone again.",
+    "marks": "Signs",
+    "story": "Story",
+    "story_required": "Tell a little so people understand.",
+    "photos_required": "Keep at least one photo.",
+    "temperament": "Temperament",
+    "requirements": "Requirements to adopt",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "saved_title": "Done, we saved the changes.",
+    "saved_body": "The notice now shows the new details.",
+    "failed": "We couldn’t save the changes. Try again."
   }
 }

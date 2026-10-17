@@ -8,6 +8,7 @@ export type HelpAction =
   | 'share'
   | 'report_content'
   | 'close_request' // «Ya no necesita ayuda»
+  | 'edit' // «Editar aviso»
   | 'reopen'
 
 export type HelpPageMode = 'open' | 'closed' | 'archived'
@@ -25,7 +26,7 @@ export function availableActions(
   if (state.status === 'active') {
     // The beneficiary never offers help to their own request.
     return viewer === 'beneficiary'
-      ? ['close_request', 'share']
+      ? ['close_request', 'edit', 'share']
       : ['pledge', 'share', 'report_content']
   }
   if (state.status === 'expired') {
