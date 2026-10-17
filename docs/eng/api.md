@@ -109,8 +109,7 @@ Simplified on purpose — the real backend must do better:
 
 Not in the contract yet: purge after 30
 days, and `«Lo tengo»` on an expired case (O3).
-From help ([07](../product/07-help-workflow.md)): photos on a request beyond the pet's own, a
-request for a custodian's found animal opened from its found case, and operator review into
+From help ([07](../product/07-help-workflow.md)): photos on a request beyond the pet's own, and operator review into
 `verified` (O9). From the profile ([auth.md](auth.md) · Profile): whether the phone is verified, and account-level contact prefs.
 From check-ins (04 · `case_checkin`): the date the case archives if nobody answers, which the copy
 «archivaremos la publicación en 5 días» needs. From push ([frontend.md](frontend.md) · Push): the **push

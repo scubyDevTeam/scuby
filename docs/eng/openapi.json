@@ -6746,6 +6746,13 @@
                       }
                     ]
                   },
+                  "from_case_code": {
+                    "default": null,
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "needs": {
                     "minItems": 1,
                     "maxItems": 3,
