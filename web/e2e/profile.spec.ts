@@ -75,3 +75,20 @@ test(
     })
   },
 )
+
+test(
+  'add a verified phone from the profile, with its SMS code',
+  tags('@profile', '@PROFILE-004'),
+  async ({ profile }) => {
+    await profile.open()
+    await profile.signIn.withEmailCode('celular.nuevo@correo.co')
+
+    await profile.changePhone('300 999 8877')
+
+    await test.step('the number is verified and stays after a reload', async () => {
+      await expect(profile.phoneVerified).toBeVisible()
+      await profile.reload()
+      await expect(profile.email('+573009998877')).toBeVisible()
+    })
+  },
+)

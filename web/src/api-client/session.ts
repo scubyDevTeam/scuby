@@ -121,6 +121,27 @@ export function useUpdateProfile() {
   })
 }
 
+/** A new number outside a publish: the SMS code first, then the check that makes it the account's. */
+export function useStartPhoneChange() {
+  return useMutation({
+    mutationFn: (phone: string) =>
+      call(accountEndpoints.startPhoneChange, { body: { phone } }, parseNothing),
+  })
+}
+
+export function useVerifyPhoneChange() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { phone: string; code: string }) =>
+      call(accountEndpoints.verifyPhoneChange, { body: input }, parseProfile),
+    onSuccess: (profile) => {
+      client.setQueryData(PROFILE, profile)
+      // The publish forms read the verified number from the session.
+      client.invalidateQueries({ queryKey: SESSION })
+    },
+  })
+}
+
 /** Registers this install for push (docs/eng/frontend.md · Push). */
 export function useRegisterPush() {
   return useMutation({

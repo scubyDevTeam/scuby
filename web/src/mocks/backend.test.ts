@@ -1851,3 +1851,37 @@ describe('the thread a claim or an interest opens (comms.md · created with its 
     )
   })
 })
+
+describe('the profile: photo and changing the phone (auth.md · Profile, Phone)', () => {
+  it('changes the phone only after the SMS code', async () => {
+    await asCarolina()
+    await call(api.startPhoneChange, { body: { phone: '+573009998877' } }, asIs)
+    expect((await call(api.getProfile, {}, parseProfile)).phone).toBeNull()
+    expect(
+      (
+        await failure(
+          call(api.verifyPhoneChange, { body: { phone: '+573009998877', code: '000000' } }, asIs),
+        )
+      ).code,
+    ).toBe('invalid_code')
+    const profile = await call(
+      api.verifyPhoneChange,
+      { body: { phone: '+573009998877', code: DEMO_CODE } },
+      parseProfile,
+    )
+    expect(profile.phone).toBe('+573009998877')
+    expect((await call(api.getSession, {}, parseUser)).phone).toBe('+573009998877')
+  })
+
+  it('sets and removes the photo', async () => {
+    await asCarolina()
+    const set = await call(
+      api.updateProfile,
+      { body: { photo_url: 'data:image/png;base64,AAAA' } },
+      parseProfile,
+    )
+    expect(set.photoUrl).toBe('data:image/png;base64,AAAA')
+    const cleared = await call(api.updateProfile, { body: { photo_url: null } }, parseProfile)
+    expect(cleared.photoUrl).toBeNull()
+  })
+})

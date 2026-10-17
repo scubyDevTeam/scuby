@@ -539,8 +539,8 @@
       "email_label": "Email you sign in with",
       "email_hint": "It’s how you sign in, so it can’t be changed for now.",
       "phone_label": "Your mobile · verified",
-      "phone_hint": "You can change it when you publish your next post.",
-      "no_phone": "We’ll ask for a mobile number when you publish your first post.",
+      "phone_hint": "You can change it here; we’ll send you a code by SMS.",
+      "no_phone": "You don’t have a verified phone yet. Add it here or when you publish your first notice.",
       "name_label": "Your name",
       "name_hint": "This is how neighbours will see you.",
       "city_label": "City",
@@ -608,6 +608,29 @@
         "cancel": "No, keep it",
         "deleting": "Deleting…",
         "failed": "We couldn’t delete your account. Try again."
+      },
+      "photo": {
+        "change": "Change photo",
+        "add": "Add photo",
+        "remove": "Remove photo",
+        "alt": "Your profile photo",
+        "failed": "We couldn’t upload the photo. Try another one."
+      },
+      "phone_change": {
+        "change": "Change",
+        "add": "Add phone",
+        "label": "Your new phone",
+        "send": "Send me the code",
+        "sending": "Sending…",
+        "code_label": "6-digit code",
+        "code_hint": "We sent it by SMS to {phone}.",
+        "demo": "Demo mode: the code is {code}.",
+        "wrong_code": "That code isn’t right. Check it or ask for another.",
+        "invalid": "Write a valid mobile number.",
+        "failed": "We couldn’t send you the code. Try again.",
+        "done": "Done, your phone is verified.",
+        "cancel": "Cancel",
+        "note": "Notices already published keep the number they went out with."
       }
     }
   },

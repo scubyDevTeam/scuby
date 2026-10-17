@@ -87,6 +87,14 @@ export const auth = [
     return null
   }),
 
+  route(api.startPhoneChange, () => null),
+
+  route(api.verifyPhoneChange, ({ user, body }) => {
+    if (body.code !== DEMO_CODE) fail('invalid_code')
+    user.phone = body.phone
+    return profileView(user)
+  }),
+
   route(api.signOut, () => {
     signOut()
     return null
@@ -105,6 +113,7 @@ export const auth = [
       user.bio = body.bio
     }
     if (body.notification_prefs) user.notification_prefs = body.notification_prefs
+    if (body.photo_url !== undefined) user.photo_url = body.photo_url
     return profileView(user)
   }),
 

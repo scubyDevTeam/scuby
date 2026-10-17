@@ -34,8 +34,10 @@ export class ProfilePage {
       // The browser's permission is a step only where it can still be asked (a browser that
       // already answered goes straight to the zone); the zone is what is under test.
       const skip = this.page.getByRole('button', { name: 'Ahora no' })
-      await expect(skip.or(this.page.getByRole('button', { name: 'Listo, avísame' }))).toBeVisible()
-      if (await skip.isVisible()) await skip.click()
+      await expect(
+        skip.or(this.page.getByRole('button', { name: 'Listo, avísame' })),
+      ).toBeAttached()
+      if ((await skip.count()) > 0) await skip.click()
       await new MapPicker(this.page).mark()
       await this.page.getByRole('button', { name: `${radiusKm} km`, exact: true }).click()
       await this.page.getByRole('button', { name: 'Listo, avísame' }).click()
@@ -96,6 +98,20 @@ export class ProfilePage {
     return step('Save the changes', () =>
       this.page.getByRole('button', { name: 'Guardar cambios' }).click(),
     )
+  }
+
+  /** Adds or changes the verified phone outside a publish: the number, then the SMS code. */
+  changePhone(national: string, code = '123456') {
+    return step(`Verify the phone ${national}`, async () => {
+      await this.page.getByRole('button', { name: /^(Cambiar|Agregar celular)$/ }).click()
+      await this.page.getByLabel(/Tu nuevo celular/).fill(national)
+      await this.page.getByRole('button', { name: 'Enviarme el código' }).click()
+      await this.page.getByLabel(/Código de 6 dígitos/).fill(code)
+    })
+  }
+
+  get phoneVerified() {
+    return this.page.getByText('Listo, tu celular quedó verificado.')
   }
 
   deleteAccount() {

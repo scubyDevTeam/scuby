@@ -503,6 +503,18 @@
                         "help"
                       ],
                       "additionalProperties": false
+                    },
+                    "photo_url": {
+                      "default": null,
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -511,7 +523,8 @@
                     "phone",
                     "city",
                     "bio",
-                    "notification_prefs"
+                    "notification_prefs",
+                    "photo_url"
                   ],
                   "additionalProperties": false
                 }
@@ -628,6 +641,17 @@
                       "adoption",
                       "help"
                     ]
+                  },
+                  "photo_url": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 }
               }
@@ -694,6 +718,18 @@
                         "help"
                       ],
                       "additionalProperties": false
+                    },
+                    "photo_url": {
+                      "default": null,
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -702,7 +738,8 @@
                     "phone",
                     "city",
                     "bio",
-                    "notification_prefs"
+                    "notification_prefs",
+                    "photo_url"
                   ],
                   "additionalProperties": false
                 }
@@ -781,6 +818,253 @@
           },
           "422": {
             "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/phone": {
+      "post": {
+        "operationId": "startPhoneChange",
+        "summary": "Sends the 6-digit SMS code to a new number, outside a publish. The number is not changed until `verifyPhoneChange`. Rate-limited like every SMS (auth.md · Phone).",
+        "tags": [
+          "me"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+[1-9]\\d{6,14}$"
+                  }
+                },
+                "required": [
+                  "phone"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/phone/verify": {
+      "post": {
+        "operationId": "verifyPhoneChange",
+        "summary": "Checks the code and makes the number the account’s verified one. Answers the whole profile. Cases already published keep the number they were published with.",
+        "tags": [
+          "me"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+[1-9]\\d{6,14}$"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "phone",
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "display_name": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "phone": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^\\+[1-9]\\d{6,14}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "city": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "bio": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "notification_prefs": {
+                      "type": "object",
+                      "properties": {
+                        "lost": {
+                          "type": "boolean"
+                        },
+                        "found": {
+                          "type": "boolean"
+                        },
+                        "adoption": {
+                          "type": "boolean"
+                        },
+                        "help": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "lost",
+                        "found",
+                        "adoption",
+                        "help"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "photo_url": {
+                      "default": null,
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "display_name",
+                    "email",
+                    "phone",
+                    "city",
+                    "bio",
+                    "notification_prefs",
+                    "photo_url"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `invalid_code`, `validation_failed`",
             "content": {
               "application/json": {
                 "schema": {
