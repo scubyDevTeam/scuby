@@ -1220,6 +1220,28 @@ describe('help — publishing (07 · Publishing)', () => {
     expect(pet).toMatchObject({ owner_id: DEMO_OWNER_ID_FOR_TESTS, custody_state: 'claimed' })
   })
 
+  it('the custodian of a found case asks for its animal, named by what it looks like', async () => {
+    await asCarolina()
+    carolinaHasAPhone()
+    const published = await call(
+      api.publishHelp,
+      { body: body({ pet: null, pet_id: null, from_case_code: 'C4STD' }) },
+      parsePublish,
+    )
+    if (published.kind !== 'published') throw new Error('expected it published')
+    expect(db.cases[published.code]?.pet_id).toBe(db.cases.C4STD?.pet_id)
+    const request = await caseOf(published.code)
+    expect(request.vertical === 'help' && request.pet.name).toBe('Perro café, mediano')
+    // Someone else's found case is not theirs to ask for.
+    expect(
+      (
+        await failure(
+          call(api.publishHelp, { body: body({ pet: null, from_case_code: 'F8UND' }) }, asIs),
+        )
+      ).code,
+    ).toBe('not_found')
+  })
+
   it('only for a pet the beneficiary holds', async () => {
     await asCarolina()
     carolinaHasAPhone()
