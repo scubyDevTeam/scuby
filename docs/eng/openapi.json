@@ -752,6 +752,66 @@
         }
       }
     },
+    "/me": {
+      "delete": {
+        "operationId": "deleteAccount",
+        "summary": "Deletes the account (the stores require it in-app; decision #28). Its active cases are closed, what it contributed to others’ cases stays anonymous, its interests and offers are withdrawn, its inbox, devices and conversations are erased, and the session ends.",
+        "tags": [
+          "me"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`error.code`: `validation_failed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`error.code`: `rate_limited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "`error.code`: `server_error`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/me/push-subscriptions": {
       "post": {
         "operationId": "registerPush",
