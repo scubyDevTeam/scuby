@@ -2074,3 +2074,13 @@ describe('the date a case archives on (04 · case_checkin)', () => {
     expect(luna.pendingCheckin?.archivesAt).toBeNull()
   })
 })
+
+describe('the demo account comes back (emulation)', () => {
+  it('«Continuar con Google» after deleting it signs into a new, empty account', async () => {
+    await asCarolina()
+    await call(api.deleteAccount, {}, asIs)
+    const again = await asCarolina()
+    expect(again.email).toBe('carolina@correo.co')
+    expect((await call(api.listMyCases, {}, parseMyCases)).length).toBe(0)
+  })
+})

@@ -1,3 +1,4 @@
+import { CasePage } from './pages/CasePage.ts'
 import { expect, tags, test } from './test.ts'
 
 test(
@@ -77,6 +78,22 @@ test(
     await test.step('the form says so and is where it was', async () => {
       await expect(publish.draftRestored).toBeVisible()
       await expect(publish.stepTitle).toHaveText('¿Dónde y cuándo?')
+    })
+  },
+)
+
+test(
+  'what one tab changed, another tab sees: the demo keeps one backend per browser',
+  tags('@publish-lost', '@PLOST-004'),
+  async ({ myCases, casePage, context }) => {
+    await myCases.openAsDemoOwner()
+    await myCases.openCase('Luna')
+    await casePage.editNotice('Collar azul con campanita')
+
+    await test.step('a new tab opens the same case, with the change', async () => {
+      const other = new CasePage(await context.newPage())
+      await other.open('7K3PQ')
+      await expect(other.text('Collar azul con campanita')).toBeVisible()
     })
   },
 )
