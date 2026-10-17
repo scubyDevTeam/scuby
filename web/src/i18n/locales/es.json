@@ -539,8 +539,8 @@
       "email_label": "Correo con el que entras",
       "email_hint": "Es con el que entras, así que por ahora no se puede cambiar.",
       "phone_label": "Tu celular · verificado",
-      "phone_hint": "Lo puedes cambiar cuando publiques tu próximo aviso.",
-      "no_phone": "Te pediremos un celular cuando publiques tu primer aviso.",
+      "phone_hint": "Puedes cambiarlo aquí; te enviamos un código por SMS.",
+      "no_phone": "Aún no tienes un celular verificado. Puedes agregarlo aquí o al publicar tu primer aviso.",
       "name_label": "Tu nombre",
       "name_hint": "Así te verán los vecinos.",
       "city_label": "Ciudad",
@@ -608,6 +608,29 @@
         "cancel": "No, conservarla",
         "deleting": "Eliminando…",
         "failed": "No pudimos eliminar tu cuenta. Inténtalo de nuevo."
+      },
+      "photo": {
+        "change": "Cambiar foto",
+        "add": "Agregar foto",
+        "remove": "Quitar foto",
+        "alt": "Tu foto de perfil",
+        "failed": "No pudimos subir la foto. Inténtalo con otra."
+      },
+      "phone_change": {
+        "change": "Cambiar",
+        "add": "Agregar celular",
+        "label": "Tu nuevo celular",
+        "send": "Enviarme el código",
+        "sending": "Enviando…",
+        "code_label": "Código de 6 dígitos",
+        "code_hint": "Te lo enviamos por SMS al {phone}.",
+        "demo": "Modo demostración: el código es {code}.",
+        "wrong_code": "Ese código no es correcto. Revísalo o pide otro.",
+        "invalid": "Escribe un celular válido.",
+        "failed": "No pudimos enviarte el código. Inténtalo de nuevo.",
+        "done": "Listo, tu celular quedó verificado.",
+        "cancel": "Cancelar",
+        "note": "Tus avisos ya publicados conservan el número con el que salieron."
       }
     }
   },

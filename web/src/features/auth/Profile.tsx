@@ -2,7 +2,6 @@ import { ApiError } from '@api-client/http'
 import { useDeleteAccount, useProfile, useSignOut, useUpdateProfile } from '@api-client/session'
 import type { Profile as ProfileData, ProfileUpdate } from '@contracts/session'
 import { BIO_MAX_LENGTH, type ProfileError, profileErrors } from '@domain/shared/profile'
-import { initials } from '@domain/shared/signin'
 import { useI18n } from '@i18n/react'
 import type { TextKey } from '@i18n/translate'
 import { Button } from '@ui/Button'
@@ -12,6 +11,8 @@ import { Message, Skeleton } from '@ui/States'
 import { WifiOff } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { NearbyAlerts } from './NearbyAlerts'
+import { PhoneChange } from './PhoneChange'
+import { ProfilePhoto } from './ProfilePhoto'
 
 /** The contract's limit on the name and the city (`profileUpdateRequest`). */
 const SHORT_TEXT_MAX = 80
@@ -36,7 +37,14 @@ const errorCopy: Record<ProfileError, TextKey> = {
  * email is the login identity and is not editable in v1; the phone is shown, and changed at the
  * next publish (the phone step re-verifies it).
  */
-export function Profile({ mapStyleUrl }: { mapStyleUrl?: string }) {
+export function Profile({
+  mapStyleUrl,
+  demoCode,
+}: {
+  mapStyleUrl?: string
+  /** Set when the backend is emulated: the SMS code it accepts. */
+  demoCode?: string
+}) {
   const { t } = useI18n()
   const profile = useProfile()
   const signOut = useSignOut()
@@ -59,12 +67,10 @@ export function Profile({ mapStyleUrl }: { mapStyleUrl?: string }) {
       ) : (
         <>
           <header className="flex items-center gap-4">
-            <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-brand text-2xl font-extrabold text-white">
-              {initials(profile.data.displayName)}
-            </span>
+            <ProfilePhoto name={profile.data.displayName} photoUrl={profile.data.photoUrl} />
             <h1 className="m-0 text-3xl font-extrabold">{profile.data.displayName}</h1>
           </header>
-          <Account profile={profile.data} />
+          <Account profile={profile.data} demoCode={demoCode} />
           <NearbyAlerts mapStyleUrl={mapStyleUrl} />
           <ProfileForm profile={profile.data} />
         </>
@@ -83,8 +89,10 @@ export function Profile({ mapStyleUrl }: { mapStyleUrl?: string }) {
 }
 
 /** What identifies the account and is not edited here: the email, the verified phone. */
-function Account({ profile }: { profile: ProfileData }) {
+function Account({ profile, demoCode }: { profile: ProfileData; demoCode?: string }) {
   const { t } = useI18n()
+  const [changing, setChanging] = useState(false)
+  const [changed, setChanged] = useState(false)
   return (
     <section className="flex flex-col gap-4 rounded-2xl bg-brand-mist p-4">
       <div>
@@ -92,15 +100,41 @@ function Account({ profile }: { profile: ProfileData }) {
         <p className="m-0 font-bold">{profile.email}</p>
         <p className="m-0 text-sm text-muted">{t('auth.profile.email_hint')}</p>
       </div>
-      {profile.phone ? (
-        <div>
-          <p className="m-0 text-sm text-muted">{t('auth.profile.phone_label')}</p>
-          <p className="m-0 font-bold">{profile.phone}</p>
-          <p className="m-0 text-sm text-muted">{t('auth.profile.phone_hint')}</p>
-        </div>
+      {changing ? (
+        <PhoneChange
+          demoCode={demoCode}
+          onCancel={() => setChanging(false)}
+          onDone={() => {
+            setChanging(false)
+            setChanged(true)
+          }}
+        />
       ) : (
-        <p className="m-0 text-sm text-muted">{t('auth.profile.no_phone')}</p>
+        <div className="flex items-start justify-between gap-3">
+          {profile.phone ? (
+            <div>
+              <p className="m-0 text-sm text-muted">{t('auth.profile.phone_label')}</p>
+              <p className="m-0 font-bold">{profile.phone}</p>
+              <p className="m-0 text-sm text-muted">{t('auth.profile.phone_hint')}</p>
+            </div>
+          ) : (
+            <p className="m-0 text-sm text-muted">{t('auth.profile.no_phone')}</p>
+          )}
+          <button
+            type="button"
+            className="min-h-11 shrink-0 cursor-pointer font-bold text-brand-deep"
+            onClick={() => {
+              setChanged(false)
+              setChanging(true)
+            }}
+          >
+            {t(
+              profile.phone ? 'auth.profile.phone_change.change' : 'auth.profile.phone_change.add',
+            )}
+          </button>
+        </div>
       )}
+      {changed ? <Notice tone="success">{t('auth.profile.phone_change.done')}</Notice> : null}
     </section>
   )
 }

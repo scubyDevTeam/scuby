@@ -576,6 +576,7 @@ export const profileView = (p: PersonRow): WireOf<typeof api.getProfile> => ({
   city: p.city,
   bio: p.bio,
   notification_prefs: p.notification_prefs,
+  photo_url: p.photo_url ?? null,
 })
 
 export function notificationsView(

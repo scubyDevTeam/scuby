@@ -11,7 +11,7 @@ function ProfileScreen() {
   if (!useSession().data) return null
   return (
     <>
-      <Profile mapStyleUrl={env.mapStyleUrl} />
+      <Profile mapStyleUrl={env.mapStyleUrl} demoCode={env.apiMock ? '123456' : undefined} />
       <div className="mx-auto max-w-lg px-5 pb-8">
         <LanguageLinks className="font-bold text-brand-deep" />
       </div>

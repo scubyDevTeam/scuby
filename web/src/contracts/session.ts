@@ -1,7 +1,7 @@
 // Sign-in and the account (docs/eng/auth.md). The session itself travels in an httpOnly cookie
 // (O12): no endpoint returns a token, and every request is sent with credentials.
 import * as z from 'zod/mini'
-import { phone } from './primitives'
+import { phone, photoUrl } from './primitives'
 
 export const userWire = z.object({
   id: z.string(),
@@ -43,6 +43,8 @@ export const profileWire = z.object({
   city: z.nullable(z.string()),
   bio: z.nullable(z.string()),
   notification_prefs: notificationPrefs,
+  /** The profile photo (auth.md · Profile `photo?`), or null for the initials. */
+  photo_url: z._default(z.nullable(photoUrl), null),
 })
 
 /** Every field optional: send what changed. The email is the login identity and is not editable. */
@@ -52,6 +54,8 @@ export const profileUpdateRequest = z.object({
   /** Plain text, no links (docs/eng/auth.md · Profile). */
   bio: z.optional(z.nullable(z.string().check(z.maxLength(280)))),
   notification_prefs: z.optional(notificationPrefs),
+  /** An uploaded photo (`uploadPhoto`), or null to go back to the initials. */
+  photo_url: z.optional(z.nullable(photoUrl)),
 })
 
 export type Profile = {
@@ -61,10 +65,11 @@ export type Profile = {
   city: string | null
   bio: string | null
   notificationPrefs: z.infer<typeof notificationPrefs>
+  photoUrl: string | null
 }
 
 export type ProfileUpdate = Partial<
-  Pick<Profile, 'displayName' | 'city' | 'bio' | 'notificationPrefs'>
+  Pick<Profile, 'displayName' | 'city' | 'bio' | 'notificationPrefs' | 'photoUrl'>
 >
 
 export function parseProfile(raw: unknown): Profile {
@@ -76,6 +81,7 @@ export function parseProfile(raw: unknown): Profile {
     city: wire.city,
     bio: wire.bio,
     notificationPrefs: wire.notification_prefs,
+    photoUrl: wire.photo_url,
   }
 }
 
@@ -84,6 +90,7 @@ export const profileUpdateBody = (input: ProfileUpdate): z.input<typeof profileU
   city: input.city,
   bio: input.bio,
   notification_prefs: input.notificationPrefs,
+  photo_url: input.photoUrl,
 })
 
 /** One row per install (docs/eng/frontend.md · Push). `fcm` and `apns` arrive with the store apps. */
@@ -95,3 +102,10 @@ export const pushSubscriptionRequest = z.object({
 })
 
 export const parseNothing = () => null
+
+/** Changing the number outside a publish (auth.md · Phone): the SMS code, then the check. */
+export const phoneStartRequest = z.object({ phone })
+export const phoneVerifyRequest = z.object({
+  phone,
+  code: z.string().check(z.regex(/^\d{6}$/)),
+})

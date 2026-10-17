@@ -5,6 +5,8 @@ import {
   emailStartRequest,
   emailVerifyRequest,
   googleSignInRequest,
+  phoneStartRequest,
+  phoneVerifyRequest,
   profileUpdateRequest,
   profileWire,
   pushSubscriptionRequest,
@@ -79,6 +81,28 @@ export const deleteAccount = endpoint({
     'are closed, what it contributed to others’ cases stays anonymous, its interests and offers ' +
     'are withdrawn, its inbox, devices and conversations are erased, and the session ends.',
   auth: 'session',
+})
+
+export const startPhoneChange = endpoint({
+  method: 'POST',
+  path: '/me/phone',
+  summary:
+    'Sends the 6-digit SMS code to a new number, outside a publish. The number is not changed ' +
+    'until `verifyPhoneChange`. Rate-limited like every SMS (auth.md · Phone).',
+  auth: 'session',
+  body: phoneStartRequest,
+})
+
+export const verifyPhoneChange = endpoint({
+  method: 'POST',
+  path: '/me/phone/verify',
+  summary:
+    'Checks the code and makes the number the account’s verified one. Answers the whole profile. ' +
+    'Cases already published keep the number they were published with.',
+  auth: 'session',
+  body: phoneVerifyRequest,
+  response: profileWire,
+  errors: ['invalid_code'],
 })
 
 export const registerPush = endpoint({

@@ -21,7 +21,9 @@ import type {
 /** The account «Continuar con Google» signs into: it owns Luna and holds a found dog. */
 export const DEMO_OWNER_ID = 'user-carolina'
 
-const ago = (ms: number) => iso(Date.now() - ms)
+// One «now» per seed: two fields an exact interval apart stay exactly that far apart.
+let seededAt = Date.now()
+const ago = (ms: number) => iso(seededAt - ms)
 
 const laureles = { lat: 6.2447, lng: -75.5916 }
 const offset = (north: number, east: number) => ({
@@ -222,6 +224,7 @@ function closedLost(
 }
 
 export function seed(): Tables {
+  seededAt = Date.now()
   const cases: CaseRow[] = [
     {
       code: '7K3PQ',
