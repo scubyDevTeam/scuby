@@ -101,3 +101,27 @@ test(
     })
   },
 )
+
+test(
+  'the owner edits the notice: the signs change on the page and no one is told again',
+  tags('@owner', '@OWNER-005'),
+  async ({ myCases, casePage, inbox }) => {
+    await myCases.openAsDemoOwner()
+    await myCases.openCase('Luna')
+
+    await test.step('the notice shows its signs', async () => {
+      await expect(casePage.text('Collar rojo con placa metálica')).toBeVisible()
+    })
+
+    await test.step('editing them is shown on the page at once', async () => {
+      await casePage.editNotice('Collar azul con campanita')
+      await expect(casePage.text('Collar azul con campanita')).toBeVisible()
+      await expect(casePage.text('Collar rojo con placa metálica')).toHaveCount(0)
+    })
+
+    await test.step('and sends no new notification', async () => {
+      await inbox.open()
+      await expect(inbox.items).toHaveCount(4)
+    })
+  },
+)

@@ -128,7 +128,8 @@
       "sighting_title": "Where did you see {name}?",
       "claim_title": "Do you have {name}?",
       "reunite_title": "Is {name} back?",
-      "correct_title": "Correct your sighting of {name}"
+      "correct_title": "Correct your sighting of {name}",
+      "edit_title": "Edit {name}’s notice"
     },
     "found": {
       "mine_title": "Is this your pet?",
@@ -1214,7 +1215,8 @@
         "other": "{count} sightings"
       },
       "area_label": "Area where she was lost (approximate)",
-      "no_sightings": "No one has seen her yet. If you do, mark it on the map."
+      "no_sightings": "No one has seen her yet. If you do, mark it on the map.",
+      "edit": "Edit notice"
     },
     "timeline": {
       "label": "Sightings",
@@ -1373,6 +1375,20 @@
         "still_verifying": "Still checking"
       },
       "failed_title": "We couldn't save your answer."
+    },
+    "edit": {
+      "title": "Edit {name}’s notice",
+      "intro": "Correct what changed. We won’t tell the neighbours again.",
+      "photos_required": "Keep at least one photo.",
+      "time_future": "The time can’t be in the future.",
+      "place_required": "Mark the zone on the map.",
+      "no_rebroadcast": "Correcting the zone doesn’t tell the neighbours again.",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "saved_title": "Done, we saved the changes.",
+      "saved_body": "The notice now shows the new details.",
+      "failed": "We couldn’t save the changes. Try again.",
+      "closed": "This notice is no longer active and can’t be edited."
     }
   },
   "map_pin": {

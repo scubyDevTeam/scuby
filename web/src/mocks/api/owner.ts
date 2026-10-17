@@ -259,6 +259,26 @@ export const owner = [
     return { id: row.code }
   }),
 
+  route(api.editLost, ({ params, user, body }) => {
+    const row = ownedLost(params.code, user)
+    if (row.status !== 'active') fail('invalid_transition')
+    const animal = db.pets.find((p) => p.id === row.pet_id)
+    if (body.photo_urls !== undefined && animal) animal.photo_urls = body.photo_urls
+    if (body.marks !== undefined && animal) animal.marks = body.marks
+    if (body.last_seen_at !== undefined && ms(body.last_seen_at) > Date.now() + 5 * 60_000) {
+      throw new Fail('validation_failed', undefined, { last_seen_at: 'En el futuro' })
+    }
+    const area = row.last_seen
+    if (body.last_seen_point !== undefined) {
+      area.center = body.last_seen_point
+      area.place_name = placeName(body.last_seen_point)
+    }
+    if (body.last_seen_radius_m !== undefined) area.radius_m = body.last_seen_radius_m
+    if (body.last_seen_at !== undefined) area.at = body.last_seen_at
+    // No notification, no broadcast: the neighbours were told once (04).
+    return null
+  }),
+
   route(api.cancelCase, ({ params, user, body }) => {
     const row = ownedLost(params.code, user)
     cancel(row, body.resolution)

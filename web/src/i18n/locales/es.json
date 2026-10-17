@@ -128,7 +128,8 @@
       "sighting_title": "¿Dónde viste a {name}?",
       "claim_title": "¿Tienes a {name}?",
       "reunite_title": "¿{name} ya apareció?",
-      "correct_title": "Corregir tu avistamiento de {name}"
+      "correct_title": "Corregir tu avistamiento de {name}",
+      "edit_title": "Editar aviso de {name}"
     },
     "found": {
       "mine_title": "¿Es tu mascota?",
@@ -1214,7 +1215,8 @@
         "other": "{count} avistamientos"
       },
       "area_label": "Zona donde se perdió (aproximada)",
-      "no_sightings": "Nadie la ha visto todavía. Si la ves, márcalo en el mapa."
+      "no_sightings": "Nadie la ha visto todavía. Si la ves, márcalo en el mapa.",
+      "edit": "Editar aviso"
     },
     "timeline": {
       "label": "Avistamientos",
@@ -1373,6 +1375,20 @@
         "still_verifying": "Aún verificando"
       },
       "failed_title": "No pudimos guardar tu respuesta."
+    },
+    "edit": {
+      "title": "Editar aviso de {name}",
+      "intro": "Corrige lo que cambió. No volvemos a avisar a los vecinos.",
+      "photos_required": "Deja al menos una foto.",
+      "time_future": "La hora no puede ser en el futuro.",
+      "place_required": "Marca la zona en el mapa.",
+      "no_rebroadcast": "Corregir la zona no vuelve a avisar a los vecinos.",
+      "save": "Guardar cambios",
+      "saving": "Guardando…",
+      "saved_title": "Listo, guardamos los cambios.",
+      "saved_body": "El aviso ya muestra lo nuevo.",
+      "failed": "No pudimos guardar los cambios. Inténtalo de nuevo.",
+      "closed": "Este aviso ya no está activo y no se puede editar."
     }
   },
   "map_pin": {
