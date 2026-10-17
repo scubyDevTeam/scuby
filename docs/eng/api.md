@@ -102,6 +102,7 @@ Simplified on purpose — the real backend must do better:
 | Rate-limit handle = a random id in localStorage | Device/IP key |
 | Matching = same species within 5 km | The matching contract in [05](../product/05-found-workflow.md) (O7) |
 | Follow-up loop runs on each request | A scheduled job; push and email deliveries ([comms.md](comms.md)) |
+| Nearby alerts stored as a zone on the account; nothing sends them | The matching/broadcast job that notifies by zone ([08](../product/08-notifications.md)) |
 | Inbox only | Push, email, quiet hours, coalescing ([08](../product/08-notifications.md)) |
 | Chat threads in a table, polled every 15 s while a thread is open; closed = its case is no longer active | Twilio Conversations behind the same endpoints: lazy creation at the first message, `state=closed` on resolution, purge by `DELETE` ([comms.md](comms.md)) |
 | Display text composed in Spanish, whatever `Accept-Language` says | Composed in the request's language |
