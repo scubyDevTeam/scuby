@@ -467,6 +467,10 @@
       },
       "only_saw_title": "¿Solo viste un animal en la calle?",
       "only_saw_body": "Entra por «Encontré un animal»: reportarlo toma un toque y no necesitas cuenta."
+    },
+    "draft": {
+      "restored_title": "Seguimos donde ibas.",
+      "start_over": "Empezar de nuevo"
     }
   },
   "feed": {

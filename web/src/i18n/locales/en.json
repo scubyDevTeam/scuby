@@ -467,6 +467,10 @@
       },
       "only_saw_title": "Just saw an animal on the street?",
       "only_saw_body": "Go through «I found an animal»: reporting it takes one tap and needs no account."
+    },
+    "draft": {
+      "restored_title": "We kept what you had typed.",
+      "start_over": "Start over"
     }
   },
   "feed": {
