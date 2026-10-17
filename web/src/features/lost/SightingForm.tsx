@@ -1,7 +1,9 @@
 import { useConfig } from '@api-client/actions'
 import { ApiError } from '@api-client/http'
+import { useCorrectSighting } from '@api-client/sighting-edit'
 import { isWaiting } from '@api-client/sighting-queue'
 import { sightingSend, useReportSighting } from '@api-client/sighting-replay'
+import type { Sighting } from '@contracts/case'
 import { validateSighting } from '@domain/lost/sightings'
 import type { Area, Point } from '@domain/shared/geo'
 import { toE164 } from '@domain/shared/phone'
@@ -47,6 +49,10 @@ type Props = {
   area: Area
   mapStyleUrl: string | undefined
   onDone: () => void
+  /** The pin being corrected: the form opens on it and nothing new is created. */
+  correcting?: Sighting | null
+  /** The reporter's own latest pin still inside its window: a second one asks about it first. */
+  ownPin?: Sighting | null
 }
 
 /** «La vi»: only the pin is required (docs/product/04 · sighting). Everything else is asked, not demanded. */
@@ -58,17 +64,21 @@ export function SightingForm({
   area,
   mapStyleUrl,
   onDone,
+  correcting = null,
+  ownPin = null,
 }: Props) {
   const i18n = useI18n()
   const { t } = i18n
   const country = useConfig().data?.countries[0]
   useSightingQueue()
   const report = useReportSighting(code)
+  const correct = useCorrectSighting(code)
   const online = useOnline()
-  const [point, setPoint] = useState<Point | null>(null)
-  const [when, setWhen] = useState<When>('now')
-  const [custom, setCustom] = useState('')
-  const [note, setNote] = useState('')
+  const [point, setPoint] = useState<Point | null>(correcting?.point ?? null)
+  const [when, setWhen] = useState<When>(correcting ? 'custom' : 'now')
+  const [custom, setCustom] = useState(correcting ? toLocalInput(correcting.seenAt) : '')
+  const [note, setNote] = useState(correcting?.note ?? '')
+  const [asking, setAsking] = useState(false)
   const [phone, setPhone] = useState('')
   const [tried, setTried] = useState(false)
   const [locating, setLocating] = useState<'idle' | 'asking' | 'failed'>('idle')
@@ -109,7 +119,46 @@ export function SightingForm({
     event.preventDefault()
     setTried(true)
     if (!point || !seenAt || ruleErrors.length > 0 || phoneError) return
+    if (correcting) return moveTo(correcting.id)
+    // A second pin from the same reporter: ask, never guess (04 · Second pin).
+    if (ownPin && !asking) return setAsking(true)
+    sendNew()
+  }
+
+  function sendNew() {
+    if (!point || !seenAt) return
     report.mutate(sightingSend(code, { point, seenAt, note: note.trim() || null, contactPhone }))
+  }
+
+  function moveTo(id: string) {
+    if (!point || !seenAt) return
+    correct.mutate({ id, point, seenAt, note: note.trim() || null })
+  }
+
+  if (correct.isSuccess) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Notice tone="success" title={t('lost.sighting_form.corrected_title')}>
+          {t('lost.sighting_form.corrected_body')}
+        </Notice>
+        <Button onClick={onDone}>{t('common.done')}</Button>
+      </div>
+    )
+  }
+
+  if (asking && ownPin && report.isIdle && !correct.isPending) {
+    return (
+      <div className="flex flex-col gap-4">
+        <h3 className="m-0 text-2xl font-extrabold">{t('lost.sighting_form.ask_title')}</h3>
+        {correct.isError ? (
+          <Notice tone="warning">{t('lost.sighting_form.correct_failed')}</Notice>
+        ) : null}
+        <Button onClick={sendNew}>{t('lost.sighting_form.ask_again')}</Button>
+        <Button variant="outline" onClick={() => moveTo(ownPin.id)}>
+          {t('lost.sighting_form.ask_correct')}
+        </Button>
+      </div>
+    )
   }
 
   if (report.isSuccess) {
@@ -156,6 +205,9 @@ export function SightingForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-5">
+      {correcting ? (
+        <p className="m-0 text-muted">{t('lost.sighting_form.correcting_intro')}</p>
+      ) : null}
       <section className="flex flex-col gap-2">
         <p className="m-0 text-muted">{t('map.tap_to_mark')}</p>
         <PickerMap
@@ -217,18 +269,23 @@ export function SightingForm({
         onChange={(event) => setNote(event.target.value)}
       />
 
-      <div className="rounded-2xl bg-brand-mist p-4">
-        <PhoneField
-          label={t('contact.your_whatsapp')}
-          optional
-          prefix={country?.phonePrefix ?? ''}
-          hint={t('lost.sighting_form.phone_hint')}
-          error={phoneError}
-          value={phone}
-          onChange={(event) => setPhone(event.target.value)}
-        />
-      </div>
+      {correcting ? null : (
+        <div className="rounded-2xl bg-brand-mist p-4">
+          <PhoneField
+            label={t('contact.your_whatsapp')}
+            optional
+            prefix={country?.phonePrefix ?? ''}
+            hint={t('lost.sighting_form.phone_hint')}
+            error={phoneError}
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+          />
+        </div>
+      )}
 
+      {correct.isError ? (
+        <Notice tone="warning">{t('lost.sighting_form.correct_failed')}</Notice>
+      ) : null}
       {report.isError ? (
         <Notice tone="warning" title={t('lost.sighting_form.failed_title')}>
           {t(
@@ -239,12 +296,28 @@ export function SightingForm({
         </Notice>
       ) : null}
 
-      <Button type="submit" disabled={report.isPending}>
-        {t(report.isPending ? 'lost.sighting_form.sending' : 'lost.sighting_form.submit')}
+      <Button type="submit" disabled={report.isPending || correct.isPending}>
+        {t(
+          correcting
+            ? correct.isPending
+              ? 'lost.sighting_form.correcting'
+              : 'lost.sighting_form.correct_submit'
+            : report.isPending
+              ? 'lost.sighting_form.sending'
+              : 'lost.sighting_form.submit',
+        )}
       </Button>
-      <p className="m-0 text-center text-sm text-muted">{t('contact.no_account')}</p>
+      {correcting ? null : (
+        <p className="m-0 text-center text-sm text-muted">{t('contact.no_account')}</p>
+      )}
     </form>
   )
+}
+
+/** `datetime-local` wants the viewer's own clock, to the minute. */
+function toLocalInput(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 const toRules = (country: { phonePrefix: string; mobilePattern: string }) => ({

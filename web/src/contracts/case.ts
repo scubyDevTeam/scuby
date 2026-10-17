@@ -35,6 +35,13 @@ export const sightingWire = z.object({
   /** The owner's alone: the reporter's number, and the pins the owner took off the public map. */
   contact_phone: z._default(z.nullable(phone), null),
   hidden: z._default(z.boolean(), false),
+  /** The pin this account or device sent: the reporter's own, whatever its age. */
+  mine: z._default(z.boolean(), false),
+  /**
+   * Only on one's own pin, and only until `created_at + 15 min` (docs/product/04 · Correction
+   * window): the time left to correct or delete it. Null once the pin is part of the record.
+   */
+  editable_until: z._default(z.nullable(timestamp), null),
 })
 
 export const lostCaseWire = z.object({
@@ -93,6 +100,8 @@ export type Sighting = {
   highlightedByOwner: boolean
   contactPhone: string | null
   hidden: boolean
+  mine: boolean
+  editableUntil: Date | null
 }
 
 export type Checkin = {
@@ -171,6 +180,8 @@ export function parseCase(raw: unknown): CaseDetail {
       highlightedByOwner: s.highlighted_by_owner,
       contactPhone: s.contact_phone,
       hidden: s.hidden,
+      mine: s.mine,
+      editableUntil: s.editable_until ? new Date(s.editable_until) : null,
     })),
     claims: wire.claims.map((claim) => ({
       id: claim.id,

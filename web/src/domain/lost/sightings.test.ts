@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { durations } from '../shared/time'
 import {
+  canEditOwn,
   moderationChange,
   moderationOptions,
+  pinToCorrect,
   placeSightings,
   splitHidden,
   validateSighting,
@@ -129,5 +131,40 @@ describe('04 · Display rules — the owner hides or highlights a pin (rules 3 a
     expect(moderationChange('unhighlight')).toEqual({ highlighted: false })
     expect(moderationChange('hide')).toEqual({ hidden: true })
     expect(moderationChange('unhide')).toEqual({ hidden: false })
+  })
+})
+
+describe('your own pins (04 · Second pin, Correction window)', () => {
+  const now = new Date('2026-10-14T12:00:00-05:00')
+  const at = (minutes: number) => new Date(now.getTime() + minutes * 60_000)
+  const pin = (
+    fields: Partial<{
+      mine: boolean
+      editableUntil: Date | null
+      seenAt: Date
+      hidden: boolean
+    }> = {},
+  ) => ({
+    mine: true,
+    editableUntil: at(10),
+    seenAt: at(-5),
+    hidden: false,
+    ...fields,
+  })
+
+  it('is editable only while it is yours and the window is open', () => {
+    expect(canEditOwn(pin(), now)).toBe(true)
+    expect(canEditOwn(pin({ editableUntil: at(-1) }), now)).toBe(false)
+    expect(canEditOwn(pin({ editableUntil: null }), now)).toBe(false)
+    expect(canEditOwn(pin({ mine: false }), now)).toBe(false)
+  })
+
+  it('asks about the latest of your editable pins, never another person’s, a hidden or an expired one', () => {
+    const older = pin({ seenAt: at(-30) })
+    const latest = pin({ seenAt: at(-5) })
+    expect(pinToCorrect([older, latest, pin({ mine: false, seenAt: at(-1) })], now)).toBe(latest)
+    expect(pinToCorrect([pin({ hidden: true })], now)).toBeNull()
+    expect(pinToCorrect([pin({ editableUntil: at(-2) })], now)).toBeNull()
+    expect(pinToCorrect([], now)).toBeNull()
   })
 })

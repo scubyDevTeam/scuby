@@ -1,11 +1,13 @@
+import { useDeleteSighting } from '@api-client/sighting-edit'
 import type { Sighting } from '@contracts/case'
 import type { PlacedSighting } from '@domain/lost/sightings'
+import { canEditOwn } from '@domain/lost/sightings'
 import { useI18n } from '@i18n/react'
 import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass } from '@ui/Button'
 import { Sheet } from '@ui/Sheet'
 import { Phone } from 'lucide-react'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { formatSeenAt } from './copy'
 
 // The owner's hide / highlight: the timeline's own tools, loaded for the owner only.
@@ -21,6 +23,8 @@ type Props = {
   onClose: () => void
   /** «La vi aquí también»: anyone but the owner, while the case is open. */
   onSawItToo?: () => void
+  /** «Corregir el punto»: the reporter's own pin, while its window is open. */
+  onCorrect?: () => void
 }
 
 /**
@@ -29,7 +33,15 @@ type Props = {
  * owner also gets the reporter's number — the server sends `contact_phone` to the owner alone — and
  * their tools. Lazy, with its words: only a tap on a pin pays for it.
  */
-export function SightingSheet({ code, sighting, now, isOwner, onClose, onSawItToo }: Props) {
+export function SightingSheet({
+  code,
+  sighting,
+  now,
+  isOwner,
+  onClose,
+  onSawItToo,
+  onCorrect,
+}: Props) {
   const i18n = useI18n()
   const { t } = i18n
   const phone = sighting.contactPhone
@@ -85,6 +97,15 @@ export function SightingSheet({ code, sighting, now, isOwner, onClose, onSawItTo
           </div>
         </div>
       ) : null}
+      {canEditOwn(sighting, now) && sighting.editableUntil ? (
+        <OwnTools
+          code={code}
+          id={sighting.id}
+          until={sighting.editableUntil}
+          onCorrect={onCorrect}
+          onDeleted={onClose}
+        />
+      ) : null}
       {isOwner ? (
         <Suspense fallback={null}>
           <SightingTools code={code} sighting={sighting} />
@@ -101,5 +122,69 @@ export function SightingSheet({ code, sighting, now, isOwner, onClose, onSawItTo
         </Button>
       ) : null}
     </Sheet>
+  )
+}
+
+/** Your own pin, inside its fifteen minutes: move it or take it back (04 · Correction window). */
+function OwnTools({
+  code,
+  id,
+  until,
+  onCorrect,
+  onDeleted,
+}: {
+  code: string
+  id: string
+  until: Date
+  onCorrect?: () => void
+  onDeleted: () => void
+}) {
+  const i18n = useI18n()
+  const { t } = i18n
+  const remove = useDeleteSighting(code)
+  const [sure, setSure] = useState(false)
+  return (
+    <section className="flex flex-col gap-2 rounded-2xl bg-brand-mist p-4">
+      <p className="m-0">
+        {t('map_sheet.sighting.yours', {
+          time: i18n.date(until, { hour: 'numeric', minute: '2-digit', hour12: true }),
+        })}
+      </p>
+      {remove.isError ? (
+        <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
+          {t('map_sheet.sighting.delete_failed')}
+        </p>
+      ) : null}
+      {sure ? (
+        <>
+          <p className="m-0 font-bold">{t('map_sheet.sighting.delete_confirm')}</p>
+          <div className="flex gap-2">
+            <Button
+              variant="danger"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(id, { onSuccess: onDeleted })}
+            >
+              {t(
+                remove.isPending ? 'map_sheet.sighting.deleting' : 'map_sheet.sighting.delete_yes',
+              )}
+            </Button>
+            <Button variant="outline" onClick={() => setSure(false)}>
+              {t('map_sheet.sighting.delete_no')}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div className="flex gap-2">
+          {onCorrect ? (
+            <Button variant="secondary" onClick={onCorrect}>
+              {t('map_sheet.sighting.correct')}
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={() => setSure(true)}>
+            {t('map_sheet.sighting.delete')}
+          </Button>
+        </div>
+      )}
+    </section>
   )
 }

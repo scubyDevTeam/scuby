@@ -54,3 +54,38 @@ test(
     })
   },
 )
+
+test(
+  'your own «La vi»: correct it, a second pin asks first, and it can be taken back',
+  tags('@helper', '@HELP-004'),
+  async ({ casePage }) => {
+    await casePage.open('7K3PQ')
+    await casePage.reportSighting('Cerca de la 70')
+
+    await test.step('your pin says it is yours and for how long', async () => {
+      await expect(casePage.sightings).toHaveCount(4)
+      await casePage.openSightingSheet(4)
+      await expect(casePage.ownPinTools).toBeVisible()
+    })
+
+    await test.step('«Corregir el punto» moves it: still four pins, the note changed', async () => {
+      await casePage.correctOwnPin('Más cerca del parque')
+      await expect(casePage.sightings).toHaveCount(4)
+      await expect(casePage.sightings.first()).toContainText('Más cerca del parque')
+    })
+
+    await test.step('a second pin asks first, and «Corregir» moves the earlier one instead', async () => {
+      await casePage.startSighting('La vi cruzar la calle')
+      await casePage.sendSighting()
+      await casePage.correctInstead()
+      await expect(casePage.sightings).toHaveCount(4)
+      await expect(casePage.sightings.first()).toContainText('La vi cruzar la calle')
+    })
+
+    await test.step('taking a pin back removes it from the trajectory', async () => {
+      await casePage.openSightingSheet(4)
+      await casePage.deleteOwnPin()
+      await expect(casePage.sightings).toHaveCount(4)
+    })
+  },
+)

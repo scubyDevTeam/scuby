@@ -4,7 +4,7 @@ import { placeSightings } from '@domain/lost/sightings'
 import { fireEvent, screen } from '@testing-library/react'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { cases } from '../../mocks/fixtures'
-import { renderWithQuery } from '../../test-utils'
+import { renderWithQuery, stubApi } from '../../test-utils'
 import { SightingSheet } from './SightingSheet'
 
 const now = new Date()
@@ -73,5 +73,69 @@ describe('SightingSheet (04 · Display rules 3)', () => {
     expect(await screen.findByRole('button', { name: /útil/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Ocultar/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'La vi aquí también' })).toBeNull()
+  })
+})
+
+describe('SightingSheet — your own pin (04 · Correction window)', () => {
+  const own = () => ({
+    ...placed('public', 's2'),
+    mine: true,
+    editableUntil: new Date(now.getTime() + 10 * 60_000),
+  })
+
+  function showOwn(sighting = own(), onCorrect?: () => void) {
+    const onClose = vi.fn()
+    renderWithQuery(
+      <SightingSheet
+        code="7K3PQ"
+        sighting={sighting}
+        now={now}
+        isOwner={false}
+        onClose={onClose}
+        onCorrect={onCorrect}
+      />,
+    )
+    return onClose
+  }
+
+  it('says the pin is yours and until when, and offers to correct or delete it', () => {
+    const onCorrect = vi.fn()
+    showOwn(own(), onCorrect)
+    expect(screen.getByText(/Es tuyo\. Puedes corregirlo o borrarlo hasta las /)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Corregir el punto' }))
+    expect(onCorrect).toHaveBeenCalled()
+  })
+
+  it('past the window, or on someone else’s pin, there are no tools', () => {
+    showOwn({ ...own(), editableUntil: new Date(now.getTime() - 1000) })
+    expect(screen.queryByRole('button', { name: 'Corregir el punto' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Borrar mi avistamiento' })).toBeNull()
+  })
+
+  it('deleting asks first, then removes it and closes the sheet', async () => {
+    const calls = stubApi({ 'DELETE /cases/7K3PQ/sightings/s2': { status: 204 } })
+    const onClose = showOwn()
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar mi avistamiento' }))
+    expect(screen.getByText(/No se puede deshacer/)).toBeTruthy()
+    expect(calls.some((c) => c.key.startsWith('DELETE'))).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, borrarlo' }))
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(calls.some((c) => c.key === 'DELETE /cases/7K3PQ/sightings/s2')).toBe(true)
+  })
+
+  it('«No» keeps it', () => {
+    showOwn()
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar mi avistamiento' }))
+    fireEvent.click(screen.getByRole('button', { name: 'No' }))
+    expect(screen.getByRole('button', { name: 'Borrar mi avistamiento' })).toBeTruthy()
+  })
+
+  it('says so when the window closed while deciding', async () => {
+    stubApi({ 'DELETE /cases/7K3PQ/sightings/s2': { status: 403 } })
+    showOwn()
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar mi avistamiento' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, borrarlo' }))
+    expect(await screen.findByText(/ya haya pasado el tiempo/)).toBeTruthy()
   })
 })

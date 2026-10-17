@@ -100,3 +100,21 @@ export function moderationChange(option: SightingModeration): {
       return { hidden: false }
   }
 }
+
+/** The pin is the viewer's own and its correction window (`created_at + 15 min`) is still open. */
+export const canEditOwn = (
+  sighting: { mine: boolean; editableUntil: Date | null },
+  now: Date,
+): boolean => sighting.mine && sighting.editableUntil !== null && sighting.editableUntil > now
+
+/**
+ * The pin a second one would be asked about (04 · Second pin from the same reporter): the
+ * reporter's latest visible sighting that can still be corrected. After its window it is part of
+ * the record, and a new pin is just a new pin.
+ */
+export function pinToCorrect<
+  T extends { mine: boolean; editableUntil: Date | null; seenAt: Date; hidden: boolean },
+>(sightings: readonly T[], now: Date): T | null {
+  const own = sightings.filter((s) => !s.hidden && canEditOwn(s, now))
+  return own.sort((a, b) => b.seenAt.getTime() - a.seenAt.getTime())[0] ?? null
+}
