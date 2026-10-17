@@ -864,6 +864,16 @@
       "note_placeholder": "Which way it was going, how it looked…",
       "phone_hint": "In case its family wants to ask you something. Only they see it.",
       "submit": "Send report"
+    },
+    "checkin": {
+      "label": "Do you still have it?",
+      "question": "Do you still have the animal you found?",
+      "why": "So its family knows it is still safe and where to look.",
+      "still_holding": "I still have it",
+      "reunited": "It’s back with its owner 🎉",
+      "kept": "I’m keeping it",
+      "transferred": "I gave it to a rescue",
+      "failed": "We couldn’t save your answer. Try again."
     }
   },
   "help": {

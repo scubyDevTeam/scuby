@@ -264,6 +264,7 @@ export const answerCheckinRequest = z.object({
     'still_verifying',
     'still_available',
     'still_needed',
+    'still_holding',
   ]),
   /** With `reunited`. `claim_confirmed` is always `platform_claim`. */
   resolution_attribution: z._default(z.nullable(lostAttributionSchema), null),

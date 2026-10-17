@@ -1,4 +1,5 @@
 import { useAnswerOwnershipClaim, useResolveFound } from '@api-client/found'
+import { useAnswerCheckin } from '@api-client/owner'
 import type { FoundCase } from '@contracts/found'
 import { evidenceTier } from '@domain/found/evidence'
 import { holdOfferDue } from '@domain/found/machine'
@@ -36,6 +37,7 @@ export function CustodianPanel({
   const { t } = i18n
   const answer = useAnswerOwnershipClaim(foundCase.code)
   const resolve = useResolveFound(foundCase.code)
+  const checkin = useAnswerCheckin(foundCase.code)
   if (foundCase.viewer !== 'custodian' || foundCase.status !== 'active') return null
 
   const open = foundCase.ownershipClaims.filter((claim) => claim.status === 'open')
@@ -48,8 +50,39 @@ export function CustodianPanel({
     now,
   )
 
+  const due = foundCase.pendingCheckin
   return (
     <>
+      {due ? (
+        // The lever is the animal's future, never a threat to the post (05 · The follow-up loop).
+        <section
+          aria-label={t('found.checkin.label')}
+          className="flex flex-col gap-3 rounded-2xl border-2 border-found p-4"
+        >
+          <p className="m-0 text-lg font-bold">{t('found.checkin.question')}</p>
+          <p className="m-0 text-muted">{t('found.checkin.why')}</p>
+          {checkin.isError ? (
+            <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">
+              {t('found.checkin.failed')}
+            </p>
+          ) : null}
+          <Button
+            disabled={checkin.isPending}
+            onClick={() => checkin.mutate({ checkinId: due.id, response: 'still_holding' })}
+          >
+            {t('found.checkin.still_holding')}
+          </Button>
+          <Button variant="outline" onClick={onConfirmed}>
+            {t('found.checkin.reunited')}
+          </Button>
+          <Button variant="outline" onClick={onKeep}>
+            {t('found.checkin.kept')}
+          </Button>
+          <Button variant="outline" onClick={onTransfer}>
+            {t('found.checkin.transferred')}
+          </Button>
+        </section>
+      ) : null}
       {offer ? (
         <section
           aria-label={t('found.custodian.offer_label')}

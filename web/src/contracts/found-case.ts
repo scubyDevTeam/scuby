@@ -1,6 +1,7 @@
 // A found case as anyone reads it (docs/product/05). Its own module so the case page's first load
 // carries the shape it reads, not the forms of the custodian and the claimants (found.ts).
 import * as z from 'zod/mini'
+import { checkinWire } from './checkin'
 import { type Color, colorSchema, point, sizeSchema, speciesSchema, timestamp } from './primitives'
 
 export const foundStatusSchema = z.enum([
@@ -56,6 +57,8 @@ export const foundCaseWire = z.object({
   ownership_claims: z._default(z.array(ownershipClaimWire), []),
   /** Set on `converted`: the adoption listing this animal moved to (05 · day-15 offer). */
   successor_case_code: z._default(z.nullable(z.string()), null),
+  /** «¿Sigues con él?» (05 · The follow-up loop), when one is due. Only the custodian receives it. */
+  pending_checkin: z._default(z.nullable(checkinWire), null),
   contact: z.nullable(z.object({ display_name: z.string(), whatsapp_url: z.nullable(z.string()) })),
 })
 
@@ -92,6 +95,7 @@ export type FoundCase = {
   withheldDetail: string | null
   ownershipClaims: OwnershipClaim[]
   successorCaseCode: string | null
+  pendingCheckin: { id: string; askedAt: Date } | null
   contact: { displayName: string; whatsappUrl: string | null } | null
 }
 
@@ -132,6 +136,10 @@ export function toFoundCase(wire: z.infer<typeof foundCaseWire>): FoundCase {
       whatsappUrl: claim.whatsapp_url,
     })),
     successorCaseCode: wire.successor_case_code,
+    pendingCheckin: wire.pending_checkin && {
+      id: wire.pending_checkin.id,
+      askedAt: new Date(wire.pending_checkin.asked_at),
+    },
     contact: wire.contact && {
       displayName: wire.contact.display_name,
       whatsappUrl: wire.contact.whatsapp_url,

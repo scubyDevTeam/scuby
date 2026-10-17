@@ -1,6 +1,7 @@
 // Found (docs/product/05): matching, publishing, «Es mío» and the custodian's endings.
 import { api } from '../../contracts/api'
 import { db, type FoundRow, findCase, newCode, newId, type PersonRow } from '../db'
+import { closeCheckins, onCustodianInteraction, onFoundPublished } from '../followup'
 import { notify } from '../notify'
 import { fail, route } from '../route'
 import { COLOR, DAY, iso, metres, placeName } from '../rules'
@@ -89,6 +90,7 @@ export const found = [
       org_name: null,
       successor_case_code: null,
     }
+    onFoundPublished(code)
     notify(
       user.id,
       'found_case.broadcast_sent',
@@ -169,8 +171,10 @@ export const found = [
     if (row.status !== 'active') fail('invalid_transition')
     if (body.outcome === 'keep_searching') {
       row.hold_offer_at = iso(Date.now() + HOLD)
+      onCustodianInteraction(row.code)
       return { id: row.code }
     }
+    closeCheckins(row.code)
     row.status = body.outcome
     row.resolved_at = iso(Date.now())
     row.resolution =

@@ -151,6 +151,7 @@ function foundView(t: Tables, row: FoundRow, viewerId: string | null): CaseWire 
           }
         })
       : [],
+    pending_checkin: custodian ? pendingCheckin(t, row.code) : null,
     contact: contact(t, row),
   }
 }
