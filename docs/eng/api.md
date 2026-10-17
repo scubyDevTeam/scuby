@@ -88,7 +88,7 @@ must be in that endpoint's `errors`. The emulated backend enforces this, so the 
 ## What the emulated backend does — and does not
 
 It is a small backend in the browser (`web/src/mocks/`): tables (`tables.ts`), seeded from
-`fixtures.ts` and kept per tab; per-viewer serialization (`serialize.ts`); the follow-up loop run
+`fixtures.ts` and kept in this browser's storage, shared by its tabs (the demo's «Restablecer» goes back to the fixtures); per-viewer serialization (`serialize.ts`); the follow-up loop run
 before each request (`followup.ts`: check-ins, stale claims, expiry); the inbox (`notify.ts`); and
 every handler wrapped by `route.ts`, which validates each request and each answer against
 `api.ts`. Sign-in accepts the code `123456`; «Continuar con Google» signs into the demo owner.
