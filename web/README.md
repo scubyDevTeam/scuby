@@ -18,6 +18,35 @@ pedidos de ayuda. Es el **alcance 1** del front; la app para tiendas (Capacitor)
   (MSW). El contrato de la API vive en el propio cliente y de él sale `docs/eng/openapi.json`, que
   es lo que el backend real debe implementar.
 
+## Estado del MVP (front)
+
+Funciona de punta a punta contra el backend emulado (`VITE_API_MOCK=true`):
+
+- **Perdido:** publicar (con borrador que sobrevive a recargar), mapa y recorrido de avistamientos,
+  «La vi» sin cuenta (con cola sin señal, corregir o borrar el propio en 15 min), «La tengo»
+  (también reactiva un aviso archivado), seguimiento «¿sigue perdida?» con la fecha de archivo,
+  editar, cerrar, eliminar, reactivar.
+- **Encontrado:** publicar o reportar como testigo, coincidencias, «Es mío» con evidencia,
+  «¿Sigues con él?», oferta del día 15, pasar a adopción, pedir ayuda para el animal, editar.
+- **Adopción:** publicar, «Me interesa» con presentación, panel de quien publica, registrar la
+  adopción, editar.
+- **Ayuda:** necesidades en especie (nunca dinero), «Yo ayudo», panel de quien pide, fotos de
+  evidencia, editar.
+- **Comunes:** inicio con lista y mapa, chat dentro de la app, Bandeja (avisos y mensajes),
+  enlaces de un toque del correo, afiche y compartir, reportes, perfil (foto, celular con SMS,
+  alertas «cerca de mí», eliminar cuenta), español e inglés, PWA y Web Push.
+
+Lo que falta no es del front:
+
+- El backend real que implemente `../docs/eng/openapi.json` (los escenarios de
+  `src/mocks/backend.test.ts` son su especificación).
+- Llaves de producción (Google, Sentry, VAPID, correo legal, fuente del mapa) y el deploy.
+- Revisión legal de términos y privacidad, y revisión del inglés.
+- Decisiones abiertas en `../docs/open-items.md` (nombre del producto, sesión, idioma de push…).
+
+Para una demo pública sin backend se puede desplegar el build con `VITE_API_MOCK=true`: cada
+visitante tiene su propio backend emulado en el navegador (código de acceso `123456`).
+
 ## Dónde está la verdad
 
 | | |
