@@ -19,6 +19,8 @@ type Props = {
   onTransfer: () => void
   /** «Publicar en adopción»: the link to the listing form, pre-filled from this case (05 · 06). */
   adoptionLink: ReactNode
+  /** «Pedir ayuda para él»: the help form for this animal (07 · The pet). */
+  helpLink?: ReactNode
 }
 
 /**
@@ -32,6 +34,7 @@ export function CustodianPanel({
   onKeep,
   onTransfer,
   adoptionLink,
+  helpLink,
 }: Props) {
   const i18n = useI18n()
   const { t } = i18n
@@ -190,6 +193,7 @@ export function CustodianPanel({
           ) : null}
         </section>
       ) : null}
+      {helpLink}
     </>
   )
 }

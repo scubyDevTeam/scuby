@@ -285,7 +285,8 @@ function helpView(t: Tables, row: HelpRow, viewerId: string | null): CaseWire {
     resolved_at: row.resolved_at,
     viewer: beneficiary ? 'beneficiary' : 'public',
     pet: {
-      name: pet.name ?? '',
+      // A found animal has no name: the request names it by what it looks like (05).
+      name: pet.name ?? lookTitle(pet),
       species: pet.species,
       size: pet.size,
       colors: pet.colors,

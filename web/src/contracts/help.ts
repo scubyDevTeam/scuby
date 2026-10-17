@@ -44,6 +44,8 @@ export type PublishHelpInput = {
   hasWhatsapp: boolean
   contact: { whatsapp: boolean; email: boolean; inApp: boolean }
   otpCode: string | null
+  /** A found case the caller holds: the request is for its animal. */
+  fromCaseCode?: string | null
 }
 
 const needRequest = z.object({
@@ -66,6 +68,11 @@ export const publishHelpRequest = z.object({
       photo_urls: z.array(photoUrl).check(z.maxLength(6)),
     }),
   ),
+  /**
+   * The found case whose animal this is for: its custodian asks for it (07 · The pet). The pet is
+   * that case's; `pet_id` and `pet` stay null.
+   */
+  from_case_code: z._default(z.nullable(z.string()), null),
   /** A request is always a bounded ask: one to three needs, each saying exactly what. */
   needs: z.array(needRequest).check(z.minLength(1), z.maxLength(3)),
   story: z.string().check(z.minLength(1), z.maxLength(2000)),
@@ -76,6 +83,7 @@ export const publishHelpRequest = z.object({
 
 export const publishHelpBody = (input: PublishHelpInput): z.input<typeof publishHelpRequest> => ({
   pet_id: input.petId,
+  from_case_code: input.fromCaseCode ?? null,
   pet: input.pet && {
     name: input.pet.name,
     species: input.pet.species,

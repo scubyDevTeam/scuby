@@ -781,7 +781,8 @@
       "confirm": "Sí, es el dueño",
       "dismiss": "No es",
       "answer_failed": "No pudimos guardar tu respuesta.",
-      "offer_adoption": "Publicar en adopción"
+      "offer_adoption": "Publicar en adopción",
+      "ask_help": "Pedir ayuda para él"
     },
     "resolve": {
       "attribution": {
@@ -1045,7 +1046,8 @@
         "need_target_invalid": "La cantidad debe ser un número entero, o déjala vacía",
         "needed_by_past": "Esa fecha ya pasó",
         "story_required": "Cuéntales qué pasó"
-      }
+      },
+      "for_found": "Para el animal que encontraste"
     }
   },
   "inbox": {
