@@ -20,7 +20,7 @@ import { DEMO_OWNER_ID as DEMO_OWNER_ID_FOR_TESTS } from './fixtures'
 import { DEMO_CODE, handlers } from './handlers'
 import { routed } from './route'
 import { DAY, HOUR } from './rules'
-import { signOut } from './session'
+import { signIn, signOut } from './session'
 
 const server = setupServer(...handlers)
 const asIs = (raw: unknown) => raw
@@ -1772,5 +1772,82 @@ describe('editing a found, adoption or help case (00 · #27)', () => {
     expect((await failure(edit('NOPE1', { story: 'x' }))).code).toBe('not_found')
     db.cases.M1SHI!.status = 'withdrawn' as never
     expect((await failure(edit('M1SHI', { story: 'x' }))).code).toBe('invalid_transition')
+  })
+})
+
+describe('deleting the account (O15, D14)', () => {
+  const remove = () => call(api.deleteAccount, {}, asIs)
+
+  it('closes the active cases, withdraws offers, erases what is personal and ends the session', async () => {
+    await asCarolina()
+    await remove()
+    expect(db.persons.some((p) => p.id === DEMO_OWNER_ID_FOR_TESTS)).toBe(false)
+    expect(db.cases['7K3PQ']?.status).toBe('cancelled')
+    expect(db.cases.M1SHI?.status).toBe('withdrawn')
+    expect(db.cases.NA7LA?.status).toBe('closed')
+    expect(db.notifications.some((n) => n.person_id === DEMO_OWNER_ID_FOR_TESTS)).toBe(false)
+    expect(
+      db.conversations.some((c) => [c.started_by, c.other_id].includes(DEMO_OWNER_ID_FOR_TESTS)),
+    ).toBe(false)
+    expect((await failure(call(api.getSession, {}, asIs))).code).toBe('unauthorized')
+  })
+
+  it('what the person gave other cases stays, without their name', async () => {
+    signIn(db.persons.find((p) => p.id === 'user-andres')!)
+    const mine = db.sightings.filter((s) => s.reporter_id === 'user-andres').length
+    expect(mine).toBeGreaterThan(0)
+    await remove()
+    expect(db.sightings.filter((s) => s.reporter_id === 'user-andres')).toHaveLength(0)
+    expect(db.sightings.filter((s) => s.reporter_id === null).length).toBeGreaterThanOrEqual(mine)
+    expect(
+      db.adoptionInterests.filter((i) => i.person_id === 'user-andres' && i.status === 'open'),
+    ).toHaveLength(0)
+  })
+
+  it('needs an account', async () => {
+    expect((await failure(remove())).code).toBe('unauthorized')
+  })
+})
+
+describe('the thread a claim or an interest opens (comms.md · created with its first message)', () => {
+  it('«Es mío» opens a thread with the evidence as its first, automatic message', async () => {
+    await asNewcomer('laura@correo.co')
+    await call(
+      api.claimOwnership,
+      {
+        params: { code: 'F8UND' },
+        body: { evidence_notes: 'Mancha blanca en la pata', chip_number: null, photo_urls: [] },
+      },
+      asIs,
+    )
+    const thread = db.conversations.find((c) => c.case_code === 'F8UND')!
+    expect(thread.other_id).toBe('user-marcela')
+    const [first] = db.messages.filter((m) => m.conversation_id === thread.id)
+    expect(first).toMatchObject({ kind: 'automatic', sender_id: null })
+    expect(first?.body).toContain('Mancha blanca en la pata')
+  })
+
+  it('«Me interesa» opens one with the introduction; asking again does not start another', async () => {
+    await asNewcomer('laura@correo.co')
+    carolinaHasAPhone()
+    const interest = {
+      phone: '+573001112233',
+      phone_has_whatsapp: true,
+      otp_code: '123456',
+      intro: {
+        housing: 'house' as const,
+        has_yard: true,
+        other_pets: null,
+        household: null,
+        why: 'Tengo patio y tiempo.',
+      },
+    }
+    await call(api.expressInterest, { params: { code: 'AD9PT' }, body: interest }, asIs)
+    await call(api.expressInterest, { params: { code: 'AD9PT' }, body: interest }, asIs)
+    const threads = db.conversations.filter((c) => c.case_code === 'AD9PT')
+    expect(threads).toHaveLength(1)
+    expect(db.messages.find((m) => m.conversation_id === threads[0]!.id)?.body).toBe(
+      'Tengo patio y tiempo.',
+    )
   })
 })

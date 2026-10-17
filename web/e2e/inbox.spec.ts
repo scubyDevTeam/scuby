@@ -7,7 +7,7 @@ test(
     await myCases.openAsDemoOwner()
 
     await test.step('the «Bandeja» tab counts what is unread', async () => {
-      await expect(inbox.navBadge).toHaveText('3 avisos sin leer')
+      await expect(inbox.navBadge).toHaveText('5 sin leer')
     })
 
     await inbox.openFromNav()
@@ -18,8 +18,8 @@ test(
       await expect(inbox.item('ya llegó a los vecinos')).not.toContainText('Sin leer')
     })
 
-    await test.step('opening the inbox reads them: the count clears', async () => {
-      await expect(inbox.navBadge).toHaveCount(0)
+    await test.step('opening the inbox reads the alerts: only the messages still wait', async () => {
+      await expect(inbox.navBadge).toHaveText('2 sin leer')
     })
 
     await test.step('a notification opens its case', async () => {

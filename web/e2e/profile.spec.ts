@@ -59,3 +59,19 @@ test(
     })
   },
 )
+
+test(
+  'delete the account: it asks once, then the session ends and the account is gone',
+  tags('@profile', '@PROFILE-003'),
+  async ({ profile }) => {
+    await profile.open()
+    await profile.signIn.withEmailCode('borrar.cuenta@correo.co')
+    await expect(profile.name('Borrar Cuenta')).toBeVisible()
+
+    await profile.deleteAccount()
+
+    await test.step('the session ended: the profile asks to sign in again', async () => {
+      await expect(profile.signIn.title).toBeVisible()
+    })
+  },
+)

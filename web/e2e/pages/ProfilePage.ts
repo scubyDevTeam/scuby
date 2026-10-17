@@ -98,6 +98,13 @@ export class ProfilePage {
     )
   }
 
+  deleteAccount() {
+    return step('Delete the account', async () => {
+      await this.page.getByRole('button', { name: 'Eliminar mi cuenta' }).click()
+      await this.page.getByRole('button', { name: 'Sí, eliminar mi cuenta' }).click()
+    })
+  }
+
   signOut() {
     return step('Sign out', () => this.page.getByRole('button', { name: 'Cerrar sesión' }).click())
   }

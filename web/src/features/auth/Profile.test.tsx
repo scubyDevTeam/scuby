@@ -136,3 +136,38 @@ describe('Profile', () => {
     await waitFor(() => expect(calls.some((c) => c.key === 'POST /auth/sign-out')).toBe(true))
   })
 })
+
+describe('Profile — «Eliminar mi cuenta» (O15)', () => {
+  const open = async (routes: Parameters<typeof stubApi>[0] = {}) => {
+    const calls = stubApi({ 'GET /me/profile': { body: caro }, ...routes })
+    renderWithQuery(<Profile />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Eliminar mi cuenta' }))
+    return calls
+  }
+
+  it('asks once, saying what happens, before deleting anything', async () => {
+    const calls = await open({ 'DELETE /me': { status: 204 } })
+    expect(screen.getByText(/Cierra tus avisos activos/)).toBeTruthy()
+    expect(calls.some((c) => c.key === 'DELETE /me')).toBe(false)
+  })
+
+  it('«No, conservarla» goes back without deleting', async () => {
+    const calls = await open({ 'DELETE /me': { status: 204 } })
+    fireEvent.click(screen.getByRole('button', { name: 'No, conservarla' }))
+    expect(screen.getByRole('button', { name: 'Eliminar mi cuenta' })).toBeTruthy()
+    expect(calls.some((c) => c.key === 'DELETE /me')).toBe(false)
+  })
+
+  it('confirming deletes the account', async () => {
+    const calls = await open({ 'DELETE /me': { status: 204 } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar mi cuenta' }))
+    await waitFor(() => expect(calls.some((c) => c.key === 'DELETE /me')).toBe(true))
+  })
+
+  it('says so when it could not, and lets it be tried again', async () => {
+    await open({ 'DELETE /me': { status: 500 } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar mi cuenta' }))
+    expect(await screen.findByText(/No pudimos eliminar tu cuenta/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Sí, eliminar mi cuenta' })).toBeTruthy()
+  })
+})
