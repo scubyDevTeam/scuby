@@ -9,8 +9,10 @@ import { api } from '../contracts/api'
 import { parseCase } from '../contracts/case'
 import { parseFeed } from '../contracts/feed'
 import { parsePledge } from '../contracts/help'
+import { parseCheckinLink } from '../contracts/links'
 import { parseMyCases, parseNotifications, parsePets, parsePublish } from '../contracts/owner'
 import { parseProfile, parseUser } from '../contracts/session'
+import { DEMO_LINKS, linkToken } from './api/links'
 import { db, type LostRow, resetDb } from './db'
 import { DEMO_OWNER_ID as DEMO_OWNER_ID_FOR_TESTS } from './fixtures'
 import { DEMO_CODE, handlers } from './handlers'
@@ -228,6 +230,19 @@ describe('«Lo vi» (04 · Validation)', () => {
     expect((await failure(sighting())).code).toBe('rate_limited')
     later(16 * 60_000)
     await sighting()
+  })
+
+  // The offline queue resends until it hears back (frontend.md · Risks §6): an answer lost on a
+  // weak signal must not become a second pin, nor a 429 that tells the reporter it failed.
+  it('a replay with the same `client_id` is the same sighting: one row, the same id, no limit', async () => {
+    const before = db.sightings.length
+    const first = (await sighting({ client_id: 'c0ffee-replay-1' })) as { id: string }
+    later(60_000)
+    const again = (await sighting({ client_id: 'c0ffee-replay-1' })) as { id: string }
+    expect(again.id).toBe(first.id)
+    expect(db.sightings).toHaveLength(before + 1)
+    // A different key is a different sighting, and the rate limit applies to it.
+    expect((await failure(sighting({ client_id: 'c0ffee-replay-2' }))).code).toBe('rate_limited')
   })
 
   it('cannot be added to a closed case', async () => {
@@ -903,7 +918,9 @@ describe('help — «Yo ayudo» (07 · `help_pledge`)', () => {
     carolinaHasAPhone()
     await pledge('HE7PA')
     const julian = db.notifications.filter((n) => n.person_id === 'user-julian')
-    expect(julian.at(-1)?.body).toBe('Carolina M. ofreció un hogar temporal para Max.')
+    expect(julian.at(-1)?.body).toBe(
+      'Carolina M. ofrece un hogar temporal para Max. Escríbele para coordinar.',
+    )
   })
 
   it('the beneficiary never pledges to their own request', async () => {
@@ -1033,6 +1050,124 @@ describe('help — the follow-up loop (07 · Cadence, soft expiry, 30-day reopen
   })
 })
 
+describe('help — endings and who hears of them (07 · Rules, Events; 08 · Help)', () => {
+  it('a covered request reads closed to everyone, and takes no more offers', async () => {
+    const request = await caseOf('CH5PA')
+    if (request.vertical !== 'help') throw new Error('expected a help request')
+    expect(request).toMatchObject({ status: 'closed', resolution: 'covered', viewer: 'public' })
+    expect(request.needs).toMatchObject([{ status: 'covered', confirmed: 1, pledged: 0 }])
+    await asNewcomer('laura.diaz@correo.co')
+    const refused = await failure(
+      call(
+        api.pledgeHelp,
+        {
+          params: { code: 'CH5PA' },
+          body: {
+            need_id: 'need-chispa-ride',
+            quantity: 1,
+            note: null,
+            phone: '+573001112233',
+            phone_has_whatsapp: true,
+            otp_code: DEMO_CODE,
+          },
+        },
+        asIs,
+      ),
+    )
+    expect(refused.code).toBe('invalid_transition')
+  })
+
+  it('a closed request leaves the feed; the open ones stay', async () => {
+    const feed = await call(api.getFeed, { query: {} }, parseFeed)
+    expect(feed.items.map((i) => i.code)).not.toContain('CH5PA')
+    expect(feed.items.map((i) => i.code)).toEqual(expect.arrayContaining(['HE7PA', 'NA7LA']))
+  })
+
+  it('the pledger hears «llegó» in 08’s words', async () => {
+    await asCarolina()
+    await call(
+      api.answerPledge,
+      { params: { code: 'NA7LA', pledgeId: 'pl-nala-home' }, body: { status: 'confirmed' } },
+      asIs,
+    )
+    const marcela = db.notifications.filter((n) => n.person_id === 'user-marcela')
+    expect(marcela.at(-1)?.body).toBe('Llegó lo que ofreciste para Nala. Gracias.')
+  })
+
+  it('closing tells only offers still waiting — not whoever already delivered', async () => {
+    await asCarolina()
+    await call(
+      api.closeHelp,
+      { params: { code: 'NA7LA' }, body: { resolution: 'pet_deceased' } },
+      asIs,
+    )
+    const told = (id: string) =>
+      db.notifications.filter((n) => n.person_id === id && n.event === 'help_request.closed')
+    expect(told('user-marcela').map((n) => n.body)).toEqual([
+      'La solicitud de Nala ya no está activa. Gracias por ofrecer.',
+    ])
+    // Andrés's sand arrived and was confirmed: nothing of his is pending.
+    expect(told('user-andres')).toEqual([])
+    expect(
+      db.checkins.filter((c) => c.case_code === 'NA7LA' && !c.cancelled_at && !c.responded_at),
+    ).toEqual([])
+  })
+
+  it('archiving tells the beneficiary until when they can reopen it', async () => {
+    await asCarolina()
+    later(5 * DAY + 14 * DAY + 2 * DAY)
+    await caseOf('NA7LA')
+    const expired = db.notifications.filter(
+      (n) => n.person_id === DEMO_OWNER_ID_FOR_TESTS && n.event === 'help_request.expired',
+    )
+    expect(expired).toHaveLength(1)
+    expect(expired[0]?.body).toMatch(
+      /^Archivamos la solicitud de ayuda de Nala\. Puedes reactivarla con un toque hasta el \d{1,2}\D+$/,
+    )
+  })
+
+  it('past the 30 days it cannot be reopened', async () => {
+    await asCarolina()
+    later(5 * DAY + 14 * DAY + 2 * DAY)
+    expect(await caseOf('NA7LA')).toMatchObject({ status: 'expired' })
+    later(31 * DAY)
+    const refused = await failure(call(api.reopenCase, { params: { code: 'NA7LA' } }, asIs))
+    expect(refused.code).toBe('invalid_transition')
+  })
+
+  it('a date that matters asks «¿sigue?» the day after it, before the week is out', async () => {
+    await asCarolina()
+    carolinaHasAPhone()
+    const tomorrow = new Date(Date.now() + DAY).toISOString().slice(0, 10)
+    const published = await call(
+      api.publishHelp,
+      {
+        body: {
+          pet_id: 'pet-nala',
+          pet: null,
+          needs: [
+            { kind: 'transport', detail: 'Al control de mañana', target: 1, needed_by: tomorrow },
+          ],
+          story: 'Tiene control mañana y no tengo carro.',
+          location_point: { lat: 6.2447, lng: -75.5916 },
+          location_radius_m: 300,
+          phone: null,
+          phone_has_whatsapp: true,
+          contact_prefs: { expose_whatsapp: true, expose_email: false, in_app_only: false },
+          otp_code: null,
+        },
+      },
+      parsePublish,
+    )
+    if (published.kind !== 'published') throw new Error('expected it published')
+    const before = await caseOf(published.code)
+    expect(before.vertical === 'help' && before.pendingCheckin).toBe(null)
+    later(3 * DAY)
+    const asked = await caseOf(published.code)
+    expect(asked.vertical === 'help' && asked.pendingCheckin).toBeTruthy()
+  })
+})
+
 describe('help — publishing (07 · Publishing)', () => {
   const body = (fields: Record<string, unknown> = {}) => ({
     pet_id: null,
@@ -1149,5 +1284,123 @@ describe('one request, one transaction', () => {
     expect(error.code).toBe('invalid_transition')
     expect(db.checkins.find((c) => c.id === 'ck-due')?.responded_at).toBeNull()
     expect((await caseOf('7K3PQ')).status).toBe('active')
+  })
+})
+
+describe('the email’s one-tap links (comms.md · Actionable check-ins, The scanner rule)', () => {
+  const openLink = (token: string) =>
+    call(api.openCheckinLink, { params: { token } }, parseCheckinLink)
+  const confirmLink = (token: string) =>
+    call(api.confirmCheckinLink, { params: { token } }, parseCheckinLink)
+  const checkinRow = (id: string) => db.checkins.find((c) => c.id === id)
+  const asJulian = () =>
+    call(api.verifyEmailCode, { body: { email: 'julian@correo.co', code: DEMO_CODE } }, parseUser)
+  const miloQuestion = async () => {
+    const milo = await caseOf('M2TQ4')
+    return milo.vertical === 'lost' ? milo.pendingCheckin : 'not a lost case'
+  }
+  const pendingOn = async (code: string) =>
+    (await call(api.listMyCases, {}, parseMyCases)).find((c) => c.code === code)?.pendingCheckinAt
+
+  it('a safe answer acts on the GET, without a session, and thanks', async () => {
+    const link = await openLink(DEMO_LINKS.mishaStillAvailable)
+    expect(link).toMatchObject({
+      caseCode: 'M1SHI',
+      vertical: 'adoption',
+      petName: 'Misha',
+      response: 'still_available',
+      kind: 'safe',
+      state: 'applied',
+    })
+    expect(checkinRow('ck-misha-1')).toMatchObject({ response: 'still_available' })
+    expect(db.cases.M1SHI?.status).toBe('active')
+  })
+
+  it('a consequential answer never acts on the GET: a scanner’s prefetch changes nothing', async () => {
+    for (let i = 0; i < 3; i++) {
+      const link = await openLink(DEMO_LINKS.miloReunited)
+      expect(link).toMatchObject({ kind: 'consequential', state: 'confirm' })
+      // Backing out is the same email's safe button.
+      expect(link.declineToken).toBe(DEMO_LINKS.miloStillLost)
+    }
+    expect(checkinRow('ck-milo-1')?.responded_at).toBeNull()
+    expect((await caseOf('M2TQ4')).status).toBe('active')
+  })
+
+  it('the confirm page’s POST applies it, with the defaults the app would ask for', async () => {
+    const link = await confirmLink(DEMO_LINKS.miloReunited)
+    expect(link.state).toBe('applied')
+    expect(checkinRow('ck-milo-1')?.response).toBe('reunited')
+    expect((await caseOf('M2TQ4')).status).toBe('reunited')
+    expect(db.cases.M2TQ4).toMatchObject({ resolution_attribution: 'unknown' })
+  })
+
+  it('a link is single-use: opening or confirming it again changes nothing', async () => {
+    await confirmLink(DEMO_LINKS.miloReunited)
+    expect((await openLink(DEMO_LINKS.miloReunited)).state).toBe('used')
+    expect((await confirmLink(DEMO_LINKS.miloReunited)).state).toBe('used')
+    await openLink(DEMO_LINKS.mishaStillAvailable)
+    const answeredAt = checkinRow('ck-misha-1')?.responded_at
+    later(HOUR)
+    expect((await openLink(DEMO_LINKS.mishaStillAvailable)).state).toBe('used')
+    expect(checkinRow('ck-misha-1')?.responded_at).toBe(answeredAt)
+  })
+
+  it('answered anywhere = answered everywhere: the other buttons stop acting', async () => {
+    await asJulian()
+    await call(
+      api.answerCheckin,
+      { params: { code: 'M2TQ4', checkinId: 'ck-milo-1' }, body: { response: 'still_lost' } },
+      asIs,
+    )
+    signOut()
+    expect((await openLink(DEMO_LINKS.miloReunited)).state).toBe('already_answered')
+    expect((await confirmLink(DEMO_LINKS.miloReunited)).state).toBe('already_answered')
+    expect((await caseOf('M2TQ4')).status).toBe('active')
+    // The app's answer was «sigue perdida»: that button reads as already used.
+    expect((await openLink(DEMO_LINKS.miloStillLost)).state).toBe('used')
+  })
+
+  it('answering through the link closes the question in the app and on home', async () => {
+    await asJulian()
+    expect(await pendingOn('M2TQ4')).toBeInstanceOf(Date)
+    expect(await miloQuestion()).toMatchObject({ id: 'ck-milo-1' })
+    await openLink(DEMO_LINKS.miloStillLost)
+    expect(await pendingOn('M2TQ4')).toBeNull()
+    expect(await miloQuestion()).toBeNull()
+  })
+
+  it('a link expires a week after its email went out, and then acts no more', async () => {
+    // Misha's check-in fell due a day ago; its email went out with the 24 h escalation.
+    later(7 * DAY - HOUR)
+    expect((await openLink(DEMO_LINKS.miloReunited)).state).not.toBe('expired')
+    later(2 * HOUR)
+    expect((await openLink(DEMO_LINKS.mishaStillAvailable)).state).toBe('expired')
+    expect((await confirmLink(DEMO_LINKS.mishaStillAvailable)).state).toBe('expired')
+    expect(checkinRow('ck-misha-1')?.responded_at).toBeNull()
+  })
+
+  it('«ya fue adoptado» ends the listing, with the person «En proceso» as the adopter', async () => {
+    const interest = db.adoptionInterests.find((i) => i.case_code === 'M1SHI')!
+    interest.status = 'chosen'
+    const token = linkToken('ck-misha-1', 'adopted')
+    expect((await openLink(token)).state).toBe('confirm')
+    expect(db.cases.M1SHI?.status).toBe('active')
+    expect((await confirmLink(token)).state).toBe('applied')
+    expect(db.cases.M1SHI).toMatchObject({ status: 'adopted', resolution: 'adopted_in_app' })
+  })
+
+  it('the demo buttons are stable: e2e/pages/EmailLinkPage.ts opens them by these values', () => {
+    expect(DEMO_LINKS).toMatchObject({
+      mishaStillAvailable: '1d6wc5o0mddvnj',
+      miloReunited: '1sl8znh06absty',
+    })
+  })
+
+  it('an unknown token, or one for a question not asked yet, is not found', async () => {
+    expect((await failure(openLink('not-a-token'))).code).toBe('not_found')
+    // Luna's next «¿sigue perdida?» falls due tomorrow: no email, so no link.
+    expect((await failure(openLink(linkToken('ck-luna-1', 'still_lost')))).code).toBe('not_found')
+    expect((await failure(confirmLink('not-a-token'))).code).toBe('not_found')
   })
 })

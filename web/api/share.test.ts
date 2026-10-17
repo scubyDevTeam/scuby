@@ -262,8 +262,14 @@ describe('link preview of a case (docs/product/10 §2)', () => {
 
     const closed = { ...help, status: 'closed', resolution: 'covered' }
     const after = await setup(() => json(closed)).open('/api/share?code=HE7PA')
-    expect(after.tag('og:title')).toBe('SOLICITUD CERRADA: Max — Envigado')
+    expect(after.tag('og:title')).toBe('YA TIENE AYUDA: Max — Envigado')
     expect(after.tag('og:description')).toContain('Max ya tiene la ayuda que necesitaba')
+
+    // Closed for another reason, it says it ended — never that the help arrived (10 §3).
+    const ended = { ...help, status: 'closed', resolution: 'pet_deceased' }
+    const gone = await setup(() => json(ended)).open('/api/share?code=HE7PA')
+    expect(gone.tag('og:title')).toBe('SOLICITUD CERRADA: Max — Envigado')
+    expect(gone.tag('og:description')).toBe('Quien la publicó cerró esta solicitud.')
   })
 
   it('a stand-in data: photo is no image to a crawler', async () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { SchematicMap } from './SchematicMap'
 import type { MapPin } from './types'
 
@@ -35,5 +35,28 @@ describe('SchematicMap', () => {
     expect(one.container.querySelectorAll('polyline')).toHaveLength(0)
     const none = render(<SchematicMap area={{ center, radiusM: 200 }} areaLabel="Zona" pins={[]} />)
     expect(none.container.querySelectorAll('g')).toHaveLength(0)
+  })
+})
+
+describe('SchematicMap — tapping a pin', () => {
+  it('reports which pin was tapped, so the page opens its sheet', () => {
+    const onSelectPin = vi.fn()
+    const { container } = render(
+      <SchematicMap
+        area={{ center, radiusM: 200 }}
+        areaLabel="Zona"
+        pins={[pin('a', 1, 100), pin('b', 2, 300)]}
+        onSelectPin={onSelectPin}
+      />,
+    )
+    fireEvent.click(container.querySelector('[data-pin="b"]')!)
+    expect(onSelectPin).toHaveBeenCalledWith('b')
+  })
+
+  it('names itself with the page’s words only', () => {
+    const { container } = render(
+      <SchematicMap area={{ center, radiusM: 200 }} areaLabel="Zona" pins={[pin('a', 1, 100)]} />,
+    )
+    expect(container.querySelector('title')?.textContent).toBe('Zona')
   })
 })

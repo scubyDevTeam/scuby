@@ -99,9 +99,19 @@ describe('HelpCasePage — seen by anyone (07)', () => {
   })
 
   it('a covered request says so, thanks the helpers and offers nothing', () => {
-    show(request('HE7PA', { status: 'closed', resolution: 'covered', resolvedAt: now }))
-    expect(screen.getByText('Max ya tiene la ayuda que necesitaba.')).toBeTruthy()
+    show(request('CH5PA'))
+    expect(screen.getByText('Ya tiene ayuda')).toBeTruthy()
+    expect(screen.getByText('Chispa ya tiene la ayuda que necesitaba.')).toBeTruthy()
+    expect(need('Transporte').getByText('Cubierto')).toBeTruthy()
     expect(screen.queryAllByRole('button', { name: /Yo ayudo/ })).toEqual([])
+    expect(screen.queryByRole('button', { name: 'Reportar' })).toBeNull()
+  })
+
+  it('closed for another reason, it never says the help arrived (10 §3)', () => {
+    show(request('HE7PA', { status: 'closed', resolution: 'pet_deceased', resolvedAt: now }))
+    expect(screen.getByText('Solicitud cerrada')).toBeTruthy()
+    expect(screen.queryByText('Ya tiene ayuda')).toBeNull()
+    expect(screen.getByText('Esta solicitud se cerró.')).toBeTruthy()
   })
 })
 

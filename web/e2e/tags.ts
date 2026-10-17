@@ -24,6 +24,9 @@ export const FLOWS = {
   '@publish-adoption': 'PADOPT',
   '@help-request': 'HREQ',
   '@publish-help': 'PHELP',
+  '@email-links': 'MAIL',
+  '@offline': 'OFFLINE',
+  '@map': 'MAP',
 } as const
 
 export type Flow = keyof typeof FLOWS
