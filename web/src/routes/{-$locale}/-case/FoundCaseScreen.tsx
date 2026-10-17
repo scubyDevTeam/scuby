@@ -155,6 +155,15 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
                 {t('found.custodian.offer_adoption')}
               </Link>
             }
+            helpLink={
+              <Link
+                to="/{-$locale}/publicar/ayuda"
+                search={{ desde: found.code }}
+                className={buttonClass('secondary')}
+              >
+                {t('found.custodian.ask_help')}
+              </Link>
+            }
           />
         }
       />

@@ -28,6 +28,8 @@ export type HelpDraft = AnimalDraft &
   ContactDraft & {
     /** One of the beneficiary's pets, or null to describe it here. */
     petId: string | null
+    /** A found case the beneficiary holds: its animal, already described. */
+    fromCaseCode: string | null
     needs: NeedDraft[]
     story: string
     center: Point | null
@@ -38,6 +40,7 @@ export const emptyHelpDraft: HelpDraft = {
   ...emptyAnimal,
   ...emptyContact,
   petId: null,
+  fromCaseCode: null,
   needs: [],
   story: '',
   center: null,
@@ -86,7 +89,9 @@ export function helpStepErrors(
 ): HelpDraftError[] {
   if (step === 1) {
     // An existing pet is already described; a new one needs what identifies it.
-    return draft.petId ? [] : animalErrors(draft, { name: true, photo: false })
+    return draft.petId || draft.fromCaseCode
+      ? []
+      : animalErrors(draft, { name: true, photo: false })
   }
   if (step === 2) return needErrors(draft.needs, context.today)
   const errors: HelpDraftError[] = []

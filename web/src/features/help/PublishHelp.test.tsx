@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
+import { parseCase } from '@contracts/case'
+import type { FoundCase } from '@contracts/found'
 import type { User } from '@contracts/session'
 import { fireEvent, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { cases } from '../../mocks/fixtures'
 import { renderWithQuery, stubApi } from '../../test-utils'
 import { PublishHelp } from './PublishHelp'
 
@@ -23,7 +26,7 @@ const nala = {
   reopenable_case_code: null,
 }
 
-function show(routes: Parameters<typeof stubApi>[0] = {}) {
+function show(routes: Parameters<typeof stubApi>[0] = {}, fromFound: FoundCase | null = null) {
   const calls = stubApi({ 'GET /me/pets': { body: [nala] }, ...routes })
   vi.stubGlobal('navigator', {
     geolocation: {
@@ -39,6 +42,7 @@ function show(routes: Parameters<typeof stubApi>[0] = {}) {
       legal="Términos"
       onExit={() => {}}
       caseLink={(code, children) => <a href={`/c/${code}`}>{children}</a>}
+      fromFound={fromFound}
     />,
   )
   return calls
@@ -110,5 +114,38 @@ describe('PublishHelp — 07 · Publishing', () => {
       phone: null,
     })
     expect(JSON.stringify(body)).not.toMatch(/amount|goal|price|link/)
+  })
+})
+
+describe('PublishHelp — for the animal a custodian holds (07 · The pet)', () => {
+  const dog = () => {
+    const parsed = parseCase(cases('responsible').C4STD)
+    if (parsed.vertical !== 'found') throw new Error('expected found')
+    return parsed
+  }
+
+  it('starts on the animal, described already, and sends its case instead of a pet', async () => {
+    const calls = show({ 'POST /help-requests': { status: 201, body: { code: 'H3LPX' } } }, dog())
+    expect(screen.getByText('Para el animal que encontraste')).toBeTruthy()
+    expect(screen.getByText('Perro café, mediano')).toBeTruthy()
+    expect(screen.queryByLabelText('Nombre')).toBeNull()
+    go()
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar Insumos' }))
+    fireEvent.change(screen.getByLabelText('¿Qué exactamente?'), {
+      target: { value: 'Concentrado' },
+    })
+    go()
+    // The zone starts where it was found.
+    expect(await screen.findByText('Zona marcada.')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(/Cuéntales a tus vecinos/), {
+      target: { value: 'Lo cuido mientras aparece su familia.' },
+    })
+    go('Publicar solicitud')
+    expect(await screen.findByText('¡Solicitud publicada!')).toBeTruthy()
+    expect(calls.find((c) => c.key === 'POST /help-requests')?.body).toMatchObject({
+      from_case_code: 'C4STD',
+      pet_id: null,
+      pet: null,
+    })
   })
 })

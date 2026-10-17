@@ -72,7 +72,18 @@ function settle(row: HelpRow) {
 export const help = [
   route(api.publishHelp, ({ user, body }) => {
     let petId = body.pet_id
-    if (petId) {
+    if (body.from_case_code) {
+      // The custodian asks for the animal they hold (07 · The pet): only theirs, only while active.
+      const found = findCase(body.from_case_code)
+      if (
+        found?.vertical !== 'found' ||
+        found.created_by !== user.id ||
+        found.status !== 'active'
+      ) {
+        fail('not_found')
+      }
+      petId = found.pet_id
+    } else if (petId) {
       // A pet the beneficiary holds: theirs, or one they keep for someone (05 · custodian).
       const holds = (id: string) =>
         db.pets.some((p) => p.id === id && p.owner_id === user.id) ||

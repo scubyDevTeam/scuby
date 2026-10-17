@@ -2,6 +2,7 @@ import { useConfig } from '@api-client/actions'
 import { usePublishHelp } from '@api-client/help'
 import { ApiError } from '@api-client/http'
 import { useMyPets } from '@api-client/owner'
+import type { FoundCase } from '@contracts/found'
 import type { User } from '@contracts/session'
 import { MAX_NEEDS, NEED_KINDS, type NeedKind } from '@domain/help/needs'
 import {
@@ -16,6 +17,7 @@ import {
 } from '@domain/help/publish'
 import { toE164 } from '@domain/shared/phone'
 import { cleanCode, isCompleteCode } from '@domain/shared/signin'
+import { describeFound } from '@features/found/copy'
 import { draftErrorKey } from '@features/publish/copy'
 import {
   AnimalFields,
@@ -71,6 +73,8 @@ type Props = {
   legal: ReactNode
   onExit: () => void
   caseLink: (code: string, children: ReactNode, className: string) => ReactNode
+  /** `?desde=`: the found case whose animal the custodian asks for (07 · The pet). */
+  fromFound?: FoundCase | null
 }
 
 /**
@@ -78,14 +82,26 @@ type Props = {
  * three things asked — each saying exactly what — then where, the story and the phone step of
  * docs/eng/auth.md. No field takes an amount, a link or an account (decision #26).
  */
-export function PublishHelp({ user, mapStyleUrl, demoCode, legal, onExit, caseLink }: Props) {
+export function PublishHelp({
+  user,
+  mapStyleUrl,
+  demoCode,
+  legal,
+  onExit,
+  caseLink,
+  fromFound = null,
+}: Props) {
   const i18n = useI18n()
   const { t } = i18n
   const country = useConfig().data?.countries[0]
   const pets = useMyPets().data ?? []
   const publish = usePublishHelp()
   const [step, setStep] = useState<HelpStep>(1)
-  const [draft, setDraft] = useState<HelpDraft>(emptyHelpDraft)
+  const [draft, setDraft] = useState<HelpDraft>(() =>
+    fromFound
+      ? { ...emptyHelpDraft, fromCaseCode: fromFound.code, center: fromFound.found.center }
+      : emptyHelpDraft,
+  )
   const [changingPhone, setChangingPhone] = useState(false)
   const [otp, setOtp] = useState('')
   const [tried, setTried] = useState<HelpStep | 0>(0)
@@ -101,15 +117,17 @@ export function PublishHelp({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
   const errorFor = messageFor(t, tried === step ? errors : [])
   const askingCode = publish.data?.kind === 'otp'
   const chosenPet = pets.find((pet) => pet.id === draft.petId) ?? null
-  const petName = chosenPet?.name ?? draft.name.trim()
+  const foundTitle = fromFound ? describeFound(i18n, fromFound.pet) : null
+  const petName = foundTitle ?? chosenPet?.name ?? draft.name.trim()
 
   function send(otpCode: string | null) {
     const { species, size, center } = draft
-    if (!center || (!draft.petId && (!species || !size))) return
+    if (!center || (!draft.petId && !draft.fromCaseCode && (!species || !size))) return
     publish.mutate({
       petId: draft.petId,
+      fromCaseCode: draft.fromCaseCode,
       pet:
-        draft.petId || !species || !size
+        draft.petId || draft.fromCaseCode || !species || !size
           ? null
           : {
               name: draft.name.trim(),
@@ -183,7 +201,22 @@ export function PublishHelp({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
         onBack={() => (step === 1 ? onExit() : setStep((step - 1) as HelpStep))}
       />
 
-      {step === 1 ? (
+      {step === 1 && fromFound ? (
+        <section className="flex items-center gap-3 rounded-2xl bg-brand-mist p-4">
+          {fromFound.pet.photoUrls[0] ? (
+            <img
+              src={fromFound.pet.photoUrls[0]}
+              alt=""
+              className="size-16 shrink-0 rounded-2xl object-cover"
+            />
+          ) : null}
+          <div>
+            <p className="m-0 text-sm text-muted">{t('help_forms.publish.for_found')}</p>
+            <p className="m-0 text-lg font-bold">{foundTitle}</p>
+          </div>
+        </section>
+      ) : null}
+      {step === 1 && !fromFound ? (
         <>
           {pets.length > 0 ? (
             <Section title={t('help_forms.publish.pet_legend')}>

@@ -340,6 +340,13 @@ export class CasePage {
     )
   }
 
+  /** On a found case the custodian holds: «Pedir ayuda para él». */
+  askHelpForFound() {
+    return step('Ask for help with the found animal', () =>
+      this.page.getByRole('link', { name: 'Pedir ayuda para él' }).click(),
+    )
+  }
+
   closePinSheet() {
     return step('Close the pin sheet with Escape', () => this.page.keyboard.press('Escape'))
   }
