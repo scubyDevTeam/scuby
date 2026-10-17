@@ -4221,13 +4221,26 @@
                                 "asked_at": {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                "archives_at": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 }
                               },
                               "required": [
                                 "id",
                                 "trigger",
                                 "claim_id",
-                                "asked_at"
+                                "asked_at",
+                                "archives_at"
                               ],
                               "additionalProperties": false
                             },
@@ -4556,13 +4569,26 @@
                                 "asked_at": {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                "archives_at": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 }
                               },
                               "required": [
                                 "id",
                                 "trigger",
                                 "claim_id",
-                                "asked_at"
+                                "asked_at",
+                                "archives_at"
                               ],
                               "additionalProperties": false
                             },
@@ -5043,13 +5069,26 @@
                                 "asked_at": {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                "archives_at": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 }
                               },
                               "required": [
                                 "id",
                                 "trigger",
                                 "claim_id",
-                                "asked_at"
+                                "asked_at",
+                                "archives_at"
                               ],
                               "additionalProperties": false
                             },
@@ -5476,13 +5515,26 @@
                                 "asked_at": {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                "archives_at": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 }
                               },
                               "required": [
                                 "id",
                                 "trigger",
                                 "claim_id",
-                                "asked_at"
+                                "asked_at",
+                                "archives_at"
                               ],
                               "additionalProperties": false
                             },
