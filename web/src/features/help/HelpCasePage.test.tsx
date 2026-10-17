@@ -163,3 +163,12 @@ describe('HelpCasePage — the beneficiary (07 · only the beneficiary confirms)
     expect(onAction).toHaveBeenCalledWith('close_request')
   })
 })
+
+describe('HelpCasePage — the request’s own photos (07 · photos[])', () => {
+  it('shows them after the pet’s', () => {
+    const data = request('HE7PA')
+    show({ ...data, photoUrls: ['data:image/png;base64,VET'] })
+    const total = data.pet.photoUrls.length + 1
+    expect(screen.getByText(`1 / ${total}`)).toBeTruthy()
+  })
+})
