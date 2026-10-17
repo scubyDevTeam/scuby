@@ -132,6 +132,12 @@ nothing to average out across loads.
 `last_seen_radius_m` is the owner's *uncertainty*. It is **not** the broadcast radius (who gets the
 push), which is a reach decision owned by the broadcast rules. Don't derive one from the other.
 
+**Editing a published case.** While it is `active`, the owner can correct its photos (at least
+one), the signs (`marks`) and where and when it was last seen (`last_seen_point`, radius and
+`last_seen_at`) — design «Aviso · editar». The name, species and the rest of the pet stay as they
+are. **An edit never re-broadcasts:** the neighbours were told once, and a corrected zone does not
+tell them again (decision #27). Closed and archived cases cannot be edited; reopening comes first.
+
 ### `sighting`
 `case_id?`, `point`, `seen_at`, `created_at`, `photos[]`, `note`, `source: anonymous | registered`,
 `reporter_person_id?`, `reporter_device_key?`, `reporter_contact?`,
