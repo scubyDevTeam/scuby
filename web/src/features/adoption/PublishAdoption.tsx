@@ -27,6 +27,7 @@ import {
   Section,
   StepHeader,
 } from '@features/publish/parts'
+import { draftKey, useSavedForm } from '@features/publish/saved-draft'
 import { useI18n } from '@i18n/react'
 import type { TextKey, Translator } from '@i18n/translate'
 import { Button } from '@ui/Button'
@@ -96,8 +97,12 @@ export function PublishAdoption({
   const { t } = i18n
   const country = useConfig().data?.countries[0]
   const publish = usePublishAdoption()
-  const [step, setStep] = useState<AdoptionStep>(1)
-  const [draft, setDraft] = useState<AdoptionDraft>(() => initialDraft(i18n, fromFound))
+  // What was typed survives a reload, per account and per found case it converts.
+  const form = useSavedForm<AdoptionStep, AdoptionDraft>(
+    draftKey(`adoption.${fromFound?.code ?? 'new'}`, user.id),
+    initialDraft(i18n, fromFound),
+  )
+  const { step, setStep, draft, setDraft } = form
   const [changingPhone, setChangingPhone] = useState(false)
   const [otp, setOtp] = useState('')
   const [tried, setTried] = useState<AdoptionStep | 0>(0)
@@ -115,28 +120,35 @@ export function PublishAdoption({
   function send(otpCode: string | null) {
     const { species, size, center } = draft
     if (!species || !size || !center) return
-    publish.mutate({
-      fromFoundCaseCode: fromFound?.code ?? null,
-      listerRole: draft.listerRole ?? 'custodian',
-      name: draft.name.trim(),
-      species,
-      size,
-      colors: draft.colors,
-      marks: draft.marks.trim() || null,
-      photoUrls: draft.photoUrls,
-      healthFlags: draft.healthFlags,
-      story: draft.story.trim(),
-      temperament: draft.temperament,
-      requirementFlags: draft.requirementFlags,
-      requirements: draft.requirements.trim() || null,
-      center,
-      radiusM: draft.radiusM,
-      externalUrl: draft.externalUrl.trim() || null,
-      phone: verifiedPhone ? null : phoneRules ? toE164(draft.phone, phoneRules) : null,
-      hasWhatsapp: draft.hasWhatsapp,
-      contact: draft.contact,
-      otpCode,
-    })
+    publish.mutate(
+      {
+        fromFoundCaseCode: fromFound?.code ?? null,
+        listerRole: draft.listerRole ?? 'custodian',
+        name: draft.name.trim(),
+        species,
+        size,
+        colors: draft.colors,
+        marks: draft.marks.trim() || null,
+        photoUrls: draft.photoUrls,
+        healthFlags: draft.healthFlags,
+        story: draft.story.trim(),
+        temperament: draft.temperament,
+        requirementFlags: draft.requirementFlags,
+        requirements: draft.requirements.trim() || null,
+        center,
+        radiusM: draft.radiusM,
+        externalUrl: draft.externalUrl.trim() || null,
+        phone: verifiedPhone ? null : phoneRules ? toE164(draft.phone, phoneRules) : null,
+        hasWhatsapp: draft.hasWhatsapp,
+        contact: draft.contact,
+        otpCode,
+      },
+      {
+        onSuccess: (result) => {
+          if (result.kind === 'published') form.clear()
+        },
+      },
+    )
   }
 
   function next(event: FormEvent) {
@@ -182,6 +194,13 @@ export function PublishAdoption({
         steps={3}
         onBack={() => (step === 1 ? onExit() : setStep((step - 1) as AdoptionStep))}
       />
+      {form.restored ? (
+        <Notice tone="info" title={t('publish.draft.restored_title')}>
+          <Button variant="link" className="ml-1" onClick={form.discard}>
+            {t('publish.draft.start_over')}
+          </Button>
+        </Notice>
+      ) : null}
 
       {step === 1 ? (
         <>

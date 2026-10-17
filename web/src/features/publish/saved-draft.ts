@@ -49,3 +49,21 @@ export function useSavedDraft<T>(key: string, initial: T) {
     },
   }
 }
+
+type Setter<T> = (next: T | ((current: T) => T)) => void
+
+/** A stepped publish form kept on the device: its step and its draft, with `useSavedDraft`'s extras. */
+export function useSavedForm<S extends number, D>(key: string, initialDraft: D) {
+  const saved = useSavedDraft<{ step: S; draft: D }>(key, { step: 1 as S, draft: initialDraft })
+  const setStep: Setter<S> = (next) =>
+    saved.setValue((kept) => ({
+      ...kept,
+      step: typeof next === 'function' ? (next as (current: S) => S)(kept.step) : next,
+    }))
+  const setDraft: Setter<D> = (next) =>
+    saved.setValue((kept) => ({
+      ...kept,
+      draft: typeof next === 'function' ? (next as (current: D) => D)(kept.draft) : next,
+    }))
+  return { ...saved, step: saved.value.step, draft: saved.value.draft, setStep, setDraft }
+}
