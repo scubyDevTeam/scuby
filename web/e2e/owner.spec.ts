@@ -125,3 +125,31 @@ test(
     })
   },
 )
+
+test(
+  'the publisher edits an adoption listing, a help request and a found notice',
+  tags('@owner', '@OWNER-006'),
+  async ({ myCases, casePage }) => {
+    await myCases.openAsDemoOwner()
+
+    await test.step('the adoption listing’s story changes on its page', async () => {
+      await myCases.openCase('Misha')
+      await casePage.editNoticeField('Historia', 'Es juguetona y busca casa con otro gato.')
+      await expect(casePage.text('Es juguetona y busca casa con otro gato.')).toBeVisible()
+    })
+
+    await test.step('the help request’s story changes on its page', async () => {
+      await myCases.open()
+      await myCases.openCase('Nala')
+      await casePage.editNoticeField('Historia', 'Ya tiene cita en la veterinaria.')
+      await expect(casePage.text('Ya tiene cita en la veterinaria.')).toBeVisible()
+    })
+
+    await test.step('the found notice’s signs change on its page', async () => {
+      await myCases.open()
+      await myCases.openCase('Perro café, mediano')
+      await casePage.editNoticeField(/Señas/, 'Collar verde nuevo')
+      await expect(casePage.text('Collar verde nuevo')).toBeVisible()
+    })
+  },
+)

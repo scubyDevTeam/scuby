@@ -227,10 +227,16 @@ describe('«Lo vi» (04 · Validation)', () => {
     expect((await failure(sighting(fields()))).code).toBe(code)
   })
 
-  it('is rate-limited: one per reporter per case every 15 minutes', async () => {
-    await sighting()
+  it('is rate-limited: five per reporter per case a day', async () => {
+    for (let i = 0; i < 5; i++) await sighting()
     expect((await failure(sighting())).code).toBe('rate_limited')
-    later(16 * 60_000)
+    later(25 * HOUR)
+    await sighting()
+  })
+
+  it('«Lo vi otra vez» inside the earlier pin’s correction window is not «hace poco» (04)', async () => {
+    await sighting()
+    later(60_000)
     await sighting()
   })
 
@@ -243,8 +249,9 @@ describe('«Lo vi» (04 · Validation)', () => {
     const again = (await sighting({ client_id: 'c0ffee-replay-1' })) as { id: string }
     expect(again.id).toBe(first.id)
     expect(db.sightings).toHaveLength(before + 1)
-    // A different key is a different sighting, and the rate limit applies to it.
-    expect((await failure(sighting({ client_id: 'c0ffee-replay-2' }))).code).toBe('rate_limited')
+    // A different key is a different sighting.
+    const other = (await sighting({ client_id: 'c0ffee-replay-2' })) as { id: string }
+    expect(other.id).not.toBe(first.id)
   })
 
   it('cannot be added to a closed case', async () => {
@@ -1710,5 +1717,60 @@ describe('editing a published lost case (04)', () => {
     expect(
       (await failure(edit({ last_seen_at: new Date(Date.now() + DAY).toISOString() }))).code,
     ).toBe('validation_failed')
+  })
+})
+
+describe('editing a found, adoption or help case (00 · #27)', () => {
+  const edit = (code: string, body: Record<string, unknown>) =>
+    call(api.editCase, { params: { code }, body }, asIs)
+  const photo = ['data:image/png;base64,AAAA']
+
+  it('the adoption lister corrects photos, story, temperament and requirements', async () => {
+    await asCarolina()
+    await edit('M1SHI', {
+      photo_urls: photo,
+      story: 'Nueva historia',
+      temperament: ['puppy'],
+      requirements: 'Patio',
+    })
+    expect(db.cases.M1SHI).toMatchObject({
+      story: 'Nueva historia',
+      temperament: ['puppy'],
+      requirements: 'Patio',
+    })
+    expect(db.pets.find((p) => p.id === db.cases.M1SHI!.pet_id)?.photo_urls).toEqual(photo)
+  })
+
+  it('the found custodian corrects photos and signs; a story is not theirs to edit', async () => {
+    await asCarolina()
+    await edit('C4STD', { marks: 'Collar verde', photo_urls: photo })
+    expect(db.pets.find((p) => p.id === db.cases.C4STD!.pet_id)?.marks).toBe('Collar verde')
+    expect((await failure(edit('C4STD', { story: 'x' }))).code).toBe('validation_failed')
+  })
+
+  it('the help beneficiary corrects the story; temperament is for adoption only', async () => {
+    await asCarolina()
+    await edit('NA7LA', { story: 'Ya tiene visita al veterinario.' })
+    expect(db.cases.NA7LA).toMatchObject({ story: 'Ya tiene visita al veterinario.' })
+    expect((await failure(edit('NA7LA', { temperament: ['puppy'] }))).code).toBe(
+      'validation_failed',
+    )
+  })
+
+  it('tells no one: no notification, no new rows', async () => {
+    await asCarolina()
+    const sent = db.notifications.length
+    await edit('M1SHI', { story: 'Otra' })
+    expect(db.notifications).toHaveLength(sent)
+  })
+
+  it('only the publisher, only while active, and not a lost case', async () => {
+    expect((await failure(edit('M1SHI', { story: 'x' }))).code).toBe('unauthorized')
+    await asCarolina()
+    expect((await failure(edit('AD9PT', { story: 'x' }))).code).toBe('forbidden')
+    expect((await failure(edit('7K3PQ', { story: 'x' }))).code).toBe('not_found')
+    expect((await failure(edit('NOPE1', { story: 'x' }))).code).toBe('not_found')
+    db.cases.M1SHI!.status = 'withdrawn' as never
+    expect((await failure(edit('M1SHI', { story: 'x' }))).code).toBe('invalid_transition')
   })
 })

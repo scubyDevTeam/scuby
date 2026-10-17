@@ -307,6 +307,17 @@ export class CasePage {
     })
   }
 
+  /** «Editar aviso» on a found, adoption or help notice: one text field of its form, then save. */
+  editNoticeField(label: string | RegExp, value: string) {
+    return step(`Edit the notice: ${label} → «${value}»`, async () => {
+      await this.page.getByRole('button', { name: 'Editar aviso' }).click()
+      await this.page.getByLabel(label).fill(value)
+      await this.page.getByRole('button', { name: 'Guardar cambios' }).click()
+      await expect(this.page.getByText('Listo, guardamos los cambios.')).toBeVisible()
+      await this.page.getByRole('button', { name: 'Listo' }).click()
+    })
+  }
+
   /** «Editar aviso»: corrects the signs and saves; the neighbours are not told again. */
   editNotice(marks: string) {
     return step(`Edit the notice: signs «${marks}»`, async () => {

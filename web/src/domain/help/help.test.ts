@@ -94,7 +94,7 @@ describe('07 · progress — confirmed first, pledged second, never one self-rep
 describe('07 · Identity ladder — who can do what', () => {
   it('a visitor can offer help; the beneficiary closes, and never offers to themselves', () => {
     expect(availableActions(active, 'public', now)).toEqual(['pledge', 'share', 'report_content'])
-    expect(availableActions(active, 'beneficiary', now)).toEqual(['close_request', 'share'])
+    expect(availableActions(active, 'beneficiary', now)).toEqual(['close_request', 'edit', 'share'])
   })
 
   it('a closed or removed request shows a banner and no actions', () => {
