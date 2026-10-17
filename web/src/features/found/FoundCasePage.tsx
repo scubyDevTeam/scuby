@@ -12,7 +12,7 @@ import { WhatsAppIcon } from '@ui/BrandIcons'
 import { Button, buttonClass } from '@ui/Button'
 import { CaseMap } from '@ui/Map/CaseMap'
 import { Notice } from '@ui/Notice'
-import { Archive, Clock, Flag, Home, Share2 } from 'lucide-react'
+import { Archive, Clock, Flag, Home, MessageSquare, Share2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { closedBand, describeFound, holdingLabel } from './copy'
 
@@ -93,6 +93,14 @@ export function FoundCasePage({
                   {t('contact.write_on_whatsapp')}
                 </a>
               ) : null}
+              <Button
+                variant="outline"
+                className="lg:w-auto"
+                onClick={() => onAction('contact_custodian')}
+              >
+                <MessageSquare aria-hidden="true" className="size-5" />
+                {t('found.page.write_chat')}
+              </Button>
             </section>
           ) : null}
 

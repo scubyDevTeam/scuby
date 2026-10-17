@@ -8,7 +8,7 @@ export type * from './tables'
 // Kept for the life of the tab, so a reload does not wipe what was published — a real backend
 // would not forget either. A new tab starts from the fixtures again.
 const KEY = 'mock-db'
-const VERSION = 4
+const VERSION = 5
 
 function load(): Tables {
   const stored = read<{ version: number; tables: Tables }>('session', KEY)

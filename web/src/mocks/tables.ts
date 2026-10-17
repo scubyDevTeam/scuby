@@ -232,6 +232,37 @@ export type NotificationRow = {
   read_at: string | null
 }
 
+/**
+ * One conversation per case and pair of people (docs/eng/comms.md · Twilio Conversations). It is
+ * closed — read-only, final — when its case is no longer active: the emulation derives it, where the
+ * real backend sets `state=closed` on the resolution.
+ */
+export type ConversationRow = {
+  id: string
+  case_code: string
+  /** The one who wrote first, and the one who answers for the case. */
+  started_by: string
+  other_id: string
+  /** Why they wrote, as the list shows it: «reclamo «Es mío»», «interesada en adoptar». */
+  topic: string
+  created_at: string
+  /** When each participant last opened the thread; what came after is unread to them. */
+  read_at: Record<string, string>
+}
+
+export type MessageRow = {
+  id: string
+  conversation_id: string
+  /** Null: the server wrote it (the claim's evidence, the interest's introduction). */
+  sender_id: string | null
+  kind: 'text' | 'automatic' | 'whatsapp'
+  label: string | null
+  body: string
+  photo_urls: string[]
+  phone: string | null
+  created_at: string
+}
+
 export type PushRow = {
   id: string
   person_id: string
@@ -263,6 +294,8 @@ export type Tables = {
   helpPledges: HelpPledgeRow[]
   checkins: CheckinRow[]
   notifications: NotificationRow[]
+  conversations: ConversationRow[]
+  messages: MessageRow[]
   pushSubscriptions: PushRow[]
   reports: ReportRow[]
   nextId: number

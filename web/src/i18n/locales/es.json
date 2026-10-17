@@ -692,7 +692,8 @@
       "possible_owner_body": "Alguien dice que es suyo y quien lo cuida lo está verificando.",
       "where_title": "Dónde se encontró",
       "area_label": "Zona donde se encontró (aproximada)",
-      "see_listing": "Ver su publicación de adopción"
+      "see_listing": "Ver su publicación de adopción",
+      "write_chat": "Escribirle por chat"
     },
     "custodian": {
       "offer_label": "Quince días sin dueño",
@@ -1469,6 +1470,64 @@
     "message": {
       "lost": "🔎 {label}: {title} — {place}. {traits}. Se perdió el {date}. Información al día y contacto: {link}",
       "found": "🐾 {label}: {title} — {place}. {traits}. Se encontró el {date}. ¿Sabes de quién es? Información al día y contacto: {link}"
+    }
+  },
+  "chat": {
+    "title": "Mensajes",
+    "tab_notices": "Avisos",
+    "tab_messages": "Mensajes",
+    "tabs_label": "Bandeja",
+    "list_label": "Conversaciones",
+    "loading": "Cargando tus mensajes",
+    "load_failed": "No pudimos cargar tus mensajes",
+    "offline": "Sin conexión. Mostramos lo último que cargó.",
+    "empty_title": "Aún no tienes mensajes",
+    "empty_hint": "Cuando alguien te escriba por un aviso, lo verás aquí. Tu número queda oculto.",
+    "closed_tag": "Cerrado",
+    "thread": {
+      "hidden_number": "Chat de {brand} · su número queda oculto",
+      "back": "Volver a mensajes",
+      "see_case": "Ver caso",
+      "loading": "Cargando la conversación",
+      "load_failed": "No pudimos abrir la conversación",
+      "not_found": "Esta conversación no existe o no es tuya.",
+      "messages_label": "Mensajes",
+      "you_sent": "Tú",
+      "composer_label": "Escribe un mensaje",
+      "composer_placeholder": "Escribe un mensaje",
+      "send": "Enviar",
+      "send_failed": "No se envió. Revisa tu conexión e inténtalo de nuevo.",
+      "too_long": "Un mensaje puede tener hasta {max} caracteres.",
+      "give_whatsapp": "Dar mi WhatsApp",
+      "give_whatsapp_hint": "Tu número se ve en este chat, solo para esta persona.",
+      "whatsapp_needs_phone": "Para dar tu WhatsApp primero verifica tu número al publicar un aviso.",
+      "gave_whatsapp": "{name} te dio su WhatsApp",
+      "you_gave_whatsapp": "Diste tu WhatsApp",
+      "open_whatsapp": "Abrir WhatsApp",
+      "closed_footer": "Este caso terminó; la conversación queda solo para leer.",
+      "closed_card": "{note} · {date}"
+    },
+    "start": {
+      "title": "Escríbele por chat",
+      "intro": "{name} verá tu mensaje en {brand}. Tu número no se comparte.",
+      "label": "Tu mensaje",
+      "placeholder": "Hola, creo que…",
+      "send": "Enviar mensaje",
+      "sent_title": "Mensaje enviado",
+      "sent_body": "{name} te responderá aquí, en tus mensajes.",
+      "see_thread": "Ver la conversación",
+      "errors": {
+        "empty": "Escribe algo para enviarlo.",
+        "too_long": "Un mensaje puede tener hasta {max} caracteres.",
+        "own": "Este aviso es tuyo.",
+        "ended": "Este caso ya terminó.",
+        "generic": "No pudimos enviarlo. Inténtalo de nuevo."
+      },
+      "signin_intro": "Para escribirle por chat necesitas entrar. Toma un minuto."
+    },
+    "unread": {
+      "one": "1 mensaje sin leer",
+      "other": "{count} mensajes sin leer"
     }
   }
 }

@@ -3,6 +3,7 @@
 // VITE_API_MOCK=false and VITE_API_URL — nothing else in the app changes (docs/eng/api.md).
 import { adoption } from './api/adoption'
 import { auth } from './api/auth'
+import { conversations } from './api/conversations'
 import { found } from './api/found'
 import { help } from './api/help'
 import { helpers } from './api/helpers'
@@ -21,4 +22,5 @@ export const handlers = [
   ...adoption,
   ...help,
   ...links,
+  ...conversations,
 ]

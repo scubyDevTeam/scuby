@@ -38,6 +38,11 @@ const PosterSheet = lazy(
     import('@features/poster/PosterSheet').then((m) => ({ default: m.PosterSheet })),
   ),
 )
+const StartChat = lazy(
+  withMessages(['chat'], () =>
+    import('@features/chat/StartChat').then((m) => ({ default: m.StartChat })),
+  ),
+)
 const SignIn = lazy(
   withMessages(['auth'], () =>
     import('@features/auth/SignIn').then((m) => ({ default: m.SignIn })),
@@ -56,6 +61,7 @@ type Open =
   | 'cancelled'
   | 'reopen'
   | 'share'
+  | 'chat'
   | null
 
 const sheetFor: Partial<Record<FoundAction, NonNullable<Open>>> = {
@@ -67,6 +73,7 @@ const sheetFor: Partial<Record<FoundAction, NonNullable<Open>>> = {
   cancel: 'cancelled',
   reopen: 'reopen',
   share: 'share',
+  contact_custodian: 'chat',
 }
 
 const titles: Record<NonNullable<Open>, TextKey> = {
@@ -78,6 +85,7 @@ const titles: Record<NonNullable<Open>, TextKey> = {
   cancelled: 'case.cancel_title',
   reopen: 'case.reopen_title',
   share: 'case.share_title',
+  chat: 'chat.start.title',
 }
 
 export function FoundCaseScreen({ found }: { found: FoundCase }) {
@@ -151,6 +159,31 @@ export function FoundCaseScreen({ found }: { found: FoundCase }) {
             // «Es mío» is never anonymous: it asks to take an animal. The account is born here.
             session.data ? (
               <OwnershipClaimForm code={found.code} onDone={close} />
+            ) : (
+              <SignIn
+                googleClientId={env.googleClientId}
+                demoCode={env.apiMock ? DEMO_CODE : undefined}
+                legal={<LegalLine />}
+              />
+            )
+          ) : null}
+          {sheet === 'chat' ? (
+            // Writing by chat is between two accounts: the account is born here, as for «Es mío».
+            session.data ? (
+              <StartChat
+                code={found.code}
+                name={found.contact?.displayName ?? ''}
+                threadLink={(id, children, className) => (
+                  <Link
+                    to="/{-$locale}/mensajes/$conversation"
+                    params={{ conversation: id }}
+                    className={className}
+                  >
+                    {children}
+                  </Link>
+                )}
+                onDone={close}
+              />
             ) : (
               <SignIn
                 googleClientId={env.googleClientId}
