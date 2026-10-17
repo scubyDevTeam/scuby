@@ -54,6 +54,12 @@ describe('FoundCasePage — seen by anyone', () => {
     expect(screen.queryByRole('button', { name: 'Me lo quedo' })).toBeNull()
   })
 
+  it('offers a chat with whoever keeps it, next to WhatsApp', () => {
+    const { onAction } = show(foundCase('F8UND'))
+    fireEvent.click(screen.getByRole('button', { name: 'Escribirle por chat' }))
+    expect(onAction).toHaveBeenCalledWith('contact_custodian')
+  })
+
   it('never shows the withheld detail or who is claiming', () => {
     show(foundCase('C4STD', { viewer: 'public' }))
     expect(screen.queryByText(/Collar verde con una campana/)).toBeNull()
@@ -74,6 +80,11 @@ describe('FoundCasePage — seen by anyone', () => {
 
 describe('FoundCasePage — the custodian (05)', () => {
   const mine = () => foundCase('C4STD', { viewer: 'custodian' })
+
+  it('has no chat with oneself', () => {
+    show(foundCase('C4STD', { viewer: 'custodian' }))
+    expect(screen.queryByRole('button', { name: 'Escribirle por chat' })).toBeNull()
+  })
 
   it('has the endings of custody', () => {
     const { onAction } = show(mine())

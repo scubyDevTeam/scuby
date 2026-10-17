@@ -8,10 +8,12 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 
 type Props = {
   caseLink: (code: string, children: ReactNode, className: string) => ReactNode
+  /** The «Avisos · Mensajes» switch, when the account has messages (`InboxTabs`). */
+  tabs?: ReactNode
 }
 
 /** The in-app inbox: a copy of every notification sent to this account (docs/product/08), newest first. */
-export function Inbox({ caseLink }: Props) {
+export function Inbox({ caseLink, tabs }: Props) {
   const { t } = useI18n()
   const notifications = useNotifications()
   const { mutate: markRead } = useReadNotifications()
@@ -34,6 +36,7 @@ export function Inbox({ caseLink }: Props) {
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-5 py-8 lg:max-w-3xl">
       <h1 className="m-0 text-3xl font-extrabold">{t('inbox.title')}</h1>
+      {tabs}
       {notifications.isPending ? (
         <div className="flex flex-col gap-3" role="status" aria-label={t('inbox.loading')}>
           <Skeleton className="h-16" />

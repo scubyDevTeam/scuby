@@ -692,7 +692,8 @@
       "possible_owner_body": "Someone says it's theirs and whoever is looking after it is checking.",
       "where_title": "Where it was found",
       "area_label": "Area where it was found (approximate)",
-      "see_listing": "See their adoption listing"
+      "see_listing": "See their adoption listing",
+      "write_chat": "Message them"
     },
     "custodian": {
       "offer_label": "Fifteen days without an owner",
@@ -1469,6 +1470,64 @@
     "message": {
       "lost": "🔎 {label}: {title} — {place}. {traits}. Lost on {date}. Up-to-date information and contact: {link}",
       "found": "🐾 {label}: {title} — {place}. {traits}. Found on {date}. Do you know whose it is? Up-to-date information and contact: {link}"
+    }
+  },
+  "chat": {
+    "title": "Messages",
+    "tab_notices": "Alerts",
+    "tab_messages": "Messages",
+    "tabs_label": "Inbox",
+    "list_label": "Conversations",
+    "loading": "Loading your messages",
+    "load_failed": "We couldn’t load your messages",
+    "offline": "No connection. Showing what was last loaded.",
+    "empty_title": "No messages yet",
+    "empty_hint": "When someone writes to you about a notice, you’ll see it here. Your number stays hidden.",
+    "closed_tag": "Closed",
+    "thread": {
+      "hidden_number": "{brand} chat · their number stays hidden",
+      "back": "Back to messages",
+      "see_case": "View case",
+      "loading": "Loading the conversation",
+      "load_failed": "We couldn’t open the conversation",
+      "not_found": "This conversation doesn’t exist or isn’t yours.",
+      "messages_label": "Messages",
+      "you_sent": "You",
+      "composer_label": "Write a message",
+      "composer_placeholder": "Write a message",
+      "send": "Send",
+      "send_failed": "It wasn’t sent. Check your connection and try again.",
+      "too_long": "A message can be up to {max} characters.",
+      "give_whatsapp": "Share my WhatsApp",
+      "give_whatsapp_hint": "Your number shows in this chat, only to this person.",
+      "whatsapp_needs_phone": "To share your WhatsApp, first verify your number when you publish a notice.",
+      "gave_whatsapp": "{name} shared their WhatsApp",
+      "you_gave_whatsapp": "You shared your WhatsApp",
+      "open_whatsapp": "Open WhatsApp",
+      "closed_footer": "This case has ended; the conversation is now read-only.",
+      "closed_card": "{note} · {date}"
+    },
+    "start": {
+      "title": "Message them",
+      "intro": "{name} will see your message in {brand}. Your number isn’t shared.",
+      "label": "Your message",
+      "placeholder": "Hi, I think…",
+      "send": "Send message",
+      "sent_title": "Message sent",
+      "sent_body": "{name} will answer you here, in your messages.",
+      "see_thread": "View the conversation",
+      "errors": {
+        "empty": "Write something to send it.",
+        "too_long": "A message can be up to {max} characters.",
+        "own": "This notice is yours.",
+        "ended": "This case has ended.",
+        "generic": "We couldn’t send it. Try again."
+      },
+      "signin_intro": "To message them you need to sign in. It takes a minute."
+    },
+    "unread": {
+      "one": "1 unread message",
+      "other": "{count} unread messages"
     }
   }
 }

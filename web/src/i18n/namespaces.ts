@@ -20,6 +20,8 @@ export const DEFERRED_NAMESPACES = [
   // The found page's words with its screen too; reporting a find and the witness page wait for
   // their own routes.
   'found',
+  // The «Mensajes» tab, a thread and the first message from a case: only with their screens.
+  'chat',
   // The same for a help request: its page's words with its screen, offering help and the
   // beneficiary's side with those forms.
   'help',

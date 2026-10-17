@@ -7,6 +7,7 @@ import { ApiError, call } from '../api-client/http'
 import { parseInterest } from '../contracts/adoption'
 import { api } from '../contracts/api'
 import { parseCase } from '../contracts/case'
+import { parseConversation, parseConversations, parseStarted } from '../contracts/conversations'
 import { parseFeed } from '../contracts/feed'
 import { parsePledge } from '../contracts/help'
 import { parseCheckinLink } from '../contracts/links'
@@ -1402,5 +1403,118 @@ describe('the email’s one-tap links (comms.md · Actionable check-ins, The sca
     // Luna's next «¿sigue perdida?» falls due tomorrow: no email, so no link.
     expect((await failure(openLink(linkToken('ck-luna-1', 'still_lost')))).code).toBe('not_found')
     expect((await failure(confirmLink('not-a-token'))).code).toBe('not_found')
+  })
+})
+
+describe('the in-app chat (comms.md · Twilio Conversations)', () => {
+  const list = () => call(api.listConversations, {}, parseConversations)
+  const open = (id: string) => call(api.getConversation, { params: { id } }, parseConversation)
+
+  it('lists the account’s threads: unread first-hand, the closed one last, never a number', async () => {
+    await asCarolina()
+    const { items, unreadCount } = await list()
+    expect(items.map((i) => i.id)).toEqual([
+      'conv-andres-misha',
+      'conv-andres-dog',
+      'conv-marcela-canela',
+    ])
+    expect(unreadCount).toBe(2)
+    expect(items.at(-1)).toMatchObject({ closed: true, otherName: 'Marcela T.' })
+    expect(JSON.stringify(items)).not.toMatch(/\+57/)
+  })
+
+  it('opening a thread shows its messages oldest first and the case card; reading clears the count', async () => {
+    await asCarolina()
+    const thread = await open('conv-andres-dog')
+    expect(thread.case).toMatchObject({ code: 'C4STD', vertical: 'found' })
+    expect(thread.messages.map((m) => m.kind)).toEqual(['automatic', 'text'])
+    expect(thread.messages[0]?.label).toBe('Mensaje automático · evidencia de «Es mío»')
+    await call(api.readConversation, { params: { id: 'conv-andres-dog' } }, asIs)
+    expect((await list()).unreadCount).toBe(1)
+  })
+
+  it('only the two people in it can open or write', async () => {
+    await asCarolina()
+    db.conversations[0]!.other_id = 'user-sofia'
+    expect((await failure(open('conv-andres-dog'))).code).toBe('forbidden')
+    expect((await failure(open('conv-nope'))).code).toBe('not_found')
+  })
+
+  it('sends a message, and reading it makes the thread read for the sender', async () => {
+    await asCarolina()
+    const sent = await call(
+      api.sendMessage,
+      { params: { id: 'conv-andres-dog' }, body: { body: '  Hola Andrés  ' } },
+      (raw) => raw as { mine: boolean; body: string },
+    )
+    expect(sent).toMatchObject({ mine: true, body: 'Hola Andrés' })
+    expect((await open('conv-andres-dog')).messages.at(-1)?.body).toBe('Hola Andrés')
+  })
+
+  it('a closed conversation is read-only and final', async () => {
+    await asCarolina()
+    const closed = await open('conv-marcela-canela')
+    expect(closed.closed?.note).toBe('Pasó a adopción')
+    expect(closed.canShareWhatsapp).toBe(false)
+    expect(
+      (
+        await failure(
+          call(
+            api.sendMessage,
+            { params: { id: 'conv-marcela-canela' }, body: { body: 'Hola' } },
+            asIs,
+          ),
+        )
+      ).code,
+    ).toBe('invalid_transition')
+  })
+
+  it('«Dar mi WhatsApp» needs a verified number and is given once', async () => {
+    await asCarolina()
+    expect(
+      (await failure(call(api.shareWhatsapp, { params: { id: 'conv-andres-misha' } }, asIs))).code,
+    ).toBe('phone_required')
+    carolinaHasAPhone()
+    expect((await open('conv-andres-misha')).canShareWhatsapp).toBe(true)
+    await call(api.shareWhatsapp, { params: { id: 'conv-andres-misha' } }, asIs)
+    const after = await open('conv-andres-misha')
+    expect(after.canShareWhatsapp).toBe(false)
+    expect(after.messages.at(-1)).toMatchObject({ kind: 'whatsapp', mine: true })
+    expect(
+      (await failure(call(api.shareWhatsapp, { params: { id: 'conv-andres-misha' } }, asIs))).code,
+    ).toBe('invalid_transition')
+  })
+
+  it('writing from a case creates the thread with its first message, and a second answers the same one', async () => {
+    await asCarolina()
+    const first = await call(
+      api.startConversation,
+      { params: { code: 'F8UND' }, body: { body: 'Creo que es mi gato' } },
+      parseStarted,
+    )
+    const again = await call(
+      api.startConversation,
+      { params: { code: 'F8UND' }, body: { body: 'Sigo aquí' } },
+      parseStarted,
+    )
+    expect(again.id).toBe(first.id)
+    expect((await open(first.id)).messages.map((m) => m.body)).toEqual([
+      'Creo que es mi gato',
+      'Sigo aquí',
+    ])
+  })
+
+  it('never on your own case, nor on one that ended', async () => {
+    await asCarolina()
+    const body = { body: 'Hola' }
+    expect(
+      (await failure(call(api.startConversation, { params: { code: 'C4STD' }, body }, asIs))).code,
+    ).toBe('forbidden')
+    expect(
+      (await failure(call(api.startConversation, { params: { code: 'R3SCU' }, body }, asIs))).code,
+    ).toBe('invalid_transition')
+    expect(
+      (await failure(call(api.startConversation, { params: { code: 'NOPE1' }, body }, asIs))).code,
+    ).toBe('not_found')
   })
 })
