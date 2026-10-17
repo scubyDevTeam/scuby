@@ -5249,6 +5249,13 @@
                         "story": {
                           "type": "string"
                         },
+                        "photo_urls": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "location": {
                           "type": "object",
                           "properties": {
@@ -5554,6 +5561,7 @@
                         "viewer",
                         "pet",
                         "story",
+                        "photo_urls",
                         "location",
                         "trust_tier",
                         "beneficiary_name",
@@ -6861,6 +6869,15 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "photo_urls": {
+                    "default": [],
+                    "maxItems": 3,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
                   "location_point": {
                     "type": "object",
