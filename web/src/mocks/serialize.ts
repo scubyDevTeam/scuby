@@ -303,6 +303,7 @@ function helpView(t: Tables, row: HelpRow, viewerId: string | null): CaseWire {
       photo_urls: pet.photo_urls,
     },
     story: row.story,
+    photo_urls: row.photo_urls ?? [],
     location: {
       center: row.location.center,
       radius_m: row.location.radius_m,

@@ -21,6 +21,7 @@ test(
     await test.step('where, what happened, the phone step — and it is live, unverified', async () => {
       await publish.map.mark()
       await publish.tellNeighbours('Luna se lastimó una pata y no tengo carro para llevarla.')
+      await publish.photos.add('nota-veterinario.png')
       await publish.phone.publishVerifying('300 715 2284', undefined, 'Publicar solicitud')
       await expect(help.text('¡Solicitud publicada!')).toBeVisible()
       await help.page.getByRole('link', { name: 'Ver mi solicitud' }).click()

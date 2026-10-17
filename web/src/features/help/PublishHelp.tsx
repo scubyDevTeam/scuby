@@ -19,6 +19,7 @@ import { toE164 } from '@domain/shared/phone'
 import { cleanCode, isCompleteCode } from '@domain/shared/signin'
 import { describeFound } from '@features/found/copy'
 import { draftErrorKey } from '@features/publish/copy'
+import { PhotoPicker } from '@features/publish/PhotoPicker'
 import {
   AnimalFields,
   AreaFields,
@@ -144,6 +145,7 @@ export function PublishHelp({
         neededBy: need.neededBy || null,
       })),
       story: draft.story.trim(),
+      photoUrls: draft.evidenceUrls,
       center,
       radiusM: draft.radiusM,
       phone: verifiedPhone ? null : phoneRules ? toE164(draft.phone, phoneRules) : null,
@@ -340,6 +342,13 @@ export function PublishHelp({
             value={draft.story}
             onChange={(event) => set({ story: event.target.value })}
           />
+          <Section title={t('help_forms.publish.evidence_title')}>
+            <p className="m-0 text-sm text-muted">{t('help_forms.publish.evidence_hint')}</p>
+            <PhotoPicker
+              urls={draft.evidenceUrls}
+              onChange={(evidenceUrls) => set({ evidenceUrls })}
+            />
+          </Section>
           <ContactFields
             user={user}
             draft={draft}

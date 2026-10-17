@@ -128,6 +128,7 @@ export const help = [
       contact_phone: phone,
       phone_has_whatsapp: body.phone_has_whatsapp,
       story: body.story,
+      photo_urls: body.photo_urls,
       location: {
         center: body.location_point,
         radius_m: body.location_radius_m,

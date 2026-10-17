@@ -109,7 +109,7 @@ Simplified on purpose — the real backend must do better:
 
 Not in the contract yet: purge after 30
 days.
-From help ([07](../product/07-help-workflow.md)): photos on a request beyond the pet's own, and operator review into
+From help ([07](../product/07-help-workflow.md)): operator review into
 `verified` (O9). From the profile ([auth.md](auth.md) · Profile): whether the phone is verified, and account-level contact prefs. From push ([frontend.md](frontend.md) · Push): the **push
 payload** the service worker reads — today `{ title, body, url, tag?, checkin?: { code, id,
 actions[] } }` in `web/src/service-worker/push.ts`, to be agreed and moved here — and what

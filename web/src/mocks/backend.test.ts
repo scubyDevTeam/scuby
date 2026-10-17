@@ -1242,6 +1242,26 @@ describe('help — publishing (07 · Publishing)', () => {
     ).toBe('not_found')
   })
 
+  it('carries its own evidence photos, shown after the pet’s (07 · photos[])', async () => {
+    await asCarolina()
+    carolinaHasAPhone()
+    const published = await call(
+      api.publishHelp,
+      { body: body({ photo_urls: ['data:image/png;base64,VET'] }) },
+      parsePublish,
+    )
+    if (published.kind !== 'published') throw new Error('expected it published')
+    const request = await caseOf(published.code)
+    expect(request.vertical === 'help' && request.photoUrls).toEqual(['data:image/png;base64,VET'])
+    expect(
+      (
+        await failure(
+          call(api.publishHelp, { body: body({ photo_urls: ['a', 'b', 'c', 'd'] }) }, asIs),
+        )
+      ).code,
+    ).toBe('validation_failed')
+  })
+
   it('only for a pet the beneficiary holds', async () => {
     await asCarolina()
     carolinaHasAPhone()

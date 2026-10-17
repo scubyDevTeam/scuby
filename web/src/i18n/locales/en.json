@@ -1049,7 +1049,9 @@
         "needed_by_past": "That date has passed",
         "story_required": "Tell them what happened"
       },
-      "for_found": "For the animal you found"
+      "for_found": "For the animal you found",
+      "evidence_title": "Photos for the request (optional)",
+      "evidence_hint": "For example the vet’s prescription or note. Never photos of people."
     }
   },
   "inbox": {

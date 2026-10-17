@@ -146,6 +146,8 @@ export type HelpRow = Published & {
   status: 'active' | 'closed' | 'expired' | 'removed'
   resolution: HelpResolution | null
   story: string
+  /** The request's own evidence (07 · `photos[]`). */
+  photo_urls?: string[]
   location: Area
   /** Nothing in the emulation reviews requests: every one is `unverified` (07 · Trust, O9). */
   trust_tier: 'unverified' | 'verified'

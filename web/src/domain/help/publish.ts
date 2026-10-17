@@ -32,6 +32,8 @@ export type HelpDraft = AnimalDraft &
     fromCaseCode: string | null
     needs: NeedDraft[]
     story: string
+    /** The request's own evidence (a vet note): optional, never of a person. */
+    evidenceUrls: string[]
     center: Point | null
     radiusM: number
   }
@@ -43,6 +45,7 @@ export const emptyHelpDraft: HelpDraft = {
   fromCaseCode: null,
   needs: [],
   story: '',
+  evidenceUrls: [],
   center: null,
   radiusM: DEFAULT_RADIUS_M,
 }
