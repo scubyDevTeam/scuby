@@ -320,6 +320,7 @@ stateDiagram-v2
     active --> expired: 2 consecutive check-ins unanswered
     active --> cancelled: owner deletes (false alarm, duplicate)
     expired --> active: owner reopens (1 tap, ≤30 days)
+    expired --> active: recovery_claim (≤30 days, decision #29)
     reunited --> [*]
     cancelled --> [*]
     expired --> [*]: purge after 30 days
