@@ -17,6 +17,8 @@ export { expect } from '@playwright/test'
 export { tags } from './tags.ts'
 
 type Pages = {
+  /** Every test ends with no sideways scroll: a phone screen never pans (frontend.md · layout). */
+  noHorizontalScroll: undefined
   adoption: AdoptionPage
   feed: FeedPage
   help: HelpPage
@@ -38,6 +40,18 @@ type Pages = {
  * on someone else's server.
  */
 export const test = base.extend<Pages>({
+  noHorizontalScroll: [
+    async ({ page }, use) => {
+      await use(undefined)
+      if (page.isClosed()) return
+      const overflow = await page
+        .evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+        .catch(() => 0)
+      if (overflow > 1)
+        throw new Error(`The page scrolls sideways by ${overflow}px at ${page.url()}`)
+    },
+    { auto: true },
+  ],
   context: async ({ context }, use) => {
     await context.route(/^https:\/\/wa\.me\//, (route) =>
       route.fulfill({ contentType: 'text/html', body: '<title>WhatsApp</title>' }),

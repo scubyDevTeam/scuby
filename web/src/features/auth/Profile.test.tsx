@@ -38,7 +38,8 @@ describe('Profile', () => {
   it('asks for a phone only when there is none yet', async () => {
     stubApi({ 'GET /me/profile': { body: { ...caro, phone: null } } })
     renderWithQuery(<Profile />)
-    expect(await screen.findByText(/Te pediremos un celular/)).toBeTruthy()
+    expect(await screen.findByText(/Aún no tienes un celular verificado/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Agregar celular' })).toBeTruthy()
   })
 
   it('saves only what changed', async () => {
@@ -169,5 +170,84 @@ describe('Profile — «Eliminar mi cuenta» (O15)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sí, eliminar mi cuenta' }))
     expect(await screen.findByText(/No pudimos eliminar tu cuenta/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Sí, eliminar mi cuenta' })).toBeTruthy()
+  })
+})
+
+describe('Profile — changing the phone outside a publish (auth.md · Phone)', () => {
+  const verified = { ...caro, phone: '+573009998877' }
+  const open = async (routes: Parameters<typeof stubApi>[0] = {}) => {
+    const calls = stubApi({
+      'GET /me/profile': { body: caro },
+      'POST /me/phone': { status: 204 },
+      'POST /me/phone/verify': { body: verified },
+      ...routes,
+    })
+    renderWithQuery(<Profile demoCode="123456" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Cambiar' }))
+    // The country's prefix arrives with the config: the number is read against it.
+    await screen.findByText('+57')
+    return calls
+  }
+
+  it('sends the code to the new number, and the six digits verify it', async () => {
+    const calls = await open()
+    type(/Tu nuevo celular/, '300 999 8877')
+    fireEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
+    expect(await screen.findByText(/Te lo enviamos por SMS al \+573009998877/)).toBeTruthy()
+    expect(calls.find((c) => c.key === 'POST /me/phone')?.body).toEqual({ phone: '+573009998877' })
+
+    type(/Código de 6 dígitos/, '123456')
+    expect(await screen.findByText('Listo, tu celular quedó verificado.')).toBeTruthy()
+    expect(calls.find((c) => c.key === 'POST /me/phone/verify')?.body).toEqual({
+      phone: '+573009998877',
+      code: '123456',
+    })
+  })
+
+  it('refuses a number that is not a mobile, before sending anything', async () => {
+    const calls = await open()
+    type(/Tu nuevo celular/, '123')
+    fireEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
+    expect(screen.getByText('Escribe un celular válido.')).toBeTruthy()
+    expect(calls.some((c) => c.key === 'POST /me/phone')).toBe(false)
+  })
+
+  it('says when the code is wrong', async () => {
+    await open({ 'POST /me/phone/verify': { status: 422 } })
+    type(/Tu nuevo celular/, '300 999 8877')
+    fireEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
+    type(
+      await screen.findByLabelText(/Código de 6 dígitos/).then(() => /Código de 6 dígitos/),
+      '000000',
+    )
+    expect(await screen.findByText(/Ese código no es correcto/)).toBeTruthy()
+  })
+
+  it('«Cancelar» goes back to the number as it was', async () => {
+    await open()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByText('+573001234567')).toBeTruthy()
+  })
+})
+
+describe('Profile — the photo', () => {
+  it('shows the initials without a photo, and the photo once there is one', async () => {
+    stubApi({ 'GET /me/profile': { body: caro } })
+    renderWithQuery(<Profile />)
+    expect(await screen.findByText('CM')).toBeTruthy()
+    expect(screen.getByText('Agregar foto')).toBeTruthy()
+  })
+
+  it('a photo replaces the initials and can be removed', async () => {
+    const calls = stubApi({
+      'GET /me/profile': { body: { ...caro, photo_url: 'data:image/png;base64,AAAA' } },
+      'PATCH /me/profile': { body: caro },
+    })
+    renderWithQuery(<Profile />)
+    expect(await screen.findByRole('img', { name: 'Tu foto de perfil' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar foto' }))
+    await waitFor(() =>
+      expect(calls.find((c) => c.key === 'PATCH /me/profile')?.body).toEqual({ photo_url: null }),
+    )
   })
 })
