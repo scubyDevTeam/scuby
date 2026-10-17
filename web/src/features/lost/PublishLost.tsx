@@ -21,13 +21,14 @@ import {
   StepHeader,
   useWhen,
 } from '@features/publish/parts'
+import { draftKey, useSavedDraft } from '@features/publish/saved-draft'
 import { useI18n } from '@i18n/react'
 import type { TextKey } from '@i18n/translate'
 import { Button } from '@ui/Button'
 import { Chips } from '@ui/Choice'
 import { TextField } from '@ui/Field'
 import { Notice } from '@ui/Notice'
-import { type FormEvent, type ReactNode, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react'
 
 const titles: Record<Step, TextKey> = {
   1: 'lost_forms.publish.step_1',
@@ -58,9 +59,29 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
   const country = useConfig().data?.countries[0]
   const pets = useMyPets().data ?? []
   const publish = usePublishLost()
-  const when = useWhen()
-  const [step, setStep] = useState<Step>(1)
-  const [draft, setDraft] = useState<LostDraft>(emptyDraft)
+  // What was typed survives a reload; the time and the step come back with it.
+  const saved = useSavedDraft<{ step: Step; draft: LostDraft; seenAt: string | null }>(
+    draftKey('lost', user.id),
+    { step: 1, draft: emptyDraft, seenAt: null },
+  )
+  const step = saved.value.step
+  const draft = saved.value.draft
+  const setStep = (next: Step | ((current: Step) => Step)) =>
+    saved.setValue((kept) => ({
+      ...kept,
+      step: typeof next === 'function' ? next(kept.step) : next,
+    }))
+  const setDraft = (next: LostDraft | ((current: LostDraft) => LostDraft)) =>
+    saved.setValue((kept) => ({
+      ...kept,
+      draft: typeof next === 'function' ? next(kept.draft) : next,
+    }))
+  const [keptSeenAt] = useState(() => saved.value.seenAt)
+  const when = useWhen(keptSeenAt ? new Date(keptSeenAt) : undefined)
+  const seenAt = when.at?.toISOString() ?? null
+  useEffect(() => {
+    saved.setValue((kept) => (kept.seenAt === seenAt ? kept : { ...kept, seenAt }))
+  }, [seenAt, saved.setValue])
   const [changingPhone, setChangingPhone] = useState(false)
   const [otp, setOtp] = useState('')
   const [tried, setTried] = useState<Step | 0>(0)
@@ -83,23 +104,31 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
   function send(otpCode: string | null) {
     const { species, size, center, lastSeenAt } = current
     if (!species || !size || !center || !lastSeenAt) return
-    publish.mutate({
-      petId: current.petId,
-      name: current.name.trim(),
-      species,
-      size,
-      colors: current.colors,
-      marks: current.marks.trim() || null,
-      chipNumber: current.chipNumber.trim() || null,
-      photoUrls: current.photoUrls,
-      center,
-      radiusM: current.radiusM,
-      lastSeenAt,
-      phone: verifiedPhone ? null : phoneRules ? toE164(current.phone, phoneRules) : null,
-      hasWhatsapp: current.hasWhatsapp,
-      contact: current.contact,
-      otpCode,
-    })
+    publish.mutate(
+      {
+        petId: current.petId,
+        name: current.name.trim(),
+        species,
+        size,
+        colors: current.colors,
+        marks: current.marks.trim() || null,
+        chipNumber: current.chipNumber.trim() || null,
+        photoUrls: current.photoUrls,
+        center,
+        radiusM: current.radiusM,
+        lastSeenAt,
+        phone: verifiedPhone ? null : phoneRules ? toE164(current.phone, phoneRules) : null,
+        hasWhatsapp: current.hasWhatsapp,
+        contact: current.contact,
+        otpCode,
+      },
+      {
+        // Published: nothing left to keep on the device.
+        onSuccess: (result) => {
+          if (result.kind === 'published') saved.clear()
+        },
+      },
+    )
   }
 
   function next(event: FormEvent) {
@@ -152,6 +181,13 @@ export function PublishLost({ user, mapStyleUrl, demoCode, legal, onExit, caseLi
         steps={3}
         onBack={() => (step === 1 ? onExit() : setStep((step - 1) as Step))}
       />
+      {saved.restored ? (
+        <Notice tone="info" title={t('publish.draft.restored_title')}>
+          <Button variant="link" className="ml-1" onClick={saved.discard}>
+            {t('publish.draft.start_over')}
+          </Button>
+        </Notice>
+      ) : null}
 
       {step === 1 ? (
         <>

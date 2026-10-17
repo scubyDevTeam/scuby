@@ -276,9 +276,9 @@ function DeleteAccount() {
   const [asking, setAsking] = useState(false)
   return (
     <section className="flex flex-col gap-3 border-t border-line pt-6">
-      <h2 className="m-0 text-lg font-bold">{t('auth.profile.delete.title')}</h2>
       {asking ? (
         <>
+          <h2 className="m-0 text-lg font-bold">{t('auth.profile.delete.title')}</h2>
           <p className="m-0 text-muted">{t('auth.profile.delete.body')}</p>
           {remove.isError ? (
             <p role="alert" className="m-0 text-sm font-semibold text-lost-deep">

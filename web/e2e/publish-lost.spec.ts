@@ -60,3 +60,23 @@ test(
     })
   },
 )
+
+test(
+  'a half-written lost notice survives a reload, on the step it was on',
+  tags('@publish-lost', '@PLOST-003'),
+  async ({ publish }) => {
+    await publish.open()
+    await publish.chooseLost()
+    await publish.signIn.withEmailCode('ana.gomez@correo.co')
+    await publish.name('Kira')
+    await publish.describe({ species: 'Perro', size: 'Mediano', colour: 'Café' })
+    await publish.next()
+
+    await publish.reload()
+
+    await test.step('the form says so and is where it was', async () => {
+      await expect(publish.draftRestored).toBeVisible()
+      await expect(publish.stepTitle).toHaveText('¿Dónde y cuándo?')
+    })
+  },
+)
