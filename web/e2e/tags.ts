@@ -27,6 +27,7 @@ export const FLOWS = {
   '@email-links': 'MAIL',
   '@offline': 'OFFLINE',
   '@map': 'MAP',
+  '@chat': 'CHAT',
 } as const
 
 export type Flow = keyof typeof FLOWS
