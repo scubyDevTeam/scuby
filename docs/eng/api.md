@@ -107,7 +107,7 @@ Simplified on purpose — the real backend must do better:
 | Display text composed in Spanish, whatever `Accept-Language` says | Composed in the request's language |
 
 Not in the contract yet: the chat's automatic first message (the claim's evidence, the interest's introduction — the emulation only seeds them), the unread messages in the bottom bar's badge, found-case check-ins (the custodian's «¿sigues con él?»), purge after 30
-days, reporter editing a sighting within 15 minutes, and `«Lo tengo»` on an expired case (O3).
+days, and `«Lo tengo»` on an expired case (O3).
 From help ([07](../product/07-help-workflow.md)): photos on a request beyond the pet's own, a
 request for a custodian's found animal opened from its found case, and operator review into
 `verified` (O9). From the profile ([auth.md](auth.md) · Profile): the photo, changing the phone outside a
