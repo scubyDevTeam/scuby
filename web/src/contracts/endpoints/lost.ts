@@ -4,6 +4,7 @@ import {
   answerCheckinRequest,
   answerClaimRequest,
   cancelRequest,
+  editLostRequest,
   moderateSightingRequest,
   myCasesWire,
   petsWire,
@@ -39,6 +40,18 @@ export const publishLost = endpoint({
   body: publishLostRequest,
   response: publishWire,
   errors: ['active_case_exists', 'not_found', ...PHONE_STEP],
+})
+
+export const editLost = endpoint({
+  method: 'PATCH',
+  path: '/lost-cases/:code',
+  summary:
+    'Corrects an active lost case: its photos, signs, and where and when it was last seen. Only ' +
+    'the owner. Fields left out stay as they are. Never re-broadcasts: correcting the zone does ' +
+    'not tell the neighbours again.',
+  auth: 'session',
+  body: editLostRequest,
+  errors: OWNER_ONLY,
 })
 
 export const reuniteCase = endpoint({

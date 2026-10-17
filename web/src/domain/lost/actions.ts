@@ -12,6 +12,7 @@ export type LostAction =
   | 'confirm_reunited'
   | 'cancel'
   | 'reopen'
+  | 'edit' // «Editar aviso»: its photos, signs, zone and time
 
 /** docs/product/10 §1: which face of the page a status shows. */
 export type LostPageMode = 'open' | 'closed' | 'archived'
@@ -32,7 +33,7 @@ export function availableActions(state: LostCaseState, viewer: Viewer, now: Date
   switch (state.status) {
     case 'active':
       return viewer === 'owner'
-        ? ['confirm_reunited', 'cancel', 'share']
+        ? ['confirm_reunited', 'edit', 'cancel', 'share']
         : ['report_sighting', 'claim_recovery', 'contact_owner', 'share', 'report_content']
     case 'expired':
       // Reachable and reopenable by the owner, no actions for anyone else.

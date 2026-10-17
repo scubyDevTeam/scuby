@@ -4,6 +4,8 @@ import * as helpersEndpoints from '../contracts/endpoints/helpers'
 import * as lostEndpoints from '../contracts/endpoints/lost'
 import {
   type CheckinAnswer,
+  type EditLostInput,
+  editLostBody,
   type LostAttribution,
   type LostCancelReason,
   type PublishLostInput,
@@ -13,6 +15,7 @@ import {
   parseUpload,
   publishLostBody,
 } from '../contracts/owner'
+import { parseNothing } from '../contracts/session'
 import { call } from './http'
 
 export const myPetsQuery = queryOptions({
@@ -74,6 +77,11 @@ export const useCancelCase = (code: string) =>
       { params: { code }, body: { resolution: input.reason } },
       parseCreated,
     ),
+  )
+
+export const useEditLost = (code: string) =>
+  useOwnerAction((input: EditLostInput) =>
+    call(lostEndpoints.editLost, { params: { code }, body: editLostBody(input) }, parseNothing),
   )
 
 export const useReopenCase = (code: string) =>

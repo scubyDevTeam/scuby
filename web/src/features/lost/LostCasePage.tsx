@@ -228,6 +228,11 @@ export function LostCasePage({
           <Button onClick={() => onAction('confirm_reunited')}>
             {t('lost.page.reunited_action')}
           </Button>
+          {can('edit') ? (
+            <Button variant="outline" onClick={() => onAction('edit')}>
+              {t('lost.page.edit')}
+            </Button>
+          ) : null}
           <Button variant="link" className="text-lost-deep" onClick={() => onAction('cancel')}>
             {t('lost.page.delete')}
           </Button>

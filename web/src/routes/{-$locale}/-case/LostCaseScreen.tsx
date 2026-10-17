@@ -28,6 +28,11 @@ const ClaimForm = lazy(
     import('@features/lost/ClaimForm').then((m) => ({ default: m.ClaimForm })),
   ),
 )
+const EditLost = lazy(
+  withMessages(['lost_forms', 'publish'], () =>
+    import('@features/lost/EditLost').then((m) => ({ default: m.EditLost })),
+  ),
+)
 const ownerForms = () => import('@features/lost/OwnerForms')
 const ReuniteForm = lazy(
   withMessages(['lost_forms'], () => ownerForms().then((m) => ({ default: m.ReuniteForm }))),
@@ -50,7 +55,16 @@ const PosterSheet = lazy(
   ),
 )
 
-type Open = 'sighting' | 'claim' | 'report' | 'reunite' | 'cancel' | 'reopen' | 'share' | null
+type Open =
+  | 'sighting'
+  | 'edit'
+  | 'claim'
+  | 'report'
+  | 'reunite'
+  | 'cancel'
+  | 'reopen'
+  | 'share'
+  | null
 
 export function LostCaseScreen({ found }: { found: LostCase }) {
   const { t } = useI18n()
@@ -72,6 +86,7 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
 
   function handle(action: LostAction) {
     if (action === 'report_sighting') return setSheet('sighting')
+    if (action === 'edit') return setSheet('edit')
     if (action === 'claim_recovery') return setSheet('claim')
     if (action === 'report_content') return setSheet('report')
     if (action === 'confirm_reunited') return setSheet('reunite')
@@ -85,6 +100,7 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
       ? t('case.lost.correct_title', { name })
       : t('case.lost.sighting_title', { name }),
     claim: t('case.lost.claim_title', { name }),
+    edit: t('case.lost.edit_title', { name }),
     report: t('case.report_title'),
     share: t('case.share_title_named', { name }),
     reunite: t('case.lost.reunite_title', { name }),
@@ -114,7 +130,7 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
         open={sheet !== null}
         onClose={close}
         title={sheet ? titles[sheet] : ''}
-        size={sheet === 'sighting' || sheet === 'share' ? 'full' : 'auto'}
+        size={sheet === 'sighting' || sheet === 'share' || sheet === 'edit' ? 'full' : 'auto'}
       >
         <Suspense fallback={<Skeleton className="h-40" />}>
           {sheet === 'sighting' ? (
@@ -130,6 +146,9 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
               mapStyleUrl={env.mapStyleUrl}
               onDone={close}
             />
+          ) : null}
+          {sheet === 'edit' ? (
+            <EditLost lostCase={found} mapStyleUrl={env.mapStyleUrl} onDone={close} />
           ) : null}
           {sheet === 'claim' ? (
             <ClaimForm

@@ -5,6 +5,7 @@ import {
   type Color,
   colorSchema,
   contactPrefs,
+  type Point,
   phone,
   photoUrl,
   point,
@@ -130,6 +131,35 @@ export const publishLostRequest = z.object({
   last_seen_radius_m: z.number().check(z.positive(), z.lte(5000)),
   last_seen_at: timestamp,
   ...publisherPhone,
+})
+
+/**
+ * Correcting a published lost case (design «Aviso · editar»): the photos, the signs and where and
+ * when it was last seen. Fields left out stay as they are. Never re-broadcasts: the neighbours
+ * were told once, and a corrected zone does not tell them again.
+ */
+export const editLostRequest = z.object({
+  photo_urls: z.optional(z.array(photoUrl).check(z.minLength(1), z.maxLength(6))),
+  marks: z.optional(z.nullable(z.string().check(z.maxLength(500)))),
+  last_seen_point: z.optional(point),
+  last_seen_radius_m: z.optional(z.number().check(z.positive(), z.lte(5000))),
+  last_seen_at: z.optional(timestamp),
+})
+
+export type EditLostInput = {
+  photoUrls?: string[]
+  marks?: string | null
+  center?: Point
+  radiusM?: number
+  lastSeenAt?: Date
+}
+
+export const editLostBody = (input: EditLostInput): z.input<typeof editLostRequest> => ({
+  ...(input.photoUrls !== undefined ? { photo_urls: input.photoUrls } : {}),
+  ...(input.marks !== undefined ? { marks: input.marks } : {}),
+  ...(input.center !== undefined ? { last_seen_point: input.center } : {}),
+  ...(input.radiusM !== undefined ? { last_seen_radius_m: input.radiusM } : {}),
+  ...(input.lastSeenAt !== undefined ? { last_seen_at: input.lastSeenAt.toISOString() } : {}),
 })
 
 export type PublishLostInput = {

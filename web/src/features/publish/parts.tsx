@@ -172,11 +172,23 @@ const dateValue = (date: Date) =>
   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 const timeValue = (date: Date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`
 
+/** A moment already known — a case being edited — as the chip that says it. */
+function initialDay(initial: Date | undefined): Day {
+  if (!initial) return 'today'
+  const now = new Date()
+  if (dateValue(initial) === dateValue(now)) return 'today'
+  return dateValue(initial) === dateValue(new Date(now.getTime() - 86_400_000))
+    ? 'yesterday'
+    : 'other'
+}
+
 /** The «when» of a publish form: a day chip plus an approximate time, as one Date. */
-export function useWhen() {
-  const [day, setDay] = useState<Day>('today')
-  const [otherDate, setOtherDate] = useState('')
-  const [time, setTime] = useState(() => timeValue(new Date()))
+export function useWhen(initial?: Date) {
+  const [day, setDay] = useState<Day>(() => initialDay(initial))
+  const [otherDate, setOtherDate] = useState(() =>
+    initial && initialDay(initial) === 'other' ? dateValue(initial) : '',
+  )
+  const [time, setTime] = useState(() => timeValue(initial ?? new Date()))
   const now = new Date()
   const base =
     day === 'today'
