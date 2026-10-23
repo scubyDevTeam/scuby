@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: scuby-backend
+  threads:
+    virtual:
+      enabled: true
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
