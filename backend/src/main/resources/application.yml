@@ -6,6 +6,10 @@ spring:
       enabled: true
   jackson:
     property-naming-strategy: SNAKE_CASE
+  flyway:
+    schemas: scuby
+    default-schema: scuby
+    create-schemas: true
 
 management:
   endpoints:

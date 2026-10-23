@@ -1,1 +1,6 @@
-# Local development — see backend/README.md
+# Local development — database from backend/compose.yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/scuby
+    username: scuby
+    password: scuby
