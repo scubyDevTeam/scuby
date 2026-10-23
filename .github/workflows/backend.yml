@@ -1,0 +1,25 @@
+name: backend
+
+on:
+  pull_request:
+    paths: ['backend/**', 'infra/docker/postgres/**', 'docs/eng/openapi.json', '.github/workflows/backend.yml']
+  push:
+    branches: [main]
+    paths: ['backend/**', 'infra/docker/postgres/**', 'docs/eng/openapi.json', '.github/workflows/backend.yml']
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version-file: backend/.java-version
+          cache: maven
+      # jOOQ codegen and Testcontainers both use the project image (docs/eng/infra.md · Database).
+      - run: docker build -t scuby/postgres:17 ../infra/docker/postgres
+      - run: ./mvnw -B verify
