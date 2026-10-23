@@ -46,7 +46,7 @@ the backend, New Relic account.
 [O16](../open-items.md); the working name is fine for staging).
 
 **P.3 Decisions to close before code.**
-- Build tool (Gradle or Maven) and the folder layout: `backend/` and `infra/` beside `web/`.
+- ~~Build tool and folder layout~~ — decided 2026-10-23: **Maven**; `backend/` and `infra/` beside `web/`.
 - [O19](../open-items.md) — who owns the contract source — at least agreed in direction with the
   client engineer, since phase S changes the contract.
 
