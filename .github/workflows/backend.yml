@@ -20,6 +20,6 @@ jobs:
           distribution: temurin
           java-version-file: backend/.java-version
           cache: maven
-      # jOOQ codegen and Testcontainers both use the project image (docs/eng/infra.md · Database).
+      # jOOQ codegen needs the tagged project image; Testcontainers builds it from the Dockerfile.
       - run: docker build -t scuby/postgres:17 ../infra/docker/postgres
       - run: ./mvnw -B verify

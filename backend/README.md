@@ -40,7 +40,6 @@ src/main/java/co/scuby/
 │   ├── roles/   Anotaciones de rol: @ApiComponent y @WorkerComponent
 │   ├── web/     Sobre de errores: ApiException → ProblemDetail → ContractErrors → {"error":{…}} del contrato
 │   └── db/      GeoPoint y Spatial (ayudas de PostGIS)
-└── db/generated/   Código de jOOQ (generado)
 src/test/java/co/scuby/contract/ContractValidator   Valida respuestas contra docs/eng/openapi.json
 ```
 
