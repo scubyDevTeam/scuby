@@ -19,10 +19,18 @@ public final class Spatial {
                 Object.class, DSL.val(p.lng()), DSL.val(p.lat()));
     }
 
+    /**
+     * Distance in meters. Both arguments must be {@code geography} (e.g. from {@link #geography});
+     * with {@code geometry} PostGIS works in degrees, not meters.
+     */
     public static Field<Double> distanceMeters(Field<?> a, Field<?> b) {
         return DSL.field("ST_Distance({0}, {1})", SQLDataType.DOUBLE, a, b);
     }
 
+    /**
+     * True when the distance is within {@code meters}. Both arguments must be {@code geography}
+     * (e.g. from {@link #geography}); with {@code geometry} PostGIS works in degrees, not meters.
+     */
     public static Condition withinMeters(Field<?> a, Field<?> b, double meters) {
         return DSL.condition("ST_DWithin({0}, {1}, {2})", a, b, DSL.val(meters));
     }

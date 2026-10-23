@@ -11,6 +11,7 @@ import static co.scuby.platform.db.Spatial.distanceMeters;
 import static co.scuby.platform.db.Spatial.geography;
 import static co.scuby.platform.db.Spatial.withinMeters;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
@@ -30,7 +31,7 @@ class SpatialTest {
     }
 
     @Test
-    void withinIsInclusiveOfTheRadius() {
+    void withinMatchesTheRadius() {
         Boolean near = db.select(org.jooq.impl.DSL.field(withinMeters(geography(PLAZA), geography(PARQUE_93), 10_000)))
                          .fetchOne(0, Boolean.class);
         Boolean far = db.select(org.jooq.impl.DSL.field(withinMeters(geography(PLAZA), geography(PARQUE_93), 5_000)))
@@ -43,5 +44,15 @@ class SpatialTest {
     void pointsOutsideTheGlobeAreRejected() {
         assertThatThrownBy(() -> new GeoPoint(91, 0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new GeoPoint(0, 181)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GeoPoint(-91, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GeoPoint(0, -181)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GeoPoint(Double.NaN, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GeoPoint(0, Double.NaN)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void edgesOfTheGlobeAreAccepted() {
+        assertThatCode(() -> new GeoPoint(90, 180)).doesNotThrowAnyException();
+        assertThatCode(() -> new GeoPoint(-90, -180)).doesNotThrowAnyException();
     }
 }
