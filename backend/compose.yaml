@@ -11,5 +11,10 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U scuby -d scuby"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 volumes:
   pgdata:
