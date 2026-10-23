@@ -1,0 +1,15 @@
+# Local database for `SPRING_PROFILES_ACTIVE=local` (backend/README.md).
+services:
+  postgres:
+    build: ../infra/docker/postgres
+    image: scuby/postgres:17
+    environment:
+      POSTGRES_DB: scuby
+      POSTGRES_USER: scuby
+      POSTGRES_PASSWORD: scuby
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
