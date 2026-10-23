@@ -35,7 +35,8 @@ backend/
     platform/roles/ApiComponent.java    role meta-annotations
     platform/roles/WorkerComponent.java
     platform/web/ErrorCode.java         the 14 codes + HTTP status (mirror of web/src/contracts/errors.ts)
-    platform/web/ApiException.java
+    platform/web/ApiException.java      extends Spring's ErrorResponseException (carries a ProblemDetail)
+    platform/web/ContractErrors.java    ProblemDetail → the contract's envelope (the one mapper)
     platform/web/ApiErrorBody.java      the envelope
     platform/web/ApiErrorHandler.java   @RestControllerAdvice extending ResponseEntityExceptionHandler
     platform/db/GeoPoint.java           lat/lng value
@@ -916,20 +917,24 @@ git commit -m "feat: PostGIS distance and radius helpers for jOOQ open-source ed
 ### Task 7: The error envelope
 
 **Files:**
-- Create: `backend/src/main/java/co/scuby/platform/web/ErrorCode.java`, `ApiException.java`, `ApiErrorBody.java`, `ApiErrorHandler.java`
+- Create: `backend/src/main/java/co/scuby/platform/web/ErrorCode.java`, `ApiException.java`, `ApiErrorBody.java`, `ContractErrors.java`, `ApiErrorHandler.java`
 - Test: `backend/src/test/java/co/scuby/platform/web/ApiErrorHandlerTest.java`
 
-Background: the body shape is fixed by the contract (decision #24, docs/eng/api.md · Errors) and the
-client rejects any other shape (`parseFailure` in `web/src/contracts/errors.ts`), so Spring's
-`ProblemDetail` (RFC 9457) body is **not** used. Spring's machinery is: the handler extends
-`ResponseEntityExceptionHandler`, which already handles every standard Spring MVC exception
-(unreadable body, validation, missing parameters, 404 route, 405, 415…), and only
-`handleExceptionInternal` is overridden to write the contract's envelope.
+Background: the wire body is fixed by the contract (decision #24, docs/eng/api.md · Errors) and the
+client rejects any other shape (`parseFailure` in `web/src/contracts/errors.ts`). Internally we use
+Spring's own model: every error is a **`ProblemDetail`** (RFC 9457) — Spring's standard MVC
+exceptions already carry one, and `ApiException` extends Spring's `ErrorResponseException` so ours do
+too, with `code`, `fields` and `details` as ProblemDetail properties. `ResponseEntityExceptionHandler`
+routes all of them to `handleExceptionInternal`, and **one mapper, `ContractErrors.toEnvelope`**,
+turns the ProblemDetail into the contract's envelope. If the contract ever moves to RFC 9457 on the
+wire (a possible outcome of open item O19), deleting the mapper is the change.
 
 **Interfaces:**
 - Produces:
   - `enum ErrorCode` — wire value via `wire()` (snake_case), HTTP status via `status()`; exactly the 14 codes of `docs/eng/api.md` · Errors / `web/src/contracts/errors.ts`.
-  - `ApiException(ErrorCode code, String message)` and `ApiException(ErrorCode, String, Map<String,String> fields, Map<String,String> details)`.
+  - `ErrorCode.fromWire(String): ErrorCode`.
+  - `ApiException(ErrorCode code, String message)` and `ApiException(ErrorCode, String, Map<String,String> fields, Map<String,String> details)` — a Spring `ErrorResponseException` whose `ProblemDetail` has properties `code` (wire value), and `fields` / `details` when non-empty; `code()` returns the `ErrorCode`.
+  - `ContractErrors.toEnvelope(ProblemDetail): ApiErrorBody` — the only place the envelope is built from an error.
   - `ApiErrorBody.of(ErrorCode, String message, Map fields, Map details)` serializing to `{"error":{"code":…,"message":…,"fields"?:…,"details"?:…}}` — `fields`/`details` omitted when empty.
 
 - [ ] **Step 1: Failing test** — `ApiErrorHandlerTest.java`
@@ -1072,6 +1077,10 @@ public enum ErrorCode {
     public HttpStatus status() { return status; }
 
     public String wire() { return name().toLowerCase(java.util.Locale.ROOT); }
+
+    public static ErrorCode fromWire(String wire) {
+        return valueOf(wire.toUpperCase(java.util.Locale.ROOT));
+    }
 }
 ```
 
@@ -1080,28 +1089,37 @@ public enum ErrorCode {
 ```java
 package co.scuby.platform.web;
 
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.ErrorResponseException;
+
 import java.util.Map;
 
-/** Thrown by any layer to answer with a contract error. */
-public class ApiException extends RuntimeException {
-    private final ErrorCode code;
-    private final Map<String, String> fields;
-    private final Map<String, String> details;
+/**
+ * Thrown by any layer to answer with a contract error. A Spring ErrorResponseException, so Spring
+ * handles it like its own; the code, fields and details ride as ProblemDetail properties.
+ */
+public class ApiException extends ErrorResponseException {
 
     public ApiException(ErrorCode code, String message) {
         this(code, message, Map.of(), Map.of());
     }
 
     public ApiException(ErrorCode code, String message, Map<String, String> fields, Map<String, String> details) {
-        super(message);
-        this.code = code;
-        this.fields = Map.copyOf(fields);
-        this.details = Map.copyOf(details);
+        super(code.status(), problem(code, message, fields, details), null);
     }
 
-    public ErrorCode code() { return code; }
-    public Map<String, String> fields() { return fields; }
-    public Map<String, String> details() { return details; }
+    public ErrorCode code() {
+        return ErrorCode.fromWire((String) getBody().getProperties().get(ContractErrors.CODE));
+    }
+
+    private static ProblemDetail problem(ErrorCode code, String message,
+                                         Map<String, String> fields, Map<String, String> details) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(code.status(), message);
+        pd.setProperty(ContractErrors.CODE, code.wire());
+        if (!fields.isEmpty()) pd.setProperty(ContractErrors.FIELDS, Map.copyOf(fields));
+        if (!details.isEmpty()) pd.setProperty(ContractErrors.DETAILS, Map.copyOf(details));
+        return pd;
+    }
 }
 ```
 
@@ -1128,6 +1146,48 @@ public record ApiErrorBody(Error error) {
 
 (Jackson 3 keeps annotations in `com.fasterxml.jackson.annotation`.)
 
+`ContractErrors.java`:
+
+```java
+package co.scuby.platform.web;
+
+import org.springframework.http.ProblemDetail;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/** The one mapper from Spring's ProblemDetail to the contract's envelope (docs/eng/api.md · Errors). */
+public final class ContractErrors {
+
+    public static final String CODE = "code";
+    public static final String FIELDS = "fields";
+    public static final String DETAILS = "details";
+
+    private ContractErrors() {}
+
+    public static ApiErrorBody toEnvelope(ProblemDetail pd) {
+        Map<String, Object> props = pd.getProperties() == null ? Map.of() : pd.getProperties();
+        ErrorCode code = props.get(CODE) instanceof String wire ? ErrorCode.fromWire(wire) : fromStatus(pd.getStatus());
+        // Never leak internals: a server error always says only "server_error".
+        String message = code == ErrorCode.SERVER_ERROR || pd.getDetail() == null ? code.wire() : pd.getDetail();
+        return ApiErrorBody.of(code, message, strings(props.get(FIELDS)), strings(props.get(DETAILS)));
+    }
+
+    /** Spring's standard MVC errors carry no code: derive it from the status. */
+    static ErrorCode fromStatus(int status) {
+        if (status == 404) return ErrorCode.NOT_FOUND;
+        if (status >= 400 && status < 500) return ErrorCode.VALIDATION_FAILED;
+        return ErrorCode.SERVER_ERROR;
+    }
+
+    private static Map<String, String> strings(Object value) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (value instanceof Map<?, ?> m) m.forEach((k, v) -> out.put(String.valueOf(k), String.valueOf(v)));
+        return out;
+    }
+}
+```
+
 `ApiErrorHandler.java`:
 
 ```java
@@ -1139,6 +1199,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -1150,56 +1212,59 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Turns every failure into the contract's envelope (docs/eng/api.md · Errors). Spring's base class
- * handles the standard MVC exceptions; we only decide the body. The client writes its own copy per code.
+ * Spring's ResponseEntityExceptionHandler classifies every MVC exception and ApiException (an
+ * ErrorResponseException) into a ProblemDetail; this class only adds what Spring lacks and hands
+ * the result to ContractErrors. The client writes its own copy per code.
  */
 @RestControllerAdvice
 public class ApiErrorHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiErrorHandler.class);
 
-    @ExceptionHandler(ApiException.class)
-    ResponseEntity<Object> api(ApiException e) {
-        return respond(e.code(), e.getMessage(), e.fields(), e.details());
-    }
-
+    /** Anything Spring does not know: a 500. */
     @ExceptionHandler(Exception.class)
     ResponseEntity<Object> unexpected(Exception e) {
         log.error("unhandled exception", e);
-        return respond(ErrorCode.SERVER_ERROR, "server_error", Map.of(), Map.of());
+        return contract(ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR));
     }
 
-    /** Every standard Spring MVC exception ends here, already classified by HTTP status. */
+    /** Spring's ProblemDetail for bean validation has no per-field map; the contract wants one. */
+    @Override
+    protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors()
+          .forEach(f -> fields.putIfAbsent(f.getField(), f.getDefaultMessage()));
+        ProblemDetail pd = ex.getBody();
+        pd.setDetail("request does not match the contract");
+        pd.setProperty(ContractErrors.CODE, ErrorCode.VALIDATION_FAILED.wire());
+        pd.setProperty(ContractErrors.FIELDS, fields);
+        return handleExceptionInternal(ex, pd, headers, status, request);
+    }
+
+    /** Every Spring-handled error, ApiException included, ends here with its ProblemDetail. */
     @Override
     protected @Nullable ResponseEntity<Object> handleExceptionInternal(Exception ex, @Nullable Object body,
             HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
-        if (ex instanceof MethodArgumentNotValidException invalid) {
-            Map<String, String> fields = new LinkedHashMap<>();
-            invalid.getBindingResult().getFieldErrors()
-                   .forEach(f -> fields.putIfAbsent(f.getField(), f.getDefaultMessage()));
-            return respond(ErrorCode.VALIDATION_FAILED, "request does not match the contract", fields, Map.of());
-        }
-        if (statusCode.value() == HttpStatus.NOT_FOUND.value()) {
-            return respond(ErrorCode.NOT_FOUND, "no such route", Map.of(), Map.of());
-        }
-        if (statusCode.is4xxClientError()) {
-            // 400, 405, 415…: the request does not fit the contract. The contract has no code per
-            // HTTP nuance, so all of them are validation_failed, answered with that code's status.
-            return respond(ErrorCode.VALIDATION_FAILED, ex.getMessage(), Map.of(), Map.of());
-        }
-        log.error("server-side MVC failure", ex);
-        return respond(ErrorCode.SERVER_ERROR, "server_error", Map.of(), Map.of());
+        if (statusCode.is5xxServerError()) log.error("server-side failure", ex);
+        ProblemDetail pd = body instanceof ProblemDetail p ? p : ProblemDetail.forStatus(statusCode);
+        return contract(pd);
     }
 
-    private static ResponseEntity<Object> respond(ErrorCode code, String message,
-                                                  Map<String, String> fields, Map<String, String> details) {
-        return ResponseEntity.status(code.status()).body(ApiErrorBody.of(code, message, fields, details));
+    /** The wire status is the code's status (docs/eng/api.md · Errors), e.g. a 400 or 405 answers 422. */
+    private static ResponseEntity<Object> contract(ProblemDetail pd) {
+        ApiErrorBody envelope = ContractErrors.toEnvelope(pd);
+        return ResponseEntity.status(ErrorCode.fromWire(envelope.error().code()).status())
+                             .contentType(MediaType.APPLICATION_JSON)
+                             .body(envelope);
     }
 }
 ```
 
-If a signature differs in Spring Framework 7 (e.g. the `@Nullable` annotation's package), match the
-base class's declaration exactly — the IDE/compiler shows it.
+`ApiException` needs no handler of its own: `ResponseEntityExceptionHandler` already declares one
+for `ErrorResponseException` and passes its ProblemDetail to `handleExceptionInternal`. If a signature
+differs in Spring Framework 7 (e.g. the `@Nullable` annotation's package), match the base class's
+declaration exactly — the compiler shows it.
 
 Field names in `fields` are Java property names; when request records gain snake_case wire names they must be mapped to the wire path (docs/eng/api.md · Errors says `fields` maps each *wire* path). Note this in the night report as a follow-up, not tonight's work.
 
