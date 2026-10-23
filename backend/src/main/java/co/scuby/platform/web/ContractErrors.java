@@ -16,7 +16,7 @@ public final class ContractErrors {
 
     public static ApiErrorBody toEnvelope(ProblemDetail pd) {
         Map<String, Object> props = pd.getProperties() == null ? Map.of() : pd.getProperties();
-        ErrorCode code = props.get(CODE) instanceof String wire ? ErrorCode.fromWire(wire) : fromStatus(pd.getStatus());
+        ErrorCode code = codeOf(props.get(CODE), pd.getStatus());
         // Never leak internals: a server error always says only "server_error".
         String message = code == ErrorCode.SERVER_ERROR || pd.getDetail() == null ? code.wire() : pd.getDetail();
         return ApiErrorBody.of(code, message, strings(props.get(FIELDS)), strings(props.get(DETAILS)));
@@ -24,9 +24,26 @@ public final class ContractErrors {
 
     /** Spring's standard MVC errors carry no code: derive it from the status. */
     static ErrorCode fromStatus(int status) {
-        if (status == 404) return ErrorCode.NOT_FOUND;
-        if (status >= 400 && status < 500) return ErrorCode.VALIDATION_FAILED;
-        return ErrorCode.SERVER_ERROR;
+        return switch (status) {
+            case 401 -> ErrorCode.UNAUTHORIZED;
+            case 403 -> ErrorCode.FORBIDDEN;
+            case 404 -> ErrorCode.NOT_FOUND;
+            case 410 -> ErrorCode.GONE;
+            case 429 -> ErrorCode.RATE_LIMITED;
+            default -> status >= 400 && status < 500 ? ErrorCode.VALIDATION_FAILED : ErrorCode.SERVER_ERROR;
+        };
+    }
+
+    /** An explicit wire code wins; an unknown one falls back to the status instead of failing the handler. */
+    private static ErrorCode codeOf(Object wire, int status) {
+        if (wire instanceof String w) {
+            try {
+                return ErrorCode.fromWire(w);
+            } catch (IllegalArgumentException unknown) {
+                // fall through to the status
+            }
+        }
+        return fromStatus(status);
     }
 
     private static Map<String, String> strings(Object value) {

@@ -17,6 +17,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -42,12 +43,17 @@ public class ApiErrorHandler extends ResponseEntityExceptionHandler {
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         Map<String, String> fields = new LinkedHashMap<>();
         ex.getBindingResult().getFieldErrors()
-          .forEach(f -> fields.putIfAbsent(f.getField(), f.getDefaultMessage()));
+          .forEach(f -> fields.putIfAbsent(wirePath(f.getField()), f.getDefaultMessage()));
         ProblemDetail pd = ex.getBody();
         pd.setDetail("request does not match the contract");
         pd.setProperty(ContractErrors.CODE, ErrorCode.VALIDATION_FAILED.wire());
         pd.setProperty(ContractErrors.FIELDS, fields);
         return handleExceptionInternal(ex, pd, headers, status, request);
+    }
+
+    /** Mirrors `spring.jackson.property-naming-strategy: SNAKE_CASE`: fields are named by wire path (docs/eng/api.md · Errors). */
+    private static String wirePath(String javaPath) {
+        return javaPath.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
     }
 
     /** Every Spring-handled error, ApiException included, ends here with its ProblemDetail. */

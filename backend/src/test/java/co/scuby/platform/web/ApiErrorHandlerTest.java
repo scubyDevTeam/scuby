@@ -9,12 +9,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -28,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({TestcontainersConfiguration.class, ApiErrorHandlerTest.Probe.class})
 class ApiErrorHandlerTest {
 
-    record Body(@NotBlank String name) {}
+    record Body(@NotBlank String petName) {}
 
     @TestConfiguration
     @RestController
@@ -42,6 +44,16 @@ class ApiErrorHandlerTest {
         @GetMapping("/probe/boom")
         void boom() {
             throw new IllegalStateException("unexpected");
+        }
+
+        @GetMapping("/probe/forbidden")
+        void forbidden() {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+
+        @GetMapping("/probe/empty-message")
+        void emptyMessage() {
+            throw new ApiException(ErrorCode.NOT_FOUND, "");
         }
 
         @PostMapping("/probe/validate")
@@ -61,10 +73,10 @@ class ApiErrorHandlerTest {
 
     @Test
     void beanValidationIsValidationFailedWithFields() throws Exception {
-        mvc.perform(post("/probe/validate").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"))
+        mvc.perform(post("/probe/validate").contentType(MediaType.APPLICATION_JSON).content("{\"pet_name\":\"\"}"))
            .andExpect(status().isUnprocessableEntity())
            .andExpect(jsonPath("$.error.code").value("validation_failed"))
-           .andExpect(jsonPath("$.error.fields.name").exists());
+           .andExpect(jsonPath("$.error.fields.pet_name").exists());
     }
 
     @Test
@@ -94,5 +106,19 @@ class ApiErrorHandlerTest {
            .andExpect(status().isInternalServerError())
            .andExpect(jsonPath("$.error.code").value("server_error"))
            .andExpect(jsonPath("$.error.message").value("server_error"));
+    }
+
+    @Test
+    void emptyMessageIsStillSerialized() throws Exception {
+        mvc.perform(get("/probe/empty-message"))
+           .andExpect(status().isNotFound())
+           .andExpect(jsonPath("$.error.message").value(""));
+    }
+
+    @Test
+    void springForbiddenMapsToForbiddenCode() throws Exception {
+        mvc.perform(get("/probe/forbidden"))
+           .andExpect(status().isForbidden())
+           .andExpect(jsonPath("$.error.code").value("forbidden"));
     }
 }
