@@ -77,7 +77,7 @@ not the monthly cap: check-ins are a daily cron, and ~300 active cases ≈ 100 s
 
 ## Twilio Conversations — the fallback chat contract
 
-Two registered users per case; our UI on their client SDK; Rails mints access tokens; message
+Two registered users per case; our UI on their client SDK; the backend mints access tokens; message
 webhooks feed moderation ([product/09](../product/09-reporting.md)) and our own push. Verified
 pricing: **first 200 active users/month free**, then $0.05/MAU (an identity counts once per month
 across all conversations); no per-message chat fees; media $0.25/GB/mo.

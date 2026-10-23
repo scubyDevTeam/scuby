@@ -12,8 +12,11 @@
 | Domain + DNS | ~$1–2 | — | Amortized yearly registration |
 | Transactional email | $0 → **$20** | 2026-08-27 | Free tier (Resend-class, 100/day) until **~300 active cases**, then the ~$20 tier (50k/mo) |
 | Twilio Conversations | $0 → usage | 2026-08-23 | First **200 active chat users/mo free**, then $0.05/MAU. Fallback channel — expected $0 for a long time (cost rules in [comms.md](comms.md)) |
-| Hosting (app + Postgres + jobs) | **TBD** | — | Decided with the backend/infra pass |
-| Media storage + CDN + transforms | **TBD** | — | O10 (build vs. service); content-hashed masters, on-demand variants |
+| Hosting — staging (EC2 `t4g.small` + EBS + public IPv4) | ~$18 | 2026-10-23 (approx) | Postgres in Docker on the same instance ([infra.md](infra.md)). Covered by the new account's credits for the first months |
+| Hosting — production adds RDS `db.t4g.micro` + 20 GB | ~$15 | 2026-10-23 (approx) | From the launch phase on ([infra.md](infra.md) · Environments) |
+| Route 53 hosted zone | $0.50 | 2026-10-23 | |
+| SQS | $0 | 2026-10-23 | 1M requests/month free permanently; every call counts, including empty long polls |
+| Media: S3 + CloudFront + Lambda transforms | ~$0 at launch | 2026-10-23 (approx) | Inside the free tiers at launch volume; decision #32, [infra.md](infra.md) · Media |
 | Web Push, Google OAuth, `wa.me`/`mailto:` | $0 | — | Free by construction |
 
 ## Variable / per-event
@@ -27,7 +30,7 @@
 
 ## Snapshot scenarios
 
-| Scale | Est. monthly (excl. hosting/media TBD) |
+| Scale | Est. monthly, excluding AWS hosting (~$18 staging, ~$33 with production RDS — rows above) |
 |---|---|
 | Launch (≤300 active cases) | **~$3–5** — number rental + domain; everything else in free tiers |
 | 1,000 active cases | **~$25–30** — email tier + number + trickle of OTPs |
@@ -40,4 +43,6 @@
   the first invoice ([comms.md](comms.md) rule 6).
 - **Daily SMS spend alarm** ([auth.md](auth.md)): sends × $0.06 above a few dollars/day = pumping.
 - **First Twilio invoice**: verify Conversations MAU count matches the lazy-creation rules.
-- Hosting + media rows get real numbers when O10 and the backend doc land.
+- **AWS Free Plan** ([infra.md](infra.md) · Account): move to the Paid Plan before month 6, or the
+  account closes. AWS Budgets alarm on monthly spend from day one.
+- **SQS above ~1M requests/month** → starts billing; check long-poll settings before anything else.
