@@ -18,6 +18,10 @@
 
   <properties>
     <java.version>25</java.version>
+    <!-- Testcontainers 1.x, for the jOOQ codegen plugin only (see the plugin's comment below). -->
+    <testcontainers-codegen.version>1.21.4</testcontainers-codegen.version>
+    <!-- Empty default so surefire's @{argLine} resolves when no other plugin (e.g. JaCoCo) sets it. -->
+    <argLine></argLine>
   </properties>
 
   <dependencies>
@@ -73,25 +77,29 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-  <groupId>com.tngtech.archunit</groupId>
-  <artifactId>archunit-junit5</artifactId>
-  <version>1.5.1</version>
-  <scope>test</scope>
-</dependency>
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>testcontainers-postgresql</artifactId>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>1.5.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
-      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <artifactId>testcontainers-postgresql</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
 
   <build>
     <plugins>
+      <!--
+        jOOQ codegen runs the migrations against a throwaway container and writes target/generated-sources/jooq.
+        - Plugin 0.0.4 is built for Testcontainers 1.x, so 1.x is pinned here for the plugin only;
+          runtime tests use Boot's managed Testcontainers (2.0.5).
+        - The jOOQ dependencies are overridden to ${jooq.version} so the generated code matches the runtime jOOQ.
+        - The plugin's internal Flyway 9 is left alone on purpose (overriding it breaks the plugin): there is
+          a drift risk against the runtime Flyway 12.
+        - Every build needs Docker and the local image scuby/postgres:17 (infra/docker/postgres/verify.sh builds it).
+      -->
       <plugin>
         <groupId>org.testcontainers</groupId>
         <artifactId>testcontainers-jooq-codegen-maven-plugin</artifactId>
@@ -120,12 +128,12 @@
           <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
-            <version>1.21.4</version>
+            <version>${testcontainers-codegen.version}</version>
           </dependency>
           <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
-            <version>1.21.4</version>
+            <version>${testcontainers-codegen.version}</version>
           </dependency>
         </dependencies>
         <executions>
@@ -168,7 +176,8 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <argLine>-XX:+EnableDynamicAgentLoading</argLine>
+          <!-- Mockito's inline mock maker self-attaches on JDK 21+; @{argLine} keeps agents other plugins add (e.g. JaCoCo). -->
+          <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
       </plugin>
       <plugin>
