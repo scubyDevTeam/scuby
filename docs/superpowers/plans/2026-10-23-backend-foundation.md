@@ -6,7 +6,7 @@
 
 **Architecture:** One Maven module, one deployable, base package `co.scuby`. Roles (`api`, `worker`) are properties that beans are conditional on. Postgres 17 + PostGIS comes from a project-built image (`infra/docker/postgres/Dockerfile`) used by Testcontainers, jOOQ codegen, local Compose and CI. No AWS, no external accounts, no domain features in this plan.
 
-**Tech Stack:** Java 25 (via jenv), Maven 3.9 + wrapper, Spring Boot 4.1.2 (Jackson 3, modular starters), jOOQ 3.21 (OSS), Flyway 12, PostgreSQL 17 + PostGIS 3 + pgvector, Testcontainers 2.0.5, networknt json-schema-validator 3.0.8, ArchUnit 1.5.1, Jib 3.5.2, GitHub Actions.
+**Tech Stack:** Java 25 (via jenv), Maven 3.9 + wrapper, Spring Boot 4.1.2 (Jackson 3, modular starters), jOOQ 3.21 (OSS), Flyway 12, PostgreSQL 17 + PostGIS 3, Testcontainers 2.0.5, networknt json-schema-validator 3.0.8, ArchUnit 1.5.1, Jib 3.5.2, GitHub Actions.
 
 ## Global Constraints
 
@@ -37,7 +37,7 @@ backend/
     platform/web/ErrorCode.java         the 14 codes + HTTP status (mirror of web/src/contracts/errors.ts)
     platform/web/ApiException.java
     platform/web/ApiErrorBody.java      the envelope
-    platform/web/ApiErrorHandler.java   @RestControllerAdvice
+    platform/web/ApiErrorHandler.java   @RestControllerAdvice extending ResponseEntityExceptionHandler
     platform/db/GeoPoint.java           lat/lng value
     platform/db/Spatial.java            PostGIS templates for jOOQ OSS
   src/main/resources/
@@ -55,7 +55,7 @@ backend/
     platform/web/ApiErrorHandlerTest.java
     contract/ContractValidator.java     validates bodies against docs/eng/openapi.json
     contract/ContractValidatorTest.java
-infra/docker/postgres/Dockerfile        postgres:17 + postgis + pgvector
+infra/docker/postgres/Dockerfile        postgres:17 + postgis
 infra/docker/postgres/verify.sh         smoke test of the image
 .github/workflows/backend.yml           CI
 ```
@@ -388,7 +388,7 @@ git commit -m "feat: api and worker roles as conditional components, with an Arc
 
 ---
 
-### Task 3: The project Postgres image (Postgres 17 + PostGIS + pgvector, ARM64 and amd64)
+### Task 3: The project Postgres image (Postgres 17 + PostGIS, ARM64 and amd64)
 
 **Files:**
 - Create: `infra/docker/postgres/Dockerfile`, `infra/docker/postgres/verify.sh`, `backend/compose.yaml`
@@ -396,19 +396,19 @@ git commit -m "feat: api and worker roles as conditional components, with an Arc
 **Interfaces:**
 - Produces: image tag `scuby/postgres:17`; local database `jdbc:postgresql://localhost:5433/scuby`, user `scuby`, password `scuby`.
 
-Background: the official `postgis/postgis` images are amd64-only (docs/eng/infra.md · Database). The official `postgres:17` image is Debian-based and already has the PGDG apt repository configured, which publishes PostGIS and pgvector for both architectures.
+Background: the official `postgis/postgis` images are amd64-only (docs/eng/infra.md · Database). The official `postgres:17` image is Debian-based and already has the PGDG apt repository configured, which publishes PostGIS for both architectures. pgvector is **not** installed now: it arrives with photo matching (open item O7), as one more package line here.
 
 - [ ] **Step 1: `infra/docker/postgres/Dockerfile`**
 
 ```dockerfile
-# Postgres 17 + PostGIS 3 + pgvector, multi-arch (docs/eng/infra.md · Database).
+# Postgres 17 + PostGIS 3, multi-arch (docs/eng/infra.md · Database).
+# pgvector joins here when photo matching needs it (open item O7).
 FROM postgres:17
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       postgresql-17-postgis-3 \
       postgresql-17-postgis-3-scripts \
-      postgresql-17-pgvector \
  && rm -rf /var/lib/apt/lists/*
 ```
 
@@ -416,7 +416,7 @@ RUN apt-get update \
 
 ```bash
 #!/usr/bin/env bash
-# Builds the image, starts it, and checks that both extensions install. Exit non-zero on failure.
+# Builds the image, starts it, and checks that PostGIS installs. Exit non-zero on failure.
 set -euo pipefail
 cd "$(dirname "$0")"
 docker build -t scuby/postgres:17 .
@@ -427,8 +427,8 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -tAc \
-  "CREATE EXTENSION postgis; CREATE EXTENSION vector; SELECT postgis_lib_version();"
-echo "OK: postgis and vector install on $(docker exec "$cid" uname -m)"
+  "CREATE EXTENSION postgis; SELECT postgis_lib_version();"
+echo "OK: postgis installs on $(docker exec "$cid" uname -m)"
 ```
 
 - [ ] **Step 3: Run it**
@@ -437,7 +437,7 @@ echo "OK: postgis and vector install on $(docker exec "$cid" uname -m)"
 chmod +x infra/docker/postgres/verify.sh && infra/docker/postgres/verify.sh
 ```
 
-Expected: a PostGIS version line, then `OK: postgis and vector install on aarch64`. If `postgresql-17-postgis-3` is unavailable, try the package names from `apt-cache search postgis` inside `postgres:17`; only as last resort switch every `17` in this task to `16` and note it in the night report (docs/eng/infra.md names 16 as the tested fallback).
+Expected: a PostGIS version line, then `OK: postgis installs on aarch64`. If `postgresql-17-postgis-3` is unavailable, try the package names from `apt-cache search postgis` inside `postgres:17`; only as last resort switch every `17` in this task to `16` and note it in the night report (docs/eng/infra.md names 16 as the tested fallback).
 
 - [ ] **Step 4: `backend/compose.yaml`**
 
@@ -466,7 +466,7 @@ Expected: `accepting connections`.
 
 ```bash
 git add infra/docker/postgres backend/compose.yaml
-git commit -m "feat: project Postgres image with PostGIS and pgvector for ARM64 and amd64; local compose"
+git commit -m "feat: project Postgres image with PostGIS for ARM64 and amd64; local compose"
 ```
 
 ---
@@ -545,13 +545,6 @@ class MigrationsTest {
     void postgisIsInstalled() {
         String version = jdbc.queryForObject("SELECT postgis_lib_version()", String.class);
         assertThat(version).startsWith("3.");
-    }
-
-    @Test
-    void pgvectorIsAvailableForLater() {
-        Integer n = jdbc.queryForObject(
-                "SELECT count(*) FROM pg_available_extensions WHERE name = 'vector'", Integer.class);
-        assertThat(n).isEqualTo(1);
     }
 
     @Test
@@ -926,6 +919,13 @@ git commit -m "feat: PostGIS distance and radius helpers for jOOQ open-source ed
 - Create: `backend/src/main/java/co/scuby/platform/web/ErrorCode.java`, `ApiException.java`, `ApiErrorBody.java`, `ApiErrorHandler.java`
 - Test: `backend/src/test/java/co/scuby/platform/web/ApiErrorHandlerTest.java`
 
+Background: the body shape is fixed by the contract (decision #24, docs/eng/api.md · Errors) and the
+client rejects any other shape (`parseFailure` in `web/src/contracts/errors.ts`), so Spring's
+`ProblemDetail` (RFC 9457) body is **not** used. Spring's machinery is: the handler extends
+`ResponseEntityExceptionHandler`, which already handles every standard Spring MVC exception
+(unreadable body, validation, missing parameters, 404 route, 405, 415…), and only
+`handleExceptionInternal` is overridden to write the contract's envelope.
+
 **Interfaces:**
 - Produces:
   - `enum ErrorCode` — wire value via `wire()` (snake_case), HTTP status via `status()`; exactly the 14 codes of `docs/eng/api.md` · Errors / `web/src/contracts/errors.ts`.
@@ -1016,6 +1016,13 @@ class ApiErrorHandlerTest {
         mvc.perform(get("/no/such/route"))
            .andExpect(status().isNotFound())
            .andExpect(jsonPath("$.error.code").value("not_found"));
+    }
+
+    @Test
+    void wrongMethodIsValidationFailedInTheEnvelope() throws Exception {
+        mvc.perform(post("/probe/conflict"))
+           .andExpect(status().isUnprocessableEntity())
+           .andExpect(jsonPath("$.error.code").value("validation_failed"));
     }
 
     @Test
@@ -1126,63 +1133,79 @@ public record ApiErrorBody(Error error) {
 ```java
 package co.scuby.platform.web;
 
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Turns every failure into the contract's envelope. The client writes its own copy per code. */
+/**
+ * Turns every failure into the contract's envelope (docs/eng/api.md · Errors). Spring's base class
+ * handles the standard MVC exceptions; we only decide the body. The client writes its own copy per code.
+ */
 @RestControllerAdvice
-public class ApiErrorHandler {
+public class ApiErrorHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiErrorHandler.class);
 
     @ExceptionHandler(ApiException.class)
-    ResponseEntity<ApiErrorBody> api(ApiException e) {
+    ResponseEntity<Object> api(ApiException e) {
         return respond(e.code(), e.getMessage(), e.fields(), e.details());
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    ResponseEntity<ApiErrorBody> invalid(MethodArgumentNotValidException e) {
-        Map<String, String> fields = new LinkedHashMap<>();
-        e.getBindingResult().getFieldErrors()
-         .forEach(f -> fields.putIfAbsent(f.getField(), f.getDefaultMessage()));
-        return respond(ErrorCode.VALIDATION_FAILED, "request does not match the contract", fields, Map.of());
-    }
-
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<ApiErrorBody> unreadable(HttpMessageNotReadableException e) {
-        return respond(ErrorCode.VALIDATION_FAILED, "unreadable request body", Map.of(), Map.of());
-    }
-
-    @ExceptionHandler(NoResourceFoundException.class)
-    ResponseEntity<ApiErrorBody> notFound(NoResourceFoundException e) {
-        return respond(ErrorCode.NOT_FOUND, "no such route", Map.of(), Map.of());
-    }
-
     @ExceptionHandler(Exception.class)
-    ResponseEntity<ApiErrorBody> unexpected(Exception e) {
+    ResponseEntity<Object> unexpected(Exception e) {
         log.error("unhandled exception", e);
         return respond(ErrorCode.SERVER_ERROR, "server_error", Map.of(), Map.of());
     }
 
-    private static ResponseEntity<ApiErrorBody> respond(ErrorCode code, String message,
-                                                        Map<String, String> fields, Map<String, String> details) {
+    /** Every standard Spring MVC exception ends here, already classified by HTTP status. */
+    @Override
+    protected @Nullable ResponseEntity<Object> handleExceptionInternal(Exception ex, @Nullable Object body,
+            HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
+        if (ex instanceof MethodArgumentNotValidException invalid) {
+            Map<String, String> fields = new LinkedHashMap<>();
+            invalid.getBindingResult().getFieldErrors()
+                   .forEach(f -> fields.putIfAbsent(f.getField(), f.getDefaultMessage()));
+            return respond(ErrorCode.VALIDATION_FAILED, "request does not match the contract", fields, Map.of());
+        }
+        if (statusCode.value() == HttpStatus.NOT_FOUND.value()) {
+            return respond(ErrorCode.NOT_FOUND, "no such route", Map.of(), Map.of());
+        }
+        if (statusCode.is4xxClientError()) {
+            // 400, 405, 415…: the request does not fit the contract. The contract has no code per
+            // HTTP nuance, so all of them are validation_failed, answered with that code's status.
+            return respond(ErrorCode.VALIDATION_FAILED, ex.getMessage(), Map.of(), Map.of());
+        }
+        log.error("server-side MVC failure", ex);
+        return respond(ErrorCode.SERVER_ERROR, "server_error", Map.of(), Map.of());
+    }
+
+    private static ResponseEntity<Object> respond(ErrorCode code, String message,
+                                                  Map<String, String> fields, Map<String, String> details) {
         return ResponseEntity.status(code.status()).body(ApiErrorBody.of(code, message, fields, details));
     }
 }
 ```
 
+If a signature differs in Spring Framework 7 (e.g. the `@Nullable` annotation's package), match the
+base class's declaration exactly — the IDE/compiler shows it.
+
 Field names in `fields` are Java property names; when request records gain snake_case wire names they must be mapped to the wire path (docs/eng/api.md · Errors says `fields` maps each *wire* path). Note this in the night report as a follow-up, not tonight's work.
 
-- [ ] **Step 4: Run to see it pass** — same command → PASS. If the unknown-route test gets a 404 without the envelope, add `spring.mvc.problemdetails.enabled: false` to `application.yml` and check whether Boot 4 needs `spring.web.resources.add-mappings: false` so `NoResourceFoundException` reaches the advice.
+- [ ] **Step 4: Run to see it pass** — same command → PASS. Keep `spring.mvc.problemdetails.enabled` at its default (`false`): when on, Boot registers its own `ResponseEntityExceptionHandler` that writes `ProblemDetail`. If the unknown-route test gets a 404 without the envelope, check whether `NoResourceFoundException` reaches the advice (Boot 4 may need `spring.web.resources.add-mappings: false`).
+
+Known follow-up (not tonight): errors raised outside Spring MVC — servlet filters, and Spring Security once it arrives in phase S — go to Boot's `/error` endpoint, which has its own body. When security lands, route those through the same envelope (a custom `ErrorAttributes` or the security entry points). Note it in the night report.
 
 - [ ] **Step 5: Commit**
 

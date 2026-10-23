@@ -79,9 +79,9 @@ only changes its connection settings.
 
 ## Database
 
-- **PostgreSQL 17 + PostGIS**, plus `pgvector` later.
+- **PostgreSQL 17 + PostGIS.** `pgvector` joins when photo matching needs it ([O7](../open-items.md)), not before.
 - **A project-built image** for staging, CI and local development:
-  `FROM postgres:17` + `postgresql-17-postgis-3` (+ `postgresql-17-pgvector`) from the PGDG
+  `FROM postgres:17` + `postgresql-17-postgis-3` from the PGDG
   repository, which publishes ARM64 builds. The official `postgis/postgis` images are amd64-only,
   which breaks both the `t4g` instance and Testcontainers on Apple-silicon laptops. If an extension
   is unavailable for 17, Postgres 16 is the tested fallback.

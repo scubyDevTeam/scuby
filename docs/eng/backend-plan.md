@@ -58,7 +58,7 @@ the backend, New Relic account.
 `/actuator/health`.
 
 **0.2 Postgres image.** *Read:* [infra.md](infra.md) · Database. *Do:* the project image
-(`postgres:17` + PostGIS + pgvector from PGDG), published for amd64 and arm64; a Compose file for
+(`postgres:17` + PostGIS from PGDG), published for amd64 and arm64; a Compose file for
 local development. *Done when:* the image runs on an Apple-silicon laptop and in CI, and
 `CREATE EXTENSION postgis` succeeds.
 
