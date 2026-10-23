@@ -171,6 +171,30 @@
           <argLine>-XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>com.google.cloud.tools</groupId>
+        <artifactId>jib-maven-plugin</artifactId>
+        <version>3.5.2</version>
+        <configuration>
+          <from>
+            <image>eclipse-temurin:25-jre</image>
+            <platforms>
+              <platform><architecture>arm64</architecture><os>linux</os></platform>
+              <platform><architecture>amd64</architecture><os>linux</os></platform>
+            </platforms>
+          </from>
+          <to>
+            <image>scuby-backend</image>
+          </to>
+          <container>
+            <mainClass>co.scuby.ScubyApplication</mainClass>
+            <ports><port>8080</port></ports>
+            <jvmFlags>
+              <jvmFlag>-XX:MaxRAMPercentage=60</jvmFlag>
+            </jvmFlags>
+          </container>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>
