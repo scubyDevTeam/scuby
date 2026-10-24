@@ -3,23 +3,47 @@
 import * as z from 'zod/mini'
 import { api, type Endpoint } from './api'
 import { ERROR_STATUS, type ErrorCode, errorWire } from './errors'
+import { nameSchemas } from './names'
 
 type JsonSchema = Record<string, unknown>
 
-/** The bare schema: no `$schema`, and no 400-character regex where `format` already says it. */
+/** Named shapes found while converting, by io. A shape a default changes (a request may omit what
+ * a response always carries) reads differently each way: the response keeps `Name`, the request
+ * becomes `NameInput` — see `resolveNames`. */
+const named = { input: new Map<string, JsonSchema>(), output: new Map<string, JsonSchema>() }
+
+const INPUT_MARK = '~in'
+
+const DEFS = '#/$defs/'
+const COMPONENTS = '#/components/schemas/'
+
+/** The bare schema: no `$schema`, no 400-character regex where `format` already says it, and every
+ * registered shape (names.ts) hoisted into `components/schemas` and referenced by `$ref`. */
 function schema(source: z.ZodMiniType, io: 'input' | 'output'): JsonSchema {
   const tidy = (node: unknown): unknown => {
     if (Array.isArray(node)) return node.map(tidy)
     if (!node || typeof node !== 'object') return node
     const out: JsonSchema = {}
     for (const [key, value] of Object.entries(node)) {
-      if (key === '$schema') continue
+      if (key === '$schema' || key === '$defs') continue
       if (key === 'pattern' && (node as JsonSchema).format === 'date-time') continue
+      if (key === '$ref' && typeof value === 'string' && value.startsWith(DEFS)) {
+        out[key] = COMPONENTS + value.slice(DEFS.length) + (io === 'input' ? INPUT_MARK : '')
+        continue
+      }
       out[key] = tidy(value)
     }
     return out
   }
-  return tidy(z.toJSONSchema(source, { io, unrepresentable: 'any' })) as JsonSchema
+  const json = z.toJSONSchema(source, {
+    io,
+    unrepresentable: 'any',
+    reused: 'inline',
+  }) as JsonSchema
+  for (const [name, def] of Object.entries((json.$defs ?? {}) as Record<string, unknown>)) {
+    named[io].set(name, tidy(def) as JsonSchema)
+  }
+  return tidy(json) as JsonSchema
 }
 
 const ALWAYS: ErrorCode[] = ['validation_failed', 'rate_limited', 'server_error']
@@ -102,7 +126,48 @@ function success(endpoint: Endpoint) {
   }
 }
 
+const refTo = (name: string, mark = '') => `${COMPONENTS}${name}${mark}"`
+
+/** Settles which shapes read differently as input and as output: those whose two forms differ, and
+ * (to a fixpoint) those that hold one. Input references to them become `NameInput`. */
+function resolveNames() {
+  const unmarked = (value: JsonSchema) => JSON.stringify(value).split(`${INPUT_MARK}"`).join('"')
+  const divergent = new Set<string>()
+  for (const [name, input] of named.input) {
+    const output = named.output.get(name)
+    if (output && unmarked(input) !== JSON.stringify(output)) divergent.add(name)
+  }
+  for (let changed = true; changed; ) {
+    changed = false
+    for (const [name, input] of named.input) {
+      if (divergent.has(name)) continue
+      const text = JSON.stringify(input)
+      if ([...divergent].some((other) => text.includes(refTo(other, INPUT_MARK)))) {
+        divergent.add(name)
+        changed = true
+      }
+    }
+  }
+  const rename = <T>(value: T): T =>
+    JSON.parse(
+      JSON.stringify(value).replace(
+        new RegExp(`${COMPONENTS}(\\w+)${INPUT_MARK}"`, 'g'),
+        (_, n: string) => refTo(n, divergent.has(n) ? 'Input' : '').replace(/"$/, '') + '"',
+      ),
+    )
+  const all: Record<string, JsonSchema> = {}
+  for (const [name, def] of named.output) all[name] = def
+  for (const [name, input] of named.input) {
+    if (divergent.has(name)) all[`${name}Input`] = input
+    else if (!(name in all)) all[name] = input
+  }
+  return { schemas: rename(all), rename }
+}
+
 export function openApiDocument() {
+  nameSchemas()
+  named.input.clear()
+  named.output.clear()
   const paths: Record<string, Record<string, unknown>> = {}
   for (const [name, endpoint] of Object.entries(api) as [string, Endpoint][]) {
     const path = endpoint.path.replace(/:([A-Za-z]+)/g, '{$1}')
@@ -118,7 +183,14 @@ export function openApiDocument() {
       responses: { [String(endpoint.status)]: success(endpoint), ...errorResponses(endpoint) },
     }
   }
-  return {
+  schema(errorWire, 'output') // registers `Error` (names.ts) — the envelope every failure shares
+  const { schemas, rename } = resolveNames()
+  // A shape only used flattened (query parameters), or only as the other form, has no reference.
+  const used = JSON.stringify(rename([paths, schemas]))
+  const sorted = Object.entries(schemas)
+    .filter(([name]) => name === 'Error' || used.includes(refTo(name)))
+    .sort(([x], [y]) => x.localeCompare(y))
+  return rename({
     openapi: '3.1.0',
     info: {
       // The product name is configuration (decision #21): the document does not spell it.
@@ -129,11 +201,11 @@ export function openApiDocument() {
     },
     paths,
     components: {
-      schemas: { Error: schema(errorWire, 'output') },
+      schemas: Object.fromEntries(sorted),
       securitySchemes: {
         // O12: an httpOnly cookie on a same-site subdomain. Every request is sent with credentials.
         session: { type: 'apiKey', in: 'cookie', name: 'session' },
       },
     },
-  }
+  })
 }

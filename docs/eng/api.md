@@ -10,12 +10,13 @@
 |---|---|---|
 | **Every endpoint**: method, path, auth, request, response, status, errors | [`web/src/contracts/api.ts`](../../web/src/contracts/api.ts) | **Yes — the source** |
 | Wire shapes (Zod) | `web/src/contracts/*.ts`, referenced from `api.ts` | Yes |
+| Names of the wire shapes (`Sighting`, `PublishLostRequest`…) | [`web/src/contracts/names.ts`](../../web/src/contracts/names.ts) — derived from each schema's export name (`sightingWire` → `Sighting`); no hand-kept list | No |
 | Error codes and their HTTP status | [`web/src/contracts/errors.ts`](../../web/src/contracts/errors.ts) | Yes |
 | **OpenAPI 3.1 document** | [`openapi.json`](openapi.json) | **No** — `pnpm openapi` in `web/` generates it; CI fails when it is stale |
 | Behaviour the backend must reproduce | [`web/src/mocks/backend.test.ts`](../../web/src/mocks/backend.test.ts) — scenarios run against the emulated backend | Yes |
 
 **Staging (decision #34).** Stage 1 — now: the source stays `api.ts`, and every wire shape is named
-(`.meta({ id })`), so `openapi.json` carries `components/schemas` and `$ref`s instead of inlined
+(`names.ts`), so `openapi.json` carries `components/schemas` and `$ref`s instead of inlined
 objects. Stage 2 — after the Java spike ([backend-plan.md](backend-plan.md) · 0.4) shows the
 generator yields usable records: [`openapi.yaml`](openapi.yaml) becomes the hand-edited source,
 either side proposes changes in a PR the other reviews, the backend generates its types and the
