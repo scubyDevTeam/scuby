@@ -12,7 +12,14 @@ import { parseConversation, parseConversations, parseStarted } from '../contract
 import { parseFeed } from '../contracts/feed'
 import { parsePledge } from '../contracts/help'
 import { parseCheckinLink } from '../contracts/links'
-import { parseMyCases, parseNotifications, parsePets, parsePublish } from '../contracts/owner'
+import {
+  parseMyCases,
+  parseNotifications,
+  parsePets,
+  parsePublish,
+  parseUpload,
+  uploadBody,
+} from '../contracts/owner'
 import { parseProfile, parseUser } from '../contracts/session'
 import { DEMO_LINKS, linkToken } from './api/links'
 import { db, type LostRow, resetDb } from './db'
@@ -2082,5 +2089,43 @@ describe('the demo account comes back (emulation)', () => {
     const again = await asCarolina()
     expect(again.email).toBe('carolina@correo.co')
     expect((await call(api.listMyCases, {}, parseMyCases)).length).toBe(0)
+  })
+})
+
+describe('photo uploads (docs/eng/api.md · Uploads, media-pipeline §1)', () => {
+  const sha256 = 'b'.repeat(64)
+  const slot = () =>
+    call(api.uploadPhoto, { body: uploadBody({ purpose: 'pet', sha256, bytes: 3 }) }, parseUpload)
+
+  it('answers a slot to send the bytes to, and the URL the photo will have', async () => {
+    const { url, target } = await slot()
+    expect(url).toContain(sha256)
+    expect(target?.url).toBe(url)
+    expect(target?.headers['content-type']).toBe('image/jpeg')
+  })
+
+  it('serves the photo once the bytes are sent, and answers no slot for a photo it has', async () => {
+    const { url, target } = await slot()
+    expect((await fetch(url)).status).toBe(404)
+    const put = await fetch(target?.url ?? '', {
+      method: 'PUT',
+      headers: target?.headers,
+      body: new Uint8Array([1, 2, 3]),
+    })
+    expect(put.ok).toBe(true)
+    const stored = await fetch(url)
+    expect(new Uint8Array(await stored.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
+    expect((await slot()).target).toBeNull()
+  })
+
+  it('refuses a hash that is not a SHA-256', async () => {
+    const error = await failure(
+      call(
+        api.uploadPhoto,
+        { body: uploadBody({ purpose: 'pet', sha256: 'nope', bytes: 3 }) },
+        asIs,
+      ),
+    )
+    expect(error.code).toBe('validation_failed')
   })
 })

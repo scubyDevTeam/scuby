@@ -66,7 +66,7 @@ export function EditLost({ lostCase, mapStyleUrl, onDone }: Props) {
         title={t('publish.animal.photos')}
         error={tried && noPhoto ? t('lost_forms.edit.photos_required') : null}
       >
-        <PhotoPicker urls={photoUrls} onChange={setPhotoUrls} />
+        <PhotoPicker purpose="pet" urls={photoUrls} onChange={setPhotoUrls} />
       </Section>
       <TextArea
         label={t('lost_forms.publish.marks')}

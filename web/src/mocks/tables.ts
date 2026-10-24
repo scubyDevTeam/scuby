@@ -299,6 +299,8 @@ export type Tables = {
   cases: Record<string, CaseRow>
   /** Codes that existed and were purged: they answer `gone`, so a printed poster never 404s. */
   purged: string[]
+  /** Stored photos by SHA-256, as data URLs: the emulation's bucket (api/media.ts). */
+  media: Record<string, string>
   sightings: SightingRow[]
   recoveryClaims: RecoveryClaimRow[]
   ownershipClaims: OwnershipClaimRow[]

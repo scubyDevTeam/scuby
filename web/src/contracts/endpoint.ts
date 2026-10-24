@@ -12,8 +12,7 @@ export type Endpoint = {
   /** `session` answers `unauthorized` without one. Who may act on what is each endpoint's `forbidden`. */
   auth: 'public' | 'session'
   query: Schema | null
-  /** JSON, or `multipart` for the one endpoint that takes a file (field `file`). */
-  body: Schema | 'multipart' | null
+  body: Schema | null
   status: 200 | 201 | 204
   /** Null with 204. */
   response: Schema | null
@@ -30,7 +29,7 @@ type Defined<D extends Definition> = {
   summary: string
   auth: D['auth']
   query: D extends { query: infer Q extends Schema } ? Q : null
-  body: D extends { body: infer B extends Schema | 'multipart' } ? B : null
+  body: D extends { body: infer B extends Schema } ? B : null
   status: Endpoint['status']
   response: D extends { response: infer R extends Schema } ? R : null
   errors: readonly ErrorCode[]
@@ -65,11 +64,7 @@ type PathParam<P extends string> = P extends `${string}:${infer After}` ? Segmen
 /** `{ code: string }` for `/cases/:code`; nothing for a path without parameters. */
 export type ParamsOf<E extends Endpoint> = { [K in PathParam<E['path']>]: string }
 /** What the caller sends. */
-export type BodyOf<E extends Endpoint> = E['body'] extends Schema
-  ? z.input<E['body']>
-  : E['body'] extends 'multipart'
-    ? Blob
-    : undefined
+export type BodyOf<E extends Endpoint> = E['body'] extends Schema ? z.input<E['body']> : undefined
 export type QueryOf<E extends Endpoint> = E['query'] extends Schema
   ? z.input<E['query']>
   : undefined

@@ -10,6 +10,7 @@ import { found } from './api/found'
 import { help } from './api/help'
 import { helpers } from './api/helpers'
 import { links } from './api/links'
+import { media } from './api/media'
 import { owner } from './api/owner'
 import { reads } from './api/reads'
 
@@ -27,4 +28,5 @@ export const handlers = [
   ...conversations,
   ...alerts,
   ...edit,
+  ...media,
 ]

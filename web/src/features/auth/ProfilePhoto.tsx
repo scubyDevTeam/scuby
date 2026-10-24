@@ -3,14 +3,14 @@ import { useUpdateProfile } from '@api-client/session'
 import { fitWithin, PHOTO_JPEG_QUALITY } from '@domain/shared/image'
 import { initials } from '@domain/shared/signin'
 import { useI18n } from '@i18n/react'
-import { prepareImage } from '@platform/image'
+import { prepareImage, sha256Hex } from '@platform/image'
 import { useId, useState } from 'react'
 
 /** The profile photo (auth.md · Profile `photo?`): re-encoded on the device, then uploaded. */
 export function ProfilePhoto({ name, photoUrl }: { name: string; photoUrl: string | null }) {
   const { t } = useI18n()
   const id = useId()
-  const upload = useUploadPhoto()
+  const upload = useUploadPhoto('profile')
   const update = useUpdateProfile()
   const [failed, setFailed] = useState(false)
   const busy = upload.isPending || update.isPending
@@ -21,7 +21,7 @@ export function ProfilePhoto({ name, photoUrl }: { name: string; photoUrl: strin
     setFailed(false)
     try {
       const prepared = await prepareImage(file, fitWithin, PHOTO_JPEG_QUALITY)
-      const url = await upload.mutateAsync(prepared)
+      const url = await upload.mutateAsync({ photo: prepared, sha256: await sha256Hex(prepared) })
       await update.mutateAsync({ photoUrl: url })
     } catch {
       setFailed(true)

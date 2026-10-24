@@ -14,9 +14,13 @@ import {
   parsePublish,
   parseUpload,
   publishLostBody,
+  type UploadPurpose,
+  uploadBody,
 } from '../contracts/owner'
 import { parseNothing } from '../contracts/session'
-import { call } from './http'
+import { ApiError, call } from './http'
+
+export type { UploadPurpose }
 
 export const myPetsQuery = queryOptions({
   queryKey: ['me', 'pets'],
@@ -32,10 +36,34 @@ export const myCasesQuery = queryOptions({
 
 export const useMyCases = () => useQuery(myCasesQuery)
 
-/** One prepared photo → its URL. */
-export function useUploadPhoto() {
+/**
+ * One prepared photo → its URL (docs/eng/api.md · Uploads): ask for a slot signed with the photo's
+ * hash, send the bytes to it, answer the URL the slot declared. A photo already stored has no slot
+ * to send to. The bytes go to storage, not to the API: no cookie, no `Accept-Language`.
+ */
+export function useUploadPhoto(purpose: UploadPurpose) {
   return useMutation({
-    mutationFn: (photo: Blob) => call(helpersEndpoints.uploadPhoto, { body: photo }, parseUpload),
+    mutationFn: async ({ photo, sha256 }: { photo: Blob; sha256: string }) => {
+      const slot = await call(
+        helpersEndpoints.uploadPhoto,
+        { body: uploadBody({ purpose, sha256, bytes: photo.size }) },
+        parseUpload,
+      )
+      if (slot.target) {
+        let response: Response
+        try {
+          response = await fetch(new URL(slot.target.url), {
+            method: 'PUT',
+            headers: slot.target.headers,
+            body: photo,
+          })
+        } catch {
+          throw new ApiError('network')
+        }
+        if (!response.ok) throw new ApiError('unexpected_response', response.status)
+      }
+      return slot.url
+    },
   })
 }
 

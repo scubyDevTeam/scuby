@@ -1,7 +1,7 @@
-import { useUploadPhoto } from '@api-client/owner'
+import { type UploadPurpose, useUploadPhoto } from '@api-client/owner'
 import { fitWithin, isHeic, PHOTO_JPEG_QUALITY } from '@domain/shared/image'
 import { useI18n } from '@i18n/react'
-import { prepareImage } from '@platform/image'
+import { prepareImage, sha256Hex } from '@platform/image'
 import { Plus, X } from 'lucide-react'
 import { useId, useState } from 'react'
 
@@ -9,15 +9,17 @@ const MAX_PHOTOS = 4
 
 /** Photos are re-encoded on the device, then uploaded one by one (docs/eng/media-pipeline.md §1). */
 export function PhotoPicker({
+  purpose,
   urls,
   onChange,
 }: {
+  purpose: UploadPurpose
   urls: readonly string[]
   onChange: (urls: string[]) => void
 }) {
   const { t } = useI18n()
   const id = useId()
-  const upload = useUploadPhoto()
+  const upload = useUploadPhoto(purpose)
   const [failed, setFailed] = useState<'heic' | 'other' | null>(null)
 
   async function add(files: FileList | null) {
@@ -26,7 +28,7 @@ export function PhotoPicker({
     setFailed(null)
     try {
       const prepared = await prepareImage(file, fitWithin, PHOTO_JPEG_QUALITY)
-      const url = await upload.mutateAsync(prepared)
+      const url = await upload.mutateAsync({ photo: prepared, sha256: await sha256Hex(prepared) })
       onChange([...urls, url])
     } catch {
       setFailed(isHeic(file) ? 'heic' : 'other')

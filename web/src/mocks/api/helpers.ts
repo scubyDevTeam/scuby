@@ -7,6 +7,7 @@ import { notify } from '../notify'
 import { fail, route } from '../route'
 import { ago, DAY, distance, HOUR, iso, metres, ms } from '../rules'
 import { EDIT_WINDOW, ownership, REOPEN_WINDOW } from '../serialize'
+import { mediaUrl } from './media'
 
 const MAX_DISTANCE_M = 30_000
 const BEFORE_CASE = DAY
@@ -214,11 +215,19 @@ export const helpers = [
     return { id }
   }),
 
-  // Photos are kept inline: the emulation has no storage. The real one is docs/eng/media-pipeline.md.
+  // The slot: where the bytes go and where the photo will be (api/media.ts is the storage side).
+  // The emulation does not check who may attach which photo; the real backend does (api.md · Uploads).
   route(api.uploadPhoto, async ({ body }) => {
-    const bytes = new Uint8Array(await body.arrayBuffer())
-    let binary = ''
-    for (const byte of bytes) binary += String.fromCharCode(byte)
-    return { url: `data:${body.type || 'image/jpeg'};base64,${btoa(binary)}` }
+    const url = mediaUrl(body.sha256)
+    if (db.media[body.sha256]) return { url, upload: null }
+    return {
+      url,
+      upload: {
+        method: 'PUT' as const,
+        url,
+        headers: { 'content-type': body.content_type },
+        expires_at: iso(Date.now() + 5 * 60 * 1000),
+      },
+    }
   }),
 ]

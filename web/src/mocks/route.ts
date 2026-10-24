@@ -28,7 +28,7 @@ export function fail(code: ErrorCode, details?: Record<string, string>): never {
   throw new Fail(code, details)
 }
 
-type Parsed<S> = S extends z.ZodMiniType ? z.output<S> : S extends 'multipart' ? Blob : undefined
+type Parsed<S> = S extends z.ZodMiniType ? z.output<S> : undefined
 
 export type Context<E extends Endpoint> = {
   params: ParamsOf<E>
@@ -77,12 +77,6 @@ function parseOrFail(schema: z.ZodMiniType, raw: unknown): unknown {
 
 async function readBody(endpoint: Endpoint, request: Request): Promise<unknown> {
   if (endpoint.body === null) return undefined
-  if (endpoint.body === 'multipart') {
-    const file = (await request.formData().catch(() => null))?.get('file')
-    if (!(file instanceof Blob))
-      throw new Fail('validation_failed', undefined, { file: 'Required' })
-    return file
-  }
   return parseOrFail(endpoint.body, await request.json().catch(() => undefined))
 }
 

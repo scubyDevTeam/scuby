@@ -6,6 +6,7 @@ import {
   shareOpenedRequest,
   sightingCorrectionRequest,
   sightingRequest,
+  uploadRequest,
   uploadWire,
 } from '../actions'
 import { endpoint, SIGHTING_RULES } from '../endpoint'
@@ -83,10 +84,12 @@ export const uploadPhoto = endpoint({
   method: 'POST',
   path: '/uploads',
   summary:
-    'Stores one prepared photo (JPEG, ≤ 1600 px) and answers its URL. Provisional: becomes ' +
-    'signed upload URLs when the media stack is chosen (O10).',
+    'Asks for a slot to store one prepared photo (JPEG, ≤ 1600 px): a short-lived presigned PUT ' +
+    'signed with the photo’s SHA-256, scoped to what the photo is for and to who asks. The answer ' +
+    'also carries the photo’s final URL; `upload` is null when that exact photo is already stored. ' +
+    'A photo in a publish body that this caller did not upload for that purpose is refused.',
   auth: 'public',
-  body: 'multipart',
+  body: uploadRequest,
   status: 201,
   response: uploadWire,
 })

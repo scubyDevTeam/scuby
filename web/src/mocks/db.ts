@@ -10,7 +10,7 @@ export type * from './tables'
 // back to the fixtures.
 export const DB_KEY = 'mock-db'
 const KEY = DB_KEY
-const VERSION = 6
+const VERSION = 7
 
 function load(): Tables {
   const stored = read<{ version: number; tables: Tables }>('local', KEY)

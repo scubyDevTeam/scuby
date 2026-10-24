@@ -138,6 +138,55 @@ export const reportBody = (input: ReportInput): z.input<typeof reportRequest> =>
 
 export const parseCreated = (raw: unknown) => createdWire.parse(raw)
 
-/** What the upload endpoint answers: the URL to send back in a form. */
-export const uploadWire = z.object({ url: photoUrl })
-export const parseUpload = (raw: unknown) => uploadWire.parse(raw).url
+/**
+ * What a photo is for. The slot is scoped to it and to who asks (session or device), so a photo
+ * cannot be attached to a row of another kind or by another person (docs/eng/media-pipeline.md §1).
+ * Limits per purpose: pet 6, sighting 3, claim 5, evidence 5, profile 1.
+ */
+export const uploadPurposeSchema = z.enum(['pet', 'sighting', 'claim', 'evidence', 'profile'])
+
+/** Asks for one upload slot: the photo as the device prepared it, declared before it is sent. */
+export const uploadRequest = z.object({
+  purpose: uploadPurposeSchema,
+  /** Lowercase hex of the bytes. The slot is signed with it, so storage refuses any other bytes. */
+  sha256: z.string().check(z.regex(/^[0-9a-f]{64}$/)),
+  content_type: z.literal('image/jpeg'),
+  bytes: z.int().check(z.positive(), z.maximum(10_000_000)),
+})
+
+/**
+ * `url` is where the photo will be, derived from its hash: it goes in the publish body as is.
+ * `upload` is where to send the bytes, or null when this exact photo is already stored.
+ */
+export const uploadWire = z.object({
+  url: photoUrl,
+  upload: z.nullable(
+    z.object({
+      method: z.literal('PUT'),
+      url: z.string().check(z.minLength(1)),
+      /** To send with the bytes, as given (the checksum header among them). */
+      headers: z.record(z.string(), z.string()),
+      expires_at: timestamp,
+    }),
+  ),
+})
+
+export type UploadPurpose = z.infer<typeof uploadPurposeSchema>
+export type UploadInput = { purpose: UploadPurpose; sha256: string; bytes: number }
+
+export const uploadBody = (input: UploadInput): z.input<typeof uploadRequest> => ({
+  purpose: input.purpose,
+  sha256: input.sha256,
+  content_type: 'image/jpeg',
+  bytes: input.bytes,
+})
+
+export const parseUpload = (raw: unknown) => {
+  const wire = uploadWire.parse(raw)
+  return {
+    url: wire.url,
+    target: wire.upload
+      ? { url: wire.upload.url, headers: wire.upload.headers, expiresAt: wire.upload.expires_at }
+      : null,
+  }
+}
