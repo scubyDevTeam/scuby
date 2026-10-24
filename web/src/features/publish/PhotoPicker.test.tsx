@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithQuery, stubApi } from '../../test-utils'
 import { PhotoPicker } from './PhotoPicker'
@@ -38,6 +39,36 @@ const pick = (name: string, type: string) =>
   })
 
 describe('PhotoPicker — media-pipeline §1', () => {
+  it('shows the photo it just sent from the device, not the stored one that may not exist yet', async () => {
+    const revoke = vi.fn()
+    vi.stubGlobal(
+      'URL',
+      Object.assign(URL, { createObjectURL: () => 'blob:local-1', revokeObjectURL: revoke }),
+    )
+    const { onChange } = show()
+    cleanup()
+    function Harness() {
+      const [urls, setUrls] = useState<string[]>([])
+      return (
+        <PhotoPicker
+          purpose="pet"
+          urls={urls}
+          onChange={(next) => {
+            onChange(next)
+            setUrls(next)
+          }}
+        />
+      )
+    }
+    const { unmount } = renderWithQuery(<Harness />)
+    pick('perro.jpg', 'image/jpeg')
+    const image = await screen.findByRole('img', { name: 'Foto 1' })
+    expect(onChange).toHaveBeenCalledWith(['https://img.example/media/a.jpg'])
+    expect(image.getAttribute('src')).toBe('blob:local-1')
+    unmount()
+    expect(revoke).toHaveBeenCalledWith('blob:local-1')
+  })
+
   it('a photo is prepared on the device, uploaded, and added', async () => {
     const { onChange, calls } = show()
     pick('perro.jpg', 'image/jpeg')
