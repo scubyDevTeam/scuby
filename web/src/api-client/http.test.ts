@@ -111,14 +111,6 @@ describe('call', () => {
     expect(init?.credentials).toBe('include')
   })
 
-  it('sends a file as multipart, letting the browser set the boundary', async () => {
-    respond(201, { url: 'u' })
-    await call(api.uploadPhoto, { body: new Blob(['x'], { type: 'image/jpeg' }) }, asIs)
-    const init = vi.mocked(fetch).mock.calls[0]?.[1]
-    expect(init?.body).toBeInstanceOf(FormData)
-    expect(new Headers(init?.headers).has('Content-Type')).toBe(false)
-  })
-
   it('asks for display text in the language the screen is in', async () => {
     respond(200, {})
     setRequestLanguage('en')

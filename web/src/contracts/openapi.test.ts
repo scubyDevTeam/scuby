@@ -21,4 +21,14 @@ describe('the OpenAPI document', () => {
     const operations = Object.values(openApiDocument().paths).flatMap((ops) => Object.keys(ops))
     expect(operations).toHaveLength(keys.length)
   })
+
+  it('names its shapes: every $ref resolves, and every component is used', () => {
+    const text = JSON.stringify(openApiDocument())
+    const defined = new Set(Object.keys(openApiDocument().components.schemas))
+    const refs = new Set(
+      [...text.matchAll(/#\/components\/schemas\/(\w+)"/g)].map((m) => m[1] as string),
+    )
+    expect([...refs].filter((name) => !defined.has(name))).toEqual([])
+    expect([...defined].filter((name) => name !== 'Error' && !refs.has(name))).toEqual([])
+  })
 })

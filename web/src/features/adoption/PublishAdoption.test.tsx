@@ -8,7 +8,10 @@ import { cases } from '../../mocks/fixtures'
 import { renderWithQuery, stubApi } from '../../test-utils'
 import { PublishAdoption } from './PublishAdoption'
 
-vi.mock('@platform/image', () => ({ prepareImage: async (file: Blob) => file }))
+vi.mock('@platform/image', () => ({
+  prepareImage: async (file: Blob) => file,
+  sha256Hex: async () => 'a'.repeat(64),
+}))
 
 const veteran: User = {
   id: 'u1',
@@ -22,7 +25,7 @@ beforeEach(() => localStorage.clear())
 
 function show(fromFound: FoundCase | null = null) {
   const calls = stubApi({
-    'POST /uploads': { status: 201, body: { url: 'photo-1.jpg' } },
+    'POST /uploads': { status: 201, body: { url: 'photo-1.jpg', upload: null } },
     'POST /adoption-cases': { body: { code: 'NEW42' } },
   })
   vi.stubGlobal('navigator', {

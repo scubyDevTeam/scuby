@@ -88,12 +88,6 @@ export function setRequestLanguage(locale: string): void {
 function init(endpoint: Endpoint, body: unknown): RequestInit {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (language) headers['Accept-Language'] = language
-  if (endpoint.body === 'multipart') {
-    // The browser sets the boundary, so no Content-Type here.
-    const form = new FormData()
-    form.append('file', body as Blob, 'photo.jpg')
-    return { method: endpoint.method, headers, body: form }
-  }
   if (endpoint.body === null) return { method: endpoint.method, headers }
   headers['Content-Type'] = 'application/json'
   return { method: endpoint.method, headers, body: JSON.stringify(body) }

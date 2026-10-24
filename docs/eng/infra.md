@@ -102,7 +102,7 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
 
 | Pipeline step | AWS |
 |---|---|
-| Upload | The backend issues a **presigned S3 PUT URL**, scoped to the row being created, into `incoming/`. The URL is signed with the photo's **SHA-256** (`x-amz-checksum-sha256`), so S3 rejects bytes that do not match the declared hash |
+| Upload | The backend issues a **presigned S3 PUT URL**, scoped to the photo's purpose and to who asks ([api.md](api.md) · Uploads), into `incoming/`. The URL is signed with the photo's **SHA-256** (`x-amz-checksum-sha256`), so S3 rejects bytes that do not match the declared hash |
 | Server-side safety steps (validate, strip EXIF, re-encode to the JPEG master) | **Ingest Lambda** on the S3 upload event: writes `media/{sha256}.jpg`, removes the `incoming/` object. Heavy image work never runs in the JVM |
 | Variants on demand, AVIF → WebP → JPEG | **CloudFront `img.<domain>` → Lambda (Node + sharp) via Function URL** on cache miss; results cached at the edge |
 | Restricted images (claim proof, orphan sightings) | **CloudFront signed URLs**, short TTL, issued by the backend to the viewer allowed to see them |

@@ -223,7 +223,7 @@ export function parsePublish(raw: unknown): PublishResult {
 }
 
 // The upload answer lives with the helpers' shapes (actions.ts): every form with photos uses it.
-export { parseUpload, uploadWire } from './actions'
+export { parseUpload, type UploadPurpose, uploadBody, uploadWire } from './actions'
 
 /** «¿Quién te ayudó?» (docs/product/04 · `resolution` values). */
 export const lostAttributionSchema = z.enum([

@@ -117,7 +117,7 @@ export function WitnessReport({
     <form onSubmit={submit} noValidate className="mx-auto flex max-w-lg flex-col gap-6 px-5 py-6">
       <h1 className="m-0 text-3xl font-extrabold">{t('found.witness.title')}</h1>
       <Section title={t('found.witness.photo')} error={errorFor('photo_required')}>
-        <PhotoPicker urls={photoUrls} onChange={setPhotoUrls} />
+        <PhotoPicker purpose="sighting" urls={photoUrls} onChange={setPhotoUrls} />
         <p className="m-0 text-sm text-muted">{t('found.witness.photo_hint')}</p>
       </Section>
       <Section title={t('pet.species_label')} error={errorFor('species_required')}>

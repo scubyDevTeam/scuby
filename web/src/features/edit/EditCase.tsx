@@ -70,7 +70,7 @@ export function EditCase({ editable, onDone }: { editable: Editable; onDone: () 
         title={t('publish.animal.photos')}
         error={tried && noPhoto ? t('edit_case.photos_required') : null}
       >
-        <PhotoPicker urls={photoUrls} onChange={setPhotoUrls} />
+        <PhotoPicker purpose="pet" urls={photoUrls} onChange={setPhotoUrls} />
       </Section>
       {editable.marks !== undefined ? (
         <TextArea

@@ -123,7 +123,11 @@ export function AnimalFields({
   return (
     <>
       <Section title={t('publish.animal.photos')} error={errorFor('photo_required')}>
-        <PhotoPicker urls={animal.photoUrls} onChange={(photoUrls) => onChange({ photoUrls })} />
+        <PhotoPicker
+          purpose="pet"
+          urls={animal.photoUrls}
+          onChange={(photoUrls) => onChange({ photoUrls })}
+        />
       </Section>
       <Section title={t('pet.species_label')} error={errorFor('species_required')}>
         <Chips
