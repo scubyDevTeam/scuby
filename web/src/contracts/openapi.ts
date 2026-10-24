@@ -97,20 +97,6 @@ function parameters(endpoint: Endpoint) {
 
 function requestBody(endpoint: Endpoint) {
   if (endpoint.body === null) return undefined
-  if (endpoint.body === 'multipart') {
-    return {
-      required: true,
-      content: {
-        'multipart/form-data': {
-          schema: {
-            type: 'object',
-            properties: { file: { type: 'string', format: 'binary' } },
-            required: ['file'],
-          },
-        },
-      },
-    }
-  }
   return {
     required: true,
     content: { 'application/json': { schema: schema(endpoint.body, 'input') } },
@@ -205,6 +191,17 @@ export function openApiDocument() {
       securitySchemes: {
         // O12: an httpOnly cookie on a same-site subdomain. Every request is sent with credentials.
         session: { type: 'apiKey', in: 'cookie', name: 'session' },
+        // Decision #35: who someone is without an account. Never required — the API sets it on the
+        // first answer to a request that arrives without one, and the browser sends it back.
+        device: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: 'device',
+          description:
+            'Opaque, httpOnly, set by the API (docs/eng/api.md · Device identity). Identifies an ' +
+            'anonymous reporter or claimant: authorizes correcting their own sighting, marks it ' +
+            '`mine`, keys rate limits. Absent or unknown → the API issues a new one.',
+        },
       },
     },
   })

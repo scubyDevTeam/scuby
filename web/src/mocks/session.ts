@@ -32,7 +32,7 @@ export function signIn(user: PersonRow) {
 
 export const signOut = () => write('local', KEY, null)
 
-/** The rate-limit handle for someone without an account: device/IP in the real backend. */
+/** The emulated `device` cookie (api.md · Device identity): who someone is without an account. */
 export function deviceKey(): string {
   const stored = read<string>('local', DEVICE)
   if (stored) return stored

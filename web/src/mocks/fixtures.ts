@@ -664,6 +664,7 @@ export function seed(): Tables {
     ],
     cases: Object.fromEntries(cases.map((row) => [row.code, row])),
     purged: ['GONE5'],
+    media: {},
     sightings: [
       sighting('s1', '7K3PQ', {
         point: offset(-90, -80),

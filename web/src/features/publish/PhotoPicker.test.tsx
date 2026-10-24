@@ -9,12 +9,27 @@ vi.mock('@platform/image', () => ({
     if (/heic|broken/i.test(file.name)) throw new Error('cannot decode')
     return new Blob(['x'], { type: 'image/jpeg' })
   }),
+  sha256Hex: vi.fn(async () => 'a'.repeat(64)),
 }))
 
 function show(onChange = vi.fn()) {
-  stubApi({ 'POST /uploads': { status: 201, body: { url: 'data:image/jpeg;base64,AAAA' } } })
-  renderWithQuery(<PhotoPicker urls={[]} onChange={onChange} />)
-  return onChange
+  const calls = stubApi({
+    'POST /uploads': {
+      status: 201,
+      body: {
+        url: 'https://img.example/media/a.jpg',
+        upload: {
+          method: 'PUT',
+          url: 'https://bucket.example/incoming/a',
+          headers: { 'x-amz-checksum-sha256': 'abc' },
+          expires_at: '2026-10-24T12:05:00-05:00',
+        },
+      },
+    },
+    'PUT /incoming/a': { status: 200 },
+  })
+  renderWithQuery(<PhotoPicker purpose="pet" urls={[]} onChange={onChange} />)
+  return { onChange, calls }
 }
 
 const pick = (name: string, type: string) =>
@@ -24,9 +39,19 @@ const pick = (name: string, type: string) =>
 
 describe('PhotoPicker — media-pipeline §1', () => {
   it('a photo is prepared on the device, uploaded, and added', async () => {
-    const onChange = show()
+    const { onChange, calls } = show()
     pick('perro.jpg', 'image/jpeg')
-    await vi.waitFor(() => expect(onChange).toHaveBeenCalledWith(['data:image/jpeg;base64,AAAA']))
+    await vi.waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(['https://img.example/media/a.jpg']),
+    )
+    // The slot is asked for with the photo's hash and what it is for, then the bytes go to it.
+    expect(calls.map((call) => call.key)).toEqual(['POST /uploads', 'PUT /incoming/a'])
+    expect(calls[0]?.body).toEqual({
+      purpose: 'pet',
+      sha256: 'a'.repeat(64),
+      content_type: 'image/jpeg',
+      bytes: 1,
+    })
   })
 
   it('an iPhone photo the browser cannot open says what to do instead', async () => {

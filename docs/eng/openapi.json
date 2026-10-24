@@ -4283,7 +4283,7 @@
     "/uploads": {
       "post": {
         "operationId": "uploadPhoto",
-        "summary": "Stores one prepared photo (JPEG, ≤ 1600 px) and answers its URL. Provisional: becomes signed upload URLs when the media stack is chosen (O10).",
+        "summary": "Asks for a slot to store one prepared photo (JPEG, ≤ 1600 px): a short-lived presigned PUT signed with the photo’s SHA-256, scoped to what the photo is for and to who asks. The answer also carries the photo’s final URL; `upload` is null when that exact photo is already stored. A photo in a publish body that this caller did not upload for that purpose is refused.",
         "tags": [
           "uploads"
         ],
@@ -4292,18 +4292,9 @@
         "requestBody": {
           "required": true,
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                },
-                "required": [
-                  "file"
-                ]
+                "$ref": "#/components/schemas/UploadRequest"
               }
             }
           }
@@ -10160,12 +10151,90 @@
           "url": {
             "type": "string",
             "minLength": 1
+          },
+          "upload": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "const": "PUT"
+                  },
+                  "url": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "headers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "method",
+                  "url",
+                  "headers",
+                  "expires_at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
-          "url"
+          "url",
+          "upload"
         ],
         "additionalProperties": false
+      },
+      "UploadPurpose": {
+        "type": "string",
+        "enum": [
+          "pet",
+          "sighting",
+          "claim",
+          "evidence",
+          "profile"
+        ]
+      },
+      "UploadRequest": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "$ref": "#/components/schemas/UploadPurpose"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "content_type": {
+            "type": "string",
+            "const": "image/jpeg"
+          },
+          "bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 10000000
+          }
+        },
+        "required": [
+          "purpose",
+          "sha256",
+          "content_type",
+          "bytes"
+        ]
       },
       "User": {
         "type": "object",
@@ -10233,6 +10302,12 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "session"
+      },
+      "device": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "device",
+        "description": "Opaque, httpOnly, set by the API (docs/eng/api.md · Device identity). Identifies an anonymous reporter or claimant: authorizes correcting their own sighting, marks it `mine`, keys rate limits. Absent or unknown → the API issues a new one."
       }
     }
   }

@@ -362,6 +362,7 @@ export function PublishHelp({
           <Section title={t('help_forms.publish.evidence_title')}>
             <p className="m-0 text-sm text-muted">{t('help_forms.publish.evidence_hint')}</p>
             <PhotoPicker
+              purpose="evidence"
               urls={draft.evidenceUrls}
               onChange={(evidenceUrls) => set({ evidenceUrls })}
             />

@@ -7,7 +7,10 @@ import { PublishFound } from './PublishFound'
 import { WitnessReport } from './WitnessReport'
 
 // jsdom has no canvas: the re-encoder is replaced, the upload still goes through the fake API.
-vi.mock('@platform/image', () => ({ prepareImage: async (file: Blob) => file }))
+vi.mock('@platform/image', () => ({
+  prepareImage: async (file: Blob) => file,
+  sha256Hex: async () => 'a'.repeat(64),
+}))
 
 const veteran: User = {
   id: 'u1',
@@ -26,7 +29,7 @@ type Routes = Parameters<typeof stubApi>[0]
 
 function withDevice(routes: Routes) {
   const calls = stubApi({
-    'POST /uploads': { status: 201, body: { url: 'photo-1.jpg' } },
+    'POST /uploads': { status: 201, body: { url: 'photo-1.jpg', upload: null } },
     ...routes,
   })
   vi.stubGlobal('navigator', {
