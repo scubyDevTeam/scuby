@@ -31,8 +31,9 @@ door open without paying for it now.
 | Rate limiting | **Bucket4j** with its Postgres-backed store |
 | Phone numbers | libphonenumber ([auth.md](auth.md)) |
 | Observability | **OpenTelemetry → New Relic** (traces, metrics, logs over OTLP); **Sentry** for errors |
-| Tests | JUnit 5, **Testcontainers** (singleton containers via `@ServiceConnection`), **WireMock** for Twilio/Resend/Google, **ElasticMQ** for SQS |
+| Tests | JUnit 5, **Testcontainers** (one static container per JVM, started lazily and wired with a `DynamicPropertyRegistrar`, not a Spring bean, so closing a test context cannot stop it), **WireMock** for Twilio/Resend/Google, **ElasticMQ** for SQS |
 | Container image | **Jib** — builds the ARM64 image without Docker or QEMU on any CI runner |
+| Build | **Maven** with the wrapper committed (`backend/mvnw`); Java version pinned for jenv in `backend/.java-version` |
 
 Pin exact versions at scaffold time; this table goes stale faster than the ecosystem.
 

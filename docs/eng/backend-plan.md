@@ -46,7 +46,7 @@ the backend, New Relic account.
 [O16](../open-items.md); the working name is fine for staging).
 
 **P.3 Decisions to close before code.**
-- Build tool (Gradle or Maven) and the folder layout: `backend/` and `infra/` beside `web/`.
+- ~~Build tool and folder layout~~ — decided 2026-10-23: **Maven**; `backend/` and `infra/` beside `web/`.
 - ~~Contract source~~ — closed by decision #34 (staged: named schemas now, `openapi.yaml` as source
   after the 0.4 spike).
 

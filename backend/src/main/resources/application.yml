@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: scuby-backend
+  threads:
+    virtual:
+      enabled: true
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  jooq:
+    sql-dialect: postgres
+  flyway:
+    schemas: scuby
+    default-schema: scuby
+    create-schemas: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

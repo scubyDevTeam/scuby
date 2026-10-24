@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.1.2</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>co.scuby</groupId>
+  <artifactId>scuby-backend</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>scuby-backend</name>
+
+  <properties>
+    <java.version>25</java.version>
+    <!-- Testcontainers 1.x, for the jOOQ codegen plugin only (see the plugin's comment below). -->
+    <testcontainers-codegen.version>1.21.4</testcontainers-codegen.version>
+    <!-- Empty default so surefire's @{argLine} resolves when no other plugin (e.g. JaCoCo) sets it. -->
+    <argLine></argLine>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>3.0.8</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jooq</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-flyway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>1.5.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!--
+        jOOQ codegen runs the migrations against a throwaway container and writes target/generated-sources/jooq.
+        - Plugin 0.0.4 is built for Testcontainers 1.x, so 1.x is pinned here for the plugin only;
+          runtime tests use Boot's managed Testcontainers (2.0.5).
+        - The jOOQ dependencies are overridden to ${jooq.version} so the generated code matches the runtime jOOQ.
+        - The plugin's internal Flyway 9 is left alone on purpose (overriding it breaks the plugin): there is
+          a drift risk against the runtime Flyway 12.
+        - Every build needs Docker and the local image scuby/postgres:17 (infra/docker/postgres/verify.sh builds it).
+      -->
+      <plugin>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-jooq-codegen-maven-plugin</artifactId>
+        <version>0.0.4</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq</artifactId>
+            <version>${jooq.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq-meta</artifactId>
+            <version>${jooq.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq-codegen</artifactId>
+            <version>${jooq.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers-codegen.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${testcontainers-codegen.version}</version>
+          </dependency>
+        </dependencies>
+        <executions>
+          <execution>
+            <id>generate-jooq-sources</id>
+            <phase>generate-sources</phase>
+            <goals><goal>generate</goal></goals>
+            <configuration>
+              <database>
+                <type>POSTGRES</type>
+                <containerImage>scuby/postgres:17</containerImage>
+              </database>
+              <flyway>
+                <locations>filesystem:src/main/resources/db/migration</locations>
+                <defaultSchema>scuby</defaultSchema>
+                <schemas>scuby</schemas>
+                <createSchemas>true</createSchemas>
+              </flyway>
+              <jooq>
+                <generator>
+                  <database>
+                    <inputSchema>scuby</inputSchema>
+                    <excludes>flyway_schema_history</excludes>
+                  </database>
+                  <target>
+                    <packageName>co.scuby.db.generated</packageName>
+                    <directory>target/generated-sources/jooq</directory>
+                  </target>
+                </generator>
+              </jooq>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!-- Mockito's inline mock maker self-attaches on JDK 21+; @{argLine} keeps agents other plugins add (e.g. JaCoCo). -->
+          <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>com.google.cloud.tools</groupId>
+        <artifactId>jib-maven-plugin</artifactId>
+        <version>3.5.2</version>
+        <configuration>
+          <from>
+            <image>eclipse-temurin:25-jre</image>
+            <platforms>
+              <platform><architecture>arm64</architecture><os>linux</os></platform>
+              <platform><architecture>amd64</architecture><os>linux</os></platform>
+            </platforms>
+          </from>
+          <to>
+            <image>scuby-backend</image>
+          </to>
+          <container>
+            <mainClass>co.scuby.ScubyApplication</mainClass>
+            <ports><port>8080</port></ports>
+            <jvmFlags>
+              <jvmFlag>-XX:MaxRAMPercentage=60</jvmFlag>
+            </jvmFlags>
+          </container>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
