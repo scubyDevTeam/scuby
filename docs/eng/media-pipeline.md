@@ -1,8 +1,8 @@
 # Media — The Image Pipeline
 
 > Cross-vertical. Every photo in the product — pet, sighting, claim proof, help evidence — goes
-> through one pipeline. This doc defines what it must do; the stack decision (build vs. service)
-> is an open item, and everything here holds either way.
+> through one pipeline. This doc defines what it must do; how AWS implements it (decision #32) is
+> in [infra.md](infra.md) · Media.
 
 ## The organizing insight
 
@@ -127,8 +127,5 @@ sighting, cases without photos) is a query over rows.
 
 ## Open items
 
-- **Stack**: build vs. service for the transform layer (imgproxy / Cloudflare Images / Supabase
-  transforms / Thumbor). Same decision covers the `og:image` renderer in [10](../product/10-sharing.md).
-  Everything above is identical either way — decided with the infra/architecture pass.
 - **Smart crop** for `og` and `thumb` (subject-aware) — when center crops visibly cut off animals
   in the feed. Cheap with a service, a project without one.

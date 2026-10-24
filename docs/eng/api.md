@@ -97,7 +97,7 @@ Simplified on purpose — the real backend must do better:
 
 | Emulated as | Real |
 |---|---|
-| Uploads stored inline as data URLs | Signed upload URLs and the media pipeline — **the one provisional endpoint** (O10) |
+| Uploads stored inline as data URLs | Signed upload URLs and the media pipeline — **the one provisional endpoint**; the infrastructure is decided (#32), the contract change is below in *Gaps* |
 | Neighbourhood = nearest of a fixed list | Reverse geocoding |
 | Rate-limit handle = a random id in localStorage | Device/IP key |
 | Matching = same species within 5 km | The matching contract in [05](../product/05-found-workflow.md) (O7) |
@@ -115,3 +115,33 @@ payload** the service worker reads — today `{ title, body, url, tag?, checkin?
 actions[] } }` in `web/src/service-worker/push.ts`, to be agreed and moved here — and what
 `device` on a push subscription holds (the client sends `null`). Each arrives as entries in `api.ts` with the
 feature that needs it.
+
+### Gaps found by the backend review (2026-10-23)
+
+A pass of every doc against the contract found these missing or in conflict. Each lands as a
+contract change with the feature that needs it; the first two block the backend's first slice
+([backend-plan.md](backend-plan.md) · S.0).
+
+- **Anonymous reporter identity on the wire.** The emulated backend keeps it in the browser's
+  storage and sends nothing, so a real backend cannot authorize "correct or delete my sighting",
+  show «tu avistamiento», or key rate limits by device ([04](../product/04-lost-workflow.md) ·
+  Correction window). Needs a device cookie or header in the contract.
+- **Uploads.** `POST /uploads` is public and not tied to a row; [media-pipeline.md](media-pipeline.md)
+  §1 requires short-lived signed URLs scoped to the row being created, and the infrastructure is
+  presigned S3 PUTs signed with the photo's SHA-256 ([infra.md](infra.md) · Media).
+- **Moderation.** No operator queue or actions, and no «en revisión» state on a case an author
+  sees ([09](../product/09-reporting.md)).
+- **Lost-publish matching.** `POST /matches` returns lost pets only; [05](../product/05-found-workflow.md)
+  · Where it runs also matches a new lost case against found cases and orphan sightings.
+- **Chat transport and cost.** The contract proxies chat through REST with polling and opens a
+  thread automatically on every «es mío» and «me interesa»; [comms.md](comms.md) has the client SDK
+  connecting only when the chat opens and conversations created lazily on the first message, never
+  on intent (cost rule 1).
+- **Phone on «Me interesa».** [auth.md](auth.md) says interest askers are never asked for a phone;
+  the contract requires a verified one.
+- **Feed order.** The contract says newest first; [02](../product/02-flows.md) says proximity +
+  recency.
+- **Smaller:** `contact.opened {whatsapp_click}` ([04](../product/04-lost-workflow.md) · Events) has
+  no endpoint; a found-case claimant cannot withdraw «es mío»; match rejections leave no record
+  ([05](../product/05-found-workflow.md) · Events); unmerge has no surface.
+

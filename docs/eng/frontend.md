@@ -131,8 +131,8 @@ reusing the contract (`api.getCase`, `caseWire`) and the language files. Vercel 
 copy of the built shell, and `api/share.ts` only re-exports it; `vercel.json`'s `buildCommand` runs
 both builds and CI runs the bundle step. The API base is `SHARE_API_URL`; unset, down, slow (2.5 s)
 or off-contract, the function returns the plain shell — the page still works, just without a
-preview. `og:image` is the case's first photo until [O10](../open-items.md) picks a renderer
-(`previewImage()` is the one seam).
+preview. `og:image` is the case's first photo until the image pipeline's `og` variant is live
+([infra.md](infra.md) · Media, decision #32; `previewImage()` is the one seam).
 
 - **No user-agent sniffing**, no separate crawler app: everyone gets the same shell with the meta
   tags and summary filled in. Readable text before any JS runs.
@@ -140,8 +140,8 @@ preview. `og:image` is the case's first photo until [O10](../open-items.md) pick
   rule the SPA follows (*Languages*). Shared links and posters carry no segment.
 - Tag *content* (title, description, which statuses show what) is owned by
   [10 · Link previews](../product/10-sharing.md). This function only places it.
-- The `og:image` URL points at whatever renders the 1200×630 card — `@vercel/og` in a second
-  function is one candidate; the choice is [O10](../open-items.md).
+- The `og:image` URL points at the image pipeline's 1200×630 `og` variant (decision #32,
+  [infra.md](infra.md) · Media).
 - **Everything else is client-rendered**, including feed and map. Those aren't preview targets —
   they just need to be fast, which is a budget problem (below).
 
@@ -190,7 +190,7 @@ confirmation copy says, what an optimistic update may assume. It never enforces 
 - A client-side `null` is an affordance; a server rejection is the truth. The UI must render a
   rejection it did not predict without breaking.
 - The two copies of each rule are accepted, and the drift is managed: the backend is not
-  TypeScript (Rails — [comms.md](comms.md)), so the **contract is written first, in `contracts`,
+  TypeScript (Java/Spring — [backend.md](backend.md)), so the **contract is written first, in `contracts`,
   and the OpenAPI document the backend implements is generated from it** ([api.md](api.md),
   decision #24). A **contract test suite** replays each machine's transition table against the
   real API and fails when they disagree. In place before the second vertical.
@@ -412,7 +412,7 @@ Pin the current major of each at scaffold time — this doc goes stale faster th
 |---|---|
 | Vite + TanStack Router | **Next.js `output: 'export'`** — gives up SSR, RSC, ISR, middleware, `next/image` (every reason to run it), keeps the App Router's complexity, and cannot statically export `/c/[code]` (codes are created at runtime). **React Router 7 framework mode** — SSR-shaped, we have no server. **TanStack Start** — a server we don't need yet; it is the in-place upgrade if we ever do |
 | One function injects OG into the shell | UA-sniffing (fragile); prerendering every case (unbounded ids); no server at all (kills the WhatsApp loop) |
-| One app, folders | Monorepo / workspaces — one deployable. A TS backend sharing `domain` was the only thing that would justify it; the backend is Rails |
+| One app, folders | Monorepo / workspaces — one deployable. A TS backend sharing `domain` was the only thing that would justify it; the backend is Java ([backend.md](backend.md)) |
 | MapLibre + open tiles | Google Maps / Mapbox — bill per load, and this map is opened constantly by strangers who never sign up |
 | Discriminated unions + `transition()` | XState (nothing to justify it); scattered conditionals (copies that drift) |
 | Biome | ESLint + Prettier — two tools, more config, no benefit at this size |
@@ -506,5 +506,5 @@ written and tested once. That boundary is what makes today's decision reversible
 
 ## Open
 
-Tracked in [open-items](../open-items.md): O10 (`og:image` renderer), O12 (session transport),
+Tracked in [open-items](../open-items.md): O12 (session transport),
 O13 (app links). The API contract: [api.md](api.md).
