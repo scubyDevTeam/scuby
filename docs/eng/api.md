@@ -1,7 +1,7 @@
 # API — The Contract Between Client and Backend
 
-> Decided 2026-10-14 (decision #24). The contract is written first, in the client's code, and the
-> backend implements it. The client and an emulated backend already run on it, so the real backend
+> Decided 2026-10-14 (decision #24), amended 2026-10-24 (#34). The contract is written first and the
+> backend implements it; who holds the pen is staged below. The client and an emulated backend already run on it, so the real backend
 > is a plug: point the app at it and nothing else changes.
 
 ## Where the contract lives
@@ -14,7 +14,15 @@
 | **OpenAPI 3.1 document** | [`openapi.json`](openapi.json) | **No** — `pnpm openapi` in `web/` generates it; CI fails when it is stale |
 | Behaviour the backend must reproduce | [`web/src/mocks/backend.test.ts`](../../web/src/mocks/backend.test.ts) — scenarios run against the emulated backend | Yes |
 
-Changing the API = edit `api.ts` (and its schemas), run `pnpm openapi`, commit both. The client
+**Staging (decision #34).** Stage 1 — now: the source stays `api.ts`, and every wire shape is named
+(`.meta({ id })`), so `openapi.json` carries `components/schemas` and `$ref`s instead of inlined
+objects. Stage 2 — after the Java spike ([backend-plan.md](backend-plan.md) · 0.4) shows the
+generator yields usable records: [`openapi.yaml`](openapi.yaml) becomes the hand-edited source,
+either side proposes changes in a PR the other reviews, the backend generates its types and the
+client its Zod from it, and the table above flips (`api.ts` and `contracts/*.ts` become generated;
+`openapi.json` goes away).
+
+Changing the API (stage 1) = edit `api.ts` (and its schemas), run `pnpm openapi`, commit both. The client
 calls only through `api.ts` (`call(api.getCase, …)`) and the emulated backend answers only through
 it, so neither can use an endpoint the contract does not list.
 

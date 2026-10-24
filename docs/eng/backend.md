@@ -165,8 +165,9 @@ document:
 - Swagger UI may serve the committed document for exploration. The backend **never generates** a
   competing document from annotations.
 
-A proposal to move the source of truth to a neutral spec file both sides generate from is open:
-[O19](../open-items.md).
+The source of truth moves to a neutral `openapi.yaml` both sides generate from, in two stages
+(decision #34, [api.md](api.md) · Where the contract lives); the document stays committed and the
+backend still never generates a competing one.
 
 ## Testing
 

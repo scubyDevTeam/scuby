@@ -16,7 +16,7 @@
 - **Every step has the same shape:** *Read* (the docs that own the behaviour), *Do*, *Done when*
   (checkable).
 - **The contract is shared.** A step that needs an endpoint changed or added changes the contract
-  first, in a PR the client engineer reviews ([api.md](api.md); the process itself is [O19](../open-items.md)).
+  first, in a PR the client engineer reviews ([api.md](api.md); the process is decision #34.
 - **When a step forces a decision**, it lands in the owning doc and the decision log in the same
   PR (repo rule 2).
 - **Global definition of done:** integration tests for the behaviour, responses validated against
@@ -47,8 +47,8 @@ the backend, New Relic account.
 
 **P.3 Decisions to close before code.**
 - Build tool (Gradle or Maven) and the folder layout: `backend/` and `infra/` beside `web/`.
-- [O19](../open-items.md) — who owns the contract source — at least agreed in direction with the
-  client engineer, since phase S changes the contract.
+- ~~Contract source~~ — closed by decision #34 (staged: named schemas now, `openapi.yaml` as source
+  after the 0.4 spike).
 
 ## Phase 0 — Foundation
 
@@ -69,7 +69,7 @@ Testcontainers database migrated by Flyway; the PostGIS template helpers and `ge
 **0.4 Contract harness.** *Read:* [api.md](api.md), [backend.md](backend.md) · The API contract.
 *Do:* the error body and codes of [api.md](api.md) · Errors; a test helper that validates every
 response against `openapi.json`. Spike: does openapi-generator produce usable Java records from the
-3.1 document (input to O19)? *Done when:* a deliberately wrong response fails a test.
+3.1 document (the gate to stage 2 of decision #34)? *Done when:* a deliberately wrong response fails a test.
 
 **0.5 Observability and CI.** *Do:* OpenTelemetry export to New Relic, Sentry; GitHub Actions
 backend workflow (path filter, tests, Jib ARM64 image). *Done when:* a PR runs the suite and
