@@ -59,7 +59,7 @@ only changes its connection settings.
 - **TLS lives at CloudFront.** ACM certificates are free but attach only to CloudFront, load
   balancers or API Gateway — never to an EC2. So no web server on the instance terminates TLS.
 - **`api.<domain>`**: a distribution with caching disabled, forwarding all headers, cookies and
-  query strings. The session cookie is set on this same-site subdomain ([O12](../open-items.md)).
+  query strings. The session cookie is set on this same-site subdomain (decision #37).
 - **The origin is closed to everything but CloudFront**: the EC2 security group admits only AWS's
   managed prefix list for CloudFront origin-facing addresses, and the backend rejects requests
   without a secret origin header.
