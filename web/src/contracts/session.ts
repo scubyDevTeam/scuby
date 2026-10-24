@@ -1,5 +1,5 @@
 // Sign-in and the account (docs/eng/auth.md). The session itself travels in an httpOnly cookie
-// (O12): no endpoint returns a token, and every request is sent with credentials.
+// (decision #37): no endpoint returns a token, and every request is sent with credentials.
 import * as z from 'zod/mini'
 import { phone, photoUrl } from './primitives'
 

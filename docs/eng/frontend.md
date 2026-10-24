@@ -506,5 +506,4 @@ written and tested once. That boundary is what makes today's decision reversible
 
 ## Open
 
-Tracked in [open-items](../open-items.md): O12 (session transport),
-O13 (app links). The API contract: [api.md](api.md).
+Tracked in [open-items](../open-items.md): O13 (app links). The API contract: [api.md](api.md).

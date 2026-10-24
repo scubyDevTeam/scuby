@@ -189,7 +189,7 @@ export function openApiDocument() {
     components: {
       schemas: Object.fromEntries(sorted),
       securitySchemes: {
-        // O12: an httpOnly cookie on a same-site subdomain. Every request is sent with credentials.
+        // Decision #37: an httpOnly cookie on a same-site subdomain. Every request is sent with credentials.
         session: { type: 'apiKey', in: 'cookie', name: 'session' },
         // Decision #35: who someone is without an account. Never required — the API sets it on the
         // first answer to a request that arrives without one, and the browser sends it back.

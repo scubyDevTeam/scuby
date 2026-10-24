@@ -36,7 +36,7 @@ it, so neither can use an endpoint the contract does not list.
   values the server composes for display (`place_name`, `title` and `summary` of a found case,
   match `why`, notification `body`) come in that language; nothing else on the wire is language
   ([frontend.md](frontend.md) · Languages). Push and email: [O17](../open-items.md).
-- **Session: an httpOnly cookie** on a same-site API origin (O12 leaning); every request is sent
+- **Session: an httpOnly cookie** on a same-site API origin (decision #37); every request is sent
   with credentials. No endpoint returns a token. `auth: session` endpoints answer `unauthorized`
   without one; who may act on *what* is each endpoint's `forbidden`.
 - **The same URL answers more to the person responsible.** `GET /cases/:code` carries `viewer`;
@@ -75,7 +75,7 @@ Someone without an account is a **device**: an opaque `device` cookie that the A
   it — the person loses the right to correct what they sent, nothing else. Moving an anonymous
   sighting to an account on sign-in is not part of this contract.
 - **Native apps** (Capacitor, another origin) cannot rely on it; they get the token transport of
-  [O12](../open-items.md) at stage 2a, and the same server-side meaning.
+  [D16](../open-items.md) at stage 2a, and the same server-side meaning.
 - The OpenAPI document lists it as the `device` security scheme. No endpoint requires it.
 
 ## Uploads

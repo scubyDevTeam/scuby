@@ -305,8 +305,7 @@ before any WhatsApp handoff opens.
 ## Phase 5 — Auth + owner publishing (backend needed)
 
 ### 5.0 Unblock
-**Check before starting:** [O12](../open-items.md) (session transport — for scope 1 the httpOnly
-cookie leaning is enough) decided, and a staging API that implements
+**Check before starting:** session transport (decision #37: the httpOnly cookie on `api.<domain>`) in place, and a staging API that implements
 [openapi.json](openapi.json) ([api.md](api.md) · Plugging in the real backend). Then point the app
 at it — `VITE_API_MOCK=false` — and run the e2e suite against it. Add the transition-table contract tests
 (frontend.md · Rule 2). Point Lighthouse CI at it too and turn its LCP assertion from `warn` to
