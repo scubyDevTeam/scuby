@@ -58,6 +58,52 @@ it, so neither can use an endpoint the contract does not list.
   format) the server checks again; rate limits, schedules, expiry and matching are server-only
   ([frontend.md](frontend.md) · Rule 2).
 
+## Device identity
+
+Someone without an account is a **device**: an opaque `device` cookie that the API sets (decision #35).
+
+- **Set by the API, never by the client.** Any answer to a request that arrives without a valid one
+  carries `Set-Cookie: device=…` — random, ≥ 128 bits, `HttpOnly; Secure; SameSite=Lax; Path=/`, one
+  year, renewed when used. The client reads nothing and sends nothing extra: it already sends every
+  request with credentials (`api-client/http.ts`). The server keeps only a hash of the value.
+- **What it identifies.** The anonymous reporter or claimant of a sighting or a «lo tengo»: it
+  authorizes correcting or deleting their own sighting inside its window, marks it `mine` on the
+  case, and is the key of the per-reporter rate limits (with the IP as a second key —
+  [04](../product/04-lost-workflow.md)). It also scopes an anonymous upload slot (*Uploads*).
+- **Not an account, never a login.** A signed-in session wins when both are present; the cookie
+  proves nothing about who someone is, only that this is the same browser. Clearing cookies forgets
+  it — the person loses the right to correct what they sent, nothing else. Moving an anonymous
+  sighting to an account on sign-in is not part of this contract.
+- **Native apps** (Capacitor, another origin) cannot rely on it; they get the token transport of
+  [O12](../open-items.md) at stage 2a, and the same server-side meaning.
+- The OpenAPI document lists it as the `device` security scheme. No endpoint requires it.
+
+## Uploads
+
+A photo reaches storage in three steps (decision #36; the pipeline's rules are
+[media-pipeline.md](media-pipeline.md) §1, the AWS side [infra.md](infra.md) · Media):
+
+1. **Ask for a slot** — `POST /uploads` with `{ purpose, sha256, content_type: 'image/jpeg', bytes }`:
+   the photo as the device prepared it (≤ 1600 px, EXIF gone) and its hash. `purpose` is what the
+   photo is for — `pet`, `sighting`, `claim`, `evidence`, `profile` — and the slot is scoped to it
+   and to who asks (the session, or the device).
+2. **Send the bytes** — the answer's `upload` is `{ method: 'PUT', url, headers, expires_at }`: a
+   presigned PUT, valid minutes, signed with the hash so storage refuses other bytes. The client
+   sends the bytes there, with those headers, and nothing else (no cookie, no `Accept-Language`).
+   `upload` is `null` when that exact photo is already stored: there is nothing to send.
+3. **Use the URL** — the answer's `url` is where the photo will be (derived from the hash, so a
+   re-upload is the same URL). It goes into the publish body (`photo_urls`) as is.
+
+Rules the server enforces, and the client may not predict:
+
+- **Limits per purpose** ([media-pipeline.md](media-pipeline.md) §1) and rate limits on slots,
+  inherited from what the photo is for. A refused slot is `rate_limited` or `validation_failed`.
+- **A photo in a publish body must be one this caller uploaded for that purpose** (or one already on
+  the row being edited); anything else is `validation_failed` on that field. So is a photo whose
+  bytes have not been processed yet — it takes seconds, normally done before the form is.
+- A slot never used leaves an object in `incoming/` that expires; nothing is attached to a row until
+  a publish names it.
+
 ## Errors
 
 Every failure has the same body, and the client writes its own copy per `code` — `message` is for
@@ -106,9 +152,9 @@ Simplified on purpose — the real backend must do better:
 
 | Emulated as | Real |
 |---|---|
-| Uploads stored inline as data URLs | Signed upload URLs and the media pipeline — **the one provisional endpoint**; the infrastructure is decided (#32), the contract change is below in *Gaps* |
+| Uploads: the same three steps against an emulated bucket (`api/media.ts`), bytes kept as data URLs; nobody checks who may attach which photo | Presigned S3 PUTs, the ingest Lambda and CloudFront variants ([infra.md](infra.md) · Media); ownership of a photo enforced at publish |
 | Neighbourhood = nearest of a fixed list | Reverse geocoding |
-| Rate-limit handle = a random id in localStorage | Device/IP key |
+| The `device` cookie = a random id in localStorage (the client never reads it) | The API-set cookie of *Device identity*; IP as a second key |
 | Matching = same species within 5 km | The matching contract in [05](../product/05-found-workflow.md) (O7) |
 | Follow-up loop runs on each request | A scheduled job; push and email deliveries ([comms.md](comms.md)) |
 | Nearby alerts stored as a zone on the account; nothing sends them | The matching/broadcast job that notifies by zone ([08](../product/08-notifications.md)) |
@@ -128,16 +174,10 @@ feature that needs it.
 ### Gaps found by the backend review (2026-10-23)
 
 A pass of every doc against the contract found these missing or in conflict. Each lands as a
-contract change with the feature that needs it; the first two block the backend's first slice
-([backend-plan.md](backend-plan.md) · S.0).
+contract change with the feature that needs it. The two that blocked the backend's first slice
+([backend-plan.md](backend-plan.md) · S.0) are settled — *Device identity* (#35) and *Uploads*
+(#36) above.
 
-- **Anonymous reporter identity on the wire.** The emulated backend keeps it in the browser's
-  storage and sends nothing, so a real backend cannot authorize "correct or delete my sighting",
-  show «tu avistamiento», or key rate limits by device ([04](../product/04-lost-workflow.md) ·
-  Correction window). Needs a device cookie or header in the contract.
-- **Uploads.** `POST /uploads` is public and not tied to a row; [media-pipeline.md](media-pipeline.md)
-  §1 requires short-lived signed URLs scoped to the row being created, and the infrastructure is
-  presigned S3 PUTs signed with the photo's SHA-256 ([infra.md](infra.md) · Media).
 - **Moderation.** No operator queue or actions, and no «en revisión» state on a case an author
   sees ([09](../product/09-reporting.md)).
 - **Lost-publish matching.** `POST /matches` returns lost pets only; [05](../product/05-found-workflow.md)

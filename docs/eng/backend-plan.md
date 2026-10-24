@@ -100,9 +100,10 @@ through a presigned URL with a matching checksum appears as a master and serves 
 *Read:* [auth.md](auth.md), [04](../product/04-lost-workflow.md), [media-pipeline.md](media-pipeline.md),
 [api.md](api.md) · Gaps found by the backend review.
 
-**S.0 Contract changes.** Agree and land, with the client engineer: how an anonymous reporter is
-identified on the wire, and the upload flow as presigned URLs scoped to a row. Both are listed in
-[api.md](api.md) · Gaps.
+**S.0 Contract changes.** Landed on the client side (decisions #35, #36): the `device` cookie
+([api.md](api.md) · Device identity) and the upload flow as slots — `POST /uploads` → presigned
+PUT → URL ([api.md](api.md) · Uploads). *Do:* implement both against `openapi.json`; the emulated
+bucket (`web/src/mocks/api/media.ts`) is the behaviour to match.
 
 **S.1 Auth.** Email code (Resend), Google sign-in, session cookie, `GET /session`, sign-out,
 `GET /config` from `supported_countries`.

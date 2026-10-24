@@ -36,7 +36,7 @@ problem; the server repeats the safety steps because not every client is ours.
 | Validate | Real image (magic bytes, not extension); reject > 10 MB pre-resize; reject dimensions > 8000 px |
 | Re-encode | Master stored as JPEG ≤ 1600 px, sRGB — one canonical format regardless of what arrived |
 | Limits | Per pet 6 · per sighting 3 · per claim proof 5 · per help evidence 5 |
-| Auth | **Short-lived signed upload URLs**, scoped to the row being created (case, sighting, claim). Never a public bucket write. Anonymous uploads (sightings, claims) inherit the rate limits of the row they belong to — an upload without a row is rejected |
+| Auth | **Short-lived signed upload URLs**, scoped to what the photo is for (pet, sighting, claim, evidence, profile) and to who asks — the session or the device. Never a public bucket write. The row does not exist yet when the photo is picked, so it is the publish that attaches: it refuses a photo this caller did not upload for that purpose. Anonymous uploads inherit the rate limits of what they are for. The mechanics: [api.md](api.md) · Uploads |
 
 ### Malicious content
 No automated NSFW/abuse scanning in v1 — volume doesn't justify it. The report button and the
