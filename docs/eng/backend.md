@@ -110,7 +110,8 @@ text at INFO.
 | `NEW_RELIC_LICENSE_KEY` | none | from SSM ([infra.md](infra.md) · Secrets) | the OTLP `api-key` header; the property `newrelic.license-key` wins if set |
 
 With `SCUBY_TELEMETRY_EXPORT=true` and no license key the application does not start (the
-`NewRelicLicenseKeyCheck` startup check); with export off the key is never read.
+`NewRelicLicenseKeyCheck` startup check, which covers this switch only: setting Boot's individual
+export flags directly bypasses it and is not supported); with export off the key is never read.
 
 Trace sampling is `management.tracing.sampling.probability` (1.0 to start). The why is in ·
 Observability below.
