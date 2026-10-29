@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give the backend everything the thin slice's lost-case endpoints will stand on — the slice's dependencies, build-failing guardrails, a test harness that checks the contract and statement counts on every call, feature flags, `supported_countries` + `GET /config`, the device cookie, sessions behind Spring Security 7, email-code and Google sign-in, the SMS phone step — a one-command local run in Docker, plus `backend/CLAUDE.md` and the owning-doc updates.
+**Goal:** Give the backend everything the thin slice's lost-case endpoints will stand on — the slice's dependencies, build-failing guardrails, a test harness that checks the contract and statement counts on every call, feature flags, `supported_countries` + `GET /config`, the device cookie, sessions behind Spring Security 7, email-code and Google sign-in, the SMS phone step, `GET /me/profile`, the Java version pinned from one source — a one-command local run in Docker (one compose project per checkout), plus `backend/CLAUDE.md` and the owning-doc updates.
 
 **Architecture:** Package by feature, flat, package-private by default (`co.scuby.platform`, `co.scuby.identity`; `uploads`, `pets`, `cases` arrive in plan A2). Cross-feature classes carry `@ModuleApi`; ArchUnit enforces the dependency DAG, derivation purity and roles by annotation; PIT mutation-tests every `*Derivation`. Spring Security 7 wiring lives in `platform.security` (domain-free); `identity` plugs in through interfaces (`RequestAuthenticator`, `SecurityRules`) and owns sessions, the device cookie, sign-in and the phone step. Sessions are opaque 256-bit tokens stored as SHA-256 with a 12-month absolute expiry; a session read never writes.
 
 **Tech Stack:** Java 25, Spring Boot 4.1.2 (Spring Framework 7.0.10, Spring Security 7.1.2, Jackson 3.1.7 — `tools.jackson.*`, annotations stay `com.fasterxml.jackson.annotation`), jOOQ 3.21.9 OSS, Flyway 12.4.0, PostgreSQL 17 + PostGIS, Testcontainers 2.0.5, Caffeine 3.2.4 (Boot-managed), libphonenumber 9.0.42, nimbus via `spring-security-oauth2-jose` (Boot-managed), AWS SDK v2 BOM 2.57.6 (S3, used in A2), ArchUnit 1.5.1, PIT 1.30.1 + pitest-junit5-plugin 1.2.3, JUnit Jupiter 6.0.3 (Boot-managed).
 
-**Design (binding):** `docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md`. Where this plan and the design disagree, the design wins: stop that task and record it in the report.
+**Design (binding):** `docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md`. Where this plan and the design disagree, the design wins: stop that task and record it in the report — except for the sanctioned departures listed in the Global Constraints, which the design itself now states (§ Identity).
 
 ## Global Constraints
 
@@ -21,7 +21,10 @@
 - **Versions:** Boot-managed versions are never re-declared. Pinned here (Maven Central, checked 2026-10-29): libphonenumber `9.0.42`, AWS SDK BOM `2.57.6`, pitest-maven `1.30.1`, pitest-junit5-plugin `1.2.3`, ArchUnit `1.5.1` (already in the pom).
 - **pom.xml and application.yml are shared with branch `be/observability`** (it adds OpenTelemetry; a merge comes later). Keep this plan's additions **grouped in one block per file**, each block opened by the comment `thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md)`. No telemetry, no OpenTelemetry, no Micrometer changes in this plan.
 - **Packages:** `co.scuby.platform.*` (domain-free), `co.scuby.identity` (flat — no subpackages). Classes are package-private unless another feature uses them; then they are `public` **and** annotated `@ModuleApi`. Platform classes are `public` without `@ModuleApi`.
-- **Flyway versions are timestamps** from now on: `V20261029_HHMM__what.sql` (the existing `V1`, `V2` stay). Each migration starts with a comment saying what it is for and which doc owns it. Qualify table names with `scuby.` inside PL/pgSQL bodies (the app's search path does not include `scuby`).
+- **Sanctioned departures from the first draft of the design** (the design's § Identity states them; they are not disagreements, do not stop for them):
+  1. The session authentication **filter lives in `platform.security`** (`RequestAuthenticationFilter`); `identity` supplies a `RequestAuthenticator` bean that `platform` defines as an interface. Why: `platform` depends on no feature (the DAG), and the filter mechanism is domain-free.
+  2. **CSRF is an `Origin` / `Sec-Fetch-Site` check** (`OriginCheckFilter`), not Spring's CSRF token; the session cookie is `__Host-` prefixed so a sibling subdomain cannot plant one (cookie tossing), and readers reject a duplicated cookie name. Why: the client sends no CSRF token (`web/src/api-client/http.ts`), and for an API on a same-site subdomain the origin check is the defence that works. `401`/`403` written by filters and security entry points still go through the one envelope mapper (`ContractErrors`).
+- **Flyway versions are timestamps** from now on: `V20261029_HHMM__what.sql` (the existing `V1`, `V2` stay). **Every branch must use timestamps too** (`be/observability`, `infra/b1-sandbox`, …): a `V3__…` merged after these would fail validation ("resolved migration not applied") on every database that already ran them. Task 15 writes this rule into `backend/CLAUDE.md`, and the final report asks the human to pass it to the other branches' owners. Each migration starts with a comment saying what it is for and which doc owns it. Qualify table names with `scuby.` inside PL/pgSQL bodies (the app's search path does not include `scuby`).
 - **Time:** the app reads time only from the `Clock` bean (`platform.time.TimeConfiguration`). SQL never uses `now()` in application queries — pass `clock.instant()` as a parameter (column defaults for operator-inserted rows are the only exception). Tests control time through `MutableClock`.
 - **JSON:** snake_case on the wire (global Jackson setting). Responses are complete: every field present, `null` not absent (Jackson's default inclusion — never add `NON_NULL` to a response record).
 - **Every integration test** is annotated `@IntegrationTest` (Task 2), calls `testDb.reset()` in `@BeforeEach`, and talks to endpoints through `ApiClient`, which validates every contract endpoint's response against `docs/eng/openapi.json` and fails when a request executes more SQL statements than its ceiling in `StatementCeilings`. Non-contract routes (test probes, dev-only routes) use `ApiClient.raw(...)`.
@@ -38,28 +41,29 @@
 
 ```
 backend/
-  pom.xml                                              + thin-slice dependency block, PIT plugin
-  CLAUDE.md                                            NEW agent instructions (Task 13)
-  README.md                                            structure + how to run (Tasks 3, 12, 13)
-  compose.yaml                                         + `backend` service under profile `app` (Task 12)
-  run-local.sh                                         NEW: Jib image + compose up + health (Task 12)
+  pom.xml                                              + thin-slice dependency block (Task 1), PIT plugin (Task 3), Jib digest + enforcer (Task 13)
+  CLAUDE.md                                            NEW agent instructions (Task 15)
+  README.md                                            structure + how to run (Tasks 3, 14, 15)
+  compose.yaml                                         + `backend` service under profile `app`, ports from env (Task 14)
+  compose-project.sh                                   NEW: this checkout's compose project name (Task 14)
+  run-local.sh                                         NEW: Jib image + compose up + health, `down` (Task 14)
   src/main/java/co/scuby/
     ScubyApplication.java                              + @ConfigurationPropertiesScan
     platform/
       modules/ModuleApi.java                           marker for the cross-feature surface (Task 3)
-      time/TimeConfiguration.java                      Clock bean (Task 1)
-      config/Prod.java                                 refuse-at-start-up helper (Task 1)
+      time/TimeConfiguration.java                      Clock bean (Task 1); SchedulingConfiguration.java (Task 7)
+      config/Prod.java                                 start-up guards: refuse (prod), requireDeployed / warnDeployed (not local/test) (Task 1)
       cache/ClearableCache.java                        in-process caches tests can clear (Task 2)
       crypto/Hashing.java                              sha256Hex, hmacSha256Hex, randomToken, randomDigits (Task 6)
-      web/ErrorEnvelopeWriter.java                     writes the contract envelope from filters (Task 1)
+      web/ErrorEnvelopeWriter.java                     writes the contract envelope from filters, via ContractErrors (Task 1)
       web/ClientAddress.java                           client IP (CloudFront header only with the origin secret) + IP hash (Task 6)
       security/WebProperties.java                      scuby.web.* (Task 1)
       security/SecurityConfiguration.java              the one SecurityFilterChain, CORS (Task 1)
       security/SecurityRules.java                      per-feature route rules (Task 1)
       security/RequestAuthenticator.java               who is signed in, supplied by identity (Task 1)
-      security/RequestAuthenticationFilter.java        runs the authenticators (Task 1)
+      security/RequestAuthenticationFilter.java        runs the authenticators; a failure is a 500 envelope (Task 1)
       security/SignedInAuthentication.java             the Authentication for a signed-in person (Task 1)
-      security/OriginCheckFilter.java                  CSRF defence: Origin / Sec-Fetch-Site on unsafe methods (Task 1)
+      security/OriginCheckFilter.java                  CSRF defence: Origin / Sec-Fetch-Site on unsafe methods, before CORS (Task 1)
       security/Caller.java, Account.java               who is asking, as controller parameters (Task 6)
       security/CallerArgumentResolver.java, CallerWebConfiguration.java (Task 6)
       flags/Flag.java, FeatureFlags.java, FlagProperties.java   (Task 4)
@@ -67,51 +71,61 @@ backend/
       SupportedCountries.java, ConfigController.java, ConfigView.java                     (Task 5)
       DeviceCookieFilter.java, DeviceCookieConfiguration.java, CookieProperties.java       (Task 6)
       Person.java, People.java, UserView.java                                             (Task 7)
-      SessionLookup.java, ActiveSession.java, DbSessionLookup.java, CachingSessionLookup.java,
+      SessionLookup.java, ActiveSession.java, NewSession.java, DbSessionLookup.java, CachingSessionLookup.java,
       SessionProperties.java, SessionConfiguration.java, SessionStore.java, SessionCookies.java,
       SessionAuthenticator.java, SignInSessions.java, SessionController.java,
       IdentitySecurityRules.java, IdentityPurge.java                                      (Task 7)
-      EmailSender.java, LogEmailSender.java, TestBypass.java, TestBypassGuard.java,
+      EmailSender.java, LogEmailSender.java, UnavailableEmailSender.java, TestBypass.java, TestBypassGuard.java,
+      AuthProperties.java, CodeHasher.java, CodeSends.java,
       DisplayNames.java, EmailCodes.java, EmailSignIn.java, EmailSignInController.java, EmailRequests.java (Task 8)
       GoogleProperties.java, GoogleIdTokenConfiguration.java, GoogleIdTokens.java,
-      GoogleIdentity.java, GoogleSignInController.java                                    (Task 9)
-      SmsSender.java, LogSmsSender.java, PhoneNumbers.java, PhoneOtp.java, SmsProperties.java,
+      GoogleIdentity.java, GoogleSignIn.java, GoogleSignInController.java                 (Task 9)
+      SmsSender.java, LogSmsSender.java, UnavailableSmsSender.java, PhoneNumbers.java, PhoneOtp.java,
+      PhoneOtpMisses.java, PhoneChange.java, SmsProperties.java,
       ProfileView.java, PhoneRequests.java, PhoneController.java                          (Task 10)
       PhoneStepDerivation.java, PublisherPhone.java                                       (Task 11)
+      ProfileController.java                                                              (Task 12)
   src/main/resources/
     application.yml (+ -local, -test, -prod)           + scuby.* block
     db/migration/V20261029_1000__feature_flags.sql
     db/migration/V20261029_1010__supported_countries.sql
     db/migration/V20261029_1020__accounts_and_sessions.sql
-    db/migration/V20261029_1030__email_codes.sql
+    db/migration/V20261029_1030__email_codes.sql              (email_code + the shared send log code_send — Task 8)
+    db/migration/V20261029_1035__code_send_index.sql          (only after its plan check fails — Task 8)
     db/migration/V20261029_1040__phone_otp.sql
-    db/migration/V20261029_1050__sms_send_sent_at_index.sql   (only after its plan check fails — Task 10)
   src/test/java/
-    co/scuby/support/  IntegrationTest, TestSupportConfiguration, MutableClock, StatementRecorder,
+    co/scuby/TestcontainersConfiguration.java          + jdbcProperties() (Task 1)
+    co/scuby/support/  IntegrationTest, TestSupportConfiguration, MutableClock, StatementRecorder, ConnectionSampler,
                        StatementCeilings, ApiClients, ApiClient, ApiResponse, TestDb, PlanAssert,
                        Accounts, RecordingEmailSender, RecordingSmsSender, GoogleTestKeys
     co/scuby/contract/ContractValidator.java           + errorsForNoContent (Task 2)
     co/scuby/architecture/ArchitectureRules.java, ArchitectureTest.java, ArchitectureRulesSelfTest.java (Task 3)
     archfixtures/...                                    fixtures that break each rule (outside co.scuby: never component-scanned)
-    co/scuby/platform/... and co/scuby/identity/...    tests named per task
+    co/scuby/platform/config/ProfileStartupTest.java   staging/prod start with their required settings, refuse without each (Task 1; keys added in 6, 8, 9)
+    co/scuby/platform/... and co/scuby/identity/...    tests named per task (identity/IdentityTestBeans.java: Task 8)
   (deleted) src/test/java/co/scuby/platform/roles/RoleBoundariesTest.java   (Task 3)
-docs/eng/backend.md, docs/eng/auth.md, docs/eng/feature-flags.md, docs/product/00-product-map.md (Task 12)
+docs/eng/backend.md, docs/eng/auth.md, docs/eng/feature-flags.md, docs/product/00-product-map.md (Task 15)
 ```
 
-**Task order and dependencies:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13. Tasks 8, 9 and 10 each depend only on 7; if one is stuck, the others can proceed. Task 11 depends on 10. Task 12 (local Docker run) needs every earlier task merged into the image; Task 13 is last.
+**Task order and dependencies:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15. The real dependencies, for the stuck rule: 8 → 9 and 8 → 10 (Task 8 creates `IdentityTestBeans`, `TestBypass`, `CodeHasher`, `CodeSends` and `RecordingEmailSender`, which 9 and 10 use or extend); 10 → 11 (`PhoneOtp`); 10 → 12 (`ProfileView`). If Task 8 is stuck, Tasks 9–12 cannot start. Task 13 (Java version, needs Docker Hub) depends only on Task 1; if it is stuck, Task 14 still runs on the unpinned `eclipse-temurin:25-jre` and the report says so. Task 14 (local Docker run) needs every earlier feature task; Task 15 is last.
 
 ---
+
 ### Task 1: Slice dependencies and the Spring Security baseline
 
 Adding Spring Security locks every route by default, so the dependencies and the platform's filter chain land together: after this task every existing test still passes, routes are public unless a feature's `SecurityRules` says otherwise, `401`/`403` come in the contract's envelope, unsafe requests from a foreign `Origin` are refused, and CORS lets the client's origin call with credentials.
 
-**CSRF decision (record it in the report; Task 13 writes it into `docs/eng/backend.md`):** the client sends no CSRF token (`web/src/api-client/http.ts` sends `Accept`, `Accept-Language`, `Content-Type` and credentials). Spring's token CSRF would need a contract change (a token endpoint and header). Instead, `OriginCheckFilter` refuses any unsafe request (`POST`, `PUT`, `PATCH`, `DELETE`) whose `Origin` header is present and not in `scuby.web.allowed-origins`, or that has no `Origin` but `Sec-Fetch-Site: cross-site`. Browsers send `Origin` on every cross-origin `fetch` and on form posts, so a forged request from another site is refused; non-browser clients cannot ride the victim's cookies anyway. `SameSite=Lax` on the cookies (decision #37) is the second layer. Rejected: Spring's synchronizer/double-submit token (contract change for no extra protection here); `SameSite=Lax` alone (a sibling subdomain is same-site, so it does not stop a request from one).
+**CSRF decision (a sanctioned departure — see Global Constraints; record it in the report; Task 15 writes it into `docs/eng/backend.md`):** the client sends no CSRF token (`web/src/api-client/http.ts` sends `Accept`, `Accept-Language`, `Content-Type` and credentials). Spring's token CSRF would need a contract change (a token endpoint and header). Instead, `OriginCheckFilter` refuses any unsafe request (`POST`, `PUT`, `PATCH`, `DELETE`) whose `Origin` header is present and not in `scuby.web.allowed-origins`, or that has no `Origin` but `Sec-Fetch-Site: cross-site`. Browsers send `Origin` on every cross-origin `fetch` and on form posts, so a forged request from another site is refused; non-browser clients cannot ride the victim's cookies anyway. `SameSite=Lax` on the cookies (decision #37) is the second layer. The check runs **before** Spring's `CorsFilter`, so a refused unsafe request gets the contract envelope (`403 forbidden`); a cross-origin **GET** from a non-allowed origin still gets `CorsFilter`'s plain-text `403 Invalid CORS request` — acceptable (no browser code of ours makes that call), and recorded in `backend.md`. A sibling subdomain can also *set* cookies for the parent domain ("cookie tossing"), which the Origin check does not stop: Task 7 names the session cookie `__Host-session` (browsers refuse a `Domain=` variant of a `__Host-` cookie) and both cookie readers reject a request carrying the same cookie name twice. Rejected: Spring's synchronizer/double-submit token (contract change for no extra protection here); `SameSite=Lax` alone (a sibling subdomain is same-site, so it does not stop a request from one).
+
+**Deployed profiles must be configured, not defaulted:** outside `local` and `test`, start-up is refused when `scuby.web.allowed-origins` is empty (CORS and the Origin check would refuse every browser call, and nothing else would say so). `ProfileStartupTest` starts the app under `staging` and `prod` with dummy values of every required property and proves that removing any one of them fails start-up; later tasks add their required properties to it (Tasks 6, 8, 9; plan A2 adds the media ones).
+
+**Response caching (decided here; Task 15 records it):** Spring Security's default `Cache-Control: no-cache, no-store, max-age=0, must-revalidate` stays on every response. Responses carry personal data per viewer (`/session`, `/me/*`, a case seen by its owner), and CloudFront would otherwise apply its default TTL to a GET without `Cache-Control`. An endpoint that wants caching later sets it explicitly and says why.
 
 **Files:**
-- Modify: `B/pom.xml` (dependency block, Java-version enforcement, Jib base image pinned)
-- Check: `B/.java-version` (must stay `25`)
+- Modify: `B/pom.xml` (dependency block only — the Java-version enforcement and the Jib base digest are Task 13)
 - Modify: `B/src/main/java/co/scuby/ScubyApplication.java`
 - Modify: `B/src/main/resources/application.yml`, `B/src/main/resources/application-local.yml`, `B/src/main/resources/application-test.yml`
+- Modify: `B/src/test/java/co/scuby/TestcontainersConfiguration.java` (add `jdbcProperties()`)
 - Create: `B/src/main/java/co/scuby/platform/time/TimeConfiguration.java`
 - Create: `B/src/main/java/co/scuby/platform/config/Prod.java`
 - Create: `B/src/main/java/co/scuby/platform/web/ErrorEnvelopeWriter.java`
@@ -124,16 +138,21 @@ Adding Spring Security locks every route by default, so the dependencies and the
 - Create: `B/src/main/java/co/scuby/platform/security/SecurityConfiguration.java`
 - Test: `B/src/test/java/co/scuby/platform/security/SecurityBaselineTest.java`
 - Test: `B/src/test/java/co/scuby/platform/config/ProdTest.java`
+- Test: `B/src/test/java/co/scuby/platform/config/ProfileStartupTest.java`
 
 **Interfaces:**
-- Consumes: `co.scuby.platform.web.ErrorCode`, `ApiErrorBody` (existing).
+- Consumes: `co.scuby.platform.web.ErrorCode`, `ApiErrorBody`, `ContractErrors` (existing).
 - Produces:
   - `@Bean Clock clock()` — `Clock.tick(Clock.systemUTC(), Duration.ofNanos(1_000))` (microseconds, Postgres precision).
   - `Prod.refuse(Environment env, boolean unsafe, String what)` — throws `IllegalStateException("Refusing to start under the prod profile: " + what)` when `unsafe` and the `prod` profile is active.
-  - `ErrorEnvelopeWriter.write(HttpServletResponse response, ErrorCode code)` — writes status + `{"error":{"code","message"}}`.
+  - `Prod.requireDeployed(Environment env, boolean provided, String what)` — throws `IllegalStateException("Refusing to start without " + what + " (required outside the local and test profiles)")` when not `provided` and neither `local` nor `test` is active. `what` names the property key (the start-up test matches on it).
+  - `Prod.warnDeployed(Environment env, boolean suspicious, String what)` — logs one WARN at start-up when `suspicious` and neither `local` nor `test` is active.
+  - `ErrorEnvelopeWriter.write(HttpServletResponse response, ErrorCode code)` — writes status + `{"error":{"code","message"}}` built by `ContractErrors.toEnvelope(...)` (the one envelope mapper).
+  - `TestcontainersConfiguration.jdbcProperties() → Map<String, String>` (test scope) — the shared container's `spring.datasource.*`, for tests that start the app without the test framework.
+  - `ProfileStartupTest.REQUIRED` (test scope) — `Map<String, Map<String, String>>` from profile (`staging`, `prod`) to every property it requires, with dummy values. Tasks 6, 8, 9 and plan A2 add entries.
   - `record WebProperties(List<String> allowedOrigins, String originSecretHeader, String originSecret, String ipHashKey)` bound to `scuby.web`.
   - `@FunctionalInterface interface SecurityRules { void authorize(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry rules); }` — every feature contributes a bean; anything not matched is `permitAll()`.
-  - `@FunctionalInterface interface RequestAuthenticator { Optional<UUID> authenticate(HttpServletRequest request); }` — returns the signed-in person's id.
+  - `@FunctionalInterface interface RequestAuthenticator { Optional<UUID> authenticate(HttpServletRequest request); }` — returns the signed-in person's id. If an authenticator throws (e.g. the database is down), `RequestAuthenticationFilter` logs it and answers `500 server_error` in the envelope — never Tomcat's `/error` page.
   - `final class SignedInAuthentication extends AbstractAuthenticationToken` with `UUID personId()`.
 
 - [ ] **Step 1: Baseline is green before any change**
@@ -254,6 +273,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Optional;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -277,6 +298,15 @@ class SecurityBaselineTest {
         @Bean
         SecurityRules probeRules() {
             return rules -> rules.requestMatchers("/probe/secured").authenticated();
+        }
+
+        /** Fails like a session lookup with the database down, only when asked to. */
+        @Bean
+        RequestAuthenticator failingProbeAuthenticator() {
+            return request -> {
+                if (request.getHeader("X-Probe-Fail") != null) throw new IllegalStateException("database down");
+                return Optional.empty();
+            };
         }
     }
 
@@ -334,7 +364,24 @@ class SecurityBaselineTest {
     @Test
     void securityHeadersAreSet() throws Exception {
         mvc.perform(get("/probe/open"))
-           .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+           .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+           // Kept on purpose (Task 1 · Response caching): no shared cache stores a per-viewer answer.
+           .andExpect(header().string("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate"));
+    }
+
+    @Test
+    void aForeignOriginGetIsRefusedByCorsInPlainText() throws Exception {
+        // Documented limitation: CorsFilter answers before any envelope can be written.
+        mvc.perform(get("/probe/open").header("Origin", "https://evil.example"))
+           .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void anAuthenticatorFailureIsAServerErrorInTheEnvelope() throws Exception {
+        mvc.perform(get("/probe/open").header("X-Probe-Fail", "1"))
+           .andExpect(status().isInternalServerError())
+           .andExpect(jsonPath("$.error.code").value("server_error"))
+           .andExpect(jsonPath("$.error.message").value("server_error"));
     }
 }
 ```
@@ -370,12 +417,117 @@ class ProdTest {
         prod.setActiveProfiles("prod");
         assertThatCode(() -> Prod.refuse(prod, false, "x")).doesNotThrowAnyException();
     }
+
+    @Test
+    void aDeployedProfileMustProvideTheSetting() {
+        for (String profile : new String[] {"staging", "prod"}) {
+            MockEnvironment env = new MockEnvironment();
+            env.setActiveProfiles(profile);
+            assertThatThrownBy(() -> Prod.requireDeployed(env, false, "scuby.web.allowed-origins"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("scuby.web.allowed-origins");
+            assertThatCode(() -> Prod.requireDeployed(env, true, "x")).doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void localAndTestMayRelyOnDefaults() {
+        for (String profile : new String[] {"local", "test"}) {
+            MockEnvironment env = new MockEnvironment();
+            env.setActiveProfiles(profile);
+            assertThatCode(() -> Prod.requireDeployed(env, false, "x")).doesNotThrowAnyException();
+        }
+    }
 }
+```
+
+`B/src/test/java/co/scuby/platform/config/ProfileStartupTest.java`:
+
+```java
+package co.scuby.platform.config;
+
+import co.scuby.ScubyApplication;
+import co.scuby.TestcontainersConfiguration;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
+
+/**
+ * Each deployed profile starts with exactly the properties infra provides (dummy values here) and refuses
+ * to start without any one of them — so a profile can neither become unstartable unnoticed nor run on a
+ * local default. Values are passed as command-line arguments: they must beat application*.yml.
+ */
+class ProfileStartupTest {
+
+    /** Every property a deployed profile requires. A task that adds a required property adds it here. */
+    static final Map<String, Map<String, String>> REQUIRED = Map.of(
+            "staging", Map.of(
+                    "scuby.web.allowed-origins", "https://staging.scuby.test"),
+            "prod", Map.of(
+                    "scuby.web.allowed-origins", "https://scuby.test",
+                    "scuby.web.origin-secret", "dummy-origin-secret"));
+
+    @ParameterizedTest
+    @ValueSource(strings = {"staging", "prod"})
+    void startsWithEveryRequiredProperty(String profile) {
+        try (ConfigurableApplicationContext context = start(profile, REQUIRED.get(profile))) {
+            assertThat(context.isActive()).isTrue();
+        }
+    }
+
+    static Stream<Arguments> eachRequiredProperty() {
+        return REQUIRED.entrySet().stream()
+                .flatMap(e -> e.getValue().keySet().stream().map(key -> Arguments.of(e.getKey(), key)));
+    }
+
+    /** Some exception in the chain names the key: a guard's message, or Boot's "Failed to bind properties under '<key>'". */
+    @ParameterizedTest(name = "{0} without {1}")
+    @MethodSource("eachRequiredProperty")
+    void refusesToStartWithoutIt(String profile, String key) {
+        Map<String, String> props = new LinkedHashMap<>(REQUIRED.get(profile));
+        props.remove(key);
+        Throwable failure = catchThrowable(() -> start(profile, props).close());
+        assertThat(failure).as("%s started without %s", profile, key).isNotNull();
+        StringBuilder chain = new StringBuilder();
+        for (Throwable t = failure; t != null; t = t.getCause()) chain.append(t.getMessage()).append('\n');
+        assertThat(chain.toString()).contains(key);
+    }
+
+    private static ConfigurableApplicationContext start(String profile, Map<String, String> props) {
+        Map<String, String> all = new LinkedHashMap<>(TestcontainersConfiguration.jdbcProperties());
+        all.putAll(props);
+        all.put("server.port", "0");
+        String[] args = all.entrySet().stream().map(e -> "--" + e.getKey() + "=" + e.getValue()).toArray(String[]::new);
+        return new SpringApplicationBuilder(ScubyApplication.class).profiles(profile).run(args);
+    }
+}
+```
+
+In `B/src/test/java/co/scuby/TestcontainersConfiguration.java`, add `import java.util.Map;` and, after `postgresProperties()`, this method (it reuses the one shared container):
+
+```java
+    /** The shared container's coordinates, for tests that start the app without Spring's test framework. */
+    public static Map<String, String> jdbcProperties() {
+        return Map.of(
+                "spring.datasource.url", postgres().getJdbcUrl(),
+                "spring.datasource.username", postgres().getUsername(),
+                "spring.datasource.password", postgres().getPassword());
+    }
 ```
 
 - [ ] **Step 5: Run to see them fail**
 
-Run: `[mvn] -q test -Dtest='SecurityBaselineTest,ProdTest' -Dsurefire.failIfNoSpecifiedTests=false`
+Run: `[mvn] -q test -Dtest='SecurityBaselineTest,ProdTest,ProfileStartupTest' -Dsurefire.failIfNoSpecifiedTests=false`
 Expected: compilation FAILURE — `cannot find symbol: class SecurityRules` / `class Prod`.
 
 - [ ] **Step 6: Platform classes**
@@ -408,16 +560,37 @@ public class TimeConfiguration {
 ```java
 package co.scuby.platform.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 
-/** Settings that are fine anywhere but production fail start-up under the `prod` profile. */
+/**
+ * Start-up guards. `refuse`: settings that are fine anywhere but production fail start-up under `prod`.
+ * `requireDeployed`: settings every deployed environment (anything but `local`/`test`) must provide.
+ */
 public final class Prod {
+
+    private static final Logger log = LoggerFactory.getLogger(Prod.class);
 
     private Prod() {}
 
     public static void refuse(Environment env, boolean unsafe, String what) {
         if (unsafe && env.matchesProfiles("prod")) {
             throw new IllegalStateException("Refusing to start under the prod profile: " + what);
+        }
+    }
+
+    /** `what` names the property key: ProfileStartupTest matches the message on it. */
+    public static void requireDeployed(Environment env, boolean provided, String what) {
+        if (!provided && !env.matchesProfiles("local | test")) {
+            throw new IllegalStateException("Refusing to start without " + what
+                    + " (required outside the local and test profiles)");
+        }
+    }
+
+    public static void warnDeployed(Environment env, boolean suspicious, String what) {
+        if (suspicious && !env.matchesProfiles("local | test")) {
+            log.warn("Start-up check: {}", what);
         }
     }
 }
@@ -430,13 +603,16 @@ package co.scuby.platform.web;
 
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
-import java.util.Map;
 
-/** The contract's envelope for answers written outside MVC (security entry points, filters). */
+/**
+ * The contract's envelope for answers written outside MVC (security entry points, filters). Built by
+ * ContractErrors, the same mapper ApiErrorHandler uses, so there is one envelope mapper.
+ */
 @Component
 public class ErrorEnvelopeWriter {
 
@@ -447,9 +623,11 @@ public class ErrorEnvelopeWriter {
     }
 
     public void write(HttpServletResponse response, ErrorCode code) throws IOException {
+        ProblemDetail pd = ProblemDetail.forStatus(code.status());
+        pd.setProperty(ContractErrors.CODE, code.wire());
         response.setStatus(code.status().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        json.writeValue(response.getOutputStream(), ApiErrorBody.of(code, code.wire(), Map.of(), Map.of()));
+        json.writeValue(response.getOutputStream(), ContractErrors.toEnvelope(pd));
     }
 }
 ```
@@ -551,10 +729,14 @@ public final class SignedInAuthentication extends AbstractAuthenticationToken {
 ```java
 package co.scuby.platform.security;
 
+import co.scuby.platform.web.ErrorCode;
+import co.scuby.platform.web.ErrorEnvelopeWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -563,20 +745,34 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Puts the signed-in person (if any) in the security context. The first authenticator that answers wins. */
+/**
+ * Puts the signed-in person (if any) in the security context. The first authenticator that answers wins.
+ * An authenticator that throws (database down) is a 500 in the contract's envelope, not Tomcat's /error.
+ */
 final class RequestAuthenticationFilter extends OncePerRequestFilter {
 
-    private final List<RequestAuthenticator> authenticators;
+    private static final Logger log = LoggerFactory.getLogger(RequestAuthenticationFilter.class);
 
-    RequestAuthenticationFilter(List<RequestAuthenticator> authenticators) {
+    private final List<RequestAuthenticator> authenticators;
+    private final ErrorEnvelopeWriter errors;
+
+    RequestAuthenticationFilter(List<RequestAuthenticator> authenticators, ErrorEnvelopeWriter errors) {
         this.authenticators = List.copyOf(authenticators);
+        this.errors = errors;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         for (RequestAuthenticator authenticator : authenticators) {
-            Optional<UUID> person = authenticator.authenticate(request);
+            Optional<UUID> person;
+            try {
+                person = authenticator.authenticate(request);
+            } catch (RuntimeException e) {
+                log.error("Authenticating {} {} failed", request.getMethod(), request.getRequestURI(), e);
+                errors.write(response, ErrorCode.SERVER_ERROR);
+                return;
+            }
             if (person.isPresent()) {
                 var context = SecurityContextHolder.createEmptyContext();
                 context.setAuthentication(new SignedInAuthentication(person.get()));
@@ -647,9 +843,12 @@ package co.scuby.platform.security;
 
 import co.scuby.platform.web.ErrorCode;
 import co.scuby.platform.web.ErrorEnvelopeWriter;
+import co.scuby.platform.config.Prod;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -666,6 +865,8 @@ import java.util.List;
 /**
  * The one filter chain (docs/eng/backend.md · Security). Stateless: the session is our own cookie,
  * resolved by a RequestAuthenticator; Spring's HTTP session, form login, basic auth and logout are off.
+ * CORS: `Customizer.withDefaults()` picks the bean named corsConfigurationSource — injecting a
+ * CorsConfigurationSource by type is ambiguous (Spring MVC's HandlerMappingIntrospector is one too).
  */
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfiguration {
@@ -674,11 +875,10 @@ public class SecurityConfiguration {
     SecurityFilterChain apiFilterChain(HttpSecurity http,
                                        ObjectProvider<SecurityRules> rules,
                                        ObjectProvider<RequestAuthenticator> authenticators,
-                                       CorsConfigurationSource cors,
                                        ErrorEnvelopeWriter errors,
                                        WebProperties web) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
-            .cors(c -> c.configurationSource(cors))
+            .cors(Customizer.withDefaults())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .httpBasic(AbstractHttpConfigurer::disable)
             .formLogin(AbstractHttpConfigurer::disable)
@@ -687,8 +887,9 @@ public class SecurityConfiguration {
             .exceptionHandling(e -> e
                     .authenticationEntryPoint((req, res, ex) -> errors.write(res, ErrorCode.UNAUTHORIZED))
                     .accessDeniedHandler((req, res, ex) -> errors.write(res, ErrorCode.FORBIDDEN)))
-            .addFilterAfter(new OriginCheckFilter(web.allowedOrigins(), errors), CorsFilter.class)
-            .addFilterBefore(new RequestAuthenticationFilter(authenticators.orderedStream().toList()),
+            // Before CorsFilter: a refused unsafe request gets the envelope, not CORS's plain-text 403.
+            .addFilterBefore(new OriginCheckFilter(web.allowedOrigins(), errors), CorsFilter.class)
+            .addFilterBefore(new RequestAuthenticationFilter(authenticators.orderedStream().toList(), errors),
                     AnonymousAuthenticationFilter.class)
             .authorizeHttpRequests(a -> {
                 rules.orderedStream().forEach(r -> r.authorize(a));
@@ -698,7 +899,9 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource(WebProperties web) {
+    CorsConfigurationSource corsConfigurationSource(WebProperties web, Environment env) {
+        Prod.requireDeployed(env, !web.allowedOrigins().isEmpty(),
+                "scuby.web.allowed-origins (env SCUBY_WEB_ALLOWED_ORIGINS: the web client's origins, comma-separated)");
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(web.allowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
@@ -743,81 +946,29 @@ Replace the content of `B/src/main/resources/application-test.yml` with:
 scuby:
   web:
     allowed-origins: [ "http://localhost:4173" ]
+# thin slice: each cached test context keeps its own pool against one Postgres container
+# (max_connections 100); small pools keep a dozen contexts under the limit.
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
 ```
 
 - [ ] **Step 8: Run the new tests and the whole suite**
 
-Run: `[mvn] -q test -Dtest='SecurityBaselineTest,ProdTest' -Dsurefire.failIfNoSpecifiedTests=false`
-Expected: PASS (10 tests).
+Run: `[mvn] -q test -Dtest='SecurityBaselineTest,ProdTest,ProfileStartupTest' -Dsurefire.failIfNoSpecifiedTests=false`
+Expected: PASS — `SecurityBaselineTest` 10, `ProdTest` 4, `ProfileStartupTest` 5 (2 starts + 3 "without" cases: staging × 1, prod × 2). If `SecurityBaselineTest` errors with `NoUniqueBeanDefinitionException … corsConfigurationSource,mvcHandlerMappingIntrospector`, something injects `CorsConfigurationSource` by type — keep `.cors(Customizer.withDefaults())` as written.
 
 Run: `[mvn] -q verify`
-Expected: `BUILD SUCCESS`. Every foundation test still passes (`ApiErrorHandlerTest`'s probes are public; its POSTs carry no `Origin`). A start-up log line `Using generated security password` is harmless until Task 9 adds a `JwtDecoder` bean (Boot's in-memory user then backs off); it is never used because form/basic login are off. If after Task 9 it still appears, add to `ScubyApplication` the exclusion of Boot's `UserDetailsServiceAutoConfiguration` (find its exact class name with `unzip -l ~/.m2/repository/org/springframework/boot/spring-boot-security/4.1.2/spring-boot-security-4.1.2.jar | grep UserDetailsServiceAutoConfiguration`).
+Expected: `BUILD SUCCESS`. Every foundation test still passes (`ApiErrorHandlerTest`'s probes are public; its POSTs carry no `Origin`). A start-up log line `Using generated security password` is harmless until Task 9 adds a `JwtDecoder` bean (Boot's in-memory user then backs off); it is never used because form/basic login are off.
 
-- [ ] **Step 9: One source of truth for the Java version**
-
-The Java version lives in three places that must agree: `<java.version>25</java.version>` in `B/pom.xml` (compilation, and now Jib's base image), `B/.java-version` (jenv locally; `.github/workflows/backend.yml` reads it with `java-version-file`), and the pinned digest of the Jib base image. Task 13 documents them under one heading in `backend/CLAUDE.md`.
-
-(a) In `B/pom.xml`, in the `jib-maven-plugin` `<configuration><from>`, replace `<image>eclipse-temurin:25-jre</image>` with:
-
-```xml
-            <!--
-              Base image derives from ${java.version}; pinned to the multi-arch index digest of
-              eclipse-temurin:25-jre (linux/amd64 + linux/arm64), looked up 2026-10-29 (25.0.4.1_1-jre).
-              To bump: docker buildx imagetools inspect eclipse-temurin:${java.version}-jre  → copy the top "Digest:".
-              Changing java.version means changing .java-version and this digest in the same commit.
-            -->
-            <image>eclipse-temurin:${java.version}-jre@sha256:78f1f183913482ef390c2722f46c3f0ce76ada341d69590e7c482ec943ee72d5</image>
-```
-
-(b) In `<build><plugins>`, before `testcontainers-jooq-codegen-maven-plugin`, add:
-
-```xml
-      <!-- thin slice: building with another JDK or an old Maven fails at validate with a clear message -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.6.3</version>
-        <executions>
-          <execution>
-            <id>enforce-java-and-maven</id>
-            <phase>validate</phase>
-            <goals><goal>enforce</goal></goals>
-            <configuration>
-              <rules>
-                <requireJavaVersion>
-                  <version>[25,26)</version>
-                  <message>Scuby's backend builds with Java 25 (backend/.java-version). Export JAVA_HOME=/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home or run `jenv local 25`.</message>
-                </requireJavaVersion>
-                <requireMavenVersion>
-                  <version>[3.9,)</version>
-                  <message>Use the wrapper: ./mvnw</message>
-                </requireMavenVersion>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-```
-
-(c) Check `B/.java-version` contains exactly `25`: `cat /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend/.java-version` → `25`.
-
-(d) Verify:
-
-Run: `[mvn] -q validate` → exits 0, no output.
-
-Run (deliberately the wrong JDK, Homebrew's default openjdk 26):
-`cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend && JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home ./mvnw -q validate; echo "exit=$?"`
-Expected: `Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion failed with message:` followed by `Scuby's backend builds with Java 25 …`, and `exit=1`.
-
-Run: `[mvn] -q -DskipTests package jib:dockerBuild -Djib.from.platforms=linux/arm64 && docker run --rm --entrypoint java scuby-backend -version 2>&1 | head -1`
-Expected: a line starting `openjdk version "25.` (Jib pulled the pinned digest; `docker image inspect scuby-backend --format '{{.Architecture}}'` prints `arm64`).
-
-- [ ] **Step 10: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice
-git add backend/pom.xml backend/src/main/java/co/scuby/ScubyApplication.java backend/src/main/java/co/scuby/platform backend/src/main/resources/application*.yml backend/src/test/java/co/scuby/platform/security backend/src/test/java/co/scuby/platform/config
-git commit -m "feat: slice dependencies, Java 25 enforced and the Jib base image pinned, security baseline — stateless chain, envelope 401/403, Origin check, CORS"
+git add backend/pom.xml backend/src/main/java/co/scuby/ScubyApplication.java backend/src/main/java/co/scuby/platform backend/src/main/resources/application*.yml backend/src/test/java/co/scuby/TestcontainersConfiguration.java backend/src/test/java/co/scuby/platform/security backend/src/test/java/co/scuby/platform/config
+git commit -m "feat: slice dependencies and the security baseline — stateless chain, envelope 401/403/500, Origin check before CORS, deployed profiles refuse missing settings"
 ```
 
 ---
@@ -833,6 +984,7 @@ Every later endpoint test goes through this harness, so the design's "contract c
 - Create: `B/src/test/java/co/scuby/support/TestSupportConfiguration.java`
 - Create: `B/src/test/java/co/scuby/support/MutableClock.java`
 - Create: `B/src/test/java/co/scuby/support/StatementRecorder.java`
+- Create: `B/src/test/java/co/scuby/support/ConnectionSampler.java`
 - Create: `B/src/test/java/co/scuby/support/StatementCeilings.java`
 - Create: `B/src/test/java/co/scuby/support/ApiClients.java`
 - Create: `B/src/test/java/co/scuby/support/ApiClient.java`
@@ -847,11 +999,12 @@ Every later endpoint test goes through this harness, so the design's "contract c
 - Produces (all in `co.scuby.support`, test scope, `public`):
   - `@IntegrationTest` — `@SpringBootTest @AutoConfigureMockMvc @ActiveProfiles("test") @Import({TestcontainersConfiguration.class, TestSupportConfiguration.class})`.
   - `MutableClock extends Clock`: `static final Instant START = Instant.parse("2026-10-14T17:00:00Z")`; `Instant instant()`, `void set(Instant)`, `void advance(Duration)`, `void reset()`.
-  - `StatementRecorder`: `void reset()`, `List<String> statements()`.
+  - `StatementRecorder`: `void reset()`, `List<String> statements()`, `List<Boolean> autoCommits()` (per statement: did it run outside a transaction).
+  - `ConnectionSampler` (a `HandlerInterceptor` every `@IntegrationTest` gets): `OptionalInt activeWhenTheHandlerStarted()` — the pool's active connections sampled after every filter ran and before the controller; `void reset()`.
   - `StatementCeilings.of(String method, String pathTemplate) → int` — fails the test when an endpoint has no ceiling.
   - `ApiClients.newBrowser() → ApiClient`.
   - `ApiClient`: `get(String template, Object... vars)`, `post(String template, String json, Object... vars)`, `put(...)`, `call(HttpMethod, String template, String json, Object... vars)`, `raw(HttpMethod, String template, String json, Object... vars)` (no contract/ceiling checks), `header(String, String) → ApiClient`, `from(String ip) → ApiClient`, `setCookie(String name, String value)`, `cookie(String name) → Optional<String>`, `newBrowser() → ApiClient`. Templates may carry a query (`"/feed?lat={lat}&lng={lng}"`); the contract path is the part before `?`.
-  - `ApiResponse(int status, String body, MockHttpServletResponse raw, List<String> statements)`: `json()`, `str(String pointer)`, `isNull(String pointer)`, `errorCode()`, `setCookies()`.
+  - `ApiResponse(int status, String body, MockHttpServletResponse raw, List<String> statements, boolean httpSessionCreated)`: `json()`, `str(String pointer)`, `isNull(String pointer)`, `errorCode()`, `setCookies()`.
   - `TestDb.reset()` — truncates `TestDb.MUTABLE_TABLES`, restores every `Flag` to its default (from Task 4 on), clears every `ClearableCache`, resets the clock and recorders. `TestDb.MUTABLE_TABLES` is a `List<String>` later tasks extend.
   - `PlanAssert.plan(DSLContext, Query) → String`; `PlanAssert.assertNoSeqScanOn(DSLContext, Query, String table)`.
   - `co.scuby.platform.cache.ClearableCache { void clear(); }` (main scope).
@@ -908,6 +1061,14 @@ class HarnessSelfTest {
         db.selectOne().fetch();
         db.selectOne().fetch();
         assertThat(recorder.statements()).hasSize(2);
+    }
+
+    @Test
+    void theRecorderSeesWhetherAStatementRanInsideATransaction() {
+        recorder.reset();
+        db.selectOne().fetch();
+        db.transaction(tx -> tx.dsl().selectOne().fetch());
+        assertThat(recorder.autoCommits()).containsExactly(true, false);
     }
 
     @Test
@@ -1057,28 +1218,92 @@ package co.scuby.support;
 import org.jooq.ExecuteContext;
 import org.jooq.ExecuteListener;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Records every SQL statement jOOQ executes; ApiClient checks the count against StatementCeilings. */
+/**
+ * Records every SQL statement jOOQ executes, and whether it ran in autocommit (outside a transaction).
+ * ApiClient checks the count against StatementCeilings; the session tests check the autocommit flag.
+ */
 public final class StatementRecorder implements ExecuteListener {
 
-    private final List<String> sql = new CopyOnWriteArrayList<>();
+    private record Executed(String sql, boolean autoCommit) {}
+
+    private final List<Executed> executed = new CopyOnWriteArrayList<>();
 
     @Override
     public void executeStart(ExecuteContext ctx) {
+        boolean autoCommit = autoCommit(ctx);
         String[] batch = ctx.batchSQL();
-        if (batch != null && batch.length > 1) sql.addAll(List.of(batch));
-        else sql.add(String.valueOf(ctx.sql()));
+        if (batch != null && batch.length > 1) {
+            for (String sql : batch) executed.add(new Executed(sql, autoCommit));
+        } else {
+            executed.add(new Executed(String.valueOf(ctx.sql()), autoCommit));
+        }
     }
 
-    public void reset() { sql.clear(); }
+    public void reset() { executed.clear(); }
 
-    public List<String> statements() { return List.copyOf(sql); }
+    public List<String> statements() { return executed.stream().map(Executed::sql).toList(); }
+
+    public List<Boolean> autoCommits() { return executed.stream().map(Executed::autoCommit).toList(); }
+
+    private static boolean autoCommit(ExecuteContext ctx) {
+        try {
+            return ctx.connection().getAutoCommit();
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
 }
 ```
 
 If `implements ExecuteListener` does not compile because the interface has abstract methods in jOOQ 3.21.9, use `extends org.jooq.impl.DefaultExecuteListener` instead and keep the same override.
+
+`B/src/test/java/co/scuby/support/ConnectionSampler.java`:
+
+```java
+package co.scuby.support;
+
+import com.zaxxer.hikari.HikariDataSource;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import javax.sql.DataSource;
+import java.sql.SQLException;
+import java.util.OptionalInt;
+
+/**
+ * Samples the pool's active connections after every filter ran and before the controller: a connection
+ * still held then means a filter (or something around it) kept a transaction open across the request.
+ * Sampling after the request proves nothing — every connection is back by then.
+ */
+public final class ConnectionSampler implements HandlerInterceptor {
+
+    private final ObjectProvider<DataSource> dataSource;
+    private volatile Integer activeAtHandlerStart;
+
+    ConnectionSampler(ObjectProvider<DataSource> dataSource) {
+        this.dataSource = dataSource;
+    }
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws SQLException {
+        activeAtHandlerStart = dataSource.getObject().unwrap(HikariDataSource.class).getHikariPoolMXBean().getActiveConnections();
+        return true;
+    }
+
+    public OptionalInt activeWhenTheHandlerStarted() {
+        Integer v = activeAtHandlerStart;
+        return v == null ? OptionalInt.empty() : OptionalInt.of(v);
+    }
+
+    public void reset() { activeAtHandlerStart = null; }
+}
+```
 
 `B/src/test/java/co/scuby/support/StatementCeilings.java`:
 
@@ -1125,7 +1350,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 
-public record ApiResponse(int status, String body, MockHttpServletResponse raw, List<String> statements) {
+/** @param httpSessionCreated true when the request created a servlet HttpSession (it never should: the API is stateless). */
+public record ApiResponse(int status, String body, MockHttpServletResponse raw, List<String> statements,
+                          boolean httpSessionCreated) {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -1165,6 +1392,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.nio.charset.StandardCharsets;
@@ -1251,13 +1479,15 @@ public final class ApiClient {
         req.with(r -> { r.setRemoteAddr(addr); return r; });
         recorder.reset();
         try {
-            MockHttpServletResponse res = mvc.perform(req).andReturn().getResponse();
+            MvcResult result = mvc.perform(req).andReturn();
+            MockHttpServletResponse res = result.getResponse();
             List<String> sql = recorder.statements();
             for (Cookie c : res.getCookies()) {
                 if (c.getMaxAge() == 0) jar.remove(c.getName());
                 else jar.put(c.getName(), new Cookie(c.getName(), c.getValue()));
             }
-            return new ApiResponse(res.getStatus(), res.getContentAsString(StandardCharsets.UTF_8), res, sql);
+            return new ApiResponse(res.getStatus(), res.getContentAsString(StandardCharsets.UTF_8), res, sql,
+                    result.getRequest().getSession(false) != null);
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -1352,12 +1582,15 @@ public final class TestDb {
     private final ObjectProvider<ClearableCache> caches;
     private final MutableClock clock;
     private final StatementRecorder recorder;
+    private final ConnectionSampler sampler;
 
-    TestDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder) {
+    TestDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder,
+           ConnectionSampler sampler) {
         this.db = db;
         this.caches = caches;
         this.clock = clock;
         this.recorder = recorder;
+        this.sampler = sampler;
     }
 
     public void reset() {
@@ -1366,6 +1599,7 @@ public final class TestDb {
         caches.orderedStream().forEach(ClearableCache::clear);
         clock.reset();
         recorder.reset();
+        sampler.reset();
     }
 }
 ```
@@ -1384,6 +1618,10 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import javax.sql.DataSource;
 
 /** Beans every @IntegrationTest gets. Later tasks add recording senders and test keys here. */
 @TestConfiguration(proxyBeanMethods = false)
@@ -1412,8 +1650,21 @@ public class TestSupportConfiguration {
     }
 
     @Bean
-    TestDb testDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder) {
-        return new TestDb(db, caches, clock, recorder);
+    ConnectionSampler connectionSampler(ObjectProvider<DataSource> dataSource) {
+        return new ConnectionSampler(dataSource);
+    }
+
+    @Bean
+    WebMvcConfigurer connectionSamplerRegistration(ConnectionSampler sampler) {
+        return new WebMvcConfigurer() {
+            @Override public void addInterceptors(InterceptorRegistry registry) { registry.addInterceptor(sampler); }
+        };
+    }
+
+    @Bean
+    TestDb testDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder,
+                  ConnectionSampler sampler) {
+        return new TestDb(db, caches, clock, recorder, sampler);
     }
 }
 ```
@@ -1425,7 +1676,7 @@ Add `Map.entry("GET /actuator/health", 0)` is already in `StatementCeilings` (it
 - [ ] **Step 4: Run**
 
 Run: `[mvn] -q test -Dtest='HarnessSelfTest,ContractValidatorTest' -Dsurefire.failIfNoSpecifiedTests=false`
-Expected: PASS (6 + 6 tests). The plan test prints two plans; the first shows `Index Scan` or `Bitmap Index Scan` on `outbox_events_created_at_idx`.
+Expected: PASS (7 + 6 tests). The plan test prints two plans; the first shows `Index Scan` or `Bitmap Index Scan` on `outbox_events_created_at_idx`.
 
 - [ ] **Step 5: Commit**
 
@@ -1447,7 +1698,10 @@ git commit -m "test: integration harness — contract check and statement ceilin
   `B/src/test/java/archfixtures/identity/Internal.java`, `B/src/test/java/archfixtures/identity/Exposed.java`,
   `B/src/test/java/archfixtures/identity/ReachesIntoCases.java`, `B/src/test/java/archfixtures/cases/UsesInternal.java`,
   `B/src/test/java/archfixtures/cases/UsesExposed.java`, `B/src/test/java/archfixtures/cases/ClockReadingDerivation.java`,
-  `B/src/test/java/archfixtures/cases/SpringUsingDerivation.java`, `B/src/test/java/archfixtures/cases/PureDerivation.java`,
+  `B/src/test/java/archfixtures/cases/SneakyDerivation.java`, `B/src/test/java/archfixtures/cases/SpringUsingDerivation.java`,
+  `B/src/test/java/archfixtures/cases/JooqUsingDerivation.java`, `B/src/test/java/archfixtures/cases/BeanUsingDerivation.java`,
+  `B/src/test/java/archfixtures/cases/PureDerivation.java`, `B/src/test/java/archfixtures/help/UsesCases.java`,
+  `B/src/test/java/archfixtures/platform/UsesIdentity.java`, `B/src/test/java/archfixtures/stray/Thing.java`,
   `B/src/test/java/archfixtures/roles/FixtureApi.java`, `B/src/test/java/archfixtures/roles/FixtureWorker.java`
 - Delete: `B/src/test/java/co/scuby/platform/roles/RoleBoundariesTest.java`
 - Modify: `B/pom.xml` (PIT plugin), `B/README.md` (one paragraph)
@@ -1456,7 +1710,7 @@ git commit -m "test: integration harness — contract check and statement ceilin
 - Consumes: `@ApiComponent`, `@WorkerComponent` (existing).
 - Produces:
   - `@co.scuby.platform.modules.ModuleApi` — `@Target(TYPE) @Retention(RUNTIME) @Documented`. A class in a feature used from another feature must carry it; classes nested in a `@ModuleApi` class count as annotated.
-  - `ArchitectureRules(String root)` with the constants `FOUNDATIONS = List.of("identity", "uploads", "pets")`, `VERTICALS = List.of("cases")`; methods `derivationsDependOnNothingImpure()`, `derivationsReadNoClockOrRandomness()`, `workersDoNotUseApi()`, `apiDoesNotUseWorkers()`, `platformDependsOnNoFeature()`, `foundationIsolated(String)`, `verticalIsolated(String)`, `onlyKnownTopLevelPackages()`, `moduleApi(String feature)`. **A new feature is added to `FOUNDATIONS` or `VERTICALS` in the same commit that creates its package** (otherwise `onlyKnownTopLevelPackages` fails).
+  - `ArchitectureRules(String root)` (production lists) and `ArchitectureRules(String root, List<String> foundations, List<String> verticals)` (the self-test aims the rules at fixtures with a second vertical), with the constants `FOUNDATIONS = List.of("identity", "uploads", "pets")`, `VERTICALS = List.of("cases")` and the instance lists `foundations()`, `verticals()`, `all()`; methods `derivationsDependOnNothingImpure()`, `derivationsReadNoClockOrRandomness()`, `workersDoNotUseApi()`, `apiDoesNotUseWorkers()`, `platformDependsOnNoFeature()`, `foundationIsolated(String)`, `verticalIsolated(String)`, `onlyKnownTopLevelPackages()`, `moduleApi(String feature)`. **A new feature is added to `FOUNDATIONS` or `VERTICALS` in the same commit that creates its package** (otherwise `onlyKnownTopLevelPackages` fails).
   - PIT runs at `verify` on `co.scuby.*Derivation*` with tests `co.scuby.*DerivationTest`, threshold 80 %.
 
 - [ ] **Step 1: Write the rules and the self-test that proves each rule bites**
@@ -1493,37 +1747,39 @@ import co.scuby.platform.roles.ApiComponent;
 import co.scuby.platform.roles.WorkerComponent;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.lang.ArchRule;
 import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
-import java.util.UUID;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.properties.CanBeAnnotated.Predicates.metaAnnotatedWith;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-/** The design's guardrails 1–4 (docs/eng/backend.md · Code structure), parameterised by root package so a self-test can aim them at fixtures. */
+/** The design's guardrails 1–4 (docs/eng/backend.md · Code structure), parameterised by root package and feature lists so a self-test can aim them at fixtures. */
 final class ArchitectureRules {
 
     static final List<String> FOUNDATIONS = List.of("identity", "uploads", "pets");
     static final List<String> VERTICALS = List.of("cases");
 
     private final String root;
+    private final List<String> foundations;
+    private final List<String> verticals;
 
     ArchitectureRules(String root) {
+        this(root, FOUNDATIONS, VERTICALS);
+    }
+
+    ArchitectureRules(String root, List<String> foundations, List<String> verticals) {
         this.root = root;
+        this.foundations = List.copyOf(foundations);
+        this.verticals = List.copyOf(verticals);
     }
 
     static final DescribedPredicate<JavaClass> DERIVATION = new DescribedPredicate<>("a *Derivation class or one nested in it") {
@@ -1539,10 +1795,28 @@ final class ArchitectureRules {
         }
     };
 
+    /**
+     * Any read of the clock or of randomness, whatever the overload: every `now(..)` on a java.time type
+     * (also `Instant.now(clock)`), Clock.system*, System.currentTimeMillis/nanoTime, UUID.randomUUID,
+     * Math.random, ThreadLocalRandom.current.
+     */
+    static final DescribedPredicate<JavaMethodCall> CLOCK_OR_RANDOMNESS = new DescribedPredicate<>("reads the clock or randomness") {
+        @Override public boolean test(JavaMethodCall call) {
+            String owner = call.getTargetOwner().getName();
+            String name = call.getName();
+            return (owner.startsWith("java.time.") && name.equals("now"))
+                    || (owner.equals("java.time.Clock") && (name.equals("systemUTC") || name.equals("systemDefaultZone")))
+                    || (owner.equals("java.lang.System") && (name.equals("currentTimeMillis") || name.equals("nanoTime")))
+                    || (owner.equals("java.util.UUID") && name.equals("randomUUID"))
+                    || (owner.equals("java.lang.Math") && name.equals("random"))
+                    || (owner.equals("java.util.concurrent.ThreadLocalRandom") && name.equals("current"));
+        }
+    };
+
     /** 1a. Derivations are pure: no Spring, jOOQ, generated tables, I/O, network, NIO or JDBC; no Spring beans. */
     ArchRule derivationsDependOnNothingImpure() {
         return noClasses().that(DERIVATION).should().dependOnClassesThat(
-                        resideInAnyPackage("org.springframework..", "org.jooq..", "co.scuby.db.generated..",
+                        resideInAnyPackage("org.springframework..", "org.jooq..", root + ".db.generated..",
                                 "java.io..", "java.net..", "java.nio..", "java.sql..")
                                 .or(metaAnnotatedWith(Component.class)))
                 .allowEmptyShould(true)
@@ -1552,15 +1826,7 @@ final class ArchitectureRules {
     /** 1b. Derivations never read the clock or randomness themselves. */
     ArchRule derivationsReadNoClockOrRandomness() {
         return noClasses().that(DERIVATION)
-                .should().callMethod(Instant.class, "now")
-                .orShould().callMethod(Clock.class, "systemUTC")
-                .orShould().callMethod(Clock.class, "systemDefaultZone")
-                .orShould().callMethod(LocalDate.class, "now")
-                .orShould().callMethod(LocalDateTime.class, "now")
-                .orShould().callMethod(OffsetDateTime.class, "now")
-                .orShould().callMethod(ZonedDateTime.class, "now")
-                .orShould().callMethod(UUID.class, "randomUUID")
-                .orShould().callMethod(Math.class, "random")
+                .should().callMethodWhere(CLOCK_OR_RANDOMNESS)
                 .orShould().callConstructor(SecureRandom.class)
                 .orShould().callConstructor(Random.class)
                 .allowEmptyShould(true)
@@ -1595,7 +1861,7 @@ final class ArchitectureRules {
     }
 
     ArchRule verticalIsolated(String vertical) {
-        List<String> others = new ArrayList<>(VERTICALS);
+        List<String> others = new ArrayList<>(verticals);
         others.remove(vertical);
         return noClasses().that().resideInAPackage(root + "." + vertical + "..")
                 .should().dependOnClassesThat().resideInAnyPackage(packages(others))
@@ -1620,9 +1886,13 @@ final class ArchitectureRules {
                 .because("cross-feature use is declared with @ModuleApi");
     }
 
-    static List<String> all() {
-        List<String> all = new ArrayList<>(FOUNDATIONS);
-        all.addAll(VERTICALS);
+    List<String> foundations() { return foundations; }
+
+    List<String> verticals() { return verticals; }
+
+    List<String> all() {
+        List<String> all = new ArrayList<>(foundations);
+        all.addAll(verticals);
         return all;
     }
 
@@ -1663,14 +1933,14 @@ class ArchitectureTest {
     @ArchTest
     void dependenciesFormTheDag(JavaClasses classes) {
         RULES.platformDependsOnNoFeature().check(classes);
-        ArchitectureRules.FOUNDATIONS.forEach(f -> RULES.foundationIsolated(f).check(classes));
-        ArchitectureRules.VERTICALS.forEach(v -> RULES.verticalIsolated(v).check(classes));
+        RULES.foundations().forEach(f -> RULES.foundationIsolated(f).check(classes));
+        RULES.verticals().forEach(v -> RULES.verticalIsolated(v).check(classes));
         RULES.onlyKnownTopLevelPackages().check(classes);
     }
 
     @ArchTest
     void crossFeatureUseIsDeclared(JavaClasses classes) {
-        ArchitectureRules.all().forEach(f -> RULES.moduleApi(f).check(classes));
+        RULES.all().forEach(f -> RULES.moduleApi(f).check(classes));
     }
 }
 ```
@@ -1684,19 +1954,32 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Each rule must fail on a fixture that breaks it — a rule that never fails guards nothing. */
 class ArchitectureRulesSelfTest {
 
     private static final JavaClasses FIXTURES = new ClassFileImporter().importPackages("archfixtures");
-    private static final ArchitectureRules RULES = new ArchitectureRules("archfixtures");
+    /** Fixtures have one foundation and two verticals, so vertical → vertical can be broken on purpose. */
+    private static final ArchitectureRules RULES =
+            new ArchitectureRules("archfixtures", List.of("identity"), List.of("cases", "help"));
 
     @Test
     void aDerivationReadingTheClockFails() {
         assertThatThrownBy(() -> RULES.derivationsReadNoClockOrRandomness().check(FIXTURES))
-                .isInstanceOf(AssertionError.class).hasMessageContaining("ClockReadingDerivation");
+                .isInstanceOf(AssertionError.class).hasMessageContaining("ClockReadingDerivation")
+                .message().doesNotContain("PureDerivation");
+    }
+
+    @Test
+    void aDerivationReadingTimeOrRandomnessThroughAnyOverloadFails() {
+        assertThatThrownBy(() -> RULES.derivationsReadNoClockOrRandomness().check(FIXTURES))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("java.lang.System.currentTimeMillis()")
+                .hasMessageContaining("java.time.Instant.now(java.time.Clock)")
+                .hasMessageContaining("java.util.concurrent.ThreadLocalRandom.current()");
     }
 
     @Test
@@ -1707,9 +1990,29 @@ class ArchitectureRulesSelfTest {
     }
 
     @Test
+    void aDerivationUsingJooqOrABeanFails() {
+        assertThatThrownBy(() -> RULES.derivationsDependOnNothingImpure().check(FIXTURES))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("JooqUsingDerivation")
+                .hasMessageContaining("BeanUsingDerivation");
+    }
+
+    @Test
     void aWorkerUsingAnApiComponentFails() {
         assertThatThrownBy(() -> RULES.workersDoNotUseApi().check(FIXTURES))
                 .isInstanceOf(AssertionError.class).hasMessageContaining("FixtureWorker");
+    }
+
+    @Test
+    void anApiComponentUsingAWorkerFails() {
+        assertThatThrownBy(() -> RULES.apiDoesNotUseWorkers().check(FIXTURES))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("FixtureApi");
+    }
+
+    @Test
+    void platformReachingIntoAFeatureFails() {
+        assertThatThrownBy(() -> RULES.platformDependsOnNoFeature().check(FIXTURES))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("UsesIdentity");
     }
 
     @Test
@@ -1719,17 +2022,23 @@ class ArchitectureRulesSelfTest {
     }
 
     @Test
+    void aVerticalReachingIntoAnotherFails() {
+        assertThatThrownBy(() -> RULES.verticalIsolated("help").check(FIXTURES))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("UsesCases");
+    }
+
+    @Test
+    void anUnknownTopLevelPackageFails() {
+        assertThatThrownBy(() -> RULES.onlyKnownTopLevelPackages().check(FIXTURES))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("archfixtures.stray.Thing");
+    }
+
+    @Test
     void anUndeclaredCrossFeatureUseFailsAndADeclaredOnePasses() {
         assertThatThrownBy(() -> RULES.moduleApi("identity").check(FIXTURES))
                 .isInstanceOf(AssertionError.class)
                 .hasMessageContaining("Internal")
                 .message().doesNotContain("Exposed");
-    }
-
-    @Test
-    void theProductionRulesHoldOnAnEmptyRoleSet() {
-        assertThatCode(() -> RULES.apiDoesNotUseWorkers().check(new ClassFileImporter().importClasses(String.class)))
-                .doesNotThrowAnyException();
     }
 }
 ```
@@ -1802,6 +2111,72 @@ public class ClockReadingDerivation {
 }
 ```
 
+`B/src/test/java/archfixtures/cases/SneakyDerivation.java` (time and randomness through overloads the old rule missed):
+```java
+package archfixtures.cases;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.util.concurrent.ThreadLocalRandom;
+
+public class SneakyDerivation {
+    public static long derive(Clock clock) {
+        return System.currentTimeMillis() + Instant.now(clock).toEpochMilli() + ThreadLocalRandom.current().nextInt();
+    }
+}
+```
+
+`B/src/test/java/archfixtures/cases/JooqUsingDerivation.java`:
+```java
+package archfixtures.cases;
+
+import org.jooq.impl.DSL;
+
+public class JooqUsingDerivation {
+    public static String derive(String s) { return DSL.inline(s).toString(); }
+}
+```
+
+`B/src/test/java/archfixtures/cases/BeanUsingDerivation.java` (depends on a class meta-annotated with `@Component`):
+```java
+package archfixtures.cases;
+
+import archfixtures.roles.FixtureApi;
+
+public class BeanUsingDerivation {
+    public static String derive(FixtureApi api) { return api.hello(); }
+}
+```
+
+`B/src/test/java/archfixtures/help/UsesCases.java` (a vertical reaching into another vertical):
+```java
+package archfixtures.help;
+
+import archfixtures.cases.UsesExposed;
+
+public class UsesCases {
+    public static String call() { return UsesExposed.call(); }
+}
+```
+
+`B/src/test/java/archfixtures/platform/UsesIdentity.java` (platform reaching into a feature):
+```java
+package archfixtures.platform;
+
+import archfixtures.identity.Exposed;
+
+public class UsesIdentity {
+    public static String call() { return Exposed.value(); }
+}
+```
+
+`B/src/test/java/archfixtures/stray/Thing.java` (a top-level package no list declares):
+```java
+package archfixtures.stray;
+
+public class Thing {}
+```
+
 `B/src/test/java/archfixtures/cases/SpringUsingDerivation.java`:
 ```java
 package archfixtures.cases;
@@ -1833,6 +2208,7 @@ import co.scuby.platform.roles.ApiComponent;
 @ApiComponent
 public class FixtureApi {
     public String hello() { return "api"; }
+    public String trigger(FixtureWorker worker) { return worker.run(this); }
 }
 ```
 
@@ -1851,7 +2227,7 @@ public class FixtureWorker {
 - [ ] **Step 2: Run them**
 
 Run: `[mvn] -q test -Dtest='ArchitectureTest,ArchitectureRulesSelfTest' -Dsurefire.failIfNoSpecifiedTests=false`
-Expected: PASS (4 + 6). `ArchitectureTest` passes because nothing violates yet (`identity` and the others do not exist; `allowEmptyShould(true)`). If a self-test fails because the rule did not fire, the rule is wrong — fix the rule, never the self-test.
+Expected: PASS (4 + 11). `ArchitectureTest` passes because nothing violates yet (`identity` and the others do not exist; `allowEmptyShould(true)`). If a self-test fails because the rule did not fire, the rule is wrong — fix the rule, never the self-test.
 
 - [ ] **Step 3: Delete the package-based role rule**
 
@@ -1903,7 +2279,7 @@ In `<build><plugins>`, after the `maven-surefire-plugin` plugin, add:
 - [ ] **Step 5: Full build**
 
 Run: `[mvn] -q verify`
-Expected: `BUILD SUCCESS`. PIT runs and finds no mutations yet (no `*Derivation` until Task 11) — its log says it found nothing to mutate; `failWhenNoMutations=false` keeps the build green. If PIT fails to start with a JUnit Platform error (`NoSuchMethodError`/`ClassNotFoundException` under `org.junit.platform`), add to the PIT plugin's `<dependencies>` `org.junit.platform:junit-platform-launcher` with `<version>${junit-jupiter.version}</version>` (JUnit 6 versions the platform with Jupiter) and retry; if that fails, apply the stuck rule and record it — Task 11 depends on PIT.
+Expected: `BUILD SUCCESS`. PIT runs and finds no mutations yet (no `*Derivation` until Task 11) — its log says it found nothing to mutate; `failWhenNoMutations=false` keeps the build green. (PIT 1.30.1 with pitest-junit5-plugin 1.2.3 was checked to run under JUnit 6.0.3 without extra dependencies.)
 
 - [ ] **Step 6: Commit**
 
@@ -2252,7 +2628,7 @@ In `B/src/test/java/co/scuby/support/TestDb.java`, add the overrides and history
 - [ ] **Step 5: Run**
 
 Run: `[mvn] -q test -Dtest='FeatureFlagsTest,ArchitectureTest'`
-Expected: PASS (5 tests run, 1 skipped — the override test until Task 7).
+Expected: PASS — `FeatureFlagsTest` 6 tests run, 1 of them skipped (the override test until Task 7); `ArchitectureTest` 4.
 
 - [ ] **Step 6: Commit**
 
@@ -2480,9 +2856,11 @@ git commit -m "feat: GET /config from supported_countries"
 
 Who is asking, as a controller parameter: the signed-in person (if any), the device (always) and a hash of the client IP. The device cookie follows decision #35 (`docs/eng/api.md` · Device identity): random ≥ 128 bits (we use 256), `HttpOnly; Secure; SameSite=Lax; Path=/`, one year, set on any answer to a request without a valid one and renewed on every unsafe request ("renewed when used"). The server keeps only its SHA-256.
 
-**Decision recorded here (report it; Task 13 writes it to `docs/eng/backend.md`):** there is **no `device` table** in this slice. Nothing reads a device row; the hash is stored on the rows that need it (`upload.owner_key`, `sighting.reporter_device_hash` in plan A2). This keeps every read free of writes — a table "created once" per device would mean an `INSERT` on the first request of every crawler and every new visitor. A table arrives with the first consumer that needs device-level data (push subscriptions, D16 tokens).
+**Decision recorded here (report it; Task 15 writes it to `docs/eng/backend.md`):** there is **no `device` table** in this slice. Nothing reads a device row; the hash is stored on the rows that need it (`upload.owner_key`, `sighting.reporter_device_hash` in plan A2). This keeps every read free of writes — a table "created once" per device would mean an `INSERT` on the first request of every crawler and every new visitor. A table arrives with the first consumer that needs device-level data (push subscriptions, D16 tokens).
 
-The CloudFront viewer address is trusted only when the request carries the origin secret header (`scuby.web.origin-secret-header` = `scuby.web.origin-secret`); otherwise the socket address is the IP. IPs are stored only as an HMAC (`scuby.web.ip-hash-key`) — enough to count, not to read back (Ley 1581 minimisation). The default key is refused under `prod`.
+The CloudFront viewer address is trusted only when the request carries the origin secret header (`scuby.web.origin-secret-header` = `scuby.web.origin-secret`); otherwise the socket address is the IP. IPs are stored only as an HMAC (`scuby.web.ip-hash-key`) — enough to count, not to read back (Ley 1581 minimisation). The default key is refused outside `local`/`test` (staging included: a known key makes the hashes reversible over the IPv4 space). A blank origin secret is refused under `prod` and logged as a WARN at start-up under any other deployed profile: without it every request has CloudFront's edge IP, so per-IP limits (SMS 20/IP/day; plan A2's sightings 80/IP/day) become global.
+
+**Cookie tossing (Task 1 · CSRF decision):** the device cookie keeps the name `device` — `docs/eng/api.md` · Device identity and decision #35 name it, so a rename to `__Host-device` is proposed to the client/docs side (Task 15's report list), never made unilaterally. Until then the risk is recorded: a sibling subdomain could plant a known device value and make a victim's anonymous sightings "mine" for the attacker. The reader already rejects a request that carries two `device` cookies (the planted one plus the real one): it is treated as having none, so a fresh device is issued.
 
 **Files:**
 - Create: `B/src/main/java/co/scuby/platform/crypto/Hashing.java`
@@ -2497,6 +2875,7 @@ The CloudFront viewer address is trusted only when the request carries the origi
 - Modify: `B/src/main/resources/application.yml` (thin-slice block)
 - Test: `B/src/test/java/co/scuby/platform/crypto/HashingTest.java`
 - Test: `B/src/test/java/co/scuby/identity/DeviceCookieTest.java`
+- Modify: `B/src/test/java/co/scuby/platform/config/ProfileStartupTest.java` (`REQUIRED`)
 
 **Interfaces:**
 - Produces:
@@ -2506,7 +2885,8 @@ The CloudFront viewer address is trusted only when the request carries the origi
   - `public record Account(UUID personId)` — a controller parameter of this type means "sign-in required": resolving it without a session answers `unauthorized`.
   - Controllers declare `Caller caller` and/or `Account account` parameters; `CallerArgumentResolver` fills them.
   - `record CookieProperties(boolean secure)` bound to `scuby.cookies` (identity, package-private).
-  - `DeviceCookieFilter.COOKIE = "device"`.
+  - `DeviceCookieFilter.COOKIE = "device"`; a request carrying the cookie name twice is treated as carrying none.
+  - `ProfileStartupTest.REQUIRED` gains `scuby.web.ip-hash-key` for `staging` and `prod`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2551,6 +2931,7 @@ class HashingTest {
 ```java
 package co.scuby.identity;
 
+import co.scuby.platform.crypto.Hashing;
 import co.scuby.platform.security.Account;
 import co.scuby.platform.security.Caller;
 import co.scuby.support.ApiClient;
@@ -2558,12 +2939,16 @@ import co.scuby.support.ApiClients;
 import co.scuby.support.ApiResponse;
 import co.scuby.support.IntegrationTest;
 import co.scuby.support.TestDb;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -2571,6 +2956,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @IntegrationTest
 @Import(DeviceCookieTest.Probe.class)
@@ -2593,9 +2979,23 @@ class DeviceCookieTest {
 
     @Autowired ApiClients clients;
     @Autowired TestDb testDb;
+    @Autowired MockMvc mvc;
 
     @BeforeEach
     void setUp() { testDb.reset(); }
+
+    @Test
+    void aRequestCarryingTheCookieTwiceIsTreatedAsHavingNone() throws Exception {
+        // A sibling subdomain planting `device` for the parent domain makes the browser send two (cookie tossing).
+        String planted = "A".repeat(43);
+        String real = "B".repeat(43);
+        MockHttpServletResponse r = mvc.perform(get("/probe/caller")
+                        .cookie(new Cookie("device", planted), new Cookie("device", real)))
+                .andReturn().getResponse();
+        String issued = r.getHeaders(HttpHeaders.SET_COOKIE).stream().filter(c -> c.startsWith("device=")).findFirst().orElseThrow();
+        assertThat(issued).doesNotStartWith("device=" + planted).doesNotStartWith("device=" + real);
+        assertThat(r.getContentAsString()).doesNotContain(Hashing.sha256Hex(planted)).doesNotContain(Hashing.sha256Hex(real));
+    }
 
     @Test
     void aRequestWithoutTheCookieGetsOne() {
@@ -2666,6 +3066,19 @@ Add to `B/src/main/resources/application-test.yml` (inside its `scuby.web` block
 
 ```yaml
     origin-secret: test-origin-secret
+```
+
+In `B/src/test/java/co/scuby/platform/config/ProfileStartupTest.java`, replace the `REQUIRED` map with:
+
+```java
+    static final Map<String, Map<String, String>> REQUIRED = Map.of(
+            "staging", Map.of(
+                    "scuby.web.allowed-origins", "https://staging.scuby.test",
+                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef"),
+            "prod", Map.of(
+                    "scuby.web.allowed-origins", "https://scuby.test",
+                    "scuby.web.origin-secret", "dummy-origin-secret",
+                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef"));
 ```
 
 - [ ] **Step 2: Run to see them fail**
@@ -2759,8 +3172,11 @@ public class ClientAddress {
 
     public ClientAddress(WebProperties web, Environment env) {
         this.web = web;
-        Prod.refuse(env, DEFAULT_KEY.equals(web.ipHashKey()), "scuby.web.ip-hash-key is the local default");
-        Prod.refuse(env, web.originSecret().isBlank(), "scuby.web.origin-secret is empty");
+        Prod.requireDeployed(env, !DEFAULT_KEY.equals(web.ipHashKey()),
+                "scuby.web.ip-hash-key (env SCUBY_WEB_IP_HASH_KEY; the local default makes IP hashes reversible)");
+        Prod.refuse(env, web.originSecret().isBlank(), "scuby.web.origin-secret is empty (env SCUBY_WEB_ORIGIN_SECRET)");
+        Prod.warnDeployed(env, web.originSecret().isBlank(),
+                "scuby.web.origin-secret is empty: every request will have CloudFront's IP, so per-IP limits become global");
     }
 
     public String ip(HttpServletRequest request) {
@@ -2968,11 +3384,17 @@ final class DeviceCookieFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
+    /** The cookie's value; null when absent or present more than once (a planted duplicate: cookie tossing). */
     private static String read(HttpServletRequest request) {
         Cookie[] all = request.getCookies();
         if (all == null) return null;
-        for (Cookie c : all) if (COOKIE.equals(c.getName())) return c.getValue();
-        return null;
+        String found = null;
+        for (Cookie c : all) {
+            if (!COOKIE.equals(c.getName())) continue;
+            if (found != null) return null;
+            found = c.getValue();
+        }
+        return found;
     }
 }
 ```
@@ -3011,14 +3433,14 @@ In `B/src/main/resources/application.yml`, thin-slice `scuby:` block, add:
 
 - [ ] **Step 4: Run**
 
-Run: `[mvn] -q test -Dtest='HashingTest,DeviceCookieTest,SecurityBaselineTest,ArchitectureTest'`
-Expected: PASS. `ArchitectureTest` still passes: `identity` depends only on `platform`.
+Run: `[mvn] -q test -Dtest='HashingTest,DeviceCookieTest,SecurityBaselineTest,ArchitectureTest,ProfileStartupTest'`
+Expected: PASS (`ProfileStartupTest` now 7: 2 starts + 5 "without" cases). `ArchitectureTest` still passes: `identity` depends only on `platform`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice
-git add backend/src/main/java/co/scuby/platform backend/src/main/java/co/scuby/identity backend/src/main/resources/application*.yml backend/src/test/java/co/scuby/platform/crypto backend/src/test/java/co/scuby/identity/DeviceCookieTest.java
+git add backend/src/main/java/co/scuby/platform backend/src/main/java/co/scuby/identity backend/src/main/resources/application*.yml backend/src/test/java/co/scuby/platform/crypto backend/src/test/java/co/scuby/platform/config backend/src/test/java/co/scuby/identity/DeviceCookieTest.java
 git commit -m "feat: device cookie (hash only, renewed when used) and Caller/Account controller parameters with the client IP hash"
 ```
 
@@ -3026,14 +3448,18 @@ git commit -m "feat: device cookie (hash only, renewed when used) and Caller/Acc
 
 ### Task 7: Sessions — opaque token, SHA-256 at rest, 12 months, reads never write
 
+The session cookie is named **`__Host-session`** (Task 1 · CSRF decision: a sibling subdomain cannot plant a `__Host-` cookie, because browsers refuse one with a `Domain` attribute, and Chrome accepts `__Host-` cookies on `http://localhost`). No doc fixes the session cookie's name, so this is not a contract change. A request carrying the name twice is treated as signed out.
+
 **Files:**
 - Create: `B/src/main/resources/db/migration/V20261029_1020__accounts_and_sessions.sql`
-- Create in `B/src/main/java/co/scuby/identity/`: `Person.java`, `People.java`, `UserView.java`, `ActiveSession.java`, `SessionLookup.java`, `DbSessionLookup.java`, `CachingSessionLookup.java`, `SessionProperties.java`, `SessionConfiguration.java`, `SessionStore.java`, `SessionCookies.java`, `SessionAuthenticator.java`, `SignInSessions.java`, `SessionController.java`, `IdentitySecurityRules.java`, `IdentityPurge.java`
+- Create in `B/src/main/java/co/scuby/identity/`: `Person.java`, `People.java`, `UserView.java`, `ActiveSession.java`, `NewSession.java`, `SessionLookup.java`, `DbSessionLookup.java`, `CachingSessionLookup.java`, `SessionProperties.java`, `SessionConfiguration.java`, `SessionStore.java`, `SessionCookies.java`, `SessionAuthenticator.java`, `SignInSessions.java`, `SessionController.java`, `IdentitySecurityRules.java`, `IdentityPurge.java`
 - Modify: `B/src/main/resources/application.yml` (thin-slice block)
 - Modify: `B/src/test/java/co/scuby/support/TestDb.java`, `StatementCeilings.java`
 - Create: `B/src/test/java/co/scuby/support/Accounts.java`
 - Modify: `B/src/test/java/co/scuby/platform/flags/FeatureFlagsTest.java` (remove `@Disabled`)
 - Test: `B/src/test/java/co/scuby/identity/SessionTest.java`, `B/src/test/java/co/scuby/identity/SessionConfigurationTest.java`
+
+`__Host-` requires `Secure`, so `scuby.cookies.secure` must stay `true` in every profile (it is, Task 6); browsers accept Secure cookies from `http://localhost`.
 
 **Interfaces:**
 - Consumes: `Hashing`, `RequestAuthenticator`, `SecurityRules`, `ClearableCache`, `Account`, `CookieProperties`.
@@ -3043,8 +3469,10 @@ git commit -m "feat: device cookie (hash only, renewed when used) and Caller/Acc
   - `People`: `Person get(UUID)`, `Optional<Person> byEmail(String normalizedEmail)`, `Optional<Person> byGoogleSub(String)`, `Person create(String normalizedEmail, String displayName, @Nullable String googleSub)`, `void linkGoogle(UUID, String sub)`, `void setPhone(UUID, String e164, @Nullable Instant verifiedAt)`. **The only writer of `person`.**
   - `record UserView(String id, String displayName, String email, @Nullable String phone)` + `static UserView of(Person)` — the contract's `User`.
   - `interface SessionLookup { Optional<ActiveSession> find(String tokenHash); void evict(String tokenHash); }`, `record ActiveSession(UUID personId, Instant expiresAt)`.
-  - `SessionStore`: `String create(UUID personId)` (returns the raw token), `void delete(String tokenHash)` (also evicts), `int purgeExpired()`.
-  - `SessionCookies`: `NAME = "session"`, `Optional<String> read(HttpServletRequest)`, `void issue(HttpServletResponse, String token)`, `void clear(HttpServletResponse)`.
+  - `record NewSession(String token, Instant expiresAt)`.
+  - `SessionStore`: `NewSession create(UUID personId)` (the raw token for the cookie and the stored expiry), `void delete(String tokenHash)` (also evicts), `int purgeExpired()`.
+  - `SessionCookies`: `NAME = "__Host-session"`, `Optional<String> read(HttpServletRequest)` (empty when absent, malformed or duplicated), `void issue(HttpServletResponse, NewSession)` (`Max-Age` = seconds from now to the session's `expires_at`, so cookie and session end together), `void clear(HttpServletResponse)`.
+  - `@Bean ClearableCache sessionCache(SessionLookup)` — the session cache registered under its interface (a no-op when the cache is off), so `TestDb` never depends on runtime-type matching.
   - `SignInSessions.open(UUID personId, HttpServletRequest, HttpServletResponse)` — ends a session the request carried, creates a new one, sets the cookie. Used by Tasks 8 and 9.
   - `GET /session` → `UserView`; `POST /auth/sign-out` → 204.
   - Test support `co.scuby.support.Accounts`: `UUID person(String email)` (creates a person directly), `UUID signIn(ApiClient api, String email)` (person + session row + cookie in the jar).
@@ -3097,7 +3525,7 @@ public final class Accounts {
           .set(SESSION.CREATED_AT, clock.instant().atOffset(ZoneOffset.UTC))
           .set(SESSION.EXPIRES_AT, clock.instant().atOffset(ZoneOffset.UTC).plusMonths(12))
           .execute();
-        api.setCookie("session", token);
+        api.setCookie("__Host-session", token);
         return id;
     }
 }
@@ -3124,14 +3552,17 @@ import co.scuby.support.Accounts;
 import co.scuby.support.ApiClient;
 import co.scuby.support.ApiClients;
 import co.scuby.support.ApiResponse;
+import co.scuby.support.ConnectionSampler;
 import co.scuby.support.IntegrationTest;
 import co.scuby.support.MutableClock;
+import co.scuby.support.StatementRecorder;
 import co.scuby.support.TestDb;
-import com.zaxxer.hikari.HikariDataSource;
+import jakarta.servlet.http.Cookie;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Duration;
 import java.time.ZoneOffset;
@@ -3139,6 +3570,7 @@ import java.util.UUID;
 
 import static co.scuby.db.generated.Tables.SESSION;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @IntegrationTest
 class SessionTest {
@@ -3148,7 +3580,9 @@ class SessionTest {
     @Autowired Accounts accounts;
     @Autowired MutableClock clock;
     @Autowired DSLContext db;
-    @Autowired HikariDataSource dataSource;
+    @Autowired ConnectionSampler sampler;
+    @Autowired StatementRecorder recorder;
+    @Autowired MockMvc mvc;
     @Autowired SessionLookup lookup;
     @Autowired SessionStore store;
 
@@ -3183,7 +3617,37 @@ class SessionTest {
         ApiResponse r = api.get("/session");
         assertThat(r.status()).isEqualTo(200);
         assertThat(r.statements()).noneMatch(s -> s.trim().toLowerCase().matches("^(insert|update|delete|merge).*"));
-        assertThat(dataSource.getHikariPoolMXBean().getActiveConnections()).isZero();
+        // The filter's lookup ran outside any transaction …
+        assertThat(recorder.autoCommits()).as("statements: %s", r.statements()).first().isEqualTo(true);
+        // … and its connection was back in the pool before the controller started (sampled *during* the request).
+        assertThat(sampler.activeWhenTheHandlerStarted()).hasValue(0);
+        // Stateless: no servlet session, no JSESSIONID.
+        assertThat(r.httpSessionCreated()).isFalse();
+        assertThat(r.setCookies()).noneMatch(c -> c.startsWith("JSESSIONID"));
+    }
+
+    @Test
+    void theCookieLastsExactlyAsLongAsTheSession() {
+        // Seconds from START to START + 12 calendar months (365 here: 2026-10-14 → 2027-10-14).
+        long seconds = Duration.between(MutableClock.START,
+                MutableClock.START.atOffset(ZoneOffset.UTC).plusMonths(12).toInstant()).toSeconds();
+        UUID id = accounts.person("ana.gomez@correo.co");
+        NewSession session = store.create(id);
+        assertThat(session.expiresAt()).isEqualTo(MutableClock.START.atOffset(ZoneOffset.UTC).plusMonths(12).toInstant());
+        var response = new org.springframework.mock.web.MockHttpServletResponse();
+        new SessionCookies(new CookieProperties(true), clock).issue(response, session);
+        assertThat(response.getHeader("Set-Cookie")).startsWith("__Host-session=" + session.token() + ";")
+                .contains("Max-Age=" + seconds).contains("Secure").contains("Path=/").doesNotContain("Domain");
+    }
+
+    @Test
+    void aRequestCarryingTheSessionCookieTwiceIsSignedOut() throws Exception {
+        accounts.signIn(api, "ana.gomez@correo.co");
+        String real = api.cookie("__Host-session").orElseThrow();
+        int status = mvc.perform(get("/session")
+                        .cookie(new Cookie("__Host-session", "A".repeat(43)), new Cookie("__Host-session", real)))
+                .andReturn().getResponse().getStatus();
+        assertThat(status).isEqualTo(401);
     }
 
     @Test
@@ -3206,16 +3670,22 @@ class SessionTest {
     @Test
     void signOutEndsTheSessionAndClearsTheCookie() {
         accounts.signIn(api, "ana.gomez@correo.co");
-        String token = api.cookie("session").orElseThrow();
+        String token = api.cookie("__Host-session").orElseThrow();
         api.get("/session");                                      // now cached
         ApiResponse out = api.post("/auth/sign-out", null);
         assertThat(out.status()).isEqualTo(204);
-        assertThat(out.setCookies()).anyMatch(c -> c.startsWith("session=;") && c.contains("Max-Age=0"));
+        assertThat(out.setCookies()).anyMatch(c -> c.startsWith("__Host-session=;") && c.contains("Max-Age=0"));
         assertThat(db.fetchCount(SESSION, SESSION.TOKEN_HASH.eq(Hashing.sha256Hex(token)))).isZero();
         assertThat(lookup.find(Hashing.sha256Hex(token))).isEmpty();   // evicted, not just deleted
         ApiClient stolen = clients.newBrowser();
-        stolen.setCookie("session", token);
+        stolen.setCookie("__Host-session", token);
         assertThat(stolen.get("/session").status()).isEqualTo(401);
+    }
+
+    @Test
+    void signOutOnTheUncachedPathStaysUnderItsCeiling() {
+        accounts.signIn(api, "ana.gomez@correo.co");
+        assertThat(api.post("/auth/sign-out", null).status()).isEqualTo(204);   // lookup + DELETE, cold
     }
 
     @Test
@@ -3225,7 +3695,7 @@ class SessionTest {
 
     @Test
     void aGarbageCookieIsJustNobody() {
-        api.setCookie("session", "garbage");
+        api.setCookie("__Host-session", "garbage");
         assertThat(api.get("/session").status()).isEqualTo(401);
     }
 
@@ -3444,6 +3914,17 @@ import java.util.UUID;
 record ActiveSession(UUID personId, Instant expiresAt) {}
 ```
 
+`NewSession.java`:
+
+```java
+package co.scuby.identity;
+
+import java.time.Instant;
+
+/** A session just created: the raw token (only for the cookie; never stored) and its absolute expiry. */
+record NewSession(String token, Instant expiresAt) {}
+```
+
 `SessionLookup.java`:
 
 ```java
@@ -3572,6 +4053,7 @@ record SessionProperties(int cacheSize, Duration cacheTtl, int lifetimeMonths) {
 ```java
 package co.scuby.identity;
 
+import co.scuby.platform.cache.ClearableCache;
 import org.jooq.DSLContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -3585,6 +4067,12 @@ class SessionConfiguration {
     SessionLookup sessionLookup(DSLContext db, Clock clock, SessionProperties properties) {
         SessionLookup database = new DbSessionLookup(db, clock);
         return properties.cacheSize() == 0 ? database : new CachingSessionLookup(database, properties, clock);
+    }
+
+    /** The cache under its own interface: TestDb finds it by declared type, not by the runtime type of sessionLookup. */
+    @Bean
+    ClearableCache sessionCache(SessionLookup sessionLookup) {
+        return sessionLookup instanceof ClearableCache cache ? cache : () -> {};
     }
 }
 ```
@@ -3621,17 +4109,18 @@ class SessionStore {
         this.properties = properties;
     }
 
-    /** Returns the raw token for the cookie; only its hash is stored. */
-    String create(UUID personId) {
+    /** Returns the raw token for the cookie (only its hash is stored) and the expiry the cookie must match. */
+    NewSession create(UUID personId) {
         String token = Hashing.randomToken(32);
         OffsetDateTime now = clock.instant().atOffset(ZoneOffset.UTC);
+        OffsetDateTime expiresAt = now.plusMonths(properties.lifetimeMonths());
         db.insertInto(SESSION)
           .set(SESSION.TOKEN_HASH, Hashing.sha256Hex(token))
           .set(SESSION.PERSON_ID, personId)
           .set(SESSION.CREATED_AT, now)
-          .set(SESSION.EXPIRES_AT, now.plusMonths(properties.lifetimeMonths()))
+          .set(SESSION.EXPIRES_AT, expiresAt)
           .execute();
-        return token;
+        return new NewSession(token, expiresAt.toInstant());
     }
 
     void delete(String tokenHash) {
@@ -3659,36 +4148,46 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/** The session cookie of decision #37: httpOnly, Secure, SameSite=Lax, on the API's own host. */
+/**
+ * The session cookie of decision #37: httpOnly, Secure, SameSite=Lax, on the API's own host. The
+ * `__Host-` prefix (Secure, Path=/, no Domain) stops a sibling subdomain from planting one; a request
+ * carrying the name twice is treated as having none.
+ */
 @Component
 class SessionCookies {
 
-    static final String NAME = "session";
+    static final String NAME = "__Host-session";
     private static final Pattern TOKEN = Pattern.compile("^[A-Za-z0-9_-]{43}$");
 
     private final CookieProperties cookies;
-    private final SessionProperties sessions;
+    private final Clock clock;
 
-    SessionCookies(CookieProperties cookies, SessionProperties sessions) {
+    SessionCookies(CookieProperties cookies, Clock clock) {
         this.cookies = cookies;
-        this.sessions = sessions;
+        this.clock = clock;
     }
 
     Optional<String> read(HttpServletRequest request) {
         Cookie[] all = request.getCookies();
         if (all == null) return Optional.empty();
+        String found = null;
         for (Cookie c : all) {
-            if (NAME.equals(c.getName()) && TOKEN.matcher(c.getValue()).matches()) return Optional.of(c.getValue());
+            if (!NAME.equals(c.getName())) continue;
+            if (found != null) return Optional.empty();   // duplicated: a planted cookie (cookie tossing)
+            found = c.getValue();
         }
-        return Optional.empty();
+        return found != null && TOKEN.matcher(found).matches() ? Optional.of(found) : Optional.empty();
     }
 
-    void issue(HttpServletResponse response, String token) {
-        response.addHeader(HttpHeaders.SET_COOKIE, base(token).maxAge(Duration.ofDays(30L * sessions.lifetimeMonths())).build().toString());
+    /** Max-Age from the session's own expires_at, so the cookie and the session end together. */
+    void issue(HttpServletResponse response, NewSession session) {
+        Duration maxAge = Duration.between(clock.instant(), session.expiresAt());
+        response.addHeader(HttpHeaders.SET_COOKIE, base(session.token()).maxAge(maxAge).build().toString());
     }
 
     void clear(HttpServletResponse response) {
@@ -3884,12 +4383,12 @@ class SchedulingConfiguration {}
 
 `TestDb.MUTABLE_TABLES`: add `"session"` and `"person"` (order does not matter: `TRUNCATE … CASCADE`).
 
-`StatementCeilings`: add `Map.entry("GET /session", 2)` (lookup + person) and `Map.entry("POST /auth/sign-out", 1)`.
+`StatementCeilings`: add `Map.entry("GET /session", 2)` (lookup + person) and `Map.entry("POST /auth/sign-out", 2)` (lookup + DELETE, measured on the uncached path like every ceiling).
 
 - [ ] **Step 5: Run**
 
 Run: `[mvn] -q test -Dtest='SessionTest,SessionConfigurationTest,FeatureFlagsTest,DeviceCookieTest,ArchitectureTest'`
-Expected: PASS. If `aSessionReadIssuesNoInsertOrUpdateAndReturnsItsConnection` reports an active connection, something opened a transaction across the request — find it (a `@Transactional` on a controller or filter) and remove it; never relax the assertion.
+Expected: PASS. If `aSessionReadIssuesNoInsertOrUpdateAndReturnsItsConnection` reports an active connection when the handler starts, or the lookup's statement ran with autocommit off, something opened a transaction across the request — find it (a `@Transactional` on a filter, or a transaction-opening `OncePerRequestFilter`) and remove it; never relax the assertion.
 
 - [ ] **Step 6: Commit**
 
@@ -3902,24 +4401,38 @@ git commit -m "feat: sessions — opaque token hashed at rest, 12-month absolute
 ---
 ### Task 8: Email-code sign-in
 
-Rules (design · Behaviour decisions, "Email code"): 6 digits, stored hashed, 5-minute expiry, 3 attempts, 60 s resend cooldown, at most 10 sends per address per UTC day; address normalised (trim, lower-case); `start` always answers 204 (it never reveals whether an account exists, nor whether a send was skipped). Accounts are born lazily at the first successful verify, named from the address like the client mock does (`juan.perez@correo.co` → «Juan Perez»). **Test bypass:** for addresses on a configured test domain the code is the fixed `scuby.auth.test-bypass.code`; enabling any bypass under `prod` fails start-up. The sender writes the code to the log in `local`, `test` and `staging`; no `EmailSender` exists under `prod` yet (the real provider comes with the domain — open item O23), so a prod start-up fails loudly instead of silently not sending.
+Rules (design · Behaviour decisions, "Email code"): 6 digits, stored hashed, 5-minute expiry, 3 attempts, 60 s resend cooldown, at most 10 sends per address per UTC day; address normalised (trim, lower-case); `start` answers 204 whether or not a send happened (it never reveals whether an account exists, nor whether a send was skipped). Accounts are born lazily at the first successful verify, named from the address like the client mock does (`juan.perez@correo.co` → «Juan Perez»).
+
+Decided here (record in the report; Task 15 writes them into `docs/eng/auth.md` and decision #40):
+- **The cooldown applies only while the current code is live and unused.** A code that was consumed, burned (3 misses) or expired never blocks a new one — otherwise signing out and back in within a minute silently fails (`start` says 204, the old code is spent).
+- **Per-device and per-IP caps on `start`: 10 per device and 20 per IP per rolling 24 h** (the SMS numbers of Task 10), answered `rate_limited` (the contract lists 429; it reveals nothing about the address). Without them anyone can lock any address out for a day (10 starts burn its daily cap) and send unbounded email across addresses. Both channels share one send log, `code_send`, and one throttle query (`CodeSends`); its plan check and index are earned here.
+- **Concurrent first starts are serialised** with a transaction-scoped advisory lock on the address (`SELECT … FOR UPDATE` locks nothing while no row exists).
+- **Codes are hashed with an HMAC** keyed by `scuby.auth.code-hash-key` (a plain SHA-256 over 10⁶ codes is reversed in milliseconds from a database leak); the default key is refused outside `local`/`test`.
+
+**Test bypass (design · Behaviour decisions, "Test bypasses"):** for addresses on a configured test domain the code is the fixed `scuby.auth.test-bypass.code`, and `start` **skips the cooldown, the daily cap and the device/IP caps and always (re)writes the row with the fixed code** — e2e specs sign the same address in several times a minute. Enabling any bypass under `prod` fails start-up. The sender writes the code to the log in `local`, `test` and `staging`. Under `prod` there is no provider yet (open item O23): `UnavailableEmailSender` lets prod start (`ProfileStartupTest` must pass) but logs an ERROR at start-up and fails every send with `server_error` — loud, never a silent non-send.
 
 **Files:**
-- Create: `B/src/main/resources/db/migration/V20261029_1030__email_codes.sql`
-- Create in `B/src/main/java/co/scuby/identity/`: `EmailSender.java`, `LogEmailSender.java`, `TestBypass.java`, `TestBypassGuard.java`, `DisplayNames.java`, `EmailCodes.java`, `EmailSignIn.java`, `EmailRequests.java`, `EmailSignInController.java`
+- Create: `B/src/main/resources/db/migration/V20261029_1030__email_codes.sql` (`email_code` and the shared send log `code_send`)
+- Create (only after Step 6 shows the seq scan): `B/src/main/resources/db/migration/V20261029_1035__code_send_index.sql`
+- Create in `B/src/main/java/co/scuby/identity/`: `EmailSender.java`, `LogEmailSender.java`, `UnavailableEmailSender.java`, `TestBypass.java`, `TestBypassGuard.java`, `AuthProperties.java`, `CodeHasher.java`, `CodeSends.java`, `DisplayNames.java`, `EmailCodes.java`, `EmailSignIn.java`, `EmailRequests.java`, `EmailSignInController.java`
 - Modify: `B/src/main/resources/application.yml`, `application-test.yml`, `application-local.yml`
-- Create: `B/src/test/java/co/scuby/support/RecordingEmailSender.java`; modify `TestSupportConfiguration.java`, `TestDb.java`, `StatementCeilings.java`
-- Test: `B/src/test/java/co/scuby/identity/EmailSignInTest.java`, `DisplayNamesTest.java`, `TestBypassGuardTest.java`
+- Create: `B/src/test/java/co/scuby/support/RecordingEmailSender.java`, `B/src/test/java/co/scuby/identity/IdentityTestBeans.java`; modify `TestSupportConfiguration.java`, `TestDb.java`, `StatementCeilings.java`, `B/src/test/java/co/scuby/platform/config/ProfileStartupTest.java` (`REQUIRED`)
+- Test: `B/src/test/java/co/scuby/identity/EmailSignInTest.java`, `DisplayNamesTest.java`, `TestBypassGuardTest.java`, `CodeSendPlanTest.java`
 
 **Interfaces:**
-- Consumes: `People`, `SignInSessions`, `UserView`, `Hashing`, `Prod`, `Clock`.
+- Consumes: `People`, `SignInSessions`, `UserView`, `Hashing`, `Prod`, `Clock`, `Caller`.
 - Produces:
-  - `interface EmailSender { void sendSignInCode(String email, String code); }` (identity, package-private) + `LogEmailSender` (`@Profile("!prod")`).
+  - `interface EmailSender { void sendSignInCode(String email, String code); }` (identity, package-private) + `LogEmailSender` (`@Profile("!prod")`) + `UnavailableEmailSender` (`@Profile("prod")`: ERROR at start-up, every send throws).
   - `record TestBypass(List<String> emailDomains, List<String> smsPrefixes, String code)` bound to `scuby.auth.test-bypass`; `boolean emailBypassed(String normalizedEmail)`, `boolean smsBypassed(String e164)`. Task 10 uses `smsBypassed`.
+  - `record AuthProperties(String codeHashKey, int emailMaxPerDevice, int emailMaxPerIp)` bound to `scuby.auth` (the nested `test-bypass` and `google` blocks bind to their own records).
+  - `CodeHasher.hash(String subject, String code) → String` — HMAC-SHA-256 with `scuby.auth.code-hash-key`; refuses the default key outside `local`/`test`. Task 10 uses it for SMS codes.
+  - `CodeSends` — the send log of both channels: `enum Channel { email, sms }`, `record Counts(int target, int device, int ip, int all)`, `Counts last24h(Channel, String target, String deviceHash, String ipHash)`, `void record(Channel, String target, @Nullable UUID personId, String deviceHash, String ipHash)`, `Select<Record4<Integer, Integer, Integer, Integer>> throttleQuery(Channel, String target, String deviceHash, String ipHash, Instant since)`, `int purgeOlderThan(Duration)`. Task 10 uses it for SMS.
+  - Table `code_send (id, channel, target, person_id, device_hash, ip_hash, sent_at)` and the index `code_send_channel_sent_at_idx` (earned in Step 6).
   - `DisplayNames.fromEmail(String) → String`.
-  - `EmailCodes.start(String normalizedEmail)`, `EmailCodes.consume(String normalizedEmail, String code) → boolean`.
-  - `POST /auth/email/start` → 204; `POST /auth/email/verify` → `UserView` + session cookie.
+  - `EmailCodes.start(String normalizedEmail, Caller caller)` (throws `rate_limited` on the device/IP caps), `EmailCodes.consume(String normalizedEmail, String code) → boolean`.
+  - `POST /auth/email/start` → 204 (or 429); `POST /auth/email/verify` → `UserView` + session cookie.
   - Test support `RecordingEmailSender`: `List<Sent> sent()`, `String lastCodeFor(String email)`, `void clear()`; `record Sent(String email, String code)`.
+  - `ProfileStartupTest.REQUIRED` gains `scuby.auth.code-hash-key` for `staging` and `prod`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -4067,6 +4580,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
 
+import static co.scuby.db.generated.Tables.CODE_SEND;
+import static co.scuby.db.generated.Tables.EMAIL_CODE;
 import static co.scuby.db.generated.Tables.PERSON;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -4106,7 +4621,7 @@ class EmailSignInTest {
         assertThat(r.status()).isEqualTo(200);
         assertThat(r.str("/display_name")).isEqualTo("Juan Perez");
         assertThat(r.str("/email")).isEqualTo("juan.perez@correo.co");
-        assertThat(r.setCookies()).anyMatch(c -> c.startsWith("session=") && c.contains("HttpOnly")
+        assertThat(r.setCookies()).anyMatch(c -> c.startsWith("__Host-session=") && c.contains("HttpOnly")
                 && c.contains("Secure") && c.contains("SameSite=Lax"));
         assertThat(api.get("/session").str("/email")).isEqualTo("juan.perez@correo.co");
     }
@@ -4164,15 +4679,79 @@ class EmailSignInTest {
             assertThat(start("ana@correo.co").status()).isEqualTo(204);
         }
         assertThat(emails.sent()).hasSize(10);
-        clock.set(MutableClock.START.plus(Duration.ofDays(1)));
+        // The next UTC day, and more than 24 h after these sends (so the device's rolling cap is clear too).
+        clock.set(MutableClock.START.plus(Duration.ofDays(1)).plus(Duration.ofHours(1)));
         start("ana@correo.co");
         assertThat(emails.sent()).hasSize(11);
+    }
+
+    @Test
+    void signingInAgainWithinAMinuteSendsAFreshCode() {
+        // A used code never blocks the next one: sign in, sign out, sign in again at once.
+        start("ana@correo.co");
+        assertThat(verify("ana@correo.co", emails.lastCodeFor("ana@correo.co")).status()).isEqualTo(200);
+        api.post("/auth/sign-out", null);
+        clock.advance(Duration.ofSeconds(5));
+        start("ana@correo.co");
+        assertThat(emails.sent()).hasSize(2);
+        assertThat(verify("ana@correo.co", emails.lastCodeFor("ana@correo.co")).status()).isEqualTo(200);
+    }
+
+    @Test
+    void signingInWhileSignedInEndsTheOldSessionUnderTheCeiling() {
+        start("ana@correo.co");
+        verify("ana@correo.co", emails.lastCodeFor("ana@correo.co"));
+        String first = api.cookie("__Host-session").orElseThrow();
+        clock.advance(Duration.ofMinutes(2));
+        start("ana@correo.co");
+        ApiResponse again = verify("ana@correo.co", emails.lastCodeFor("ana@correo.co"));   // lookup + DELETE on top
+        assertThat(again.status()).isEqualTo(200);
+        assertThat(api.cookie("__Host-session")).isPresent().get().isNotEqualTo(first);
+        ApiClient old = clients.newBrowser();
+        old.setCookie("__Host-session", first);
+        assertThat(old.get("/session").status()).isEqualTo(401);
+    }
+
+    @Test
+    void oneDeviceIsThrottledAcrossAddresses() {
+        for (int i = 0; i < 10; i++) assertThat(start("p" + i + "@correo.co").status()).isEqualTo(204);
+        assertThat(start("p10@correo.co").errorCode()).isEqualTo("rate_limited");
+    }
+
+    @Test
+    void oneIpIsThrottledAcrossDevices() {
+        for (int i = 0; i < 20; i++) {
+            ApiResponse r = clients.newBrowser().from("198.51.100.77")
+                    .post("/auth/email/start", "{\"email\":\"q" + i + "@correo.co\"}");
+            assertThat(r.status()).isEqualTo(204);
+        }
+        ApiResponse last = clients.newBrowser().from("198.51.100.77").post("/auth/email/start", "{\"email\":\"q20@correo.co\"}");
+        assertThat(last.errorCode()).isEqualTo("rate_limited");
+    }
+
+    @Test
+    void codesAreStoredAsAKeyedHashNotAPlainOne() {
+        start("ana@correo.co");
+        String code = emails.lastCodeFor("ana@correo.co");
+        String stored = db.select(EMAIL_CODE.CODE_HASH).from(EMAIL_CODE).fetchOne().value1();
+        assertThat(stored).matches("^[0-9a-f]{64}$").isNotEqualTo(co.scuby.platform.crypto.Hashing.sha256Hex("ana@correo.co:" + code));
     }
 
     @Test
     void theTestDomainUsesTheFixedCode() {
         start("e2e-1@e2e.scuby.test");
         assertThat(verify("e2e-1@e2e.scuby.test", "123456").status()).isEqualTo(200);
+    }
+
+    @Test
+    void aTestDomainAddressSkipsTheCooldownAndEveryCapAndIsAlwaysRewritten() {
+        // Test bypass (design · Test bypasses): e2e specs sign the same address in again and again within seconds.
+        for (int round = 0; round < 12; round++) {
+            assertThat(start("ana@e2e.scuby.test").status()).isEqualTo(204);
+            assertThat(clients.newBrowser().post("/auth/email/verify",
+                    "{\"email\":\"ana@e2e.scuby.test\",\"code\":\"123456\"}").status()).isEqualTo(200);
+        }
+        assertThat(db.fetchCount(CODE_SEND)).isZero();   // bypassed starts write no throttle rows
     }
 
     @Test
@@ -4185,19 +4764,76 @@ class EmailSignInTest {
 }
 ```
 
+`B/src/test/java/co/scuby/identity/CodeSendPlanTest.java`:
+
+```java
+package co.scuby.identity;
+
+import co.scuby.support.IntegrationTest;
+import co.scuby.support.PlanAssert;
+import co.scuby.support.TestDb;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.time.Instant;
+
+/** Growth-sensitive query (design · Queries and indexes): the code-send throttle counts of both channels. */
+@IntegrationTest
+class CodeSendPlanTest {
+
+    @Autowired DSLContext db;
+    @Autowired TestDb testDb;
+    @Autowired CodeSends sends;
+
+    @BeforeEach
+    void setUp() { testDb.reset(); }
+
+    @Test
+    void theThrottleCountReadsOnlyTheLastDayOfOneChannel() {
+        db.execute("""
+                INSERT INTO scuby.code_send (channel, target, device_hash, ip_hash, sent_at)
+                SELECT CASE WHEN g % 2 = 0 THEN 'sms' ELSE 'email' END,
+                       '+57300' || lpad(g::text, 7, '0'), md5(g::text) || md5(g::text), md5((g % 500)::text) || md5('x'),
+                       timestamptz '2026-01-01' + g * interval '10 minutes'
+                FROM generate_series(1, 30000) g""");
+        db.execute("ANALYZE scuby.code_send");
+        PlanAssert.assertNoSeqScanOn(db,
+                sends.throttleQuery(CodeSends.Channel.sms, "+573007152284", "d", "i", Instant.parse("2026-10-13T17:00:00Z")),
+                "code_send");
+    }
+}
+```
+
+In `B/src/test/java/co/scuby/platform/config/ProfileStartupTest.java`, replace the `REQUIRED` map with:
+
+```java
+    static final Map<String, Map<String, String>> REQUIRED = Map.of(
+            "staging", Map.of(
+                    "scuby.web.allowed-origins", "https://staging.scuby.test",
+                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
+                    "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef"),
+            "prod", Map.of(
+                    "scuby.web.allowed-origins", "https://scuby.test",
+                    "scuby.web.origin-secret", "dummy-origin-secret",
+                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
+                    "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef"));
+```
+
 - [ ] **Step 2: Run to see them fail**
 
-Run: `[mvn] -q test -Dtest='EmailSignInTest,DisplayNamesTest,TestBypassGuardTest'`
-Expected: compilation FAILURE (`EmailSender`, `TestBypass` … not found).
+Run: `[mvn] -q test -Dtest='EmailSignInTest,DisplayNamesTest,TestBypassGuardTest,CodeSendPlanTest'`
+Expected: compilation FAILURE (`EmailSender`, `TestBypass`, `CodeSends` … not found).
 
 - [ ] **Step 3: Migration**
 
 `B/src/main/resources/db/migration/V20261029_1030__email_codes.sql`:
 
 ```sql
--- Email sign-in codes (docs/eng/auth.md · Sign-in): one pending code per address, stored hashed;
--- 5-minute expiry, 3 attempts, 60 s resend cooldown, 10 sends per address per UTC day.
--- Lookups are by primary key only.
+-- Email sign-in codes (docs/eng/auth.md · Sign-in): one pending code per address, stored as an
+-- HMAC; 5-minute expiry, 3 attempts, 60 s resend cooldown while the code is live, 10 sends per
+-- address per UTC day. Lookups are by primary key only.
 CREATE TABLE email_code (
   email         text PRIMARY KEY CHECK (email = lower(btrim(email))),
   code_hash     text NOT NULL,
@@ -4206,6 +4842,19 @@ CREATE TABLE email_code (
   sent_at       timestamptz NOT NULL,
   sends_day     date NOT NULL,
   sends_on_day  int NOT NULL
+);
+
+-- code_send: the send log of both code channels (email sign-in, SMS OTP — docs/eng/auth.md · OTP
+-- mechanics) behind the per-target, per-device and per-IP throttles and the SMS spend alarm. Rows
+-- older than 30 days are purged (IdentityPurge). Devices and IPs are stored as hashes only.
+CREATE TABLE code_send (
+  id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  channel      text NOT NULL CHECK (channel IN ('email', 'sms')),
+  target       text NOT NULL,
+  person_id    uuid REFERENCES person (id) ON DELETE SET NULL,
+  device_hash  text NOT NULL,
+  ip_hash      text NOT NULL,
+  sent_at      timestamptz NOT NULL
 );
 ```
 
@@ -4242,6 +4891,153 @@ class LogEmailSender implements EmailSender {
     @Override
     public void sendSignInCode(String email, String code) {
         log.info("sign-in code for {}: {}", email, code);
+    }
+}
+```
+
+`UnavailableEmailSender.java`:
+
+```java
+package co.scuby.identity;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
+/**
+ * prod until open item O23 closes: there is no email provider. Prod still starts (ProfileStartupTest),
+ * but says so at start-up and fails every send — a 500, never a silent non-send.
+ */
+@Component
+@Profile("prod")
+class UnavailableEmailSender implements EmailSender {
+
+    private static final Logger log = LoggerFactory.getLogger(UnavailableEmailSender.class);
+
+    UnavailableEmailSender() {
+        log.error("No email provider under prod (open item O23): email-code sign-in will fail with server_error");
+    }
+
+    @Override
+    public void sendSignInCode(String email, String code) {
+        throw new IllegalStateException("no email provider under prod (open item O23)");
+    }
+}
+```
+
+`AuthProperties.java`:
+
+```java
+package co.scuby.identity;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+/**
+ * scuby.auth.*: the key of the code HMAC and the email-start caps per device and per IP (rolling 24 h).
+ * The nested test-bypass and google blocks bind to TestBypass and GoogleProperties.
+ */
+@ConfigurationProperties("scuby.auth")
+record AuthProperties(String codeHashKey, int emailMaxPerDevice, int emailMaxPerIp) {}
+```
+
+`CodeHasher.java`:
+
+```java
+package co.scuby.identity;
+
+import co.scuby.platform.config.Prod;
+import co.scuby.platform.crypto.Hashing;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Component;
+
+/** Sign-in and OTP codes at rest: an HMAC, so a database leak alone does not reveal a live code. */
+@Component
+class CodeHasher {
+
+    static final String DEFAULT_KEY = "local-only-code-hash-key";
+
+    private final String key;
+
+    CodeHasher(AuthProperties auth, Environment env) {
+        Prod.requireDeployed(env, auth.codeHashKey() != null && !DEFAULT_KEY.equals(auth.codeHashKey()),
+                "scuby.auth.code-hash-key (env SCUBY_AUTH_CODE_HASH_KEY; the local default makes stored codes guessable)");
+        this.key = auth.codeHashKey();
+    }
+
+    String hash(String subject, String code) {
+        return Hashing.hmacSha256Hex(key, subject + ":" + code);
+    }
+}
+```
+
+`CodeSends.java`:
+
+```java
+package co.scuby.identity;
+
+import org.jooq.DSLContext;
+import org.jooq.Record4;
+import org.jooq.Select;
+import org.jooq.impl.DSL;
+import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Component;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
+
+import static co.scuby.db.generated.Tables.CODE_SEND;
+
+/** The send log of both code channels: one indexed range count per check (design · Queries and indexes). */
+@Component
+class CodeSends {
+
+    enum Channel { email, sms }
+
+    record Counts(int target, int device, int ip, int all) {}
+
+    private final DSLContext db;
+    private final Clock clock;
+
+    CodeSends(DSLContext db, Clock clock) {
+        this.db = db;
+        this.clock = clock;
+    }
+
+    Counts last24h(Channel channel, String target, String deviceHash, String ipHash) {
+        Record4<Integer, Integer, Integer, Integer> r =
+                throttleQuery(channel, target, deviceHash, ipHash, clock.instant().minus(Duration.ofHours(24))).fetchOne();
+        return new Counts(r.value1(), r.value2(), r.value3(), r.value4());
+    }
+
+    void record(Channel channel, String target, @Nullable UUID personId, String deviceHash, String ipHash) {
+        db.insertInto(CODE_SEND)
+          .set(CODE_SEND.CHANNEL, channel.name()).set(CODE_SEND.TARGET, target).set(CODE_SEND.PERSON_ID, personId)
+          .set(CODE_SEND.DEVICE_HASH, deviceHash).set(CODE_SEND.IP_HASH, ipHash)
+          .set(CODE_SEND.SENT_AT, clock.instant().atOffset(ZoneOffset.UTC))
+          .execute();
+    }
+
+    /** One pass over one channel's last 24 h: per target, per device, per IP, and all (the SMS alarm). */
+    Select<Record4<Integer, Integer, Integer, Integer>> throttleQuery(Channel channel, String target, String deviceHash,
+                                                                      String ipHash, Instant since) {
+        return db.select(
+                         DSL.count().filterWhere(CODE_SEND.TARGET.eq(target)),
+                         DSL.count().filterWhere(CODE_SEND.DEVICE_HASH.eq(deviceHash)),
+                         DSL.count().filterWhere(CODE_SEND.IP_HASH.eq(ipHash)),
+                         DSL.count())
+                 .from(CODE_SEND)
+                 .where(CODE_SEND.CHANNEL.eq(DSL.inline(channel.name())))
+                 .and(CODE_SEND.SENT_AT.gt(since.atOffset(ZoneOffset.UTC)));
+    }
+
+    int purgeOlderThan(Duration age) {
+        OffsetDateTime cutoff = clock.instant().minus(age).atOffset(ZoneOffset.UTC);
+        return db.deleteFrom(CODE_SEND).where(CODE_SEND.SENT_AT.lt(cutoff)).execute();
     }
 }
 ```
@@ -4332,6 +5128,9 @@ package co.scuby.identity;
 
 import co.scuby.db.generated.tables.records.EmailCodeRecord;
 import co.scuby.platform.crypto.Hashing;
+import co.scuby.platform.security.Caller;
+import co.scuby.platform.web.ApiException;
+import co.scuby.platform.web.ErrorCode;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Component;
 
@@ -4357,41 +5156,49 @@ class EmailCodes {
     private final Clock clock;
     private final EmailSender sender;
     private final TestBypass bypass;
+    private final CodeHasher hasher;
+    private final CodeSends sends;
+    private final AuthProperties limits;
 
-    EmailCodes(DSLContext db, Clock clock, EmailSender sender, TestBypass bypass) {
+    EmailCodes(DSLContext db, Clock clock, EmailSender sender, TestBypass bypass, CodeHasher hasher,
+               CodeSends sends, AuthProperties limits) {
         this.db = db;
         this.clock = clock;
         this.sender = sender;
         this.bypass = bypass;
+        this.hasher = hasher;
+        this.sends = sends;
+        this.limits = limits;
     }
 
-    /** Sends a new code unless inside the cooldown or over the daily cap. Silent either way. */
-    void start(String email) {
+    /**
+     * Sends a new code unless the live one is inside its cooldown or the address is over its daily cap
+     * (silent: the caller answers 204 either way). Over the device or IP cap: rate_limited.
+     * A test-domain address skips every limit and always gets a fresh row with the fixed code.
+     */
+    void start(String email, Caller caller) {
         Instant now = clock.instant();
         LocalDate today = now.atOffset(ZoneOffset.UTC).toLocalDate();
+        if (bypass.emailBypassed(email)) {
+            write(email, bypass.code(), now, today, 1);
+            sender.sendSignInCode(email, bypass.code());
+            return;
+        }
+        // Serialises concurrent starts for one address: FOR UPDATE locks nothing while no row exists.
+        db.fetch("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "email_code:" + email);
         EmailCodeRecord row = db.selectFrom(EMAIL_CODE).where(EMAIL_CODE.EMAIL.eq(email)).forUpdate().fetchOne();
-        if (row != null && row.getSentAt().toInstant().plus(COOLDOWN).isAfter(now)) return;
+        boolean live = row != null && row.getAttempts() < MAX_ATTEMPTS && row.getExpiresAt().toInstant().isAfter(now);
+        if (live && row.getSentAt().toInstant().plus(COOLDOWN).isAfter(now)) return;
         int sendsToday = row != null && row.getSendsDay().equals(today) ? row.getSendsOnDay() : 0;
         if (sendsToday >= MAX_SENDS_PER_DAY) return;
 
-        String code = bypass.emailBypassed(email) ? bypass.code() : Hashing.randomDigits(6);
-        OffsetDateTime at = now.atOffset(ZoneOffset.UTC);
-        db.insertInto(EMAIL_CODE)
-          .set(EMAIL_CODE.EMAIL, email)
-          .set(EMAIL_CODE.CODE_HASH, hash(email, code))
-          .set(EMAIL_CODE.EXPIRES_AT, at.plus(TTL))
-          .set(EMAIL_CODE.ATTEMPTS, 0)
-          .set(EMAIL_CODE.SENT_AT, at)
-          .set(EMAIL_CODE.SENDS_DAY, today)
-          .set(EMAIL_CODE.SENDS_ON_DAY, sendsToday + 1)
-          .onConflict(EMAIL_CODE.EMAIL).doUpdate()
-          .set(EMAIL_CODE.CODE_HASH, hash(email, code))
-          .set(EMAIL_CODE.EXPIRES_AT, at.plus(TTL))
-          .set(EMAIL_CODE.ATTEMPTS, 0)
-          .set(EMAIL_CODE.SENT_AT, at)
-          .set(EMAIL_CODE.SENDS_DAY, today)
-          .set(EMAIL_CODE.SENDS_ON_DAY, sendsToday + 1)
-          .execute();
+        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.email, email, caller.deviceHash(), caller.ipHash());
+        if (counts.device() >= limits.emailMaxPerDevice() || counts.ip() >= limits.emailMaxPerIp()) {
+            throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes requested");
+        }
+        String code = Hashing.randomDigits(6);
+        write(email, code, now, today, sendsToday + 1);
+        sends.record(CodeSends.Channel.email, email, caller.personId(), caller.deviceHash(), caller.ipHash());
         sender.sendSignInCode(email, code);
     }
 
@@ -4401,17 +5208,35 @@ class EmailCodes {
         if (row == null || row.getAttempts() >= MAX_ATTEMPTS || !row.getExpiresAt().toInstant().isAfter(clock.instant())) {
             return false;
         }
-        if (!row.getCodeHash().equals(hash(email, code))) {
+        if (!row.getCodeHash().equals(hasher.hash(email, code))) {
             db.update(EMAIL_CODE).set(EMAIL_CODE.ATTEMPTS, row.getAttempts() + 1).where(EMAIL_CODE.EMAIL.eq(email)).execute();
             return false;
         }
-        // Keep the row (its send counters gate the daily cap); make the code unusable.
+        // Keep the row (its send counters gate the daily cap); make the code unusable — and no longer "live",
+        // so the next start sends a fresh code at once.
         db.update(EMAIL_CODE).set(EMAIL_CODE.ATTEMPTS, MAX_ATTEMPTS).where(EMAIL_CODE.EMAIL.eq(email)).execute();
         return true;
     }
 
-    private static String hash(String email, String code) {
-        return Hashing.sha256Hex(email + ":" + code);
+    private void write(String email, String code, Instant now, LocalDate today, int sendsOnDay) {
+        OffsetDateTime at = now.atOffset(ZoneOffset.UTC);
+        String hash = hasher.hash(email, code);
+        db.insertInto(EMAIL_CODE)
+          .set(EMAIL_CODE.EMAIL, email)
+          .set(EMAIL_CODE.CODE_HASH, hash)
+          .set(EMAIL_CODE.EXPIRES_AT, at.plus(TTL))
+          .set(EMAIL_CODE.ATTEMPTS, 0)
+          .set(EMAIL_CODE.SENT_AT, at)
+          .set(EMAIL_CODE.SENDS_DAY, today)
+          .set(EMAIL_CODE.SENDS_ON_DAY, sendsOnDay)
+          .onConflict(EMAIL_CODE.EMAIL).doUpdate()
+          .set(EMAIL_CODE.CODE_HASH, hash)
+          .set(EMAIL_CODE.EXPIRES_AT, at.plus(TTL))
+          .set(EMAIL_CODE.ATTEMPTS, 0)
+          .set(EMAIL_CODE.SENT_AT, at)
+          .set(EMAIL_CODE.SENDS_DAY, today)
+          .set(EMAIL_CODE.SENDS_ON_DAY, sendsOnDay)
+          .execute();
     }
 }
 ```
@@ -4442,6 +5267,7 @@ final class EmailRequests {
 ```java
 package co.scuby.identity;
 
+import co.scuby.platform.security.Caller;
 import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.ErrorCode;
 import org.springframework.stereotype.Service;
@@ -4465,8 +5291,8 @@ class EmailSignIn {
     }
 
     @Transactional
-    public void start(String email) {
-        codes.start(normalize(email));
+    public void start(String email, Caller caller) {
+        codes.start(normalize(email), caller);
     }
 
     /** A wrong code throws invalid_code, but the spent attempt is committed (noRollbackFor). */
@@ -4485,6 +5311,7 @@ class EmailSignIn {
 package co.scuby.identity;
 
 import co.scuby.platform.roles.ApiComponent;
+import co.scuby.platform.security.Caller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -4505,10 +5332,10 @@ class EmailSignInController {
         this.sessions = sessions;
     }
 
-    /** Always 204: never reveals whether the address has an account or whether a send was skipped. */
+    /** 204 whether or not a code went out: never reveals whether the address has an account. 429 only for the device/IP caps. */
     @PostMapping("/auth/email/start")
-    ResponseEntity<Void> start(@Valid @RequestBody EmailRequests.Start body) {
-        signIn.start(body.email());
+    ResponseEntity<Void> start(Caller caller, @Valid @RequestBody EmailRequests.Start body) {
+        signIn.start(body.email(), caller);
         return ResponseEntity.noContent().build();
     }
 
@@ -4525,6 +5352,9 @@ Configuration. `application.yml`, thin-slice `scuby:` block, add:
 
 ```yaml
   auth:
+    code-hash-key: local-only-code-hash-key
+    email-max-per-device: 10
+    email-max-per-ip: 20
     test-bypass:
       email-domains: []
       sms-prefixes: []
@@ -4542,38 +5372,64 @@ Configuration. `application.yml`, thin-slice `scuby:` block, add:
 
 `application-local.yml`, under `scuby:` add the same `auth.test-bypass` block (local runs and the e2e acceptance in plan A2 use it; the log sender still prints real codes for every other address).
 
-`TestDb.MUTABLE_TABLES`: add `"email_code"`. `StatementCeilings`: add `Map.entry("POST /auth/email/start", 2)` and `Map.entry("POST /auth/email/verify", 6)` (consume select+update, person lookup, person insert+select, session insert; the new browser has no session to delete).
+`TestDb.MUTABLE_TABLES`: add `"email_code"`, `"code_send"`. `StatementCeilings`: add `Map.entry("POST /auth/email/start", 5)` (advisory lock, row select, throttle count, upsert, send-log insert) and `Map.entry("POST /auth/email/verify", 8)` (consume select + update, person lookup, person insert + select, session insert — plus, for a browser that already holds a session, the filter's lookup and the old session's DELETE; `signingInWhileSignedInEndsTheOldSessionUnderTheCeiling` exercises that path).
 
-- [ ] **Step 5: Run**
+- [ ] **Step 5: Run the endpoint tests**
 
-Run: `[mvn] -q test -Dtest='EmailSignInTest,DisplayNamesTest,TestBypassGuardTest,ArchitectureTest'`
-Expected: PASS. Note the measured statement counts for both endpoints in the report and lower the ceilings to them if lower.
+Run: `[mvn] -q test -Dtest='EmailSignInTest,DisplayNamesTest,TestBypassGuardTest,ArchitectureTest,ProfileStartupTest'`
+Expected: PASS (`ProfileStartupTest` now 9: 2 starts + 7 "without" cases). Note the measured statement counts for both endpoints in the report and lower the ceilings to them if lower.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Measure the throttle query — expect a seq scan first**
+
+Run: `[mvn] -q test -Dtest=CodeSendPlanTest`
+Expected: FAIL with `Seq Scan on code_send` in the printed plan. Copy that plan into the report under "code_send — before".
+
+- [ ] **Step 7: Earn the index**
+
+`B/src/main/resources/db/migration/V20261029_1035__code_send_index.sql`:
+
+```sql
+-- Serves CodeSends.throttleQuery: count(*) FILTER (target | device_hash | ip_hash), count(*)
+--   FROM code_send WHERE channel = <literal> AND sent_at > now - 24 h — one range scan over one
+--   channel's last day of sends (email sign-in starts, SMS OTP sends).
+-- Plan before (30,000 rows, ANALYZE): Seq Scan on code_send (see the A1 report).
+-- Plan after: Index Scan / Bitmap Index Scan on code_send_channel_sent_at_idx.
+-- Write cost: one more index entry per code sent. Overlaps: none (the table has only its primary
+-- key). The same index serves the 30-day purge (sent_at range across both channels: a skip-free
+-- scan per channel, acceptable for a daily job).
+-- Needs human approval before merge (design · Queries and indexes).
+CREATE INDEX code_send_channel_sent_at_idx ON code_send (channel, sent_at);
+```
+
+Run: `[mvn] -q test -Dtest=CodeSendPlanTest`
+Expected: PASS; the printed plan uses `code_send_channel_sent_at_idx`. Copy it into the report under "code_send — after" and add the index to the report's **Indexes for human approval** list.
+
+- [ ] **Step 8: Commit**
 
 ```bash
 cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice
-git add backend/src/main/resources/db/migration/V20261029_1030__email_codes.sql backend/src/main/java/co/scuby/identity backend/src/main/resources/application*.yml backend/src/test/java/co/scuby/support backend/src/test/java/co/scuby/identity
-git commit -m "feat: email-code sign-in — hashed 6-digit codes, expiry, attempts, cooldown, daily cap, lazy accounts, prod-refused test domain"
+git add backend/src/main/resources/db/migration/V20261029_1030__email_codes.sql backend/src/main/resources/db/migration/V20261029_1035__code_send_index.sql backend/src/main/java/co/scuby/identity backend/src/main/resources/application*.yml backend/src/test/java/co/scuby/support backend/src/test/java/co/scuby/identity backend/src/test/java/co/scuby/platform/config
+git commit -m "feat: email-code sign-in — HMAC'd 6-digit codes, expiry, attempts, cooldown on live codes, daily and device/IP caps, lazy accounts, prod-refused test domain"
 ```
 
 ---
 
 ### Task 9: Google sign-in (ID token verified with NimbusJwtDecoder)
 
-The client sends Google's ID token (`POST /auth/google {credential}`); the backend verifies the signature against Google's keys, `aud` = our client ID, `iss` ∈ {`https://accounts.google.com`, `accounts.google.com`}, expiry; requires `email_verified`; the identity key is `sub`; a first Google sign-in links to an existing account with the same (verified) email. Any rejection is `unauthorized`. No OAuth redirect, no client secret. Tests use a locally generated RSA key — no network.
+The client sends Google's ID token (`POST /auth/google {credential}`); the backend verifies the signature against Google's keys, `aud` = our client ID, `iss` ∈ {`https://accounts.google.com`, `accounts.google.com`}, expiry; requires `email_verified`, `exp` and `iat`; the identity key is `sub`; a first Google sign-in links to an existing account with the same (verified) email **only when that account has no Google identity yet** — an account already linked to a different `sub` answers `unauthorized` (logged), so a second Google identity asserting the same email can never take the account over. A Google name longer than 80 characters is cut to 80 (the `person.display_name` limit). Google's key set is fetched with a 2 s connect / 3 s read timeout. The default client ID (`local-google-client-id`) is refused outside `local`/`test` (env `SCUBY_AUTH_GOOGLE_CLIENT_ID`). Any rejection is `unauthorized`. No OAuth redirect, no client secret. Tests use a locally generated RSA key — no network.
 
 **Files:**
 - Create in `B/src/main/java/co/scuby/identity/`: `GoogleProperties.java`, `GoogleIdTokenConfiguration.java`, `GoogleIdentity.java`, `GoogleIdTokens.java`, `GoogleSignIn.java`, `GoogleSignInController.java`
 - Modify: `B/src/main/resources/application.yml`, `application-test.yml`
-- Create: `B/src/test/java/co/scuby/support/GoogleTestKeys.java`; modify `B/src/test/java/co/scuby/identity/IdentityTestBeans.java`, `StatementCeilings.java`
+- Create: `B/src/test/java/co/scuby/support/GoogleTestKeys.java`; modify `B/src/test/java/co/scuby/identity/IdentityTestBeans.java`, `StatementCeilings.java`, `B/src/test/java/co/scuby/platform/config/ProfileStartupTest.java` (`REQUIRED`)
 - Test: `B/src/test/java/co/scuby/identity/GoogleSignInTest.java`
 
 **Interfaces:**
 - Consumes: `People`, `SignInSessions`, `UserView`, `DisplayNames`, `EmailSignIn.normalize`.
 - Produces:
   - `record GoogleProperties(String clientId, String jwkSetUri)` bound to `scuby.auth.google`.
-  - `GoogleIdTokenConfiguration.validator(String clientId, Clock clock) → OAuth2TokenValidator<Jwt>` (static, reused by the test decoder) and the bean `JwtDecoder googleIdTokenDecoder`.
+  - `GoogleIdTokenConfiguration.validator(String clientId, Clock clock) → OAuth2TokenValidator<Jwt>` (static, reused by the test decoder; requires `exp` and `iat` present) and the bean `JwtDecoder googleIdTokenDecoder` (JWKS fetched with timeouts; refuses the default client ID outside `local`/`test`).
+  - `ProfileStartupTest.REQUIRED` gains `scuby.auth.google.client-id` for `staging` and `prod`.
   - `GoogleIdTokens.verify(String credential) → GoogleIdentity` (throws `ApiException(UNAUTHORIZED)`); `record GoogleIdentity(String sub, String email, String name)`.
   - `POST /auth/google` → `UserView` + session cookie.
   - Test support `GoogleTestKeys`: `String token(Map<String, Object> claims)` signed with the test key, `String tokenSignedByAnotherKey(Map<String, Object>)`, `RSAPublicKey publicKey()`, `static Map<String, Object> claims(String sub, String email, Instant now)` (valid defaults: `iss`, `aud` = `test-google-client-id`, `iat`, `exp` = now + 1 h, `email_verified` = true, `name`).
@@ -4783,7 +5639,59 @@ class GoogleSignInTest {
     void garbageIsRefused() {
         assertThat(google("not-a-jwt").errorCode()).isEqualTo("unauthorized");
     }
+
+    @Test
+    void aTokenWithoutExpiryIsRefused() {
+        var c = claims();
+        c.remove("exp");
+        assertThat(google(keys.token(c)).errorCode()).isEqualTo("unauthorized");
+    }
+
+    @Test
+    void anAccountLinkedToAnotherGoogleIdentityIsNotTakenOver() {
+        String owner = google(keys.token(claims())).str("/id");                     // sub-1 owns carolina@correo.co
+        var other = GoogleTestKeys.claims("google-sub-2", "carolina@correo.co", clock.instant());
+        ApiResponse r = clients.newBrowser().post("/auth/google", "{\"credential\":\"" + keys.token(other) + "\"}");
+        assertThat(r.errorCode()).isEqualTo("unauthorized");
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
+        assertThat(db.fetchOne(PERSON).getId().toString()).isEqualTo(owner);
+    }
+
+    @Test
+    void aVeryLongGoogleNameIsCutToEightyCharacters() {
+        var c = claims();
+        c.put("name", "Ñ".repeat(120));
+        ApiResponse r = google(keys.token(c));
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(r.str("/display_name")).hasSize(80);
+    }
+
+    @Test
+    void signingInWhileSignedInEndsTheOldSessionUnderTheCeiling() {
+        google(keys.token(claims()));
+        String first = api.cookie("__Host-session").orElseThrow();
+        ApiResponse again = google(keys.token(claims()));                           // lookup + DELETE on top
+        assertThat(again.status()).isEqualTo(200);
+        assertThat(api.cookie("__Host-session")).isPresent().get().isNotEqualTo(first);
+    }
 }
+```
+
+In `B/src/test/java/co/scuby/platform/config/ProfileStartupTest.java`, replace the `REQUIRED` map with its final A1 form:
+
+```java
+    static final Map<String, Map<String, String>> REQUIRED = Map.of(
+            "staging", Map.of(
+                    "scuby.web.allowed-origins", "https://staging.scuby.test",
+                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
+                    "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef",
+                    "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com"),
+            "prod", Map.of(
+                    "scuby.web.allowed-origins", "https://scuby.test",
+                    "scuby.web.origin-secret", "dummy-origin-secret",
+                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
+                    "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef",
+                    "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com"));
 ```
 
 `application-test.yml`, under `scuby.auth` add:
@@ -4817,8 +5725,11 @@ record GoogleProperties(String clientId, String jwkSetUri) {}
 ```java
 package co.scuby.identity;
 
+import co.scuby.platform.config.Prod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
@@ -4828,35 +5739,54 @@ import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Set;
 
 @Configuration(proxyBeanMethods = false)
 class GoogleIdTokenConfiguration {
 
+    static final String DEFAULT_CLIENT_ID = "local-google-client-id";
     private static final Set<String> ISSUERS = Set.of("https://accounts.google.com", "accounts.google.com");
 
-    /** Keys are fetched from Google lazily, at the first sign-in (no network at start-up). */
+    /**
+     * Keys are fetched from Google lazily, at the first sign-in (no network at start-up), with timeouts
+     * so a slow Google never hangs sign-in requests.
+     */
     @Bean
-    JwtDecoder googleIdTokenDecoder(GoogleProperties google, Clock clock) {
+    JwtDecoder googleIdTokenDecoder(GoogleProperties google, Clock clock, Environment env) {
+        Prod.requireDeployed(env, google.clientId() != null && !DEFAULT_CLIENT_ID.equals(google.clientId()),
+                "scuby.auth.google.client-id (env SCUBY_AUTH_GOOGLE_CLIENT_ID: the web client's Google OAuth client ID)");
+        SimpleClientHttpRequestFactory http = new SimpleClientHttpRequestFactory();
+        http.setConnectTimeout(Duration.ofSeconds(2));
+        http.setReadTimeout(Duration.ofSeconds(3));
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(google.jwkSetUri())
-                                                   .jwsAlgorithm(SignatureAlgorithm.RS256).build();
+                                                   .jwsAlgorithm(SignatureAlgorithm.RS256)
+                                                   .restOperations(new RestTemplate(http))
+                                                   .build();
         decoder.setJwtValidator(validator(google.clientId(), clock));
         return decoder;
     }
 
-    /** Expiry (60 s skew) on our clock, Google as issuer, our client ID in the audience. */
+    /**
+     * Expiry (60 s skew) on our clock, `exp` and `iat` present (JwtTimestampValidator skips an absent
+     * one), Google as issuer, our client ID in the audience.
+     */
     static OAuth2TokenValidator<Jwt> validator(String clientId, Clock clock) {
         JwtTimestampValidator time = new JwtTimestampValidator(Duration.ofSeconds(60));
         time.setClock(clock);
+        OAuth2TokenValidator<Jwt> hasExpiry = new JwtClaimValidator<Instant>(JwtClaimNames.EXP, Objects::nonNull);
+        OAuth2TokenValidator<Jwt> hasIssuedAt = new JwtClaimValidator<Instant>(JwtClaimNames.IAT, Objects::nonNull);
         OAuth2TokenValidator<Jwt> issuer = new JwtClaimValidator<Object>(JwtClaimNames.ISS,
                 iss -> iss != null && ISSUERS.contains(iss.toString()));
         OAuth2TokenValidator<Jwt> audience = new JwtClaimValidator<Object>(JwtClaimNames.AUD,
                 aud -> aud instanceof Collection<?> c ? c.contains(clientId) : clientId.equals(aud));
-        return new DelegatingOAuth2TokenValidator<>(time, issuer, audience);
+        return new DelegatingOAuth2TokenValidator<>(time, hasExpiry, hasIssuedAt, issuer, audience);
     }
 }
 ```
@@ -4914,11 +5844,18 @@ class GoogleIdTokens {
 ```java
 package co.scuby.identity;
 
+import co.scuby.platform.web.ApiException;
+import co.scuby.platform.web.ErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class GoogleSignIn {
+
+    private static final Logger log = LoggerFactory.getLogger(GoogleSignIn.class);
+    static final int MAX_NAME = 80;   // person.display_name CHECK
 
     private final GoogleIdTokens tokens;
     private final People people;
@@ -4928,19 +5865,30 @@ class GoogleSignIn {
         this.people = people;
     }
 
-    /** By `sub`; else link the account with the same verified email; else create one. */
+    /**
+     * By `sub`; else link the account with the same verified email — only if it has no Google identity
+     * yet (the identity key is `sub`: a different one never replaces it); else create one.
+     */
     @Transactional
     public Person signIn(String credential) {
         GoogleIdentity google = tokens.verify(credential);
         return people.byGoogleSub(google.sub()).orElseGet(() -> {
             String email = EmailSignIn.normalize(google.email());
             return people.byEmail(email).map(p -> {
+                if (p.googleSub() != null) {
+                    log.warn("Google sign-in refused: account {} is linked to another Google identity", p.id());
+                    throw new ApiException(ErrorCode.UNAUTHORIZED, "this account is linked to another Google account");
+                }
                 people.linkGoogle(p.id(), google.sub());
                 return people.get(p.id());
-            }).orElseGet(() -> people.create(email,
-                    google.name() == null || google.name().isBlank() ? DisplayNames.fromEmail(email) : google.name().strip(),
-                    google.sub()));
+            }).orElseGet(() -> people.create(email, displayName(google, email), google.sub()));
         });
+    }
+
+    private static String displayName(GoogleIdentity google, String email) {
+        if (google.name() == null || google.name().isBlank()) return DisplayNames.fromEmail(email);
+        String name = google.name().strip();
+        return name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name;
     }
 }
 ```
@@ -4990,42 +5938,46 @@ class GoogleSignInController {
       jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
 ```
 
-`StatementCeilings`: add `Map.entry("POST /auth/google", 5)`.
+`StatementCeilings`: add `Map.entry("POST /auth/google", 7)` (sub lookup, email lookup, person insert + select, session insert — plus, for a browser that already holds a session, the filter's lookup and the old session's DELETE; `signingInWhileSignedInEndsTheOldSessionUnderTheCeiling` exercises that path).
 
 - [ ] **Step 4: Run**
 
-Run: `[mvn] -q test -Dtest='GoogleSignInTest,EmailSignInTest,ArchitectureTest'`
-Expected: PASS (9 + 9 + 4). Also check the start-up log of this run no longer prints `Using generated security password` (a `JwtDecoder` bean now exists); if it does, apply the exclusion described in Task 1 Step 8.
+Run: `[mvn] -q test -Dtest='GoogleSignInTest,EmailSignInTest,ArchitectureTest,ProfileStartupTest'`
+Expected: PASS (13 + 15 + 4 + 11). Also check the start-up log of this run no longer prints `Using generated security password` (a `JwtDecoder` bean now exists, and Boot's in-memory user backs off on it).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice
-git add backend/src/main/java/co/scuby/identity backend/src/main/resources/application*.yml backend/src/test/java/co/scuby/support backend/src/test/java/co/scuby/identity
-git commit -m "feat: Google sign-in — ID token verified with NimbusJwtDecoder (signature, aud, iss, expiry, email_verified), linked by sub then email"
+git add backend/src/main/java/co/scuby/identity backend/src/main/resources/application*.yml backend/src/test/java/co/scuby/support backend/src/test/java/co/scuby/identity backend/src/test/java/co/scuby/platform/config
+git commit -m "feat: Google sign-in — ID token verified with NimbusJwtDecoder (signature, aud, iss, exp/iat, email_verified), linked by sub then by email when unlinked"
 ```
 
 ---
 ### Task 10: Phone OTP — `POST /me/phone`, `POST /me/phone/verify`
 
-The checklist of `docs/eng/auth.md` · OTP mechanics, none skippable: 6-digit code stored hashed, 5-minute expiry, max 3 attempts, invalidated on success; resend cooldown 60 s; max 4 sends per number per rolling 24 h; per-device and per-IP throttles (decided here: **10 per device and 20 per IP per rolling 24 h** — record in the report; Task 13 writes the numbers into `auth.md`); number validated **before any send** (libphonenumber + the country's `mobile_pattern` from `supported_countries`); a daily spend alarm (a `WARN` log line `sms.daily_send_alarm` when sends in the last 24 h exceed `scuby.sms.alarm-daily-sends`, default 50 — the metric/alert itself arrives with telemetry on branch `be/observability`). Test numbers (`scuby.auth.test-bypass.sms-prefixes`) accept the fixed code and send nothing. `/me/phone` is **not** gated by `publisher_phone_otp` (the flag gates the publish step only — `docs/eng/feature-flags.md` registry); a repeat inside the cooldown answers 204 without resending; a throttle answers `rate_limited`.
+The checklist of `docs/eng/auth.md` · OTP mechanics, none skippable: 6-digit code stored hashed, 5-minute expiry, max 3 attempts, invalidated on success; resend cooldown 60 s; max 4 sends per number per rolling 24 h; per-device and per-IP throttles (decided here: **10 per device and 20 per IP per rolling 24 h** — record in the report; Task 15 writes the numbers into `auth.md`); number validated **before any send** (libphonenumber + the country's `mobile_pattern` from `supported_countries`); a daily spend alarm (a `WARN` log line `sms.daily_send_alarm` when sends in the last 24 h exceed `scuby.sms.alarm-daily-sends`, default 50 — the metric/alert itself arrives with telemetry on branch `be/observability`). Sends are logged in `code_send` (channel `sms`) through `CodeSends` (Task 8), whose throttle query and index Task 8 already earned. `/me/phone` is **not** gated by `publisher_phone_otp` (the flag gates the publish step only — `docs/eng/feature-flags.md` registry); a repeat inside the cooldown answers 204 without resending; a throttle answers `rate_limited`. Codes are stored with `CodeHasher` (HMAC, Task 8). Under `prod` there is no SMS provider yet (O23): `UnavailableSmsSender` logs an ERROR at start-up and fails every send.
+
+**Test numbers (design · Test bypasses):** numbers starting with a `scuby.auth.test-bypass.sms-prefixes` entry (test profile: `+5730000000`, i.e. `+57 300 000 00xx` — 100 numbers) accept the fixed code, send nothing, **skip the cooldown and every throttle, write no `code_send` row, and always (re)write the pending code with the fixed code** — repeated e2e runs on one day never hit `rate_limited`.
+
+**A correct code is consumed only if the caller commits:** `PhoneOtp.check` runs **inside the caller's transaction** (`Propagation.MANDATORY`) and consumes the code with one conditional `DELETE` there, so a publish that rolls back after the phone step leaves the code usable for the retry. Only a **wrong** attempt is counted in its own transaction (`PhoneOtpMisses`, `REQUIRES_NEW`), because it must survive the caller's rollback; that path alone holds a second pooled connection for one `UPDATE`. The outer transaction reads the pending row without `FOR UPDATE`, so the inner `UPDATE` never waits on a lock its own caller holds.
 
 **Files:**
 - Create: `B/src/main/resources/db/migration/V20261029_1040__phone_otp.sql`
-- Create (only after Step 6 shows the seq scan): `B/src/main/resources/db/migration/V20261029_1050__sms_send_sent_at_index.sql`
-- Create in `B/src/main/java/co/scuby/identity/`: `SmsSender.java`, `LogSmsSender.java`, `SmsProperties.java`, `PhoneNumbers.java`, `PhoneOtp.java`, `ProfileView.java`, `PhoneRequests.java`, `PhoneController.java`
+- Create in `B/src/main/java/co/scuby/identity/`: `SmsSender.java`, `LogSmsSender.java`, `UnavailableSmsSender.java`, `SmsProperties.java`, `PhoneNumbers.java`, `PhoneOtp.java`, `PhoneOtpMisses.java`, `PhoneChange.java`, `ProfileView.java`, `PhoneRequests.java`, `PhoneController.java`
 - Modify: `IdentityPurge.java`, `application.yml`, `IdentityTestBeans.java`, `TestDb.java`, `StatementCeilings.java`
 - Create: `B/src/test/java/co/scuby/support/RecordingSmsSender.java`
-- Test: `B/src/test/java/co/scuby/identity/PhoneNumbersTest.java`, `PhoneEndpointsTest.java`, `SmsSendPlanTest.java`
+- Test: `B/src/test/java/co/scuby/identity/PhoneNumbersTest.java`, `PhoneEndpointsTest.java`
 
 **Interfaces:**
-- Consumes: `SupportedCountries`, `TestBypass.smsBypassed`, `People.setPhone`, `Caller`, `Account`, `Hashing`.
+- Consumes: `SupportedCountries`, `TestBypass.smsBypassed`, `CodeHasher`, `CodeSends`, `People.setPhone`, `Caller`, `Account`, `Hashing`.
 - Produces:
   - `@ModuleApi public class PhoneNumbers`: `public String requireMobile(String e164, String field)` → normalised E.164, or `ApiException(VALIDATION_FAILED, fields = {field: "not a supported mobile number"})`.
-  - `interface SmsSender { void sendCode(String e164, String code); }` + `LogSmsSender` (`@Profile("!prod")`).
-  - `PhoneOtp`: `enum Sent { SENT, COOLDOWN }`; `Sent send(UUID personId, String e164, Caller caller)` (throws `rate_limited`; runs in the caller's transaction or its own); `boolean check(UUID personId, String e164, String code)` — **`Propagation.REQUIRES_NEW`**, so a wrong attempt is committed even when the caller then throws and rolls back.
-  - `record ProfileView(String displayName, String email, @Nullable String phone, @Nullable String city, @Nullable String bio, NotificationPrefs notificationPrefs, @Nullable String photoUrl)` — the contract's `Profile`.
-  - Tables `phone_otp` (PK person_id+phone) and `sms_send` (send log for the throttles; purged after 30 days).
+  - `interface SmsSender { void sendCode(String e164, String code); }` + `LogSmsSender` (`@Profile("!prod")`) + `UnavailableSmsSender` (`@Profile("prod")`).
+  - `PhoneOtp`: `enum Sent { SENT, COOLDOWN }`; `Sent send(UUID personId, String e164, Caller caller)` (throws `rate_limited`; runs in the caller's transaction or its own); `boolean check(UUID personId, String e164, String code)` — **`Propagation.MANDATORY`**: the right code is consumed in the caller's transaction (a rollback leaves it usable); a wrong attempt is committed at once by `PhoneOtpMisses.record` (`REQUIRES_NEW`).
+  - `PhoneChange.verify(UUID personId, String e164, String code) → Person` — the `/me/phone/verify` transaction.
+  - `record ProfileView(String displayName, String email, @Nullable String phone, @Nullable String city, @Nullable String bio, NotificationPrefs notificationPrefs, @Nullable String photoUrl)` — the contract's `Profile`; `static ProfileView of(Person)`. Task 12 serves it on `GET /me/profile`.
+  - Table `phone_otp` (PK person_id+phone). SMS sends are rows of `code_send` (Task 8).
   - Test support `RecordingSmsSender`: `List<Sent> sent()`, `String lastCodeFor(String e164)`, `void clear()`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -5081,6 +6033,8 @@ package co.scuby.identity;
 
 import co.scuby.platform.web.ApiException;
 import co.scuby.support.IntegrationTest;
+import co.scuby.support.TestDb;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -5093,6 +6047,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PhoneNumbersTest {
 
     @Autowired PhoneNumbers numbers;
+    @Autowired TestDb testDb;
+
+    @BeforeEach
+    void setUp() { testDb.reset(); }
 
     @Test
     void aColombianMobileIsAccepted() {
@@ -5128,12 +6086,15 @@ import co.scuby.support.IntegrationTest;
 import co.scuby.support.MutableClock;
 import co.scuby.support.RecordingSmsSender;
 import co.scuby.support.TestDb;
+import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
 
+import static co.scuby.db.generated.Tables.CODE_SEND;
+import static co.scuby.db.generated.Tables.PHONE_OTP;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest
@@ -5146,6 +6107,7 @@ class PhoneEndpointsTest {
     @Autowired Accounts accounts;
     @Autowired RecordingSmsSender sms;
     @Autowired MutableClock clock;
+    @Autowired DSLContext db;
 
     ApiClient api;
 
@@ -5261,64 +6223,44 @@ class PhoneEndpointsTest {
         assertThat(sms.sent()).isEmpty();
         assertThat(verify("+573000000001", "123456").str("/phone")).isEqualTo("+573000000001");
     }
-}
-```
-
-Note `oneDeviceIsThrottledAcrossNumbersAndAccounts` uses numbers `+573000000100`…`+573000000109`, which are **not** in the test-bypass prefix `+5730000000` (that prefix covers `+573000000000`–`+573000000009` only) — check before running; they must be real sends to count.
-
-`B/src/test/java/co/scuby/identity/SmsSendPlanTest.java`:
-
-```java
-package co.scuby.identity;
-
-import co.scuby.support.IntegrationTest;
-import co.scuby.support.PlanAssert;
-import co.scuby.support.TestDb;
-import org.jooq.DSLContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.time.Instant;
-
-/** Growth-sensitive query (design · Queries and indexes): the SMS throttle counts. */
-@IntegrationTest
-class SmsSendPlanTest {
-
-    @Autowired DSLContext db;
-    @Autowired TestDb testDb;
-    @Autowired PhoneOtp otp;
-
-    @BeforeEach
-    void setUp() { testDb.reset(); }
 
     @Test
-    void theThrottleCountReadsOnlyTheLastDay() {
-        db.execute("""
-                INSERT INTO scuby.sms_send (phone, device_hash, ip_hash, sent_at)
-                SELECT '+57300' || lpad(g::text, 7, '0'), md5(g::text) || md5(g::text), md5((g % 500)::text) || md5('x'),
-                       timestamptz '2026-01-01' + g * interval '10 minutes'
-                FROM generate_series(1, 30000) g""");
-        db.execute("ANALYZE scuby.sms_send");
-        PlanAssert.assertNoSeqScanOn(db, otp.throttleQuery("+573007152284", "d", "i", Instant.parse("2026-10-13T17:00:00Z")), "sms_send");
+    void aTestNumberSkipsTheCooldownAndEveryThrottleAndIsAlwaysRewritten() {
+        // Test bypass (design · Test bypasses): e2e specs verify the same test number many times a day.
+        for (int i = 0; i < 6; i++) {
+            assertThat(startChange(api, "+573000000002").status()).isEqualTo(204);
+            assertThat(verify("+573000000002", "123456").status()).isEqualTo(200);
+        }
+        assertThat(sms.sent()).isEmpty();
+        assertThat(db.fetchCount(CODE_SEND)).isZero();
+    }
+
+    @Test
+    void codesAreStoredAsAKeyedHashNotAPlainOne() {
+        startChange(api, PHONE);
+        String code = sms.lastCodeFor(PHONE);
+        String stored = db.select(PHONE_OTP.CODE_HASH).from(PHONE_OTP).fetchOne().value1();
+        assertThat(stored).matches("^[0-9a-f]{64}$").isNotEqualTo(co.scuby.platform.crypto.Hashing.sha256Hex(PHONE + ":" + code));
     }
 }
 ```
 
+`+5730000000` is a prefix of 12-digit E.164 numbers, so it covers `+573000000000`–`+573000000099` (`+57 300 000 00xx`, 100 numbers). `oneDeviceIsThrottledAcrossNumbersAndAccounts` uses `+573000000100`…`+573000000109` and `+573000000200`, which are **outside** that range — they must be real sends to count.
+
 - [ ] **Step 2: Run to see them fail**
 
-Run: `[mvn] -q test -Dtest='PhoneNumbersTest,PhoneEndpointsTest,SmsSendPlanTest'`
+Run: `[mvn] -q test -Dtest='PhoneNumbersTest,PhoneEndpointsTest'`
 Expected: compilation FAILURE (`PhoneNumbers`, `PhoneOtp`, `SmsSender` not found).
 
-- [ ] **Step 3: Migration (no index yet)**
+- [ ] **Step 3: Migration**
 
 `B/src/main/resources/db/migration/V20261029_1040__phone_otp.sql`:
 
 ```sql
 -- Phone OTP (docs/eng/auth.md · OTP mechanics). phone_otp: one pending code per (person, number),
--- stored hashed; 5-minute expiry, 3 attempts, 60 s cooldown. sms_send: the send log behind the
--- throttles (4 per number, 10 per device, 20 per IP per rolling 24 h) and the spend alarm; rows
--- older than 30 days are purged (IdentityPurge). IPs and devices are stored as hashes only.
+-- stored as an HMAC; 5-minute expiry, 3 attempts, 60 s cooldown. The sends themselves are rows of
+-- code_send (channel 'sms', V20261029_1030) behind the throttles (4 per number, 10 per device,
+-- 20 per IP per rolling 24 h) and the spend alarm.
 CREATE TABLE phone_otp (
   person_id   uuid NOT NULL REFERENCES person (id) ON DELETE CASCADE,
   phone       text NOT NULL CHECK (phone ~ '^\+[1-9][0-9]{6,14}$'),
@@ -5327,15 +6269,6 @@ CREATE TABLE phone_otp (
   attempts    int NOT NULL DEFAULT 0,
   sent_at     timestamptz NOT NULL,
   PRIMARY KEY (person_id, phone)
-);
-
-CREATE TABLE sms_send (
-  id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  phone        text NOT NULL,
-  person_id    uuid REFERENCES person (id) ON DELETE SET NULL,
-  device_hash  text NOT NULL,
-  ip_hash      text NOT NULL,
-  sent_at      timestamptz NOT NULL
 );
 ```
 
@@ -5372,6 +6305,34 @@ class LogSmsSender implements SmsSender {
     @Override
     public void sendCode(String e164, String code) {
         log.info("SMS code for {}: {}", e164, code);
+    }
+}
+```
+
+`UnavailableSmsSender.java`:
+
+```java
+package co.scuby.identity;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
+/** prod until open item O23 closes: no SMS provider. Prod starts, says so, and fails every send (500). */
+@Component
+@Profile("prod")
+class UnavailableSmsSender implements SmsSender {
+
+    private static final Logger log = LoggerFactory.getLogger(UnavailableSmsSender.class);
+
+    UnavailableSmsSender() {
+        log.error("No SMS provider under prod (open item O23): phone verification will fail with server_error");
+    }
+
+    @Override
+    public void sendCode(String e164, String code) {
+        throw new IllegalStateException("no SMS provider under prod (open item O23)");
     }
 }
 ```
@@ -5451,9 +6412,6 @@ import co.scuby.platform.security.Caller;
 import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.ErrorCode;
 import org.jooq.DSLContext;
-import org.jooq.Record4;
-import org.jooq.Select;
-import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -5468,7 +6426,6 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static co.scuby.db.generated.Tables.PHONE_OTP;
-import static co.scuby.db.generated.Tables.SMS_SEND;
 
 /** SMS one-time codes with the full checklist of docs/eng/auth.md · OTP mechanics. */
 @Component
@@ -5487,95 +6444,169 @@ class PhoneOtp {
     private final SmsSender sender;
     private final TestBypass bypass;
     private final SmsProperties limits;
+    private final CodeHasher hasher;
+    private final CodeSends sends;
+    private final PhoneOtpMisses misses;
 
-    PhoneOtp(DSLContext db, Clock clock, SmsSender sender, TestBypass bypass, SmsProperties limits) {
+    PhoneOtp(DSLContext db, Clock clock, SmsSender sender, TestBypass bypass, SmsProperties limits,
+             CodeHasher hasher, CodeSends sends, PhoneOtpMisses misses) {
         this.db = db;
         this.clock = clock;
         this.sender = sender;
         this.bypass = bypass;
         this.limits = limits;
+        this.hasher = hasher;
+        this.sends = sends;
+        this.misses = misses;
     }
 
-    /** Sends a code to a number already validated by PhoneNumbers. Inside the cooldown: no resend. */
+    /**
+     * Sends a code to a number already validated by PhoneNumbers. Inside the cooldown: no resend.
+     * A test number skips the cooldown and the throttles, sends nothing and always gets the fixed code.
+     */
     @Transactional
     public Sent send(UUID personId, String phone, Caller caller) {
         Instant now = clock.instant();
+        if (bypass.smsBypassed(phone)) {
+            write(personId, phone, bypass.code(), now);
+            return Sent.SENT;
+        }
         PhoneOtpRecord pending = db.selectFrom(PHONE_OTP)
                                    .where(PHONE_OTP.PERSON_ID.eq(personId), PHONE_OTP.PHONE.eq(phone))
                                    .forUpdate().fetchOne();
         if (pending != null && pending.getSentAt().toInstant().plus(COOLDOWN).isAfter(now)) return Sent.COOLDOWN;
 
-        Record4<Integer, Integer, Integer, Integer> counts =
-                throttleQuery(phone, caller.deviceHash(), caller.ipHash(), now.minus(Duration.ofHours(24))).fetchOne();
-        if (counts.value1() >= limits.maxPerNumber() || counts.value2() >= limits.maxPerDevice()
-                || counts.value3() >= limits.maxPerIp()) {
+        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.sms, phone, caller.deviceHash(), caller.ipHash());
+        if (counts.target() >= limits.maxPerNumber() || counts.device() >= limits.maxPerDevice()
+                || counts.ip() >= limits.maxPerIp()) {
             throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes sent");
         }
 
-        boolean test = bypass.smsBypassed(phone);
-        String code = test ? bypass.code() : Hashing.randomDigits(6);
-        OffsetDateTime at = now.atOffset(ZoneOffset.UTC);
-        db.insertInto(PHONE_OTP)
-          .set(PHONE_OTP.PERSON_ID, personId).set(PHONE_OTP.PHONE, phone)
-          .set(PHONE_OTP.CODE_HASH, hash(phone, code)).set(PHONE_OTP.EXPIRES_AT, at.plus(TTL))
-          .set(PHONE_OTP.ATTEMPTS, 0).set(PHONE_OTP.SENT_AT, at)
-          .onConflict(PHONE_OTP.PERSON_ID, PHONE_OTP.PHONE).doUpdate()
-          .set(PHONE_OTP.CODE_HASH, hash(phone, code)).set(PHONE_OTP.EXPIRES_AT, at.plus(TTL))
-          .set(PHONE_OTP.ATTEMPTS, 0).set(PHONE_OTP.SENT_AT, at)
-          .execute();
-        db.insertInto(SMS_SEND)
-          .set(SMS_SEND.PHONE, phone).set(SMS_SEND.PERSON_ID, personId)
-          .set(SMS_SEND.DEVICE_HASH, caller.deviceHash()).set(SMS_SEND.IP_HASH, caller.ipHash())
-          .set(SMS_SEND.SENT_AT, at)
-          .execute();
-        if (counts.value4() + 1 > limits.alarmDailySends()) {
-            log.warn("sms.daily_send_alarm sends_24h={} threshold={}", counts.value4() + 1, limits.alarmDailySends());
+        String code = Hashing.randomDigits(6);
+        write(personId, phone, code, now);
+        sends.record(CodeSends.Channel.sms, phone, personId, caller.deviceHash(), caller.ipHash());
+        if (counts.all() + 1 > limits.alarmDailySends()) {
+            log.warn("sms.daily_send_alarm sends_24h={} threshold={}", counts.all() + 1, limits.alarmDailySends());
         }
-        if (!test) sender.sendCode(phone, code);
+        sender.sendCode(phone, code);
         return Sent.SENT;
     }
 
     /**
-     * True once per code. Its own transaction (REQUIRES_NEW): a wrong attempt stays counted even when
-     * the caller answers invalid_code and rolls its own transaction back.
+     * True once per code, inside the caller's transaction (MANDATORY): the right code is consumed by a
+     * conditional DELETE that commits only with the caller — a rolled-back publish leaves it usable.
+     * A wrong code is counted by PhoneOtpMisses in its own transaction, so the miss survives the
+     * caller's rollback. The row is read without FOR UPDATE: the miss's UPDATE must not wait on a lock
+     * held by its own caller.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.MANDATORY)
     public boolean check(UUID personId, String phone, String code) {
+        OffsetDateTime now = clock.instant().atOffset(ZoneOffset.UTC);
         PhoneOtpRecord row = db.selectFrom(PHONE_OTP)
                                .where(PHONE_OTP.PERSON_ID.eq(personId), PHONE_OTP.PHONE.eq(phone))
-                               .forUpdate().fetchOne();
-        if (row == null || row.getAttempts() >= MAX_ATTEMPTS || !row.getExpiresAt().toInstant().isAfter(clock.instant())) {
+                               .fetchOne();
+        if (row == null || row.getAttempts() >= MAX_ATTEMPTS || !row.getExpiresAt().isAfter(now)) return false;
+        String hash = hasher.hash(phone, code);
+        if (!row.getCodeHash().equals(hash)) {
+            misses.record(personId, phone);
             return false;
         }
-        if (!row.getCodeHash().equals(hash(phone, code))) {
-            row.setAttempts(row.getAttempts() + 1);
-            row.update();
-            return false;
-        }
-        row.delete();
-        return true;
+        // Atomic consume: a concurrent check of the same code deletes nothing and gets false.
+        return db.deleteFrom(PHONE_OTP)
+                 .where(PHONE_OTP.PERSON_ID.eq(personId), PHONE_OTP.PHONE.eq(phone), PHONE_OTP.CODE_HASH.eq(hash),
+                        PHONE_OTP.ATTEMPTS.lt(MAX_ATTEMPTS), PHONE_OTP.EXPIRES_AT.gt(now))
+                 .execute() == 1;
     }
 
-    /** One pass over the last 24 h of sends: per number, per device, per IP, and all (the alarm). */
-    Select<Record4<Integer, Integer, Integer, Integer>> throttleQuery(String phone, String deviceHash, String ipHash, Instant since) {
-        return db.select(
-                         DSL.count().filterWhere(SMS_SEND.PHONE.eq(phone)),
-                         DSL.count().filterWhere(SMS_SEND.DEVICE_HASH.eq(deviceHash)),
-                         DSL.count().filterWhere(SMS_SEND.IP_HASH.eq(ipHash)),
-                         DSL.count())
-                 .from(SMS_SEND)
-                 .where(SMS_SEND.SENT_AT.gt(since.atOffset(ZoneOffset.UTC)));
-    }
-
-    int purgeOlderThan(Duration age) {
+    int purgeExpiredBefore(Duration age) {
         OffsetDateTime cutoff = clock.instant().minus(age).atOffset(ZoneOffset.UTC);
-        int sends = db.deleteFrom(SMS_SEND).where(SMS_SEND.SENT_AT.lt(cutoff)).execute();
-        db.deleteFrom(PHONE_OTP).where(PHONE_OTP.EXPIRES_AT.lt(cutoff)).execute();
-        return sends;
+        return db.deleteFrom(PHONE_OTP).where(PHONE_OTP.EXPIRES_AT.lt(cutoff)).execute();
     }
 
-    private static String hash(String phone, String code) {
-        return Hashing.sha256Hex(phone + ":" + code);
+    private void write(UUID personId, String phone, String code, Instant now) {
+        OffsetDateTime at = now.atOffset(ZoneOffset.UTC);
+        String hash = hasher.hash(phone, code);
+        db.insertInto(PHONE_OTP)
+          .set(PHONE_OTP.PERSON_ID, personId).set(PHONE_OTP.PHONE, phone)
+          .set(PHONE_OTP.CODE_HASH, hash).set(PHONE_OTP.EXPIRES_AT, at.plus(TTL))
+          .set(PHONE_OTP.ATTEMPTS, 0).set(PHONE_OTP.SENT_AT, at)
+          .onConflict(PHONE_OTP.PERSON_ID, PHONE_OTP.PHONE).doUpdate()
+          .set(PHONE_OTP.CODE_HASH, hash).set(PHONE_OTP.EXPIRES_AT, at.plus(TTL))
+          .set(PHONE_OTP.ATTEMPTS, 0).set(PHONE_OTP.SENT_AT, at)
+          .execute();
+    }
+}
+```
+
+`PhoneOtpMisses.java`:
+
+```java
+package co.scuby.identity;
+
+import org.jooq.DSLContext;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
+
+import static co.scuby.db.generated.Tables.PHONE_OTP;
+
+/**
+ * A wrong OTP attempt, committed on its own (REQUIRES_NEW) so it counts even when the caller answers
+ * invalid_code and rolls back. A separate bean: a self-call would bypass the transactional proxy.
+ */
+@Component
+class PhoneOtpMisses {
+
+    private final DSLContext db;
+
+    PhoneOtpMisses(DSLContext db) {
+        this.db = db;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void record(UUID personId, String phone) {
+        db.update(PHONE_OTP)
+          .set(PHONE_OTP.ATTEMPTS, PHONE_OTP.ATTEMPTS.plus(1))
+          .where(PHONE_OTP.PERSON_ID.eq(personId), PHONE_OTP.PHONE.eq(phone))
+          .execute();
+    }
+}
+```
+
+`PhoneChange.java`:
+
+```java
+package co.scuby.identity;
+
+import co.scuby.platform.web.ApiException;
+import co.scuby.platform.web.ErrorCode;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.util.UUID;
+
+/** `/me/phone/verify` in one transaction: consume the code, store the number verified. */
+@Service
+class PhoneChange {
+
+    private final PhoneOtp otp;
+    private final People people;
+    private final Clock clock;
+
+    PhoneChange(PhoneOtp otp, People people, Clock clock) {
+        this.otp = otp;
+        this.people = people;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public Person verify(UUID personId, String phone, String code) {
+        if (!otp.check(personId, phone, code)) throw new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code");
+        people.setPhone(personId, phone, clock.instant());
+        return people.get(personId);
     }
 }
 ```
@@ -5630,15 +6661,11 @@ package co.scuby.identity;
 import co.scuby.platform.roles.ApiComponent;
 import co.scuby.platform.security.Account;
 import co.scuby.platform.security.Caller;
-import co.scuby.platform.web.ApiException;
-import co.scuby.platform.web.ErrorCode;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.time.Clock;
 
 @ApiComponent
 @RestController
@@ -5646,14 +6673,12 @@ class PhoneController {
 
     private final PhoneNumbers numbers;
     private final PhoneOtp otp;
-    private final People people;
-    private final Clock clock;
+    private final PhoneChange change;
 
-    PhoneController(PhoneNumbers numbers, PhoneOtp otp, People people, Clock clock) {
+    PhoneController(PhoneNumbers numbers, PhoneOtp otp, PhoneChange change) {
         this.numbers = numbers;
         this.otp = otp;
-        this.people = people;
-        this.clock = clock;
+        this.change = change;
     }
 
     /** The number is not changed until verify; a repeat inside the cooldown is a silent 204. */
@@ -5666,16 +6691,12 @@ class PhoneController {
     @PostMapping("/me/phone/verify")
     ProfileView verify(Account account, @Valid @RequestBody PhoneRequests.Verify body) {
         String phone = numbers.requireMobile(body.phone(), "phone");
-        if (!otp.check(account.personId(), phone, body.code())) {
-            throw new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code");
-        }
-        people.setPhone(account.personId(), phone, clock.instant());
-        return ProfileView.of(people.get(account.personId()));
+        return ProfileView.of(change.verify(account.personId(), phone, body.code()));
     }
 }
 ```
 
-`IdentityPurge.java` — add `PhoneOtp` and purge its rows:
+`IdentityPurge.java` — add `CodeSends` and `PhoneOtp` and purge their rows:
 
 ```java
 @WorkerComponent
@@ -5684,17 +6705,20 @@ class IdentityPurge {
     private static final Logger log = LoggerFactory.getLogger(IdentityPurge.class);
 
     private final SessionStore sessions;
+    private final CodeSends sends;
     private final PhoneOtp otp;
 
-    IdentityPurge(SessionStore sessions, PhoneOtp otp) {
+    IdentityPurge(SessionStore sessions, CodeSends sends, PhoneOtp otp) {
         this.sessions = sessions;
+        this.sends = sends;
         this.otp = otp;
     }
 
     @Scheduled(cron = "${scuby.purge.cron:0 17 3 * * *}", zone = "UTC")
     void purge() {
-        log.info("purged {} expired sessions, {} SMS send records older than 30 days",
-                sessions.purgeExpired(), otp.purgeOlderThan(java.time.Duration.ofDays(30)));
+        java.time.Duration month = java.time.Duration.ofDays(30);
+        log.info("purged {} expired sessions, {} code-send records and {} stale OTP rows older than 30 days",
+                sessions.purgeExpired(), sends.purgeOlderThan(month), otp.purgeExpiredBefore(month));
     }
 }
 ```
@@ -5709,42 +6733,19 @@ class IdentityPurge {
     alarm-daily-sends: 50
 ```
 
-`TestDb.MUTABLE_TABLES`: add `"phone_otp"`, `"sms_send"`. `StatementCeilings`: add `Map.entry("POST /me/phone", 6)` (session lookup, supported_countries, otp select, throttle count, otp upsert, send insert) and `Map.entry("POST /me/phone/verify", 6)` (session lookup, supported_countries, otp select + delete, person update, person select).
+`TestDb.MUTABLE_TABLES`: add `"phone_otp"`. `StatementCeilings`: add `Map.entry("POST /me/phone", 6)` (session lookup, supported_countries, otp select, throttle count, otp upsert, send-log insert) and `Map.entry("POST /me/phone/verify", 6)` (session lookup, supported_countries, otp select, conditional delete — or the miss's update —, person update, person select).
 
 - [ ] **Step 5: Run the endpoint tests**
 
-Run: `[mvn] -q test -Dtest='PhoneNumbersTest,PhoneEndpointsTest,ArchitectureTest'`
-Expected: PASS.
+Run: `[mvn] -q test -Dtest='PhoneNumbersTest,PhoneEndpointsTest,CodeSendPlanTest,ArchitectureTest'`
+Expected: PASS (`CodeSendPlanTest` still uses `code_send_channel_sent_at_idx`: the SMS sends share the table and the index of Task 8).
 
-- [ ] **Step 6: Measure the throttle query — expect a seq scan first**
-
-Run: `[mvn] -q test -Dtest=SmsSendPlanTest`
-Expected: FAIL with `Seq Scan on sms_send` in the printed plan. Copy that plan into the report under "sms_send — before".
-
-- [ ] **Step 7: Earn the index**
-
-`B/src/main/resources/db/migration/V20261029_1050__sms_send_sent_at_index.sql`:
-
-```sql
--- Serves PhoneOtp.throttleQuery: count(*) FILTER (phone | device_hash | ip_hash), count(*)
---   FROM sms_send WHERE sent_at > now - 24 h — one range scan over the last day's sends.
--- Plan before (30,000 rows, ANALYZE): Seq Scan on sms_send (see the A1 report).
--- Plan after: Index Scan / Bitmap Index Scan on sms_send_sent_at_idx.
--- Write cost: one more index entry per SMS sent (≈ one per publisher, ever). Overlaps: none
--- (the table has only its primary key). The same index serves the 30-day purge.
--- Needs human approval before merge (design · Queries and indexes).
-CREATE INDEX sms_send_sent_at_idx ON sms_send (sent_at);
-```
-
-Run: `[mvn] -q test -Dtest=SmsSendPlanTest`
-Expected: PASS; the printed plan uses `sms_send_sent_at_idx`. Copy it into the report under "sms_send — after" and add the index to the report's **Indexes for human approval** list.
-
-- [ ] **Step 8: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice
-git add backend/src/main/resources/db/migration/V20261029_1040__phone_otp.sql backend/src/main/resources/db/migration/V20261029_1050__sms_send_sent_at_index.sql backend/src/main/java/co/scuby/identity backend/src/main/resources/application.yml backend/src/test/java/co/scuby/support backend/src/test/java/co/scuby/identity
-git commit -m "feat: phone OTP — /me/phone and verify with the auth.md checklist (hashed code, expiry, attempts, cooldown, throttles, spend alarm)"
+git add backend/src/main/resources/db/migration/V20261029_1040__phone_otp.sql backend/src/main/java/co/scuby/identity backend/src/main/resources/application.yml backend/src/test/java/co/scuby/support backend/src/test/java/co/scuby/identity
+git commit -m "feat: phone OTP — /me/phone and verify with the auth.md checklist (HMAC'd code, expiry, attempts, cooldown, throttles, spend alarm; a code is consumed only when the caller commits)"
 ```
 
 ---
@@ -5752,6 +6753,8 @@ git commit -m "feat: phone OTP — /me/phone and verify with the auth.md checkli
 ### Task 11: The publish phone step — `PhoneStepDerivation` and `PublisherPhone`
 
 What `POST /lost-cases` (plan A2) calls to decide the phone step (design · Behaviour decisions, "Phone step at publish"; `docs/eng/auth.md` · Behind a flag): **OTP when `publisher_phone_otp` is on and the number is new or not verified** (stricter than the client mock, which skipped a stored-but-unverified number). The first call without a code sends the SMS and answers "code sent"; repeating it inside the 60 s cooldown answers "code sent" again without resending. A wrong code is `invalid_code` (and the attempt stays counted). Flag off: the number is still required and validated, stored E.164 **unverified**, and the publish goes through (the contract cannot say `unverified` — open item O24).
+
+`resolve` is `@Transactional(propagation = MANDATORY)`: it must run **inside the publish's transaction**, and the publish (plan A2) calls it **after every other validation** — fields, photos, `active_case_exists`. A right code is then consumed only when the publish commits; if anything after the phone step fails and rolls back, the same code still works for the retry (Task 10 · `PhoneOtp.check`).
 
 **Files:**
 - Create: `B/src/main/java/co/scuby/identity/PhoneStepDerivation.java`
@@ -5763,7 +6766,7 @@ What `POST /lost-cases` (plan A2) calls to decide the phone step (design · Beha
 - Consumes: `FeatureFlags`/`Flag.PUBLISHER_PHONE_OTP`, `People`, `PhoneNumbers`, `PhoneOtp`, `Caller`.
 - Produces:
   - `enum PhoneStepDerivation.Step { USE_VERIFIED, SEND_CODE, CHECK_CODE, STORE_UNVERIFIED }` and `static Step PhoneStepDerivation.decide(boolean otpOn, @Nullable String storedPhone, boolean storedVerified, String target, boolean codeGiven)` — pure.
-  - `@ModuleApi public class PublisherPhone`: `public Outcome resolve(UUID personId, @Nullable String bodyPhone, @Nullable String otpCode, Caller caller)`; `public sealed interface Outcome permits Ready, CodeSent`; `public record Ready(String phone, boolean verified) implements Outcome`; `public record CodeSent() implements Outcome`. Throws `ApiException`: `phone_required` (no body phone and none stored), `validation_failed` on field `phone`, `invalid_code`, `rate_limited`. Runs inside the caller's transaction.
+  - `@ModuleApi public class PublisherPhone`: `public Outcome resolve(UUID personId, @Nullable String bodyPhone, @Nullable String otpCode, Caller caller)`; `public sealed interface Outcome permits Ready, CodeSent`; `public record Ready(String phone, boolean verified) implements Outcome`; `public record CodeSent() implements Outcome`. Throws `ApiException`: `phone_required` (no body phone and none stored), `validation_failed` on field `phone`, `invalid_code`, `rate_limited`. `@Transactional(propagation = MANDATORY)`: runs inside the caller's transaction, called after the caller's other validation.
 
 - [ ] **Step 1: Write the failing table test**
 
@@ -5924,6 +6927,23 @@ class PublisherPhoneTest {
     }
 
     @Test
+    void aRightCodeSurvivesAPublishThatRollsBackAfterThePhoneStep() {
+        resolve(PHONE, null);
+        String code = sms.lastCodeFor(PHONE);
+        assertThatThrownBy(() -> tx.execute(s -> {
+            publisherPhone.resolve(ana, PHONE, code, caller);
+            throw new IllegalStateException("the publish failed after the phone step");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(resolve(PHONE, code)).isEqualTo(new PublisherPhone.Ready(PHONE, true));   // same code, still good
+    }
+
+    @Test
+    void resolveOutsideATransactionIsAProgrammingError() {
+        assertThatThrownBy(() -> publisherPhone.resolve(ana, PHONE, null, caller))
+                .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+    }
+
+    @Test
     void noNumberAnywhereIsPhoneRequired() {
         assertThatThrownBy(() -> resolve(null, null))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(codeOf(e)).isEqualTo("phone_required"));
@@ -5974,13 +6994,16 @@ import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.ErrorCode;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.util.UUID;
 
 /**
  * The phone step of every publish (docs/eng/auth.md · UI contract — the phone step). Called inside
- * the publish's transaction; identity stays the only writer of `person` and `phone_otp`.
+ * the publish's transaction, after the publish's own validation, so a rolled-back publish leaves a
+ * right code usable; identity stays the only writer of `person` and `phone_otp`.
  */
 @ModuleApi
 @Component
@@ -6008,6 +7031,7 @@ public class PublisherPhone {
         this.clock = clock;
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
     public Outcome resolve(UUID personId, @Nullable String bodyPhone, @Nullable String otpCode, Caller caller) {
         Person person = people.get(personId);
         String target = bodyPhone != null ? numbers.requireMobile(bodyPhone, "phone") : person.phone();
@@ -6052,21 +7076,278 @@ git commit -m "feat: publish phone step — pure PhoneStepDerivation (OTP for ne
 ```
 
 ---
-### Task 12: Run the whole backend locally with Docker
+### Task 12: `GET /me/profile`
 
-One command brings up Postgres and the API (profile `local`) on `http://localhost:8080`, so the web client's dev server (`http://localhost:5173`) and its Playwright preview build (`http://localhost:4173`, `web/playwright.config.ts`) can call it with credentials. Plan A2's final acceptance task depends on this. The image is the one Jib builds (`scuby-backend`); `docker compose up -d` alone still starts only Postgres (tests and codegen use it), because the API service sits behind the compose profile `app`.
+The profile page reads it after sign-in (`web/e2e/auth.spec.ts` · `@AUTH-001`), so the slice serves it (design · Scope: the slice has 15 endpoints — this one and plan A2's `GET /me/cases` were added so the sign-in and publish e2e specs can pass). A session-gated read of the caller's own `person` row, answered as the contract's `Profile` (`ProfileView`, Task 10). `phone` is the **verified** number only (`Person.verifiedPhone()`): a stored but unverified number never shows (`User.phone` and `Profile.phone` show only a verified number — the same rule as `GET /session`). `PATCH /me/profile` is not in the slice.
 
-**Cookies on localhost:** the session and device cookies are `Secure; SameSite=Lax`. Browsers treat `http://localhost` as a secure context and accept `Secure` cookies from it, and `localhost:5173` → `localhost:8080` is same-site (the port is not part of the site), so `SameSite=Lax` cookies flow on `fetch(..., {credentials: 'include'})`. CORS allows both client origins with credentials (`application-local.yml`, Task 1). Nothing to relax.
+**Files:**
+- Create: `B/src/main/java/co/scuby/identity/ProfileController.java`
+- Modify: `B/src/test/java/co/scuby/support/StatementCeilings.java`
+- Test: `B/src/test/java/co/scuby/identity/ProfileEndpointTest.java`
+
+**Interfaces:**
+- Consumes: `People.get`, `ProfileView.of`, `Account`; `IdentitySecurityRules` already makes `/me/**` `authenticated()` (Task 7).
+- Produces: `GET /me/profile` → `ProfileView` (contract `Profile`); 401 without a session.
+
+- [ ] **Step 1: Write the failing test**
+
+`B/src/test/java/co/scuby/identity/ProfileEndpointTest.java`:
+
+```java
+package co.scuby.identity;
+
+import co.scuby.support.Accounts;
+import co.scuby.support.ApiClient;
+import co.scuby.support.ApiClients;
+import co.scuby.support.ApiResponse;
+import co.scuby.support.IntegrationTest;
+import co.scuby.support.TestDb;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.UUID;
+
+import static co.scuby.db.generated.Tables.PERSON;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@IntegrationTest
+class ProfileEndpointTest {
+
+    @Autowired ApiClients clients;
+    @Autowired TestDb testDb;
+    @Autowired Accounts accounts;
+    @Autowired DSLContext db;
+
+    ApiClient api;
+
+    @BeforeEach
+    void setUp() {
+        testDb.reset();
+        api = clients.newBrowser();
+    }
+
+    @Test
+    void nobodySignedInIsUnauthorized() {
+        ApiResponse r = api.get("/me/profile");
+        assertThat(r.status()).isEqualTo(401);
+        assertThat(r.errorCode()).isEqualTo("unauthorized");
+    }
+
+    @Test
+    void aNewAccountHasDefaultsAndEveryFieldPresent() {
+        accounts.signIn(api, "ana.gomez@correo.co");
+        ApiResponse r = api.get("/me/profile");
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(r.str("/display_name")).isEqualTo("ana.gomez");
+        assertThat(r.str("/email")).isEqualTo("ana.gomez@correo.co");
+        assertThat(r.isNull("/phone")).isTrue();
+        assertThat(r.isNull("/city")).isTrue();
+        assertThat(r.isNull("/bio")).isTrue();
+        assertThat(r.isNull("/photo_url")).isTrue();
+        for (String vertical : new String[] {"lost", "found", "adoption", "help"}) {
+            assertThat(r.json().at("/notification_prefs/" + vertical).asBoolean()).as(vertical).isTrue();
+        }
+    }
+
+    @Test
+    void aStoredButUnverifiedNumberIsNotShown() {
+        UUID id = accounts.signIn(api, "ana.gomez@correo.co");
+        db.update(PERSON).set(PERSON.PHONE, "+573007152284").where(PERSON.ID.eq(id)).execute();
+        assertThat(api.get("/me/profile").isNull("/phone")).isTrue();
+    }
+
+    @Test
+    void theVerifiedNumberIsShown() {
+        accounts.signIn(api, "ana.gomez@correo.co");
+        api.post("/me/phone", "{\"phone\":\"+573000000003\"}");                       // a test number: fixed code
+        api.post("/me/phone/verify", "{\"phone\":\"+573000000003\",\"code\":\"123456\"}");
+        assertThat(api.get("/me/profile").str("/phone")).isEqualTo("+573000000003");
+    }
+
+    @Test
+    void eachAccountSeesOnlyItsOwnProfile() {
+        accounts.signIn(api, "ana.gomez@correo.co");
+        ApiClient other = clients.newBrowser();
+        accounts.signIn(other, "carolina@correo.co");
+        assertThat(api.get("/me/profile").str("/email")).isEqualTo("ana.gomez@correo.co");
+        assertThat(other.get("/me/profile").str("/email")).isEqualTo("carolina@correo.co");
+    }
+}
+```
+
+`StatementCeilings`: add `Map.entry("GET /me/profile", 2)` (session lookup + person).
+
+- [ ] **Step 2: Run to see it fail**
+
+Run: `[mvn] -q test -Dtest=ProfileEndpointTest`
+Expected: FAIL — the signed-in cases get a 404 (no handler yet), which `ApiClient`'s contract check reports (`GET /me/profile → 404 breaks the contract`); `nobodySignedInIsUnauthorized` already passes (the `/me/**` rule).
+
+- [ ] **Step 3: The controller**
+
+`B/src/main/java/co/scuby/identity/ProfileController.java`:
+
+```java
+package co.scuby.identity;
+
+import co.scuby.platform.roles.ApiComponent;
+import co.scuby.platform.security.Account;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/** The caller's own profile (contract `getProfile`). Read-only: one person lookup, no transaction. */
+@ApiComponent
+@RestController
+class ProfileController {
+
+    private final People people;
+
+    ProfileController(People people) {
+        this.people = people;
+    }
+
+    @GetMapping("/me/profile")
+    ProfileView profile(Account account) {
+        return ProfileView.of(people.get(account.personId()));
+    }
+}
+```
+
+- [ ] **Step 4: Run**
+
+Run: `[mvn] -q test -Dtest='ProfileEndpointTest,PhoneEndpointsTest,ArchitectureTest'`
+Expected: PASS (5 + 12 + 4). Record the measured statement count of `GET /me/profile` in the report.
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice
+git add backend/src/main/java/co/scuby/identity/ProfileController.java backend/src/test/java/co/scuby/identity/ProfileEndpointTest.java backend/src/test/java/co/scuby/support/StatementCeilings.java
+git commit -m "feat: GET /me/profile — the caller's profile, verified phone only"
+```
+
+---
+
+### Task 13: One source of truth for the Java version — Jib base image by digest, enforcer
+
+The Java version lives in three places that must agree: `<java.version>25</java.version>` in `B/pom.xml` (compilation, and Jib's base image), `B/.java-version` (jenv locally; `.github/workflows/backend.yml` reads it with `java-version-file`), and the **digest** of the Jib base image (two builds of the same commit must give the same image). The Maven enforcer refuses any other JDK. This is its own small task because it needs Docker Hub: if a pull fails here, only this task stops — every other task's commits are already in.
+
+**The digest is never copied from this plan.** Look it up when you run the task, verify it, and record it in the report.
+
+**Files:**
+- Modify: `B/pom.xml` (Jib `<from><image>`, the enforcer plugin)
+- Check: `B/.java-version` (must stay `25`)
+
+**Interfaces:**
+- Consumes: the existing `jib-maven-plugin` configuration in `B/pom.xml` (base `eclipse-temurin:25-jre`, platforms arm64 and amd64, image `scuby-backend`).
+- Produces: the base image `eclipse-temurin:${java.version}-jre@sha256:<digest looked up in Step 1>`; `validate` fails on a JDK outside `[25,26)` or a Maven older than 3.9. Task 14's `run-local.sh` and plan A2's e2e script build with it.
+
+- [ ] **Step 1: Look up and verify the digest**
+
+Run: `docker buildx imagetools inspect eclipse-temurin:25-jre`
+Expected: a `Name:` line, a `MediaType: application/vnd.oci.image.index.v1+json` (or the Docker manifest-list type) line, a top-level `Digest: sha256:<64 hex>` line, and a `Manifests:` list that includes **both** `Platform: linux/amd64` and `Platform: linux/arm64`. Copy the **top-level** `Digest:` (the index, not a per-platform manifest) — call it `<DIGEST>`.
+
+Verify it resolves by digest: `docker buildx imagetools inspect eclipse-temurin:25-jre@<DIGEST> | head -3` → the same `Digest:`.
+
+Record in the report: the date, `<DIGEST>`, and the Temurin version the index carries (`docker buildx imagetools inspect eclipse-temurin:25-jre --format '{{json .Image}}' | grep -o '"JAVA_VERSION=[^"]*"' | head -1`; if the format flag is unsupported, write "not printed").
+
+If `imagetools inspect` fails (no network, Docker Hub rate limit): apply the stuck rule to this task only, and leave the pom's `<image>eclipse-temurin:25-jre</image>` untouched.
+
+- [ ] **Step 2: Pin it in `B/pom.xml`**
+
+In the `jib-maven-plugin` `<configuration><from>`, replace `<image>eclipse-temurin:25-jre</image>` with (substituting the real `<DIGEST>` and today's date — no placeholder may remain in the file):
+
+```xml
+            <!--
+              thin slice: the base image derives from ${java.version} and is pinned to the multi-arch
+              index digest of eclipse-temurin:${java.version}-jre (linux/amd64 + linux/arm64), looked up
+              on <the date you ran Step 1>.
+              To bump: docker buildx imagetools inspect eclipse-temurin:${java.version}-jre → the top "Digest:".
+              Changing java.version means changing .java-version and this digest in the same commit.
+            -->
+            <image>eclipse-temurin:${java.version}-jre@<DIGEST></image>
+```
+
+Check that nothing unsubstituted is left: `grep -n '<DIGEST>\|<the date' /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend/pom.xml` → no output.
+
+- [ ] **Step 3: The enforcer**
+
+In `<build><plugins>`, before `testcontainers-jooq-codegen-maven-plugin`, add:
+
+```xml
+      <!-- thin slice: building with another JDK or an old Maven fails at validate with a clear message -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.6.3</version>
+        <executions>
+          <execution>
+            <id>enforce-java-and-maven</id>
+            <phase>validate</phase>
+            <goals><goal>enforce</goal></goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[25,26)</version>
+                  <message>Scuby's backend builds with Java 25 (backend/.java-version). Export JAVA_HOME=/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home or run `jenv local 25`.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                  <message>Use the wrapper: ./mvnw</message>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+```
+
+Check `B/.java-version` contains exactly `25`: `cat /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend/.java-version` → `25`.
+
+- [ ] **Step 4: Verify**
+
+Run: `[mvn] -q validate` → exits 0, no output.
+
+Run (deliberately the wrong JDK, Homebrew's default openjdk):
+`cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend && JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home ./mvnw -q validate; echo "exit=$?"`
+Expected: `Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion failed with message:` followed by `Scuby's backend builds with Java 25 …`, and `exit=1`. (If `/opt/homebrew/opt/openjdk` is itself 25, skip this check and say so in the report.)
+
+Run: `[mvn] -q -DskipTests package jib:dockerBuild -Djib.from.platforms=linux/arm64 && docker run --rm --entrypoint java scuby-backend -version 2>&1 | head -1`
+Expected: a line starting `openjdk version "25.`; `docker image inspect scuby-backend --format '{{.Architecture}}'` prints `arm64`.
+
+Run: `[mvn] -q verify` → `BUILD SUCCESS`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice
+git add backend/pom.xml
+git commit -m "feat: one source for the Java version — Jib base image pinned by a verified digest, enforcer refuses other JDKs"
+```
+
+---
+
+### Task 14: Run the whole backend locally with Docker
+
+One command brings up Postgres and the API (profile `local`) on `http://localhost:8080`, so the web client's dev server (`http://localhost:5173`) and its Playwright preview build (`http://localhost:4173`, `web/playwright.config.ts`) can call it with credentials. Plan A2's final acceptance task depends on this. The image is the one Jib builds (Task 13); `docker compose up -d` alone still starts only Postgres (tests and codegen use it), because the API service sits behind the compose profile `app`.
+
+**One compose project per checkout.** Compose names a project after its directory, so every checkout's `backend/compose.yaml` (the main checkout, each worktree) would otherwise share the project `backend` — its containers, its `pgdata` volume and its ports — and one session's run would recreate, migrate or stop another's database. `backend/compose-project.sh` prints `scuby-backend-<basename of the git top level>` (e.g. `scuby-backend-be-thin-slice`; `scuby-backend-scuby-monorepo` in the main checkout); `run-local.sh` exports it as `COMPOSE_PROJECT_NAME` and tags the image with the same slug (`scuby-backend:<slug>`), so the volume, the containers and the image are per checkout. Host ports default to 5433 (Postgres) and 8080 (API) and can be moved with `SCUBY_DB_PORT` / `SCUBY_API_PORT`; the script refuses to start when one is taken (two checkouts cannot both own 8080 — stop the other first). Plan A2's e2e script uses its own project, `scuby-e2e-<same slug>`.
+
+**Cookies on localhost:** the session (`__Host-session`) and device cookies are `Secure; SameSite=Lax`. Browsers treat `http://localhost` as a secure context and accept `Secure` (and `__Host-`) cookies from it, and `localhost:5173` → `localhost:8080` is same-site (the port is not part of the site), so `SameSite=Lax` cookies flow on `fetch(..., {credentials: 'include'})`. CORS allows both client origins with credentials (`application-local.yml`, Task 1). Nothing to relax.
 
 **Files:**
 - Modify: `B/compose.yaml`
-- Create: `B/run-local.sh`
+- Create: `B/compose-project.sh`, `B/run-local.sh`
 - Modify: `B/README.md`
 - Test: manual verification below (no Java test: this task is wiring)
 
 **Interfaces:**
-- Consumes: the Jib configuration (Task 1: base image pinned), profile `local` (`application-local.yml`: allowed origins 5173/4173, test bypass for `e2e.scuby.test` and `+5730000000x`).
-- Produces: `bash backend/run-local.sh` → API healthy on `http://127.0.0.1:8080`; `docker compose --profile app down` stops it. Compose service name `backend`, image `scuby-backend`. Environment variables set there override `application-local.yml`; plan A2 adds `SCUBY_MEDIA_PUBLIC_BASE_URL` to this service.
+- Consumes: the Jib configuration (Task 13: base image pinned by digest), profile `local` (`application-local.yml`: allowed origins 5173/4173, test bypass for `e2e.scuby.test` and `+5730000000`, i.e. `+57 300 000 00xx`).
+- Produces:
+  - `bash backend/compose-project.sh` → prints the checkout's compose project name.
+  - `bash backend/run-local.sh` → API healthy on `http://127.0.0.1:${SCUBY_API_PORT:-8080}`; `bash backend/run-local.sh down` stops this checkout's project (and only it).
+  - Compose service `backend`, image `scuby-backend:${SCUBY_IMAGE_TAG:-local}` (the script sets the tag to the checkout slug and builds with `-Djib.to.image=scuby-backend:<slug>`); host ports `127.0.0.1:${SCUBY_DB_PORT:-5433}` and `127.0.0.1:${SCUBY_API_PORT:-8080}`. Environment variables set on the `backend` service override `application-local.yml`; plan A2 adds its media variables there.
 
 - [ ] **Step 1: Extend `B/compose.yaml`**
 
@@ -6074,9 +7355,11 @@ Replace the file with:
 
 ```yaml
 # Local database for `SPRING_PROFILES_ACTIVE=local` (backend/README.md).
+# Always run compose with this checkout's project name (bash compose-project.sh) — run-local.sh does —
+# so worktrees never share containers, volumes or ports.
 # `docker compose up -d` starts only Postgres (tests, jOOQ codegen, the API run from Maven).
-# `docker compose --profile app up -d --wait` also starts the API from the Jib image `scuby-backend`
-# (backend/run-local.sh builds it first).
+# `docker compose --profile app up -d --wait` also starts the API from the Jib image
+# `scuby-backend:${SCUBY_IMAGE_TAG}` (backend/run-local.sh builds it first).
 services:
   postgres:
     build: ../infra/docker/postgres
@@ -6086,7 +7369,7 @@ services:
       POSTGRES_USER: scuby
       POSTGRES_PASSWORD: scuby
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:${SCUBY_DB_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -6096,32 +7379,66 @@ services:
       retries: 30
 
   backend:
-    image: scuby-backend
+    image: scuby-backend:${SCUBY_IMAGE_TAG:-local}
     profiles: [ "app" ]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: local
-      # Inside the compose network Postgres is `postgres:5432`, not the host's 5433.
+      # Inside the compose network Postgres is `postgres:5432`, whatever the host port.
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/scuby
       SPRING_DATASOURCE_USERNAME: scuby
       SPRING_DATASOURCE_PASSWORD: scuby
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${SCUBY_API_PORT:-8080}:8080"
 
 volumes:
   pgdata:
 ```
 
-- [ ] **Step 2: `B/run-local.sh`**
+- [ ] **Step 2: `B/compose-project.sh` and `B/run-local.sh`**
+
+`B/compose-project.sh`:
 
 ```bash
 #!/usr/bin/env bash
-# Runs the whole backend locally in Docker: Postgres + the API (profile local) on http://localhost:8080.
-# Usage (from anywhere): bash backend/run-local.sh      Stop: docker compose -f backend/compose.yaml --profile app down
+# Prints this checkout's compose project name: scuby-backend-<basename of the git top level>,
+# lower-cased, anything but [a-z0-9_-] replaced by "-" (compose's rule for project names).
+set -euo pipefail
+top="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+slug="$(basename "$top" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_\n-' '-')"
+echo "scuby-backend-${slug}"
+```
+
+`B/run-local.sh`:
+
+```bash
+#!/usr/bin/env bash
+# Runs the whole backend locally in Docker: Postgres + the API (profile local), as this checkout's
+# own compose project. Usage (from anywhere): bash backend/run-local.sh       Stop: bash backend/run-local.sh down
+# Ports: SCUBY_DB_PORT (default 5433), SCUBY_API_PORT (default 8080).
 set -euo pipefail
 cd "$(dirname "$0")"
+
+export COMPOSE_PROJECT_NAME="$(bash compose-project.sh)"
+export SCUBY_IMAGE_TAG="${COMPOSE_PROJECT_NAME#scuby-backend-}"
+export SCUBY_DB_PORT="${SCUBY_DB_PORT:-5433}"
+export SCUBY_API_PORT="${SCUBY_API_PORT:-8080}"
+
+if [[ "${1:-}" == "down" ]]; then
+  docker compose --profile app down
+  exit 0
+fi
+
+for port in "$SCUBY_DB_PORT" "$SCUBY_API_PORT"; do
+  if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1 \
+     && ! docker compose ps --format '{{.Publishers}}' 2>/dev/null | grep -q ":$port->"; then
+    echo "port $port is taken by something outside project $COMPOSE_PROJECT_NAME (lsof -nP -iTCP:$port -sTCP:LISTEN)."
+    echo "Stop it, or choose another port: SCUBY_DB_PORT=… SCUBY_API_PORT=… bash $0"
+    exit 1
+  fi
+done
 
 # Java 25 (backend/.java-version); the Maven enforcer refuses any other JDK.
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home}"
@@ -6130,18 +7447,20 @@ export PATH="$JAVA_HOME/bin:$PATH"
 # The build needs Docker (jOOQ codegen) and the image scuby/postgres:17.
 docker image inspect scuby/postgres:17 >/dev/null 2>&1 || docker build -t scuby/postgres:17 ../infra/docker/postgres
 
-./mvnw -q -DskipTests package jib:dockerBuild -Djib.from.platforms=linux/arm64
+./mvnw -q -DskipTests package jib:dockerBuild -Djib.from.platforms=linux/arm64 -Djib.to.image="scuby-backend:${SCUBY_IMAGE_TAG}"
 docker compose --profile app up -d --wait
 
+health="http://localhost:${SCUBY_API_PORT}/actuator/health"
 for _ in $(seq 1 90); do
-  if curl -sf http://localhost:8080/actuator/health >/dev/null; then break; fi
+  if curl -sf "$health" >/dev/null; then break; fi
   sleep 1
 done
-curl -sf http://localhost:8080/actuator/health || { echo "the API did not become healthy: docker compose logs backend"; exit 1; }
+curl -sf "$health" || { echo "the API did not become healthy: COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME docker compose logs backend"; exit 1; }
 echo
-echo "API:    http://localhost:8080"
-echo "Health: http://localhost:8080/actuator/health"
-echo "Stop:   docker compose -f $(pwd)/compose.yaml --profile app down"
+echo "Project: $COMPOSE_PROJECT_NAME"
+echo "API:     http://localhost:${SCUBY_API_PORT}"
+echo "Health:  $health"
+echo "Stop:    bash $(pwd)/run-local.sh down"
 ```
 
 - [ ] **Step 3: Document it in `B/README.md` (Spanish)**
@@ -6149,49 +7468,56 @@ echo "Stop:   docker compose -f $(pwd)/compose.yaml --profile app down"
 In the table under `## Cómo correrlo`, replace the row for `./mvnw -DskipTests package jib:dockerBuild …` with these two rows (keep the other rows):
 
 ```markdown
-| `bash run-local.sh` | Todo en Docker: construye la imagen `scuby-backend` con Jib, levanta Postgres y la API (perfil `local`) y espera a que la salud diga `UP`. La API queda en `http://localhost:8080`; el cliente (`pnpm dev`, puerto 5173) y su build de e2e (puerto 4173) pueden llamarla con credenciales. Se detiene con `docker compose --profile app down` |
+| `bash run-local.sh` | Todo en Docker: construye la imagen `scuby-backend:<checkout>` con Jib, levanta Postgres y la API (perfil `local`) como proyecto de compose propio de este checkout (`bash compose-project.sh` lo imprime) y espera a que la salud diga `UP`. La API queda en `http://localhost:8080` (`SCUBY_API_PORT` la mueve; Postgres en 5433, `SCUBY_DB_PORT`); el cliente (`pnpm dev`, puerto 5173) y su build de e2e (puerto 4173) pueden llamarla con credenciales. Se detiene con `bash run-local.sh down` |
 | `./mvnw -DskipTests package jib:dockerBuild -Djib.from.platforms=linux/arm64` | Solo la imagen local `scuby-backend` (el pom lista arm64 y amd64 para publicar en un registro) |
 ```
 
 and add below the table:
 
 ```markdown
-`docker compose up -d` sin `--profile app` levanta solo Postgres (lo que necesitan las pruebas y la
-generación de jOOQ). En el perfil `local` los códigos de correo y SMS salen en el log
-(`docker compose logs -f backend`); las direcciones `@e2e.scuby.test` y los números
-`+57 300 000 000x` aceptan siempre `123456`.
+Cada checkout (el principal y cada worktree) es su propio proyecto de compose: contenedores, volumen
+de datos e imagen no se comparten. Para Postgres solo: `COMPOSE_PROJECT_NAME=$(bash compose-project.sh) docker compose up -d`
+(lo que necesitan las pruebas y la generación de jOOQ). En el perfil `local` los códigos de correo y
+SMS salen en el log (`COMPOSE_PROJECT_NAME=$(bash compose-project.sh) docker compose logs -f backend`);
+las direcciones `@e2e.scuby.test` y los números `+57 300 000 00xx` aceptan siempre `123456`.
 ```
 
 - [ ] **Step 4: Verify**
 
+Run: `bash /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend/compose-project.sh`
+Expected: `scuby-backend-be-thin-slice`.
+
 Run: `bash /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend/run-local.sh`
-Expected: ends with `{"status":"UP"...}` and the three `API/Health/Stop` lines.
+Expected: ends with `{"status":"UP"...}` and the `Project/API/Health/Stop` lines, `Project: scuby-backend-be-thin-slice`. If it stops on "port … is taken", another checkout's stack owns the port: do **not** stop it (other sessions own it — Global Constraints); rerun with `SCUBY_DB_PORT=55432 SCUBY_API_PORT=18080` and use those ports below.
+
+Run: `docker ps --filter label=com.docker.compose.project=scuby-backend-be-thin-slice --format '{{.Names}}'`
+Expected: exactly two containers, both named `scuby-backend-be-thin-slice-…`; `docker volume ls --format '{{.Name}}' | grep '^scuby-backend-be-thin-slice_pgdata$'` prints the volume.
 
 Run: `curl -sf localhost:8080/actuator/health` → `{"status":"UP"...}`.
 Run: `curl -s -i localhost:8080/config | head -20` → `HTTP/1.1 200`, a `Set-Cookie: device=…; Secure; HttpOnly; SameSite=Lax` header and the Colombia row.
 Run (CORS for the client's origin): `curl -s -i -X OPTIONS localhost:8080/auth/email/start -H 'Origin: http://localhost:5173' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type' | grep -i '^access-control'`
 Expected: `Access-Control-Allow-Origin: http://localhost:5173` and `Access-Control-Allow-Credentials: true`. Repeat with `Origin: http://localhost:4173` → same.
-Run: `docker compose -f /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend/compose.yaml --profile app down`
-Expected: both containers removed. Then `docker compose -f …/backend/compose.yaml up -d --wait` starts **only** `postgres` (check `docker compose -f …/backend/compose.yaml ps` lists one service); stop it again with `docker compose -f …/backend/compose.yaml down`.
+Run: `bash /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend/run-local.sh down`
+Expected: both containers of this project removed; containers of any other project untouched (`docker ps` shows them as before). Then `COMPOSE_PROJECT_NAME=scuby-backend-be-thin-slice docker compose -f /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice/backend/compose.yaml up -d --wait` starts **only** `postgres` (its `ps` lists one service); stop it again with the same prefix and `down`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice
-git add backend/compose.yaml backend/run-local.sh backend/README.md
-git commit -m "feat: run the whole backend locally in Docker — compose app profile with the Jib image, run-local.sh"
+git add backend/compose.yaml backend/compose-project.sh backend/run-local.sh backend/README.md
+git commit -m "feat: run the whole backend locally in Docker — one compose project per checkout, app profile with the Jib image, run-local.sh"
 ```
 
 ---
 
-### Task 13: `backend/CLAUDE.md`, owning docs, decision #40, final verification
+### Task 15: `backend/CLAUDE.md`, owning docs, decision #40, final verification
 
 **Files:**
 - Create: `B/CLAUDE.md`
 - Modify: `W/docs/eng/backend.md`, `W/docs/eng/auth.md`, `W/docs/eng/feature-flags.md`, `W/docs/product/00-product-map.md`, `B/README.md` (structure section)
 
 **Interfaces:**
-- Consumes: everything above; the report's recorded decisions (CSRF, no device table, SMS throttle numbers).
+- Consumes: everything above; the report's recorded decisions (CSRF by Origin check before CORS, `__Host-session` and duplicate-cookie rejection, kept `Cache-Control: no-store`, deployed profiles refusing missing settings, no device table, code throttle numbers for both channels, cooldown only on a live code, HMAC'd codes, test bypasses skipping every limit, an OTP consumed only when its caller commits, Google linking only unlinked accounts).
 - Produces: docs that later plans (A2) extend: `docs/eng/backend.md` gains the sections **Code structure**, **Security**, **Sessions**; A2 adds to them.
 
 - [ ] **Step 1: `B/CLAUDE.md`**
@@ -6209,8 +7535,8 @@ Behaviour lives in `../docs/` and wins over this code. Architecture: `../docs/en
 |---|---|
 | `./mvnw verify` | Everything CI runs: jOOQ codegen, tests, ArchUnit, PIT on derivations |
 | `./mvnw test -Dtest=X` | One test class |
-| `bash run-local.sh` | Postgres + the API in Docker on http://localhost:8080 (profile `local`) |
-| `docker compose up -d` | Postgres only |
+| `bash run-local.sh` | Postgres + the API in Docker on http://localhost:8080 (profile `local`), as this checkout's own compose project; `bash run-local.sh down` stops it |
+| `COMPOSE_PROJECT_NAME=$(bash compose-project.sh) docker compose up -d` | Postgres only. Never run compose without this checkout's project name: the default (`backend`) is shared with every other checkout |
 
 ## Java version
 
@@ -6218,7 +7544,7 @@ One version, three places that must agree — change them in one commit:
 
 1. `pom.xml` `<java.version>` — compilation, and Jib's base image `eclipse-temurin:${java.version}-jre@sha256:…`.
 2. `.java-version` — jenv locally; CI reads it (`java-version-file` in `.github/workflows/backend.yml`).
-3. The Jib base-image digest in `pom.xml` — bump with `docker buildx imagetools inspect eclipse-temurin:<version>-jre` (copy the index `Digest:`).
+3. The Jib base-image digest in `pom.xml` — look it up with `docker buildx imagetools inspect eclipse-temurin:<version>-jre` (the top-level index `Digest:`, whose manifests list linux/amd64 and linux/arm64), verify it with `docker buildx imagetools inspect eclipse-temurin:<version>-jre@<digest>`; never copy a digest from a plan or a chat.
 
 The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older than 3.9.
 
@@ -6259,14 +7585,20 @@ The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older 
   seed several rows to prove it).
 - Viewer-dependent endpoints get a **leak test**: as a non-owner, every owner-only field is `null`.
 - Time travel: `MutableClock` (`advance`, `set`). Codes sent by email/SMS: `RecordingEmailSender`,
-  `RecordingSmsSender`. Signed-in shortcut: `Accounts.signIn(api, email)`.
+  `RecordingSmsSender`. Signed-in shortcut: `Accounts.signIn(api, email)` (sets the `__Host-session`
+  cookie).
+- Connection hygiene: `ConnectionSampler` samples the pool while the controller starts, and
+  `StatementRecorder.autoCommits()` says which statements ran outside a transaction.
+- A deployed profile's required setting goes into `ProfileStartupTest.REQUIRED` (dummy value): the
+  test proves `staging` and `prod` start with them and refuse to start without each.
 - A new writable table goes into `TestDb.MUTABLE_TABLES`.
 
 ## Migrations and indexes
 
-- Flyway file names are timestamps: `V20261029_1430__what.sql` (never sequence numbers). Each
-  starts with a comment: what it is for, which doc owns it. Qualify tables with `scuby.` inside
-  PL/pgSQL.
+- Flyway file names are timestamps: `V20261029_1430__what.sql` (never sequence numbers) — **on
+  every branch**: a `V3__…` merged after timestamped migrations fails validation on every database
+  that already ran them. Each starts with a comment: what it is for, which doc owns it. Qualify
+  tables with `scuby.` inside PL/pgSQL.
 - **An index is earned:** only growth-sensitive queries get a plan check (`PlanAssert`, seeded
   thousands of rows). Write the failing plan check first, then the index; its migration comment
   carries the query, the plan before/after, the write cost and overlaps. Every new index is listed
@@ -6309,21 +7641,39 @@ randomness; roles by annotation; the DAG; the declared surface), PIT mutation te
 derivations (≥ 80 %), contract conformance of every response an integration test produces, leak
 tests on viewer-dependent endpoints, statement-count ceilings per request (an N+1 fails the test),
 plan checks on growth-sensitive queries only, and indexes added only with a measured plan and human
-approval. Flyway versions are timestamps so parallel branches never collide.
+approval. Flyway versions are timestamps on every branch so parallel branches never collide.
 
 ## Security
 
 One Spring Security filter chain, stateless (`platform.security`): no HTTP session, form login,
-basic auth or logout filter. Features declare their own route rules (`SecurityRules` beans);
-`identity` supplies who is signed in (`RequestAuthenticator`). `401`/`403` come in the contract's
-envelope.
+basic auth or logout filter. Features declare their own route rules (`SecurityRules` beans). The
+authentication filter is domain-free and lives in `platform`; `identity` supplies who is signed in
+through a `RequestAuthenticator` (so `platform` depends on no feature). `401`/`403`, and a `500`
+when the authenticator fails (the database is down), come in the contract's envelope through the
+same mapper as every other error.
 
 **CSRF without a token** (the client sends none): an unsafe request (`POST`/`PUT`/`PATCH`/`DELETE`)
 whose `Origin` is not an allowed client origin, or that has no `Origin` but `Sec-Fetch-Site:
-cross-site`, is `forbidden`. `SameSite=Lax` cookies are the second layer. Rejected: Spring's token
-CSRF (needs a contract change for no gain here); `SameSite` alone (a sibling subdomain is
-same-site). **CORS** allows only the client's origins (`scuby.web.allowed-origins`), with
-credentials.
+cross-site`, is `forbidden`. The check runs before CORS, so the refusal comes in the envelope; a
+cross-origin `GET` from a non-allowed origin still gets CORS's plain-text `403`. `SameSite=Lax`
+cookies are the second layer. Rejected: Spring's token CSRF (needs a contract change for no gain
+here); `SameSite` alone (a sibling subdomain is same-site). **CORS** allows only the client's
+origins (`scuby.web.allowed-origins`), with credentials.
+
+**Cookie tossing:** a sibling subdomain can set cookies for the parent domain. The session cookie is
+`__Host-session` (browsers refuse a `__Host-` cookie that names a `Domain`), and both cookie readers
+treat a name sent twice as absent. The device cookie keeps the name `device` until the client side
+agrees to `__Host-device` (proposed).
+
+**Caching:** every response carries `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`
+(Spring Security's default, kept on purpose): answers are per viewer, and a CDN must never store
+one. An endpoint that wants caching sets it explicitly and says why.
+
+**Deployed profiles are configured, never defaulted:** outside `local` and `test`, start-up is
+refused without the allowed origins, the IP-hash key, the code-hash key and the Google client ID;
+under `prod` also without the origin secret (under `staging` a missing one is a start-up warning:
+every per-IP limit would key on CloudFront's address). A start-up test keeps every deployed profile
+startable with exactly those settings.
 
 **Client IP** (a rate-limit key): `CloudFront-Viewer-Address` only when the request carries the
 origin secret header, else the socket address. IPs are stored only as an HMAC.
@@ -6334,14 +7684,16 @@ that need it, so reads never write. A table arrives with the first consumer of d
 
 ## Sessions
 
-An **opaque** 256-bit token in the `session` cookie (decision #37); the database stores only its
-SHA-256, with `expires_at` = sign-in + 12 months (absolute). **Reading a session never writes** —
-no `last_seen_at`, no sliding expiry; writes happen on sign-in, sign-out, account deletion and a
-daily purge. A bounded in-process cache (10,000 entries, 60 s) sits in front of the lookup behind
+An **opaque** 256-bit token in the `__Host-session` cookie (decision #37); the database stores only
+its SHA-256, with `expires_at` = sign-in + 12 months (absolute); the cookie's `Max-Age` is computed
+from that `expires_at`, so both end together. **Reading a session never writes** — no
+`last_seen_at`, no sliding expiry; writes happen on sign-in, sign-out, account deletion and a daily
+purge. A bounded in-process cache (10,000 entries, 60 s) sits in front of the lookup behind
 `SessionLookup`; sign-out evicts locally; size `0` disables it. **Connection hygiene:** the lookup
 runs outside any transaction and returns its connection at once; transactions live in service
-methods, never across a request — a test asserts 0 active connections after an authenticated
-request and no `INSERT`/`UPDATE` on a session read. Rejected: JWT sessions (cannot be revoked
+methods, never across a request — a test asserts the lookup ran in autocommit, the pool had 0 active
+connections when the controller started (sampled during the request, not after it), no servlet
+session was created, and a session read issues no `INSERT`/`UPDATE`. Rejected: JWT sessions (cannot be revoked
 before they expire — sign-out, account deletion, a stolen phone); a short JWT plus refresh token
 (more code and keys for nothing at one instance).
 ```
@@ -6367,20 +7719,40 @@ before they expire — sign-out, account deletion, a stolen phone); a short JWT 
 - Sessions are long-lived: an opaque token in an httpOnly cookie, stored only as its SHA-256,
   expiring 12 months after sign-in whatever the use (no sliding refresh); sign-out ends it at once.
   Mechanics: [backend.md](backend.md) · Sessions.
-- **Email code:** 6 digits, stored hashed, 5-minute expiry, 3 attempts, 60 s resend cooldown, at
-  most 10 sends per address per day; the address is trimmed and lower-cased; starting a sign-in
-  always answers the same (it never reveals whether an account exists). The account is named from
-  the address («juan.perez@…» → «Juan Perez») until the person edits it.
+- **Email code:** 6 digits, stored as a keyed hash, 5-minute expiry, 3 attempts, a 60 s resend
+  cooldown while the current code is live and unused (a used or burned code never blocks a new
+  one), at most 10 sends per address per day, and at most 10 per device and 20 per IP over a rolling
+  24 h (those two answer "too many requests"); the address is trimmed and lower-cased; otherwise
+  starting a sign-in always answers the same (it never reveals whether an account exists). The
+  account is named from the address («juan.perez@…» → «Juan Perez») until the person edits it.
 - **Google:** the client sends Google's ID token; the server verifies the signature against
-  Google's keys, the audience (our client ID), the issuer and the expiry, requires a verified
-  email, keys the account on Google's `sub`, and links a first Google sign-in to the account with
-  the same email. No redirect flow, no client secret.
+  Google's keys, the audience (our client ID), the issuer, the expiry and issue time, requires a
+  verified email, keys the account on Google's `sub`, and links a first Google sign-in to the
+  account with the same email only if that account has no Google identity yet. No redirect flow, no
+  client secret.
 - **Until the providers exist** ([O23](../open-items.md)), local, test and staging write email and
-  SMS codes to the log. For e2e runs, addresses on a test domain and numbers in a reserved range
-  accept a fixed code; configuring either under the production profile stops the server at start-up.
+  SMS codes to the log; production starts but refuses every send. For e2e runs, addresses on a test
+  domain and numbers in a reserved range accept a fixed code and skip the cooldowns and every send
+  limit; configuring either under the production profile stops the server at start-up.
 ```
 
-(b) In `### OTP mechanics`, replace `per-device and per-IP throttles (same rate-limit machinery the flows already use)` with `per-device (10 per day) and per-IP (20 per day) throttles over rolling 24 h; a repeat inside the cooldown answers as if sent, without sending`.
+(b) In `### OTP mechanics`, the bullet that starts `- Resend cooldown 60 s; max 4 sends per number per day;` wraps over two lines. Replace these two lines exactly:
+
+```markdown
+- Resend cooldown 60 s; max 4 sends per number per day; per-device and per-IP throttles (same
+  rate-limit machinery the flows already use)
+```
+
+with:
+
+```markdown
+- Resend cooldown 60 s; max 4 sends per number per day; per-device (10 per day) and per-IP (20 per
+  day) throttles over rolling 24 h; a repeat inside the cooldown answers as if sent, without sending
+- A right code is consumed only when the action it unlocks commits (a failed publish leaves it
+  usable); a wrong one counts even when the action fails
+```
+
+Also in that checklist, in the line `- 6-digit code, stored **hashed**, 5-minute expiry, max 3 attempts, invalidated on success`, replace `stored **hashed**` with `stored as a **keyed hash** (HMAC)`.
 
 (c) After the paragraph that starts `**Behind a flag.**`, add one sentence at its end: `The flag gates the publish step only; changing the number in settings always verifies it.`
 
@@ -6395,7 +7767,7 @@ before they expire — sign-out, account deletion, a stolen phone); a short JWT 
 Append as the last row of the decision-log table (after the highest-numbered row present on this branch; #39 belongs to another branch):
 
 ```markdown
-| 40 | Backend code structure and guardrails *(2026-10-29)* | **Package by feature, flat, package-private by default**: `platform` (domain-free), foundations (`identity`, `uploads`, `pets`) that depend only on it, verticals (`cases`) that depend on foundations and never on each other; a declared cross-feature surface (`@ModuleApi`); one writing feature per table; viewer-dependent responses built as access → facts → pure derivation → record; **rules that fail the build** — ArchUnit (derivation purity, roles by annotation, the DAG, the declared surface), PIT mutation testing on derivations, contract conformance and leak tests, statement-count ceilings per request, plan checks on growth-sensitive queries, indexes only with a measured plan and human approval; timestamped Flyway versions — [eng/backend.md](../eng/backend.md) · Code structure | Package by layer (a feature's code spread over the tree, nothing stops cross-feature reach-ins); by feature with layer subpackages (a subpackage cannot see its parent's package-private classes, so everything turns public); hexagonal ports and adapters (a port per table for two engineers — ceremony without a second adapter); Spring Modulith (its checks are what ArchUnit gives here, plus an event-publication registry we do not need beside the outbox); conventions in a README instead of build rules (AI agents write most of the code and human review time is the scarce resource) |
+| 40 | Backend code structure and guardrails *(2026-10-29)* | **Package by feature, flat, package-private by default**: `platform` (domain-free), foundations (`identity`, `uploads`, `pets`) that depend only on it, verticals (`cases`) that depend on foundations and never on each other; a declared cross-feature surface (`@ModuleApi`); one writing feature per table; viewer-dependent responses built as access → facts → pure derivation → record; **rules that fail the build** — ArchUnit (derivation purity, roles by annotation, the DAG, the declared surface), PIT mutation testing on derivations, contract conformance and leak tests, statement-count ceilings per request, plan checks on growth-sensitive queries, indexes only with a measured plan and human approval; timestamped Flyway versions on every branch. Security wiring follows the same DAG: the authentication filter is domain-free in `platform` and `identity` supplies the authenticator; CSRF is an `Origin`/`Sec-Fetch-Site` check (the client sends no token) plus a `__Host-` session cookie against cookie tossing — [eng/backend.md](../eng/backend.md) · Code structure, Security | Package by layer (a feature's code spread over the tree, nothing stops cross-feature reach-ins); by feature with layer subpackages (a subpackage cannot see its parent's package-private classes, so everything turns public); hexagonal ports and adapters (a port per table for two engineers — ceremony without a second adapter); Spring Modulith (its checks are what ArchUnit gives here, plus an event-publication registry we do not need beside the outbox); conventions in a README instead of build rules (AI agents write most of the code and human review time is the scarce resource); the session filter owned by `identity` (`platform`'s security chain would depend on a feature); Spring's CSRF token (a contract change — token endpoint and header — for no protection the Origin check lacks here) |
 ```
 
 - [ ] **Step 6: README structure section**
@@ -6405,7 +7777,7 @@ In `B/README.md`, replace the `## Estructura` code block with:
 ```
 src/main/java/co/scuby/
 ├── platform/    técnico, sin dominio: roles, web (sobre de errores), db (PostGIS), security, flags, time
-├── identity/    cuentas, sesiones, cookie de dispositivo, código por correo, Google, OTP por SMS, GET /config
+├── identity/    cuentas, sesiones, cookie de dispositivo, código por correo, Google, OTP por SMS, GET /config, GET /me/profile
 src/test/java/co/scuby/support/     arnés de pruebas: ApiClient (contrato + techo de sentencias), TestDb, MutableClock
 src/test/java/co/scuby/architecture/ reglas de ArchUnit que fallan el build
 ```
@@ -6413,7 +7785,7 @@ src/test/java/co/scuby/architecture/ reglas de ArchUnit que fallan el build
 - [ ] **Step 7: Final verification**
 
 Run: `[mvn] verify`
-Expected: `BUILD SUCCESS`; tests all green; PIT ≥ 80 % on `PhoneStepDerivation`.
+Expected: `BUILD SUCCESS`; tests all green (including `ProfileStartupTest`: `staging` and `prod` start with their required settings); PIT ≥ 80 % on `PhoneStepDerivation`.
 
 Run: `git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-thin-slice status --short`
 Expected: only the doc files of this task modified/added.
@@ -6428,12 +7800,22 @@ git commit -m "doc: backend code structure, security and sessions; auth mechanic
 
 - [ ] **Step 9: Finish the report**
 
-Append to the report a final section: the commit list (`git log --oneline origin/main..HEAD`), every measured statement count vs. ceiling, PIT score, **Indexes for human approval** (expected: `sms_send_sent_at_idx`), deviations from this plan, and open questions. Do not commit the report.
+Append to the report a final section with:
+- the commit list (`git log --oneline origin/main..HEAD`), every measured statement count vs. ceiling, the PIT score, the Jib base digest recorded in Task 13;
+- **Indexes for human approval** (expected: `code_send_channel_sent_at_idx`);
+- **Settings infra must provide** for `staging` and `prod` (plan A2 adds the media ones): `SCUBY_WEB_ALLOWED_ORIGINS` (the web client's origins, comma-separated), `SCUBY_WEB_ORIGIN_SECRET` (the value CloudFront sends in `X-Origin-Secret`; required in prod, warned about in staging), `SCUBY_WEB_IP_HASH_KEY`, `SCUBY_AUTH_CODE_HASH_KEY` (random secrets, ≥ 32 characters), `SCUBY_AUTH_GOOGLE_CLIENT_ID` (the web client's Google OAuth client ID);
+- **Proposed to the client side** (contract/docs changes, never made here): rename the device cookie `device` → `__Host-device` (`docs/eng/api.md` · Device identity, decision #35) — until then a sibling subdomain can plant a device value; list `403 forbidden` on the unsafe endpoints whose contract lists none (`POST /auth/email/start`, `/auth/email/verify`, `/auth/google`, `/auth/sign-out` — the Origin check answers it);
+- **For the human to pass on:** branches `be/observability` and `infra/b1-sandbox` must name Flyway migrations with timestamps too (Global Constraints);
+- deviations from this plan, and open questions.
+
+Do not commit the report.
 
 ---
 
 ## Self-review notes (for the plan's reader)
 
-- Spec coverage (design → task): dependencies up front (1); guardrails 1–5 (3; 6 = harness 2 + every endpoint test; 7 = A2); timestamped Flyway (from 4); flags of decision #18 with both flags (4); `supported_countries` + `GET /config` (5); device cookie (6); sessions, Spring Security filter by identity, per-feature `SecurityRules`, CSRF/CORS, envelope 401/403, connection hygiene (1, 6, 7); email code + test-domain bypass refused in prod (8); Google ID token with NimbusJwtDecoder, local keys (9); phone OTP + `/me/phone(/verify)` + libphonenumber + country pattern (10); the publish phone step for A2 (11); local Docker run, Java version single source (1, 12); `backend/CLAUDE.md` + owning docs + decision #40 (13).
-- Not in this plan: telemetry/OpenTelemetry (branch `be/observability`; expect a merge in `pom.xml` and `application.yml` — this plan's additions are grouped in one block per file); uploads, pets, lost cases, feed, sightings, place names (plan A2); real email/SMS providers (O23); notifications and check-ins (design: not in this slice).
-- Handoff: when `infra/b1-sandbox` merges, its image build should use this branch's pinned Jib base image (`eclipse-temurin:${java.version}-jre@sha256:…`).
+- Spec coverage (design → task): dependencies up front (1); guardrails 1–5 (3; 6 = harness 2 + every endpoint test; 7 = A2); timestamped Flyway on every branch (from 4; rule in Global Constraints and `backend/CLAUDE.md`); flags of decision #18 with both flags (4); `supported_countries` + `GET /config` (5); device cookie (6); sessions, the authentication filter in `platform` with identity's `RequestAuthenticator`, per-feature `SecurityRules`, CSRF by Origin check before CORS, `__Host-session`, CORS, envelope 401/403/500, connection hygiene sampled during the request (1, 6, 7); deployed profiles refusing missing settings, proven by `ProfileStartupTest` (1, 6, 8, 9); email code with live-code cooldown, device/IP caps, HMAC'd codes, test-domain bypass skipping every limit and refused in prod (8); Google ID token with NimbusJwtDecoder, exp/iat required, link only when unlinked, local keys (9); phone OTP + `/me/phone(/verify)` + libphonenumber + country pattern, code consumed only when the caller commits (10); the publish phone step for A2 (11); `GET /me/profile` (12, design · Scope); Java version single source with a digest verified at execution time (13); local Docker run as a per-checkout compose project (14); `backend/CLAUDE.md` + owning docs + decision #40 (15).
+- Sanctioned departures from the design's first draft (filter location, CSRF mechanism) are stated in the design's § Identity and in Global Constraints; they do not trigger the "design wins" stop.
+- Endpoints in A1: `GET /config`, `GET /session`, `POST /auth/email/start`, `POST /auth/email/verify`, `POST /auth/google`, `POST /auth/sign-out`, `POST /me/phone`, `POST /me/phone/verify`, `GET /me/profile` — 9 of the slice's 15 (A2 adds the other 6, `GET /me/cases` among them).
+- Not in this plan: telemetry/OpenTelemetry (branch `be/observability`; expect a merge in `pom.xml` and `application.yml` — this plan's additions are grouped in one block per file); uploads, pets, lost cases, feed, sightings, `/me/cases`, place names (plan A2); real email/SMS providers (O23); notifications and check-ins (design: not in this slice); `PATCH /me/profile`.
+- Handoff: when `infra/b1-sandbox` merges, its image build should use this branch's pinned Jib base image (`eclipse-temurin:${java.version}-jre@sha256:…`) and its compose commands need a project name (Task 14).

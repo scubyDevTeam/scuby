@@ -1,7 +1,7 @@
 # Backend Thin Slice — Design
 
 > Design for the backend's first slice (phase S of [backend-plan.md](../../eng/backend-plan.md)):
-> sign in, publish a lost case, view it, report a sighting — 13 endpoints of the contract. Decided
+> sign in, publish a lost case, view it, report a sighting — 15 endpoints of the contract. Decided
 > 2026-10-29. The durable parts of this design land in their owning docs as part of the
 > implementation (listed at the end); this file records the whole design in one place for the plans
 > that implement it.
@@ -11,9 +11,13 @@
 | Group | Endpoints |
 |---|---|
 | Config and session | `GET /config`, `GET /session`, `POST /auth/email/start`, `POST /auth/email/verify`, `POST /auth/google`, `POST /auth/sign-out` |
-| Phone | `POST /me/phone`, `POST /me/phone/verify` |
+| Phone and profile | `POST /me/phone`, `POST /me/phone/verify`, `GET /me/profile` |
 | Photos | `POST /uploads` |
-| Lost cases | `POST /lost-cases`, `GET /cases/{code}` (lost only), `GET /feed`, `POST /cases/{code}/sightings` |
+| Lost cases | `POST /lost-cases`, `GET /cases/{code}` (lost only), `GET /feed`, `POST /cases/{code}/sightings`, `GET /me/cases` |
+
+The two reads `GET /me/profile` and `GET /me/cases` were added on 2026-10-29: the client's sign-in and
+publish e2e specs open the profile page and «Mis casos», so the "done when" below cannot pass
+without them; both read data the slice already creates.
 
 Behaviour is fixed by the contract (`docs/eng/openapi.json`, `docs/eng/api.md`), by the client's
 emulated backend (`web/src/mocks/`, whose scenarios in `web/src/mocks/backend.test.ts` are the
@@ -22,7 +26,9 @@ acceptance tests to port) and by the product docs (`docs/eng/auth.md`,
 
 **Done when:** the client, built with `VITE_API_MOCK=false` against a backend running these
 endpoints, passes its sign-in, publish-lost and lost-case e2e specs; every response validates
-against the contract.
+against the contract. Expected failures, documented and out of this slice: the specs that sign in
+with Google (`@AUTH-002`, `@PLOST-002`, `@PLOST-004` — Google in e2e needs a real credential) and
+`@LINK-001` (needs `/me/pets`, reopening, editing and claims — the next phase).
 
 ## How the code is written: AI agents write, humans review
 
@@ -99,11 +105,20 @@ in `platform.web`.
 
 ## Identity
 
-- **Spring Security 7** with a custom authentication filter owned by `identity`: it reads the
-  session cookie, resolves the account and puts it in the security context. Route rules come from
-  each feature's own `SecurityRules` bean (no central file every feature edits). CSRF, CORS and
-  security headers from Spring Security. `401`/`403` from Spring Security's entry points go through
-  the same error-envelope mapper as everything else.
+- **Spring Security 7** with a custom authentication filter. The filter mechanism is domain-free and
+  lives in `platform.security`; `identity` supplies a `RequestAuthenticator` (an interface
+  `platform` defines) that reads the session cookie and resolves the account, and the filter puts
+  it in the security context. Why not a filter owned by `identity`: `platform`'s security chain
+  would then depend on a feature, breaking the DAG below. Route rules come from each feature's own
+  `SecurityRules` bean (no central file every feature edits). CORS and security headers from Spring
+  Security. **CSRF is an `Origin` / `Sec-Fetch-Site` check** on unsafe methods (refused unless the
+  `Origin` is an allowed client origin; with no `Origin`, refused when `Sec-Fetch-Site:
+  cross-site`), running before CORS, instead of Spring's CSRF token: the client sends no CSRF token
+  (adding one is a contract change), and for an API on a same-site subdomain the origin check is the
+  defence that works. Because a sibling subdomain can still *set* cookies for the parent domain
+  ("cookie tossing"), the session cookie is `__Host-session` and a cookie name sent twice is treated
+  as absent. `401`/`403` from Spring Security's entry points and filters go through the same
+  error-envelope mapper as everything else.
 - **Sessions** (decision #37: httpOnly cookie on the API's same-site subdomain): an **opaque**
   256-bit random token; the database stores only its SHA-256, with `expires_at = created + 12
   months`. **Reading a session never writes**: no `last_seen_at`, no sliding expiry. Writes happen
@@ -114,8 +129,9 @@ in `platform.web`.
   token (more code and keys for a gain we do not need at one instance).
 - **Connection hygiene:** the filter's lookup runs outside any transaction (autocommit) and returns
   its connection at once; transactions live in service methods, never across a whole request.
-  Tested: after an authenticated request the pool has 0 active connections, and a session read
-  issues no `INSERT`/`UPDATE`.
+  Tested: while the controller of an authenticated request runs, the pool has 0 active connections
+  (sampled during the request — after it, every connection is back anyway), the lookup ran in
+  autocommit, and a session read issues no `INSERT`/`UPDATE`.
 - **Device cookie** (decision #35): opaque, only its hash stored; the row is created once; renewing
   the cookie's lifetime is a `Set-Cookie` header, not a database write.
 - **Google:** the client sends Google's **ID token** (`POST /auth/google {credential}`); the backend
@@ -125,7 +141,9 @@ in `platform.web`.
 - **Email code and SMS OTP:** behind `EmailSender` and `SmsSender`. In `local`, `test` and `staging`
   the senders write the code to the log. For e2e runs, a **fixed code for addresses on a test
   domain** (configurable, e.g. `*@e2e.scuby.test`) can be enabled — **refused at start-up in
-  `prod`**. Real providers come with the domain (email leaning SES — open item O23).
+  `prod`**. Bypassed addresses and numbers skip the resend cooldown and every send limit (e2e
+  specs sign the same address in several times a minute). Real providers come with the domain
+  (email leaning SES — open item O23).
 
 ## Guardrails that fail the build
 
@@ -176,7 +194,7 @@ proposed to the client side (list at the end of this section), never made unilat
 | `seen_at` in the future | Tolerate **5 minutes** of device clock drift; beyond that `seen_at_in_future` (`product/04` is corrected to say so) |
 | Email code | 6 digits, stored hashed, 5-minute expiry, 3 attempts, 60 s cooldown, 10 per address per day; address normalised (trim, lower-case); always 204 |
 | Google | Require `email_verified`; identity key = Google `sub`; link to an existing account by verified email |
-| Test bypasses (never prod) | Fixed email code for a test domain (e.g. `*@e2e.scuby.test`); fixed SMS code for a reserved test number range (e.g. `+57 300 000 00xx`); `publisher_phone_otp` off per test account. Enabling a bypass under the `prod` profile fails start-up |
+| Test bypasses (never prod) | Fixed email code for a test domain (e.g. `*@e2e.scuby.test`); fixed SMS code for a reserved test number range (e.g. `+57 300 000 00xx`); bypassed addresses and numbers skip the cooldown and every send limit and always get a fresh code row; `publisher_phone_otp` off per test account. Enabling a bypass under the `prod` profile fails start-up |
 | Place names | `PlaceNamer` interface; computed once at publish (and on location edit), stored on the case. Behind a new flag **`reverse_geocoding`, default off** → `place_name` is a generic localized label («Zona marcada en el mapa»). A **spike** compares Amazon Location (stored results ≈ $4 per 1,000), Nominatim and PostGIS with open barrio polygons on ~15 Colombian points (Laureles vs Belén, Chapinero, a small municipality, a rural point) before the flag is turned on — previews and posters show the **barrio** (`product/10`) |
 | Feature flags | The flag system of decision #18 (tables, change history, registry, one evaluation function) is built in this slice: `publisher_phone_otp` and `reverse_geocoding` need it |
 | Case codes | Case-insensitive lookup; the purged-code table exists (empty) so `gone` works |
@@ -186,7 +204,7 @@ proposed to the client side (list at the end of this section), never made unilat
 - **Plan checks only where a query can degrade as a table grows:** the feed, a case's sightings, the rate-limit counts, the `active_case_exists` check. Those get an integration test with seeded volume (thousands of rows) asserting the expected plan (index used, no sequential scan on the large table). Primary-key/unique lookups, single-row writes and small static tables are exempt.
 - **An index is earned, not assumed:** measure first; a proposed index carries, in its migration comment and the task report, the query it serves, the plan before and after, its write cost on that table and any overlap with existing indexes. **Every new index needs human approval** before the branch merges; the final report lists them.
 
-**Proposed to the client side (contract/docs changes):** feed paging; `phone_step: unverified` (O24); feed parameters missing from `openapi.json`; the 5-minute tolerance in `product/04`; nearest-first wording made consistent across contract and docs.
+**Proposed to the client side (contract/docs changes):** feed paging; `phone_step: unverified` (O24); feed parameters missing from `openapi.json`; the 5-minute tolerance in `product/04`; nearest-first wording made consistent across contract and docs; **the feed point** — the client sends no `lat`/`lng` today, so every visitor gets the national feed until it sends the device position (or the country's `default_center` from `/config`); the server's nearest-first branch is built and tested, and its spatial index waits for that change; the device cookie renamed `__Host-device` (cookie tossing).
 
 ## Human review focus
 
