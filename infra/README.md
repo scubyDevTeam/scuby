@@ -29,21 +29,28 @@ infra/
 
 ## Correr el sandbox
 
-Todo con `AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1`. Los comandos largos corren en segundo
-plano (con `nohup`), nunca en primer plano: si se interrumpe la espera de CloudFront, quedan
-recursos fuera del estado de Terraform.
+**Dónde clonar.** El watchdog corre bajo launchd, y macOS (TCC) no deja que un proceso de launchd
+lea `~/Desktop`, `~/Documents` ni `~/Downloads`. El sandbox se corre desde un clon o worktree fuera
+de esas carpetas (p. ej. `~/scuby-b1-run`), y el estado de Terraform vive en ese clon. Todos los
+comandos de abajo, desde la raíz de ese clon.
 
 Los scripts guardan sus archivos de trabajo (`sso-login`, `watchdog.log`, `watchdog.fired`) en un
 directorio fijo, y hoy lo tienen escrito a mano (pendiente: hacerlo configurable). Los ejemplos
-de abajo lo llaman `SCRATCH`:
+de abajo lo llaman `SCRATCH`; `/private/tmp` se vacía al reiniciar, de ahí el `mkdir`:
 
 ```bash
+export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
 SCRATCH=/private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad
+mkdir -p "$SCRATCH"
 ```
 
-**Dónde clonar.** El watchdog corre bajo launchd, y macOS (TCC) no deja que un proceso de launchd
-lea `~/Desktop`, `~/Documents` ni `~/Downloads`. El sandbox se corre desde un clon o worktree fuera
-de esas carpetas (p. ej. `~/scuby-b1-run`), y el estado de Terraform vive en ese clon.
+Los comandos largos (apply, deploy, smoke, destroy) corren en segundo plano con `nohup`, cada uno
+con su `.log` y su `.exit`: si se interrumpe la espera de CloudFront, quedan recursos fuera del
+estado de Terraform. Por ejemplo:
+
+```bash
+nohup bash infra/scripts/sandbox-deploy.sh > "$SCRATCH/deploy.log" 2>&1; echo $? > "$SCRATCH/deploy.exit"
+```
 
 Orden:
 
@@ -59,14 +66,16 @@ Orden:
    launchctl submit -l co.scuby.watchdog -o "$SCRATCH/watchdog.log" -e "$SCRATCH/watchdog.log" -- /usr/bin/caffeinate -dims /bin/bash "$PWD/infra/scripts/sandbox-watchdog.sh" "$deadline"
    ```
 
-   El log queda en `$SCRATCH/watchdog.log`. Antes de aplicar debe mostrar las rutas de `terraform`
-   y `aws` (no `MISSING`).
-4. `terraform -chdir=infra/terraform/envs/sandbox apply`
-5. `infra/scripts/sandbox-deploy.sh`
+   No se aplica sin watchdog vivo: `launchctl list | grep co.scuby.watchdog` debe mostrar un PID,
+   y `$SCRATCH/watchdog.log` debe mostrar las rutas de `terraform` y `aws` (no `MISSING`).
+4. `nohup terraform -chdir=infra/terraform/envs/sandbox apply -auto-approve -input=false > "$SCRATCH/apply.log" 2>&1; echo $? > "$SCRATCH/apply.exit"`
+5. `bash infra/scripts/sandbox-deploy.sh`, en segundo plano como el ejemplo de arriba.
 6. Mínimo **90 min** de SSO restantes (`sso-remaining.sh`); si no, saltar al destroy.
-   Luego `infra/scripts/sandbox-smoke.sh`
-7. **Siempre, al final:** `infra/scripts/sandbox-destroy.sh`, aunque el apply, el deploy o el smoke
-   hayan fallado.
+   Luego `bash infra/scripts/sandbox-smoke.sh`, en segundo plano.
+7. **Siempre, al final:** `bash infra/scripts/sandbox-destroy.sh`, en segundo plano, aunque el
+   apply, el deploy o el smoke hayan fallado. Justo después del destroy, el sweep puede listar la
+   instancia terminada, sus volúmenes o reglas de security group ya borrados: la API de etiquetas
+   tarda en enterarse. Esperar unos minutos y volver a correr `bash infra/scripts/sweep.sh`.
 
 El watchdog quita su propio job de launchd cuando dispara. Si la corrida termina con normalidad,
 se detiene con `launchctl remove co.scuby.watchdog`.
@@ -79,8 +88,8 @@ se detiene con `launchctl remove co.scuby.watchdog`.
   cuenta, salvo que el estado de Terraform esté vacío. Es la red de seguridad si la corrida se corta.
 
 `infra/scripts/sweep.sh` comprueba, después de destruir, que no quede nada de Scuby (por etiqueta
-`Project=scuby` y por prefijo de nombre `scuby-`, `/scuby/` o `/scuby`) y que la VPC por defecto y el
-bucket ajenos sigan ahí. Imprime `sweep: clean` y sale con 0 si todo está bien; sale con 1 si queda
+`Project=scuby` y por prefijo de nombre `scuby…`, `/scuby/` o `/aws/lambda/scuby-`) y que los
+recursos ajenos (la VPC por defecto y el bucket) sigan ahí. Imprime `sweep: clean` y sale con 0 si todo está bien; sale con 1 si queda
 algo o si una comprobación falla, y con 2 si las credenciales no sirven.
 
 ## No tocar
