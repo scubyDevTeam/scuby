@@ -43,8 +43,9 @@ src/main/java/co/scuby/
 src/test/java/co/scuby/contract/ContractValidator   Valida respuestas contra docs/eng/openapi.json
 ```
 
-Convención de paquetes: el código del API va en `..api..` y el del trabajo de fondo en `..worker..`;
-una prueba de ArchUnit las mantiene separadas.
+Convención de paquetes: por funcionalidad y plano (`platform`, `identity`, `uploads`, `pets`, `cases`);
+las reglas de dependencia, roles y pureza las comprueba `ArchitectureTest` (ArchUnit) y fallan el
+build. Instrucciones para agentes: [`CLAUDE.md`](CLAUDE.md).
 
 ## Más
 

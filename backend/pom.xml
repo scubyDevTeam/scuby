@@ -236,6 +236,34 @@
           <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
       </plugin>
+      <!-- thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md): mutation testing on derivations -->
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <version>${pitest.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-junit5-plugin</artifactId>
+            <version>${pitest-junit5.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <targetClasses><param>co.scuby.*Derivation*</param></targetClasses>
+          <targetTests><param>co.scuby.*DerivationTest</param></targetTests>
+          <mutationThreshold>80</mutationThreshold>
+          <failWhenNoMutations>false</failWhenNoMutations>
+          <timestampedReports>false</timestampedReports>
+          <outputFormats><param>HTML</param><param>XML</param></outputFormats>
+        </configuration>
+        <executions>
+          <execution>
+            <id>mutation-test-derivations</id>
+            <phase>verify</phase>
+            <goals><goal>mutationCoverage</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>com.google.cloud.tools</groupId>
         <artifactId>jib-maven-plugin</artifactId>
