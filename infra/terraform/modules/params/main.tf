@@ -2,8 +2,8 @@
 # person, or the deploy script in the sandbox). The placeholder is write-only, so Terraform keeps
 # neither it nor the real value in the state (docs/eng/infra.md · Secrets).
 #
-# DO NOT bump value_wo_version, rename a parameter or remove one from secret_names on a live
-# environment: each makes the next apply write "placeholder" over the real value.
+# On a live environment: bumping value_wo_version makes the next apply write "placeholder" over
+# the real value; renaming or removing an entry in secret_names deletes that parameter, value included.
 variable "prefix" { type = string }
 variable "secret_names" { type = list(string) }
 
