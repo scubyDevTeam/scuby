@@ -61,8 +61,6 @@ public class SecurityConfiguration {
     CorsConfigurationSource corsConfigurationSource(WebProperties web, Environment env) {
         Prod.requireDeployed(env, !web.allowedOrigins().isEmpty(),
                 "scuby.web.allowed-origins (env SCUBY_WEB_ALLOWED_ORIGINS: the web client's origins, comma-separated)");
-        Prod.refuse(env, web.originSecret().isBlank(),
-                "scuby.web.origin-secret is blank (env SCUBY_WEB_ORIGIN_SECRET: CloudFront's origin secret)");
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(web.allowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

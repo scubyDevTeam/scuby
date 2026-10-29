@@ -26,5 +26,7 @@ scuby:
     origin-secret-header: X-Origin-Secret
     origin-secret: ""
     ip-hash-key: local-only-ip-hash-key
+  cookies:
+    secure: true
   flags:
     cache-ttl: 30s

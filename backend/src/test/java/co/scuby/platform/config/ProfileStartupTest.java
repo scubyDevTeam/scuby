@@ -26,10 +26,12 @@ class ProfileStartupTest {
     /** Every property a deployed profile requires. A task that adds a required property adds it here. */
     static final Map<String, Map<String, String>> REQUIRED = Map.of(
             "staging", Map.of(
-                    "scuby.web.allowed-origins", "https://staging.scuby.test"),
+                    "scuby.web.allowed-origins", "https://staging.scuby.test",
+                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef"),
             "prod", Map.of(
                     "scuby.web.allowed-origins", "https://scuby.test",
-                    "scuby.web.origin-secret", "dummy-origin-secret"));
+                    "scuby.web.origin-secret", "dummy-origin-secret",
+                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef"));
 
     @ParameterizedTest
     @ValueSource(strings = {"staging", "prod"})
