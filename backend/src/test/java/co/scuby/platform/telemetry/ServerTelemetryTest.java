@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.logging.LoggingInitializationContext;
 import org.springframework.boot.logging.LoggingSystem;
+import org.springframework.boot.logging.LoggingSystemProperty;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -57,8 +58,8 @@ class ServerTelemetryTest {
         LoggingSystem logging = LoggingSystem.get(ServerTelemetryTest.class.getClassLoader());
         logging.cleanUp();
         // Boot publishes these as JVM system properties when the staging context starts, and a later initialisation reads them back.
-        System.clearProperty("CONSOLE_LOG_STRUCTURED_FORMAT");
-        System.clearProperty("CONSOLE_LOG_THRESHOLD");
+        System.clearProperty(LoggingSystemProperty.CONSOLE_STRUCTURED_FORMAT.getEnvironmentVariableName());
+        System.clearProperty(LoggingSystemProperty.CONSOLE_THRESHOLD.getEnvironmentVariableName());
         logging.beforeInitialize();
         logging.initialize(new LoggingInitializationContext(new StandardEnvironment()), null, null);
     }
@@ -70,6 +71,8 @@ class ServerTelemetryTest {
         assertThat(env.getProperty("management.opentelemetry.tracing.export.otlp.endpoint")).isEqualTo("https://otlp.nr-data.net:4318/v1/traces");
         assertThat(env.getProperty("management.opentelemetry.logging.export.otlp.endpoint")).isEqualTo("https://otlp.nr-data.net:4318/v1/logs");
         assertThat(env.getProperty("management.opentelemetry.tracing.export.otlp.headers.api-key")).isEqualTo("test-not-a-key");
+        assertThat(env.getProperty("management.opentelemetry.logging.export.otlp.headers.api-key")).isEqualTo("test-not-a-key");
+        assertThat(env.getProperty("management.otlp.metrics.export.headers.api-key")).isEqualTo("test-not-a-key");
     }
 
     @Test
