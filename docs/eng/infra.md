@@ -130,13 +130,12 @@ arrives with the backend's upload slots, which know each photo's purpose.
 - One parameter per value — not one JSON blob — so a value changes alone, permissions and history
   are per value, and no size limit is hit. Standard parameters are free.
 - **Never in the image, never at build time.** The same image runs in every environment.
-- **Terraform creates each parameter with a placeholder and ignores later value changes**
-  (`lifecycle { ignore_changes = [value] }`); a person sets the real value through the CLI or
-  console. **Today that is not enough:** `ignore_changes` only hides the diff, and every refresh
-  still reads the decrypted value into the state, which stores it in plain text. In the sandbox the
-  state is local and git-ignored, so it holds only the database password. Before staging, whose
-  state lives in S3, either Terraform stops owning the values (the CLI creates them, Terraform only
-  grants IAM on the prefix) or the parameters use write-only values.
+- **Terraform creates each parameter with a write-only placeholder** (`value_wo`); a person sets the
+  real value through the CLI or console. Terraform state stores values in plain text, so no value
+  may live there: a write-only argument is sent to AWS but never stored, and a refresh leaves the
+  state's `value` empty even after the real value is set (verified 2026-10-29). Not
+  `ignore_changes = [value]`: that only hides the diff, and every refresh would read the decrypted
+  value back into the state.
 - **Sandbox exceptions:** the deploy script generates the database password and the instance passes
   it to the containers through a `.env` file; nothing is imported from the prefix at start-up yet.
 
@@ -153,7 +152,6 @@ arrives with the backend's upload slots, which know each photo's purpose.
 What the sandbox proved but staging must not inherit as it is. Where a module has a safe default
 (keep data, 14-day logs), the sandbox opts into the throwaway setting; staging must not copy it.
 
-- **Secrets out of the state** — *Secrets* above.
 - **Data that deletes itself:** the media and registry modules default to keeping data
   (`force_destroy` / `force_delete` = `false`); only the sandbox opts into deleting it. The bucket
   holds the only copy of every master photo, so staging adds `prevent_destroy` on the bucket and
