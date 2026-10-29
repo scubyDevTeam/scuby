@@ -22,6 +22,7 @@ module "registry" {
   source       = "../../modules/registry"
   name         = local.name
   repositories = ["backend", "postgres"]
+  force_delete = true # sandbox is throwaway
 }
 
 module "queues" {
@@ -55,6 +56,8 @@ module "media" {
   lambda_zip    = "${path.root}/../../../lambda/media/dist/media-lambdas.zip"
   # Sandbox: any origin may PUT with a presigned URL. Staging restricts this to the app's origin.
   cors_allowed_origins = ["*"]
+  force_destroy        = true # sandbox is throwaway
+  log_retention_days   = 1
 }
 
 resource "random_password" "origin_secret" {

@@ -1,11 +1,16 @@
 variable "name" { type = string }
 variable "repositories" { type = list(string) }
+variable "force_delete" {
+  description = "Let terraform destroy delete repositories that still hold images. Throwaway environments only."
+  type        = bool
+  default     = false
+}
 
 resource "aws_ecr_repository" "this" {
   for_each             = toset(var.repositories)
   name                 = "${var.name}-${each.key}"
   image_tag_mutability = "MUTABLE"
-  force_delete         = true
+  force_delete         = var.force_delete
 }
 
 resource "aws_ecr_lifecycle_policy" "keep_recent" {

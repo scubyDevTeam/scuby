@@ -2,6 +2,16 @@ variable "name" { type = string }
 variable "bucket_suffix" { type = string }
 variable "lambda_zip" { type = string }
 variable "cors_allowed_origins" { type = list(string) }
+variable "force_destroy" {
+  description = "Let terraform destroy delete the bucket with its objects. Throwaway environments only: the bucket holds the only copy of every master photo."
+  type        = bool
+  default     = false
+}
+variable "log_retention_days" {
+  description = "Retention of the two Lambda CloudWatch log groups."
+  type        = number
+  default     = 14
+}
 
 data "aws_cloudfront_response_headers_policy" "simple_cors" { name = "Managed-SimpleCORS" }
 
@@ -9,7 +19,7 @@ data "aws_cloudfront_response_headers_policy" "simple_cors" { name = "Managed-Si
 
 resource "aws_s3_bucket" "media" {
   bucket        = "${var.name}-media-${var.bucket_suffix}"
-  force_destroy = true
+  force_destroy = var.force_destroy
 }
 
 resource "aws_s3_bucket_public_access_block" "media" {
@@ -78,12 +88,12 @@ resource "aws_iam_role" "transform" {
 
 resource "aws_cloudwatch_log_group" "ingest" {
   name              = "/aws/lambda/${var.name}-ingest"
-  retention_in_days = 1
+  retention_in_days = var.log_retention_days
 }
 
 resource "aws_cloudwatch_log_group" "transform" {
   name              = "/aws/lambda/${var.name}-transform"
-  retention_in_days = 1
+  retention_in_days = var.log_retention_days
 }
 
 data "aws_iam_policy_document" "ingest" {

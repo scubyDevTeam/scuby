@@ -6,6 +6,7 @@ variable "env" {
 variable "log_retention_days" {
   description = "Retention of the backend CloudWatch log group."
   type        = number
+  default     = 14
 }
 variable "vpc_id" { type = string }
 variable "subnet_id" { type = string }
