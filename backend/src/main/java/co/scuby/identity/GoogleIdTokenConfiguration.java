@@ -14,6 +14,7 @@ import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Clock;
@@ -26,6 +27,7 @@ import java.util.Set;
 @Configuration(proxyBeanMethods = false)
 class GoogleIdTokenConfiguration {
 
+    private static final long SKEW_SECONDS = 60;
     static final String DEFAULT_CLIENT_ID = "local-google-client-id";
     private static final Set<String> ISSUERS = Set.of("https://accounts.google.com", "accounts.google.com");
 
@@ -40,23 +42,29 @@ class GoogleIdTokenConfiguration {
         SimpleClientHttpRequestFactory http = new SimpleClientHttpRequestFactory();
         http.setConnectTimeout(Duration.ofSeconds(2));
         http.setReadTimeout(Duration.ofSeconds(3));
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(google.jwkSetUri())
+        return decoder(google.jwkSetUri(), new RestTemplate(http), google.clientId(), clock);
+    }
+
+    /** The one decoder recipe (RS256 only, our validators); tests reuse it with their own key fetcher. */
+    static NimbusJwtDecoder decoder(String jwkSetUri, RestOperations rest, String clientId, Clock clock) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
                                                    .jwsAlgorithm(SignatureAlgorithm.RS256)
-                                                   .restOperations(new RestTemplate(http))
+                                                   .restOperations(rest)
                                                    .build();
-        decoder.setJwtValidator(validator(google.clientId(), clock));
+        decoder.setJwtValidator(validator(clientId, clock));
         return decoder;
     }
 
     /**
-     * Expiry (60 s skew) on our clock, `exp` and `iat` present (JwtTimestampValidator skips an absent
-     * one), Google as issuer, our client ID in the audience.
+     * Expiry (60 s skew) on our clock, `exp` present and `iat` present and not in the future beyond the skew
+     * (JwtTimestampValidator skips an absent one), Google as issuer, our client ID in the audience.
      */
     static OAuth2TokenValidator<Jwt> validator(String clientId, Clock clock) {
-        JwtTimestampValidator time = new JwtTimestampValidator(Duration.ofSeconds(60));
+        JwtTimestampValidator time = new JwtTimestampValidator(Duration.ofSeconds(SKEW_SECONDS));
         time.setClock(clock);
         OAuth2TokenValidator<Jwt> hasExpiry = new JwtClaimValidator<Instant>(JwtClaimNames.EXP, Objects::nonNull);
-        OAuth2TokenValidator<Jwt> hasIssuedAt = new JwtClaimValidator<Instant>(JwtClaimNames.IAT, Objects::nonNull);
+        OAuth2TokenValidator<Jwt> hasIssuedAt = new JwtClaimValidator<Instant>(JwtClaimNames.IAT,
+                iat -> iat != null && !iat.isAfter(clock.instant().plusSeconds(SKEW_SECONDS)));
         OAuth2TokenValidator<Jwt> issuer = new JwtClaimValidator<Object>(JwtClaimNames.ISS,
                 iss -> iss != null && ISSUERS.contains(iss.toString()));
         OAuth2TokenValidator<Jwt> audience = new JwtClaimValidator<Object>(JwtClaimNames.AUD,

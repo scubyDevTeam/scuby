@@ -41,12 +41,18 @@ class GoogleSignInTest {
         api = clients.newBrowser();
     }
 
+    private ApiResponse emailSignIn(ApiClient browser, String email) {
+        browser.post("/auth/email/start", "{\"email\":\"" + email + "\"}");
+        return browser.post("/auth/email/verify",
+                "{\"email\":\"" + email + "\",\"code\":\"" + emails.lastCodeFor(email) + "\"}");
+    }
+
     private ApiResponse google(String credential) {
         return api.post("/auth/google", "{\"credential\":\"" + credential + "\"}");
     }
 
     private Map<String, Object> claims() {
-        return GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant());
+        return GoogleTestKeys.claims("google-sub-1", "carolina@gmail.com", clock.instant());
     }
 
     @Test
@@ -54,7 +60,7 @@ class GoogleSignInTest {
         ApiResponse r = google(keys.token(claims()));
         assertThat(r.status()).isEqualTo(200);
         assertThat(r.str("/display_name")).isEqualTo("Carolina Mejía");
-        assertThat(r.str("/email")).isEqualTo("carolina@correo.co");
+        assertThat(r.str("/email")).isEqualTo("carolina@gmail.com");
         assertThat(api.get("/session").status()).isEqualTo(200);
         assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
     }
@@ -68,9 +74,7 @@ class GoogleSignInTest {
 
     @Test
     void aFirstGoogleSignInLinksToTheAccountWithThatEmail() {
-        api.post("/auth/email/start", "{\"email\":\"carolina@correo.co\"}");
-        String viaEmail = api.post("/auth/email/verify",
-                "{\"email\":\"carolina@correo.co\",\"code\":\"" + emails.lastCodeFor("carolina@correo.co") + "\"}").str("/id");
+        String viaEmail = emailSignIn(api, "carolina@gmail.com").str("/id");
         String viaGoogle = clients.newBrowser().post("/auth/google", "{\"credential\":\"" + keys.token(claims()) + "\"}").str("/id");
         assertThat(viaGoogle).isEqualTo(viaEmail);
         assertThat(db.fetchCount(PERSON)).isEqualTo(1);
@@ -124,7 +128,7 @@ class GoogleSignInTest {
     @Test
     void anAccountLinkedToAnotherGoogleIdentityIsNotTakenOver() {
         String owner = google(keys.token(claims())).str("/id");                     // sub-1 owns carolina@correo.co
-        var other = GoogleTestKeys.claims("google-sub-2", "carolina@correo.co", clock.instant());
+        var other = GoogleTestKeys.claims("google-sub-2", "carolina@gmail.com", clock.instant());
         ApiResponse r = clients.newBrowser().post("/auth/google", "{\"credential\":\"" + keys.token(other) + "\"}");
         assertThat(r.errorCode()).isEqualTo("unauthorized");
         assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
@@ -188,12 +192,188 @@ class GoogleSignInTest {
         }
     }
 
+    private static final org.jooq.Field<Boolean> AUTHORITATIVE =
+            org.jooq.impl.DSL.field("google_email_authoritative", Boolean.class);
+
+    private ApiResponse signInWith(Map<String, Object> claims) {
+        return clients.newBrowser().post("/auth/google", "{\"credential\":\"" + keys.token(claims) + "\"}");
+    }
+
+    // ---- outage is not a bad token
+    @Test
+    void googleKeysBeingUnreachableIsAServerErrorNotAnUnauthorized() {
+        google(keys.token(claims()));                                              // warms the key cache
+        keys.jwksDown(true);
+        try {
+            ApiResponse r = google(keys.tokenWithUnknownKeyId(claims()));          // unknown kid: refetch fails
+            assertThat(r.status()).isEqualTo(500);
+            assertThat(r.errorCode()).isEqualTo("server_error");
+        } finally {
+            keys.jwksDown(false);
+        }
+    }
+
+    // ---- authoritative email rule
+    @Test
+    void aGmailAddressLinksAnExistingEmailCodeAccount() {
+        String id = emailSignIn(api, "carolina@gmail.com").str("/id");
+        ApiResponse r = signInWith(claims());
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(r.str("/id")).isEqualTo(id);
+        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isTrue();
+    }
+
+    @Test
+    void aWorkspaceDomainMatchingHdLinksAnExistingAccount() {
+        String id = emailSignIn(api, "carolina@empresa.co").str("/id");
+        var c = GoogleTestKeys.claims("google-sub-1", "Carolina@Empresa.co", clock.instant());
+        c.put("hd", "EMPRESA.co");
+        ApiResponse r = signInWith(c);
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(r.str("/id")).isEqualTo(id);
+        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isTrue();
+    }
+
+    @Test
+    void anHdThatDoesNotMatchTheEmailDomainIsNotAuthoritative() {
+        emailSignIn(api, "carolina@empresa.co");
+        var c = GoogleTestKeys.claims("google-sub-1", "carolina@empresa.co", clock.instant());
+        c.put("hd", "otra.co");
+        assertThat(signInWith(c).errorCode()).isEqualTo("unauthorized");
+    }
+
+    @Test
+    void aNonAuthoritativeEmailDoesNotLinkAnExistingAccount() {
+        emailSignIn(api, "carolina@correo.co");
+        var c = GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant());
+        ApiResponse r = signInWith(c);
+        assertThat(r.status()).isEqualTo(401);
+        assertThat(r.errorCode()).isEqualTo("unauthorized");
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isNull();
+    }
+
+    @Test
+    void aNonAuthoritativeEmailCanStillCreateAnAccountButItIsMarked() {
+        ApiResponse r = signInWith(GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant()));
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
+        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isFalse();
+    }
+
+    @Test
+    void anEmailCodeSignInUnlinksANonAuthoritativeGoogleAndEndsTheAttackersSession() {
+        ApiClient attacker = clients.newBrowser();
+        assertThat(attacker.post("/auth/google", "{\"credential\":\""
+                + keys.token(GoogleTestKeys.claims("attacker-sub", "victim@correo.co", clock.instant())) + "\"}").status()).isEqualTo(200);
+        assertThat(attacker.get("/session").status()).isEqualTo(200);
+
+        ApiClient owner = clients.newBrowser();
+        assertThat(emailSignIn(owner, "victim@correo.co").status()).isEqualTo(200);
+
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isNull();
+        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isNull();
+        assertThat(attacker.get("/session").status()).isEqualTo(401);
+        assertThat(owner.get("/session").status()).isEqualTo(200);
+        assertThat(db.fetchCount(co.scuby.db.generated.Tables.SESSION)).isEqualTo(1);
+    }
+
+    @Test
+    void anEmailCodeSignInKeepsAnAuthoritativeGoogleLinkAndItsSessions() {
+        ApiClient google = clients.newBrowser();
+        google.post("/auth/google", "{\"credential\":\"" + keys.token(claims()) + "\"}");
+        assertThat(emailSignIn(clients.newBrowser(), "carolina@gmail.com").status()).isEqualTo(200);
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
+        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isTrue();
+        assertThat(google.get("/session").status()).isEqualTo(200);
+    }
+
+    @Test
+    void concurrentSignInsOfTheSameGoogleAccountOverAnEmailCodeAccountAreBothAccepted() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            testDb.reset();
+            String id = emailSignIn(clients.newBrowser(), "carolina@gmail.com").str("/id");
+            var results = race(List.of("google-sub-1", "google-sub-1"));
+            assertThat(results).extracting(ApiResponse::status).containsOnly(200);
+            assertThat(results).extracting(r -> r.str("/id")).containsOnly(id);
+        }
+    }
+
+    // ---- token shape
+    @Test
+    void anIssuedAtInTheFutureBeyondTheSkewIsRefused() {
+        var c = claims();
+        c.put("iat", java.util.Date.from(clock.instant().plusSeconds(600)));
+        c.put("exp", java.util.Date.from(clock.instant().plusSeconds(4000)));
+        assertThat(google(keys.token(c)).errorCode()).isEqualTo("unauthorized");
+    }
+
+    @Test
+    void anIssuedAtWithinTheSkewIsAccepted() {
+        var c = claims();
+        c.put("iat", java.util.Date.from(clock.instant().plusSeconds(30)));
+        assertThat(google(keys.token(c)).status()).isEqualTo(200);
+    }
+
+    @Test
+    void aTokenWithoutIssuedAtIsRefused() {
+        var c = claims();
+        c.remove("iat");
+        assertThat(google(keys.token(c)).errorCode()).isEqualTo("unauthorized");
+    }
+
+    @Test
+    void theBareAccountsGoogleComIssuerIsAccepted() {
+        var c = claims();
+        c.put("iss", "accounts.google.com");
+        assertThat(google(keys.token(c)).status()).isEqualTo(200);
+    }
+
+    @Test
+    void anAudienceListContainingOurClientIsAcceptedAndOneWithoutItRefused() {
+        var ok = claims();
+        ok.put("aud", List.of("other", GoogleTestKeys.CLIENT_ID));
+        assertThat(google(keys.token(ok)).status()).isEqualTo(200);
+        var no = claims();
+        no.put("aud", List.of("other", "another"));
+        assertThat(google(keys.token(no)).errorCode()).isEqualTo("unauthorized");
+    }
+
+    @Test
+    void anHs256TokenAndAnUnsignedTokenAreRefused() throws Exception {
+        var set = new com.nimbusds.jwt.JWTClaimsSet.Builder().issuer("https://accounts.google.com").audience(GoogleTestKeys.CLIENT_ID)
+                .subject("google-sub-1").claim("email", "carolina@gmail.com").claim("email_verified", true)
+                .issueTime(java.util.Date.from(clock.instant())).expirationTime(java.util.Date.from(clock.instant().plusSeconds(3600))).build();
+        var hs = new com.nimbusds.jwt.SignedJWT(new com.nimbusds.jose.JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.HS256).keyID("test").build(), set);
+        hs.sign(new com.nimbusds.jose.crypto.MACSigner(new byte[32]));
+        assertThat(google(hs.serialize()).errorCode()).isEqualTo("unauthorized");
+        assertThat(google(new com.nimbusds.jwt.PlainJWT(set).serialize()).errorCode()).isEqualTo("unauthorized");
+    }
+
+    // ---- name
+    @Test
+    void controlAndFormatCharactersAreStrippedFromTheGoogleName() {
+        var c = claims();
+        c.put("name", "Caro\u200Blina\u202E Mej\u0007ía");
+        assertThat(google(keys.token(c)).str("/display_name")).isEqualTo("Carolina Mejía");
+    }
+
+    @Test
+    void aNameOfOnlyInvisibleCharactersFallsBackToTheEmail() {
+        var c = claims();
+        c.put("name", "\u200B\u202E");
+        assertThat(google(keys.token(c)).str("/display_name")).isEqualTo("Carolina");
+    }
+
     private List<ApiResponse> race(List<String> subs) throws Exception {
+        return race(subs, "carolina@gmail.com");
+    }
+
+    private List<ApiResponse> race(List<String> subs, String email) throws Exception {
         var pool = Executors.newFixedThreadPool(subs.size());
         try {
             var barrier = new CyclicBarrier(subs.size());
             List<Future<ApiResponse>> futures = subs.stream().map(sub -> {
-                String token = keys.token(GoogleTestKeys.claims(sub, "carolina@correo.co", clock.instant()));
+                String token = keys.token(GoogleTestKeys.claims(sub, email, clock.instant()));
                 ApiClient browser = clients.newBrowser();
                 return pool.submit(() -> {
                     barrier.await();

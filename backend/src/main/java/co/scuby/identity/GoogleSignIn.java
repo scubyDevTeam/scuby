@@ -22,30 +22,54 @@ class GoogleSignIn {
     }
 
     /**
-     * By `sub`; else link the account with the same verified email — only if it has no Google identity
-     * yet (the identity key is `sub`: a different one never replaces it); else create one. People.create
-     * keeps the row a concurrent sign-in inserted for the same email (and drops our sub), so whatever
-     * account we end with is linked with a conditional update and re-checked: exactly one account, and
-     * its google_sub is the one that won.
+     * By `sub`; else the account with the same verified email, linked only if it has no Google identity
+     * yet (the identity key is `sub`: a different one never replaces it) AND Google is authoritative for
+     * that address (gmail.com, or a Workspace `hd` equal to its domain) — otherwise anyone could register
+     * a Google account over someone else's address and take over their Scuby account; else create one
+     * (non-authoritative emails may create, flagged so an email-code sign-in can later revoke the link).
+     * People.create keeps the row a concurrent sign-in inserted for the same email, so the account we end
+     * with is linked with a conditional update and re-checked: exactly one account, and its google_sub is
+     * the one that won (ours or an identical racing request's).
      */
     @Transactional
     public Person signIn(String credential) {
         GoogleIdentity google = tokens.verify(credential);
         return people.byGoogleSub(google.sub()).orElseGet(() -> {
             String email = EmailSignIn.normalize(google.email());
+            boolean authoritative = google.emailAuthoritative();
             Person account = people.byEmail(email)
-                    .orElseGet(() -> people.create(email, displayName(google, email), google.sub()));
+                    .orElseGet(() -> people.create(email, displayName(google, email), google.sub(), authoritative));
             if (google.sub().equals(account.googleSub())) return account;
-            if (account.googleSub() == null && people.linkGoogle(account.id(), google.sub())) return people.get(account.id());
+            if (account.googleSub() != null) {
+                log.warn("Google sign-in refused: account {} is linked to another Google identity", account.id());
+                throw new ApiException(ErrorCode.UNAUTHORIZED, "this account is linked to another Google account");
+            }
+            if (!authoritative) {
+                log.warn("Google sign-in refused: account {} exists and Google is not authoritative for its email", account.id());
+                throw new ApiException(ErrorCode.UNAUTHORIZED, "this account must be signed into with its email code first");
+            }
+            if (people.linkGoogle(account.id(), google.sub(), true)) return people.get(account.id());
+            Person current = people.get(account.id());                       // lost a race: fine if the winner is us
+            if (google.sub().equals(current.googleSub())) return current;
             log.warn("Google sign-in refused: account {} is linked to another Google identity", account.id());
             throw new ApiException(ErrorCode.UNAUTHORIZED, "this account is linked to another Google account");
         });
     }
 
     private static String displayName(GoogleIdentity google, String email) {
-        if (google.name() == null || google.name().isBlank()) return DisplayNames.fromEmail(email);
-        String name = google.name().strip();
+        String name = google.name() == null ? "" : stripInvisible(google.name()).strip();
+        if (name.isEmpty()) return DisplayNames.fromEmail(email);
         if (name.codePointCount(0, name.length()) <= MAX_NAME) return name;
         return name.substring(0, name.offsetByCodePoints(0, MAX_NAME));
+    }
+
+    /** Drops control (Cc) and format (Cf: zero-width, RTL override...) characters. */
+    private static String stripInvisible(String s) {
+        StringBuilder out = new StringBuilder(s.length());
+        s.codePoints().filter(cp -> {
+            int t = Character.getType(cp);
+            return t != Character.CONTROL && t != Character.FORMAT;
+        }).forEach(out::appendCodePoint);
+        return out.toString();
     }
 }

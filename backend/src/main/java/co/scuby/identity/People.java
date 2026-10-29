@@ -41,12 +41,13 @@ class People {
     }
 
     /** Creates the account, or returns the one a concurrent sign-in just created (same email, or same Google identity). */
-    Person create(String normalizedEmail, String displayName, @Nullable String googleSub) {
+    Person create(String normalizedEmail, String displayName, @Nullable String googleSub, boolean googleEmailAuthoritative) {
         db.insertInto(PERSON)
           .set(PERSON.ID, UUID.randomUUID())
           .set(PERSON.EMAIL, normalizedEmail)
           .set(PERSON.DISPLAY_NAME, displayName)
           .set(PERSON.GOOGLE_SUB, googleSub)
+          .set(PERSON.GOOGLE_EMAIL_AUTHORITATIVE, googleSub == null ? null : googleEmailAuthoritative)
           .set(PERSON.CREATED_AT, clock.instant().atOffset(ZoneOffset.UTC))
           .onConflictDoNothing()   // any unique key: the email, or a google_sub a concurrent sign-in just set
           .execute();
@@ -56,9 +57,16 @@ class People {
     }
 
     /** Sets the Google identity only while the account has none; false when it already has one (never overwritten). */
-    boolean linkGoogle(UUID id, String sub) {
-        return db.update(PERSON).set(PERSON.GOOGLE_SUB, sub)
+    boolean linkGoogle(UUID id, String sub, boolean emailAuthoritative) {
+        return db.update(PERSON).set(PERSON.GOOGLE_SUB, sub).set(PERSON.GOOGLE_EMAIL_AUTHORITATIVE, emailAuthoritative)
                  .where(PERSON.ID.eq(id).and(PERSON.GOOGLE_SUB.isNull()))
+                 .execute() == 1;
+    }
+
+    /** Drops the Google identity (and its flag) only while it is still non-authoritative; false if nothing changed. */
+    boolean unlinkNonAuthoritativeGoogle(UUID id) {
+        return db.update(PERSON).setNull(PERSON.GOOGLE_SUB).setNull(PERSON.GOOGLE_EMAIL_AUTHORITATIVE)
+                 .where(PERSON.ID.eq(id).and(PERSON.GOOGLE_EMAIL_AUTHORITATIVE.isFalse()))
                  .execute() == 1;
     }
 
@@ -72,7 +80,7 @@ class People {
     }
 
     private static Person toPerson(PersonRecord r) {
-        return new Person(r.getId(), r.getDisplayName(), r.getEmail(), r.getGoogleSub(), r.getPhone(),
+        return new Person(r.getId(), r.getDisplayName(), r.getEmail(), r.getGoogleSub(), r.getGoogleEmailAuthoritative(), r.getPhone(),
                 r.getPhoneVerifiedAt() == null ? null : r.getPhoneVerifiedAt().toInstant(),
                 r.getCity(), r.getBio(), r.getNotifyLost(), r.getNotifyFound(), r.getNotifyAdoption(),
                 r.getNotifyHelp(), r.getPhotoUrl());

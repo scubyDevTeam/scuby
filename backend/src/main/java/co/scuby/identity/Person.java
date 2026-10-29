@@ -5,7 +5,7 @@ import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.util.UUID;
 
-record Person(UUID id, String displayName, String email, @Nullable String googleSub,
+record Person(UUID id, String displayName, String email, @Nullable String googleSub, @Nullable Boolean googleEmailAuthoritative,
               @Nullable String phone, @Nullable Instant phoneVerifiedAt,
               @Nullable String city, @Nullable String bio,
               boolean notifyLost, boolean notifyFound, boolean notifyAdoption, boolean notifyHelp,

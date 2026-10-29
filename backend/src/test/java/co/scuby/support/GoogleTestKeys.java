@@ -4,7 +4,18 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
+import org.springframework.mock.http.client.MockClientHttpRequest;
+import org.springframework.mock.http.client.MockClientHttpResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.client.RestOperations;
+import org.springframework.web.client.RestTemplate;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -23,9 +34,30 @@ public final class GoogleTestKeys {
     private final KeyPair ours = generate();
     private final KeyPair theirs = generate();
 
+    private volatile boolean jwksDown;
+
+    /** While down, fetching Google's keys fails like a network outage. */
+    public void jwksDown(boolean down) { jwksDown = down; }
+
+    /** Stands in for the HTTP call to Google's JWKS URL. */
+    public RestOperations jwksFetcher() {
+        return new RestTemplate((uri, method) -> new MockClientHttpRequest(method, uri) {
+            @Override protected org.springframework.http.client.ClientHttpResponse executeInternal() throws IOException {
+                if (jwksDown) throw new IOException("jwks down");
+                String json = new JWKSet(new RSAKey.Builder(publicKey()).keyID("test").build()).toString();
+                MockClientHttpResponse r = new MockClientHttpResponse(json.getBytes(StandardCharsets.UTF_8), HttpStatus.OK);
+                r.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+                return r;
+            }
+        });
+    }
+
     public RSAPublicKey publicKey() { return (RSAPublicKey) ours.getPublic(); }
 
     public String token(Map<String, Object> claims) { return sign(claims, ours); }
+
+    /** Signed by our key but naming a key id the cached key set does not have: forces a key refetch. */
+    public String tokenWithUnknownKeyId(Map<String, Object> claims) { return sign(claims, ours, "rotated-key"); }
 
     public String tokenSignedByAnotherKey(Map<String, Object> claims) { return sign(claims, theirs); }
 
@@ -42,11 +74,13 @@ public final class GoogleTestKeys {
         return c;
     }
 
-    private static String sign(Map<String, Object> claims, KeyPair key) {
+    private static String sign(Map<String, Object> claims, KeyPair key) { return sign(claims, key, "test"); }
+
+    private static String sign(Map<String, Object> claims, KeyPair key, String kid) {
         try {
             JWTClaimsSet.Builder b = new JWTClaimsSet.Builder();
             claims.forEach((k, v) -> b.claim(k, v instanceof List<?> l ? l : v));
-            SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test").build(), b.build());
+            SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(kid).build(), b.build());
             jwt.sign(new RSASSASigner(key.getPrivate()));
             return jwt.serialize();
         } catch (Exception e) {

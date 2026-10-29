@@ -25,12 +25,11 @@ public class IdentityTestBeans {
         return new co.scuby.support.GoogleTestKeys();
     }
 
-    /** Same validators as production, keys from GoogleTestKeys instead of Google's JWKS URL. */
+    /** The production decoder recipe (RS256 only, same validators); only the key fetch is replaced. */
     @Bean
     @Primary
     org.springframework.security.oauth2.jwt.JwtDecoder testGoogleIdTokenDecoder(co.scuby.support.GoogleTestKeys keys, java.time.Clock clock) {
-        var decoder = org.springframework.security.oauth2.jwt.NimbusJwtDecoder.withPublicKey(keys.publicKey()).build();
-        decoder.setJwtValidator(GoogleIdTokenConfiguration.validator(co.scuby.support.GoogleTestKeys.CLIENT_ID, clock));
-        return decoder;
+        return GoogleIdTokenConfiguration.decoder("http://google-jwks.test/certs", keys.jwksFetcher(),
+                co.scuby.support.GoogleTestKeys.CLIENT_ID, clock);
     }
 }

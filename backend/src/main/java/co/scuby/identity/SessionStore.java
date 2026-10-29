@@ -48,6 +48,12 @@ class SessionStore {
         evictAfterCommit(tokenHash);
     }
 
+    /** Ends every session of the person (e.g. a credential was revoked); the cache is evicted after commit. */
+    void deleteAllOf(UUID personId) {
+        db.deleteFrom(SESSION).where(SESSION.PERSON_ID.eq(personId)).returning(SESSION.TOKEN_HASH)
+          .fetch(SESSION.TOKEN_HASH).forEach(this::evictAfterCommit);
+    }
+
     /**
      * Evicting before the commit lets a concurrent request still see the row and re-cache the session; so
      * inside a transaction the eviction runs after it commits (and also now, to shorten the window).
