@@ -59,6 +59,26 @@ class ProfileStartupTest {
         assertThat(chain.toString()).contains(key);
     }
 
+    static Stream<Arguments> unusableIpHashKeys() {
+        return Stream.of("staging", "prod").flatMap(profile -> Stream.of(
+                Arguments.of(profile, ""),
+                Arguments.of(profile, "   "),
+                Arguments.of(profile, "too-short-key-31-characters-xx"),
+                Arguments.of(profile, "local-only-ip-hash-key")));
+    }
+
+    @ParameterizedTest(name = "{0} with ip-hash-key \"{1}\"")
+    @MethodSource("unusableIpHashKeys")
+    void refusesABlankShortOrDefaultIpHashKey(String profile, String key) {
+        Map<String, String> props = new LinkedHashMap<>(REQUIRED.get(profile));
+        props.put("scuby.web.ip-hash-key", key);
+        Throwable failure = catchThrowable(() -> start(profile, props).close());
+        assertThat(failure).as("%s started with ip-hash-key '%s'", profile, key).isNotNull();
+        StringBuilder chain = new StringBuilder();
+        for (Throwable t = failure; t != null; t = t.getCause()) chain.append(t.getMessage()).append('\n');
+        assertThat(chain.toString()).contains("scuby.web.ip-hash-key");
+    }
+
     private static ConfigurableApplicationContext start(String profile, Map<String, String> props) {
         Map<String, String> all = new LinkedHashMap<>(TestcontainersConfiguration.jdbcProperties());
         all.putAll(props);

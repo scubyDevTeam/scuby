@@ -55,6 +55,7 @@ class DeviceCookieTest {
 
     @Test
     void aRequestCarryingTheCookieTwiceIsTreatedAsHavingNone() throws Exception {
+        // MockMvc directly: ApiClient's cookie jar holds one cookie per name, so it cannot send a duplicate.
         // A sibling subdomain planting `device` for the parent domain makes the browser send two (cookie tossing).
         String planted = "A".repeat(43);
         String real = "B".repeat(43);
@@ -120,6 +121,50 @@ class DeviceCookieTest {
                 .header("CloudFront-Viewer-Address", "198.51.100.7:51234");
         assertThat(viaCloudFront.raw(HttpMethod.GET, "/probe/caller", null).str("/ip"))
                 .isEqualTo(direct.raw(HttpMethod.GET, "/probe/caller", null).str("/ip"));
+    }
+
+    private String ipVia(String viewerAddress, String secret) {
+        return clients.newBrowser().from("10.0.0.5")
+                .header("X-Origin-Secret", secret)
+                .header("CloudFront-Viewer-Address", viewerAddress)
+                .raw(HttpMethod.GET, "/probe/caller", null).str("/ip");
+    }
+
+    private String ipOfSocket(String ip) {
+        return clients.newBrowser().from(ip).raw(HttpMethod.GET, "/probe/caller", null).str("/ip");
+    }
+
+    @Test
+    void aCorrectViewerHeaderWithAWrongSecretUsesTheSocketAddress() {
+        String viewed = ipVia("198.51.100.7:51234", "wrong-secret");
+        assertThat(viewed).isEqualTo(ipOfSocket("10.0.0.5")).isNotEqualTo(ipOfSocket("198.51.100.7"));
+    }
+
+    @Test
+    void ipv6ViewerAddressesAreParsedBracketedOrNot() {
+        assertThat(ipVia("[::1]:443", "test-origin-secret")).isEqualTo(ipOfSocket("::1"));
+        assertThat(ipVia("2001:db8::1:443", "test-origin-secret")).isEqualTo(ipOfSocket("2001:db8::1"));
+    }
+
+    @Test
+    void aValidSecretWithoutAParseableViewerAddressFallsBackToTheSocket() {
+        assertThat(ipVia("garbage", "test-origin-secret")).isEqualTo(ipOfSocket("10.0.0.5"));
+    }
+
+    @Test
+    void aSecurityRejectedRequestStillGetsTheCookie() {
+        ApiResponse r = clients.newBrowser().raw(HttpMethod.GET, "/probe/account", null);
+        assertThat(r.status()).isEqualTo(401);
+        assertThat(r.setCookies()).anyMatch(c -> c.startsWith("device="));
+    }
+
+    @Test
+    void aCorsPreflightGetsNoCookie() {
+        ApiResponse r = clients.newBrowser()
+                .header("Origin", "http://localhost:4173")
+                .header("Access-Control-Request-Method", "POST")
+                .raw(HttpMethod.OPTIONS, "/probe/caller", null);
+        assertThat(r.setCookies()).noneMatch(c -> c.startsWith("device="));
     }
 
     @Test
