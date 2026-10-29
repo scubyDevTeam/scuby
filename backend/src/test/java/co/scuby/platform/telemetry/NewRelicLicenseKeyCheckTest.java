@@ -2,12 +2,11 @@ package co.scuby.platform.telemetry;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.core.env.AbstractEnvironment;
 import org.springframework.core.env.StandardEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** The newrelic profile must not start without a license key: an unresolved header would make every export fail with 403, silently. */
+/** Exporting telemetry (scuby.telemetry.export=true) must not start without a license key: an unresolved header would make every export fail with 403, silently. */
 class NewRelicLicenseKeyCheckTest {
 
     /** Cuts the OS environment and JVM properties off, so a NEW_RELIC_LICENSE_KEY exported in the developer's shell cannot change a case. */
@@ -19,8 +18,8 @@ class NewRelicLicenseKeyCheckTest {
             })
             .withUserConfiguration(NewRelicLicenseKeyCheck.class);
 
-    private ApplicationContextRunner withProfile() {
-        return runner.withPropertyValues(AbstractEnvironment.ACTIVE_PROFILES_PROPERTY_NAME + "=newrelic");
+    private ApplicationContextRunner withExport() {
+        return runner.withPropertyValues("scuby.telemetry.export=true");
     }
 
     @Test
@@ -34,7 +33,7 @@ class NewRelicLicenseKeyCheckTest {
 
     @Test
     void missingKeyFailsStartup() {
-        withProfile().run(ctx -> assertThat(ctx).hasFailed().getFailure()
+        withExport().run(ctx -> assertThat(ctx).hasFailed().getFailure()
                 .rootCause().isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("newrelic.license-key")
                 .hasMessageContaining("NEW_RELIC_LICENSE_KEY"));
@@ -42,7 +41,7 @@ class NewRelicLicenseKeyCheckTest {
 
     @Test
     void blankKeyFailsStartupWithoutEchoingIt() {
-        withProfile().withPropertyValues("newrelic.license-key=", "NEW_RELIC_LICENSE_KEY=   ").run(ctx -> assertThat(ctx).hasFailed().getFailure()
+        withExport().withPropertyValues("newrelic.license-key=", "NEW_RELIC_LICENSE_KEY=   ").run(ctx -> assertThat(ctx).hasFailed().getFailure()
                 .rootCause().isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("newrelic.license-key")
                 .hasMessageContaining("NEW_RELIC_LICENSE_KEY")
@@ -51,26 +50,31 @@ class NewRelicLicenseKeyCheckTest {
 
     @Test
     void emptyEnvironmentVariableFailsStartup() {
-        withProfile().withPropertyValues("NEW_RELIC_LICENSE_KEY=").run(ctx -> assertThat(ctx).hasFailed());
+        withExport().withPropertyValues("NEW_RELIC_LICENSE_KEY=").run(ctx -> assertThat(ctx).hasFailed());
     }
 
     @Test
     void environmentVariableNameStarts() {
-        withProfile().withPropertyValues("NEW_RELIC_LICENSE_KEY=secret-from-env").run(ctx -> assertThat(ctx).hasNotFailed());
+        withExport().withPropertyValues("NEW_RELIC_LICENSE_KEY=secret-from-env").run(ctx -> assertThat(ctx).hasNotFailed());
     }
 
     @Test
     void propertyNameStarts() {
-        withProfile().withPropertyValues("newrelic.license-key=secret-from-property").run(ctx -> assertThat(ctx).hasNotFailed());
+        withExport().withPropertyValues("newrelic.license-key=secret-from-property").run(ctx -> assertThat(ctx).hasNotFailed());
     }
 
     @Test
     void failureMessageNeverContainsAValue() {
-        withProfile().withPropertyValues("newrelic.license-key=").run(ctx -> assertThat(ctx).getFailure().rootCause().hasMessageNotContaining("secret"));
+        withExport().withPropertyValues("newrelic.license-key=").run(ctx -> assertThat(ctx).getFailure().rootCause().hasMessageNotContaining("secret"));
     }
 
     @Test
-    void withoutTheProfileTheCheckIsAbsent() {
+    void withoutExportTheCheckIsAbsent() {
         runner.run(ctx -> assertThat(ctx).doesNotHaveBean(NewRelicLicenseKeyCheck.class));
+    }
+
+    @Test
+    void withExportOffTheCheckIsAbsent() {
+        runner.withPropertyValues("scuby.telemetry.export=false").run(ctx -> assertThat(ctx).doesNotHaveBean(NewRelicLicenseKeyCheck.class));
     }
 }

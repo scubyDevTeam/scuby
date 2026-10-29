@@ -1,8 +1,4 @@
 spring:
-  profiles:
-    group:
-      staging: newrelic, server
-      prod: newrelic, server
   application:
     name: scuby-backend
   threads:
@@ -17,6 +13,15 @@ spring:
     default-schema: scuby
     create-schemas: true
 
+# Telemetry to New Relic (US) — decision #38. Everything is driven by variables, so a laptop and the tests set
+# nothing and export nothing; servers set them (docs/eng/backend.md · Environments and profiles). The key is
+# newrelic.license-key on servers (Parameter Store, docs/eng/infra.md · Secrets) or NEW_RELIC_LICENSE_KEY on a
+# laptop (from the Keychain); never in a file.
+scuby:
+  environment: ${SCUBY_ENVIRONMENT:local}
+  telemetry:
+    export: ${SCUBY_TELEMETRY_EXPORT:false}
+
 management:
   endpoints:
     web:
@@ -25,22 +30,47 @@ management:
   opentelemetry:
     resource-attributes:
       service.name: scuby-backend
-      deployment.environment: local
+      deployment.environment: ${scuby.environment}
+    tracing:
+      export:
+        otlp:
+          endpoint: https://otlp.nr-data.net:4318/v1/traces
+          headers:
+            api-key: ${newrelic.license-key:${NEW_RELIC_LICENSE_KEY:}}
+    logging:
+      export:
+        otlp:
+          endpoint: https://otlp.nr-data.net:4318/v1/logs
+          headers:
+            api-key: ${newrelic.license-key:${NEW_RELIC_LICENSE_KEY:}}
   tracing:
     sampling:
       probability: 1.0   # Boot's default is 0.1; decision #38 starts at 100% (lower via MANAGEMENT_TRACING_SAMPLING_PROBABILITY)
     export:
       otlp:
-        enabled: false
+        enabled: ${scuby.telemetry.export}
   otlp:
     metrics:
       export:
-        enabled: false
+        enabled: ${scuby.telemetry.export}
+        url: https://otlp.nr-data.net:4318/v1/metrics
+        headers:
+          api-key: ${newrelic.license-key:${NEW_RELIC_LICENSE_KEY:}}
+        aggregation-temporality: delta
+        histogram-flavor: base2_exponential_bucket_histogram
+        step: 60s
   logging:
     export:
       otlp:
-        enabled: false
+        enabled: ${scuby.telemetry.export}
   metrics:
     distribution:
       percentiles-histogram:
         http.server.requests: true
+
+logging:
+  structured:
+    format:
+      console: ${SCUBY_CONSOLE_FORMAT:}      # "ecs" on servers: stdout is the crash record (docs/eng/infra.md · Logs)
+  threshold:
+    console: ${SCUBY_CONSOLE_THRESHOLD:INFO} # "WARN" on servers; INFO goes to New Relic

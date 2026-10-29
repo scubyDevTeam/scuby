@@ -20,7 +20,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -28,14 +27,14 @@ import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** What the staging/prod groups switch on: New Relic export settings and the WARN-and-up JSON console (decision #38). */
+/** What the server variables switch on: New Relic export settings and the WARN-and-up JSON console (decision #38). */
 @SpringBootTest(properties = {
+        "SCUBY_ENVIRONMENT=staging",
+        "SCUBY_CONSOLE_FORMAT=ecs",
+        "SCUBY_CONSOLE_THRESHOLD=WARN",
         "NEW_RELIC_LICENSE_KEY=test-not-a-key",
-        "management.tracing.export.otlp.enabled=false",
-        "management.otlp.metrics.export.enabled=false",
-        "management.logging.export.otlp.enabled=false"
+        "SCUBY_TELEMETRY_EXPORT=false" // nothing may leave the machine
 })
-@ActiveProfiles("staging")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Import(TestcontainersConfiguration.class)
 @ExtendWith(OutputCaptureExtension.class)
@@ -57,7 +56,7 @@ class ServerTelemetryTest {
     static void restoreDefaultLogging() {
         LoggingSystem logging = LoggingSystem.get(ServerTelemetryTest.class.getClassLoader());
         logging.cleanUp();
-        // Boot publishes these as JVM system properties when the staging context starts, and a later initialisation reads them back.
+        // Boot publishes these as JVM system properties when this context starts, and a later initialisation reads them back.
         System.clearProperty(LoggingSystemProperty.CONSOLE_STRUCTURED_FORMAT.getEnvironmentVariableName());
         System.clearProperty(LoggingSystemProperty.CONSOLE_THRESHOLD.getEnvironmentVariableName());
         logging.beforeInitialize();
@@ -73,11 +72,6 @@ class ServerTelemetryTest {
         assertThat(env.getProperty("management.opentelemetry.tracing.export.otlp.headers.api-key")).isEqualTo("test-not-a-key");
         assertThat(env.getProperty("management.opentelemetry.logging.export.otlp.headers.api-key")).isEqualTo("test-not-a-key");
         assertThat(env.getProperty("management.otlp.metrics.export.headers.api-key")).isEqualTo("test-not-a-key");
-    }
-
-    @Test
-    void prodGetsTheSameProfiles() {
-        assertThat(env.getProperty("spring.profiles.group.prod")).contains("newrelic").contains("server");
     }
 
     @Test

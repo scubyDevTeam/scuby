@@ -10,7 +10,7 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Component;
 
 /**
- * Sends every log record to Spring Boot's OpenTelemetry SDK (exported only with the newrelic profile).
+ * Sends every log record to Spring Boot's OpenTelemetry SDK (exported only with SCUBY_TELEMETRY_EXPORT=true).
  * Attached in code, not in logback-spring.xml, so Boot keeps its default console — the only one that
  * honours logging.structured.format.console. Lines logged before this bean exists reach stdout only.
  */

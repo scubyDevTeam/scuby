@@ -16,7 +16,7 @@ import org.springframework.test.annotation.DirtiesContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Without the newrelic profile nothing is exported, and logs still reach OpenTelemetry (docs/eng/backend.md · Observability). */
+/** Without SCUBY_TELEMETRY_EXPORT=true nothing is exported, and logs still reach OpenTelemetry (docs/eng/backend.md · Observability). */
 @SpringBootTest(properties = "scuby.test.context=telemetry-defaults") // own cache key: never reuses a context whose logging another class reset
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Import(TestcontainersConfiguration.class)
