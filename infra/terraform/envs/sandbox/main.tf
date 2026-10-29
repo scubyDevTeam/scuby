@@ -47,3 +47,12 @@ module "dns" {
   count  = var.domain == "" ? 0 : 1
   domain = var.domain
 }
+
+module "media" {
+  source        = "../../modules/media"
+  name          = local.name
+  bucket_suffix = random_id.suffix.hex
+  lambda_zip    = "${path.root}/../../../lambda/media/dist/media-lambdas.zip"
+  # Sandbox: any origin may PUT with a presigned URL. Staging restricts this to the app's origin.
+  cors_allowed_origins = ["*"]
+}
