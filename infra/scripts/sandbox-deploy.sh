@@ -24,8 +24,8 @@ docker tag scuby/postgres:17 "$POSTGRES_REPO:17" && docker push "$POSTGRES_REPO:
 docker tag scuby-backend "$BACKEND_REPO:sandbox" && docker push "$BACKEND_REPO:sandbox"
 
 echo "== database password (generated once by the CLI, kept across retries)"
-# Terraform creates the parameter with the value "placeholder" and ignores later changes to it, but its
-# refresh does read the real value back into the git-ignored local state. Only the CLI ever writes it.
+# Terraform creates the parameter with a write-only "placeholder" and never stores a value in its
+# state; only the CLI writes the real one.
 # A retry must keep the existing value: the Postgres volume was already initialised with it.
 current=$(aws ssm get-parameter --name "$PREFIX/db/password" --with-decryption \
   --query Parameter.Value --output text)
