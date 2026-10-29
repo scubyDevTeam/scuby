@@ -49,7 +49,7 @@ resource "newrelic_nrql_alert_condition" "no_data" {
   open_violation_on_expiration   = true
   close_violations_on_expiration = false
   nrql {
-    query = "SELECT count(*) FROM Metric WHERE ${local.svc} AND ${local.alert_env}"
+    query = "SELECT count(*) FROM Metric WHERE ${local.svc} AND ${local.alert_env} FACET deployment.environment"
   }
   critical {
     operator              = "below"
