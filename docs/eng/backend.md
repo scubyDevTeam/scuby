@@ -97,13 +97,20 @@ different rates. The split is a second instance of the same image with `scuby.ro
 
 Each is combined with the role profiles (`api`, `worker`) once they are split.
 
-Two profiles switch telemetry on; the `staging` and `prod` groups pull in both:
+Telemetry and the server console are not profiles: `application.yml` reads these environment
+variables, and with none set (a laptop, the tests) nothing is exported and the console is plain
+text at INFO.
 
-- **`newrelic`** — the three OTLP exports (traces, metrics, logs) to New Relic. Off in `local` and
-  `test`; on a laptop it is opt-in as `local,newrelic`. Needs the license key
-  ([infra.md](infra.md) · Secrets); without it the application does not start.
-- **`server`** — the console prints structured JSON (ECS) at WARN and up, the crash record that
-  [infra.md](infra.md) · Logs ships to CloudWatch.
+| Variable | Default | On servers | Drives |
+|---|---|---|---|
+| `SCUBY_ENVIRONMENT` | `local` | `staging` / `prod` | the `deployment.environment` resource attribute |
+| `SCUBY_TELEMETRY_EXPORT` | `false` | `true` | the three OTLP exports (traces, metrics, logs) to New Relic |
+| `SCUBY_CONSOLE_FORMAT` | empty (plain text) | `ecs` | structured JSON console, the crash record that [infra.md](infra.md) · Logs ships to CloudWatch |
+| `SCUBY_CONSOLE_THRESHOLD` | `INFO` | `WARN` | the console's minimum level (INFO goes to New Relic) |
+| `NEW_RELIC_LICENSE_KEY` | none | from SSM ([infra.md](infra.md) · Secrets) | the OTLP `api-key` header; the property `newrelic.license-key` wins if set |
+
+With `SCUBY_TELEMETRY_EXPORT=true` and no license key the application does not start (the
+`NewRelicLicenseKeyCheck` startup check); with export off the key is never read.
 
 Trace sampling is `management.tracing.sampling.probability` (1.0 to start). The why is in ·
 Observability below.

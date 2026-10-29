@@ -50,14 +50,14 @@ una prueba de ArchUnit las mantiene separadas.
 
 En `local` y `test` no se exporta nada. Para mandar datos reales a New Relic desde el portátil, con
 su propio Postgres y puertos para no chocar con otras ejecuciones locales (con
-`SPRING_PROFILES_ACTIVE=local,newrelic` contra el compose habitual también funciona):
+`SCUBY_TELEMETRY_EXPORT=true` contra el compose habitual también funciona):
 
 ```bash
 docker run -d --rm --name scuby-obs-pg -p 127.0.0.1:15433:5432 \
   -e POSTGRES_DB=scuby -e POSTGRES_USER=scuby -e POSTGRES_PASSWORD=scuby scuby/postgres:17
 until docker exec scuby-obs-pg pg_isready -U scuby -d scuby >/dev/null 2>&1; do sleep 1; done
 NEW_RELIC_LICENSE_KEY="$(security find-generic-password -s scuby-newrelic-license-key -w)" \
-  SPRING_PROFILES_ACTIVE=local,newrelic SERVER_PORT=18080 \
+  SCUBY_TELEMETRY_EXPORT=true SPRING_PROFILES_ACTIVE=local SERVER_PORT=18080 \
   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:15433/scuby ./mvnw spring-boot:run
 docker stop scuby-obs-pg   # al terminar
 ```
@@ -66,8 +66,8 @@ La llave sale del Keychain (ítem `scuby-newrelic-license-key`); nunca la imprim
 archivos o chats.
 
 Dónde mirar: el dashboard «Scuby — Backend» en New Relic (variable `env`, `local` seleccionable) o
-`bash infra/scripts/nr-query.sh "<NRQL>"` desde la raíz. Los servidores la activan solos con los
-grupos `staging`/`prod`; ver [`backend.md`](../docs/eng/backend.md) · Environments and profiles y
+`bash infra/scripts/nr-query.sh "<NRQL>"` desde la raíz. Los servidores la activan con las variables de entorno
+`SCUBY_TELEMETRY_EXPORT` y compañía, listadas en [`backend.md`](../docs/eng/backend.md) · Environments and profiles; ver también
 [`infra.md`](../docs/eng/infra.md) · Secrets.
 
 ## Más

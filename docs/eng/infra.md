@@ -84,7 +84,8 @@ only changes its connection settings.
   `/scuby/<env>/backend` — mode `non-blocking`, so a CloudWatch hiccup never stalls the container;
   **retention 7 days** (it is the crash record; day-to-day logs are in New Relic). The log group is
   Terraform-managed and the instance role may only `logs:CreateLogStream` / `logs:PutLogEvents` on
-  it.
+  it. The backend container receives the telemetry and console variables of
+  [backend.md](backend.md) · Environments and profiles (the license key from SSM).
 - **Lambdas:** their logs go to CloudWatch, as Lambda does; retention set per group.
 - **Cost:** CloudWatch Logs ingests 5 GB/month free; with WARN-and-up only, launch volume is
   megabytes. An alarm on the groups' `IncomingBytes` catches a runaway logger.
@@ -152,7 +153,8 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
   `newrelic.license-key`. On a laptop the same value comes from the environment variable
   `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. (The parameter and the start-up import
   arrive with staging. Until then a deploy reads the parameter on the instance into its mode-600
-  environment file and passes it to the backend container as `NEW_RELIC_LICENSE_KEY`.)
+  environment file and passes it to the backend container as `NEW_RELIC_LICENSE_KEY`, next to the
+  other telemetry variables listed in [backend.md](backend.md) · Environments and profiles.)
 
 ## Infrastructure as code
 
