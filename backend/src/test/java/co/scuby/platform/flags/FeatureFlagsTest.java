@@ -1,6 +1,7 @@
 package co.scuby.platform.flags;
 
 import co.scuby.support.IntegrationTest;
+import co.scuby.support.StatementRecorder;
 import co.scuby.support.TestDb;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,17 +21,36 @@ class FeatureFlagsTest {
     @Autowired FeatureFlags flags;
     @Autowired DSLContext db;
     @Autowired TestDb testDb;
+    @Autowired StatementRecorder recorder;
 
     @BeforeEach
     void setUp() { testDb.reset(); }
 
     @Test
     void theRegistryAndTheTableAgree() {
+        // reset() restored the migration's seeds, so this compares the enum with what Flyway created
         var keys = db.select(FEATURE_FLAGS.KEY).from(FEATURE_FLAGS).fetchSet(FEATURE_FLAGS.KEY);
         assertThat(keys).containsExactlyInAnyOrderElementsOf(Arrays.stream(Flag.values()).map(Flag::key).toList());
-        for (Flag f : Flag.values()) {
-            assertThat(flags.isEnabled(f, null)).as(f.key()).isEqualTo(f.defaultEnabled());
+    }
+
+    @Test
+    void seedsAreAsDecided() {
+        var seeded = db.select(FEATURE_FLAGS.KEY, FEATURE_FLAGS.ENABLED).from(FEATURE_FLAGS)
+                       .fetchMap(FEATURE_FLAGS.KEY, FEATURE_FLAGS.ENABLED);
+        assertThat(seeded).containsEntry("publisher_phone_otp", true).containsEntry("reverse_geocoding", false);
+    }
+
+    @Test
+    void aWarmSnapshotExecutesNoSql() {
+        flags.isEnabled(Flag.PUBLISHER_PHONE_OTP, null); // warm
+        recorder.reset();
+        for (int i = 0; i < 50; i++) {
+            UUID person = UUID.randomUUID();
+            flags.isEnabled(Flag.PUBLISHER_PHONE_OTP, person);
+            flags.isEnabled(Flag.REVERSE_GEOCODING, person);
         }
+        flags.isEnabled(Flag.REVERSE_GEOCODING, null);
+        assertThat(recorder.statements()).isEmpty();
     }
 
     @Test

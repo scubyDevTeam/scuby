@@ -43,7 +43,8 @@ is_enabled(flag_key, person?) =
   something.
 - Values are resolved per request by the backend, which already knows the account from the
   session.
-- Values are cached in-process for ~30 s. A flip takes effect within that window, no deploy.
+- Evaluation reads an in-process snapshot of both tables (`feature_flags`, `feature_flag_overrides`),
+  reloaded at most every ~30 s: no SQL per request. A flip takes effect within that window, no deploy.
 
 ## Flags are a backend concern
 

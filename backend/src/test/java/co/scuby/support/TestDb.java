@@ -2,9 +2,12 @@ package co.scuby.support;
 
 import co.scuby.platform.cache.ClearableCache;
 import org.jooq.DSLContext;
+import co.scuby.db.generated.tables.records.FeatureFlagsRecord;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
+
+import static co.scuby.db.generated.Tables.FEATURE_FLAGS;
 
 /** Puts the shared database and in-process state back to a known start before each test. */
 public final class TestDb {
@@ -31,14 +34,24 @@ public final class TestDb {
         this.sampler = sampler;
     }
 
+    /** feature_flags as Flyway left it (the migration's seeds), captured the first time reset() runs. */
+    private List<FeatureFlagsRecord> flagSeeds;
+
+    private void restoreFlagSeeds() {
+        if (flagSeeds == null) {
+            flagSeeds = List.copyOf(db.selectFrom(FEATURE_FLAGS).fetch());
+        }
+        db.deleteFrom(FEATURE_FLAGS).execute();
+        for (FeatureFlagsRecord r : flagSeeds) {
+            r.changed(true);
+            db.insertInto(FEATURE_FLAGS).set(r).execute();
+        }
+    }
+
     public void reset() {
         db.execute("TRUNCATE " + String.join(", ", MUTABLE_TABLES.stream().map(t -> "scuby." + t).toList())
                 + " RESTART IDENTITY CASCADE");
-        for (co.scuby.platform.flags.Flag f : co.scuby.platform.flags.Flag.values()) {
-            db.execute("""
-                    INSERT INTO scuby.feature_flags (key, enabled, description, owner) VALUES (?, ?, 'restored by TestDb', 'tests')
-                    ON CONFLICT (key) DO UPDATE SET enabled = excluded.enabled""", f.key(), f.defaultEnabled());
-        }
+        restoreFlagSeeds();
         db.execute("TRUNCATE scuby.feature_flag_changes RESTART IDENTITY");
         caches.orderedStream().forEach(ClearableCache::clear);
         clock.reset();
