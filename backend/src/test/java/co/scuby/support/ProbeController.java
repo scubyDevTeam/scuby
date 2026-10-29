@@ -3,6 +3,7 @@ package co.scuby.support;
 import jakarta.servlet.http.HttpServletResponse;
 import org.jooq.DSLContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,10 +17,11 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * Test-only routes (this class lives in src/test, so production never has them) that let the harness
+ * Test-only routes, imported by @IntegrationTest only (this class lives in src/test, so production never has them) that let the harness
  * self-tests prove its guardrails fail: statement counts, 204 answers, and a request a filter refuses.
  * None is in the contract; self-tests call them through ApiClient.callChecked with a stand-in contract path.
  */
+@TestConfiguration(proxyBeanMethods = false)
 @RestController
 class ProbeController {
 
@@ -39,6 +41,15 @@ class ProbeController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void statements(@RequestParam int n) {
         for (int i = 0; i < n; i++) db.selectOne().fetch();
+    }
+
+    /** Runs jOOQ statements on a second thread (an async hand-off), joins it, then answers 204 having run none on the request thread. */
+    @PostMapping("/harness-probe/other-thread-statements")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void otherThreadStatements() throws InterruptedException {
+        Thread other = new Thread(() -> { for (int i = 0; i < 5; i++) db.selectOne().fetch(); });
+        other.start();
+        other.join();
     }
 
     @PostMapping("/harness-probe/no-content")

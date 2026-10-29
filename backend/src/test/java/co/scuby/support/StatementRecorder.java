@@ -32,7 +32,8 @@ public final class StatementRecorder implements ExecuteListener {
 
     public List<String> statements() { return executed.stream().map(Executed::sql).toList(); }
 
-    /** Only the statements the calling thread executed (MockMvc runs the request on the test thread). */
+    /** Only the statements the calling thread executed (MockMvc runs the request on the test thread).
+     * Statements on other threads (async hand-offs) are not counted. */
     public List<String> statementsOnCurrentThread() {
         Thread me = Thread.currentThread();
         return executed.stream().filter(e -> e.thread() == me).map(Executed::sql).toList();

@@ -20,5 +20,5 @@ import java.lang.annotation.Target;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @ExtendWith(ResetBeforeEach.class)
-@Import({TestcontainersConfiguration.class, TestSupportConfiguration.class})
+@Import({TestcontainersConfiguration.class, TestSupportConfiguration.class, ProbeController.class})
 public @interface IntegrationTest {}

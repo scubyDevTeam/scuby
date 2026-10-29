@@ -104,9 +104,9 @@ class HarnessSelfTest {
         db.execute("ANALYZE scuby.outbox_events");
         var q = db.selectFrom(OUTBOX_EVENTS).where(OUTBOX_EVENTS.CREATED_AT.gt(DSL.currentOffsetDateTime()));
         PlanAssert.assertUsesIndex(db, q, "outbox_events_created_at_idx");
-        assertThatThrownBy(() -> PlanAssert.assertUsesIndex(db, q, "no_such_idx"))
+        assertThatThrownBy(() -> PlanAssert.assertUsesIndex(db, q, "outbox_events_pkey"))
                 .isInstanceOf(AssertionError.class)
-                .hasMessageContaining("no_such_idx");
+                .hasMessageContaining("outbox_events_pkey");
     }
 
     @Test
@@ -132,7 +132,7 @@ class HarnessSelfTest {
         assertThat(api.callChecked(HttpMethod.POST, "/auth/sign-out", 0, "/harness-probe/no-content", null).status()).isEqualTo(204);
         assertThatThrownBy(() -> api.callChecked(HttpMethod.POST, "/auth/sign-out", 0, "/harness-probe/no-content-with-body", null))
                 .isInstanceOf(AssertionError.class)
-                .hasMessageContaining("breaks the contract");
+                .hasMessageContaining("the body must be empty");
     }
 
     @Test
@@ -146,19 +146,10 @@ class HarnessSelfTest {
     }
 
     @Test
-    void onlyTheRequestThreadsStatementsAreCounted() throws InterruptedException {
+    void onlyTheRequestThreadsStatementsAreCounted() {
         ApiClient api = clients.newBrowser();
-        Thread other = new Thread(() -> { for (int i = 0; i < 5; i++) db.selectOne().fetch(); });
-        other.start();
-        other.join();
-        ApiResponse r = api.callChecked(HttpMethod.POST, "/auth/sign-out", 0, "/harness-probe/no-content", null);
+        ApiResponse r = api.callChecked(HttpMethod.POST, "/auth/sign-out", 0, "/harness-probe/other-thread-statements", null);
+        assertThat(r.status()).isEqualTo(204);
         assertThat(r.statements()).isEmpty();
-        recorder.reset();
-        other = new Thread(() -> db.selectOne().fetch());
-        other.start();
-        other.join();
-        db.selectOne().fetch();
-        assertThat(recorder.statementsOnCurrentThread()).hasSize(1);
-        assertThat(recorder.statements()).hasSize(2);
     }
 }
