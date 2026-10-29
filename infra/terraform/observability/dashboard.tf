@@ -43,7 +43,7 @@ resource "newrelic_one_dashboard" "backend" {
       row    = 1
       column = 7
       width  = 6
-      nrql_query { query = "SELECT percentile(http.server.requests, 50, 95) FROM Metric WHERE ${local.svc} AND ${local.dash_env} TIMESERIES" }
+      nrql_query { query = "SELECT percentile(http.server.requests, 50, 95) FROM Metric WHERE ${local.svc} AND ${local.dash_env} AND uri NOT LIKE '/actuator%' TIMESERIES" }
     }
     widget_line {
       title  = "Server errors (5xx) per minute"

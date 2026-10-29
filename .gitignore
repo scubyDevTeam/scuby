@@ -5,3 +5,6 @@ infra/terraform/observability/*.tfstate.*
 infra/terraform/observability/.terraform.tfstate.lock.info
 infra/terraform/observability/*.tfplan
 infra/terraform/observability/crash.log
+infra/terraform/observability/*.tfvars
+infra/terraform/observability/*.auto.tfvars
+infra/terraform/observability/override.tf
