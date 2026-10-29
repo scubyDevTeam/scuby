@@ -3,9 +3,14 @@ import sharp from 'sharp';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_DIMENSION = 8000;
-// HEIC (HEVC) is not here on purpose: prebuilt sharp decodes only AVIF through libheif, so the
-// client converts iPhone photos before upload (docs/eng/media-pipeline.md §1).
-const ACCEPTED = new Set(['jpeg', 'png', 'webp', 'avif']);
+// sharp reports AVIF as format 'heif' with compression 'av1'. HEIC (heif + 'hevc') is rejected on
+// purpose: prebuilt sharp decodes only AV1 through libheif, so the client converts iPhone photos
+// before upload (docs/eng/media-pipeline.md §1).
+const ACCEPTED = new Set(['jpeg', 'png', 'webp']);
+
+export function isAcceptedFormat(meta) {
+  return ACCEPTED.has(meta.format) || (meta.format === 'heif' && meta.compression === 'av1');
+}
 const INCOMING = /^incoming\/([0-9a-f]{64})$/;
 
 export async function normalizeMaster(input) {
@@ -16,7 +21,7 @@ export async function normalizeMaster(input) {
   } catch {
     throw new Error('not an image');
   }
-  if (!ACCEPTED.has(meta.format)) throw new Error('not an image');
+  if (!isAcceptedFormat(meta)) throw new Error('not an image');
   if (meta.width > MAX_DIMENSION || meta.height > MAX_DIMENSION) throw new Error('dimensions above 8000 px');
   // sharp drops all metadata unless asked to keep it: EXIF (GPS included) never reaches the master.
   return sharp(input)

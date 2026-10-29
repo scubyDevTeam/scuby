@@ -20,16 +20,30 @@ export async function handler(event) {
       await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
       continue;
     }
-    const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-    const input = Buffer.from(await obj.Body.transformToByteArray());
+    let obj;
     try {
-      const master = await normalizeMaster(input);
+      obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    } catch (e) {
+      if (e.name === 'NoSuchKey') {
+        // Duplicate S3 event: the upload was already processed and removed.
+        console.warn(JSON.stringify({ msg: 'already processed', key }));
+        continue;
+      }
+      throw e;
+    }
+    const input = Buffer.from(await obj.Body.transformToByteArray());
+    let master;
+    try {
+      master = await normalizeMaster(input);
+    } catch (e) {
+      console.warn(JSON.stringify({ msg: 'upload rejected', key, reason: e.message }));
+    }
+    // Outside the rejection catch: a failed write must throw so Lambda retries and the upload survives.
+    if (master) {
       await s3.send(new PutObjectCommand({
         Bucket: bucket, Key: target, Body: master,
         ContentType: 'image/jpeg', CacheControl: 'public, max-age=31536000, immutable',
       }));
-    } catch (e) {
-      console.warn(JSON.stringify({ msg: 'upload rejected', key, reason: e.message }));
     }
     await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
   }
