@@ -53,12 +53,13 @@ su propio Postgres y puertos para no chocar con otras ejecuciones locales (con
 `SPRING_PROFILES_ACTIVE=local,newrelic` contra el compose habitual también funciona):
 
 ```bash
-docker run --rm --name scuby-obs-pg -p 127.0.0.1:15433:5432 \
-  -e POSTGRES_DB=scuby -e POSTGRES_USER=scuby -e POSTGRES_PASSWORD=scuby scuby/postgres:17   # en otra terminal, o añade -d
-NR_KEY="$(security find-generic-password -s scuby-newrelic-license-key -w)"
-export NEW_RELIC_LICENSE_KEY="$NR_KEY"
-SERVER_PORT=18080 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:15433/scuby \
-  SPRING_PROFILES_ACTIVE=local,newrelic ./mvnw spring-boot:run
+docker run -d --rm --name scuby-obs-pg -p 127.0.0.1:15433:5432 \
+  -e POSTGRES_DB=scuby -e POSTGRES_USER=scuby -e POSTGRES_PASSWORD=scuby scuby/postgres:17
+until docker exec scuby-obs-pg pg_isready -U scuby -d scuby >/dev/null 2>&1; do sleep 1; done
+NEW_RELIC_LICENSE_KEY="$(security find-generic-password -s scuby-newrelic-license-key -w)" \
+  SPRING_PROFILES_ACTIVE=local,newrelic SERVER_PORT=18080 \
+  SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:15433/scuby ./mvnw spring-boot:run
+docker stop scuby-obs-pg   # al terminar
 ```
 
 La llave sale del Keychain (ítem `scuby-newrelic-license-key`); nunca la imprimas ni la pegues en

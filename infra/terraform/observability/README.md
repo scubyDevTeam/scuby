@@ -17,8 +17,6 @@ ambientes alertan: [`docs/eng/infra.md`](../../../docs/eng/infra.md) · Observab
     nunca enviaría correo.
 - **Destino, canal y workflow** de correo hacia scubydev@gmail.com.
 
-Las alertas miran solo `deployment.environment` staging y prod.
-
 Una vez la ingesta pasa de 50 GB (o de 80), esa condición vuelve a enviar correo cerca de una vez al
 día hasta fin de mes: New Relic cierra los incidentes a las 24 h y se reabren.
 

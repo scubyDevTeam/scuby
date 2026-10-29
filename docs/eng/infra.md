@@ -97,9 +97,9 @@ provider authenticates with a User API key (`NRAK-…`) from the operator's envi
 the repo, never in Parameter Store.
 
 Applied to account 8675334: the dashboard «Scuby — Backend» and the policy `scuby-backend`, which
-emails scubydev@gmail.com. Its conditions watch `deployment.environment` staging and prod only
-(laptop runs are `local` and never page); the no-data condition stays off until staging runs
-continuously. Apply with `infra/terraform/observability/apply.sh`. State is local to the
+emails scubydev@gmail.com. The HTTP and no-data conditions watch `deployment.environment` staging
+and prod only (laptop runs are `local` and never page); the ingest conditions (50 and 80 GB) are
+account-wide. The no-data condition stays off until staging runs continuously. Apply with `infra/terraform/observability/apply.sh`. State is local to the
 operator's machine and git-ignored until staging's S3 state bucket exists; then it moves to that
 backend. What each resource is and how to rebuild lost state:
 [`infra/terraform/observability/README.md`](../../infra/terraform/observability/README.md).
@@ -150,7 +150,8 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
 - **New Relic license key:** `/scuby/<env>/newrelic/license-key`, imported as the property
   `newrelic.license-key`. On a laptop the same value comes from the environment variable
   `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. (The parameter and the start-up import
-  arrive with staging; the sandbox gets the key the way it gets its database password.)
+  arrive with staging. Until then a deploy reads the parameter on the instance into its mode-600
+  environment file and passes it to the backend container as `NEW_RELIC_LICENSE_KEY`.)
 
 ## Infrastructure as code
 
