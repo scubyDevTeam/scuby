@@ -5,6 +5,8 @@ scuby:
     allowed-origins: [ "http://localhost:4173" ]
     origin-secret: test-origin-secret
   auth:
+    google:
+      client-id: test-google-client-id
     test-bypass:
       email-domains: [ "e2e.scuby.test" ]
       sms-prefixes: [ "+5730000000" ]

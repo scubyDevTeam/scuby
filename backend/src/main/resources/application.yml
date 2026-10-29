@@ -42,3 +42,6 @@ scuby:
       email-domains: []
       sms-prefixes: []
       code: "123456"
+    google:
+      client-id: local-google-client-id
+      jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs

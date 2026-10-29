@@ -40,7 +40,7 @@ class People {
         return db.selectFrom(PERSON).where(PERSON.GOOGLE_SUB.eq(sub)).fetchOptional().map(People::toPerson);
     }
 
-    /** Creates the account, or returns the one a concurrent sign-in just created for the same email. */
+    /** Creates the account, or returns the one a concurrent sign-in just created (same email, or same Google identity). */
     Person create(String normalizedEmail, String displayName, @Nullable String googleSub) {
         db.insertInto(PERSON)
           .set(PERSON.ID, UUID.randomUUID())
@@ -48,13 +48,18 @@ class People {
           .set(PERSON.DISPLAY_NAME, displayName)
           .set(PERSON.GOOGLE_SUB, googleSub)
           .set(PERSON.CREATED_AT, clock.instant().atOffset(ZoneOffset.UTC))
-          .onConflict(PERSON.EMAIL).doNothing()
+          .onConflictDoNothing()   // any unique key: the email, or a google_sub a concurrent sign-in just set
           .execute();
-        return byEmail(normalizedEmail).orElseThrow();
+        Optional<Person> byEmail = byEmail(normalizedEmail);
+        if (byEmail.isPresent() || googleSub == null) return byEmail.orElseThrow();
+        return byGoogleSub(googleSub).orElseThrow();
     }
 
-    void linkGoogle(UUID id, String sub) {
-        db.update(PERSON).set(PERSON.GOOGLE_SUB, sub).where(PERSON.ID.eq(id)).execute();
+    /** Sets the Google identity only while the account has none; false when it already has one (never overwritten). */
+    boolean linkGoogle(UUID id, String sub) {
+        return db.update(PERSON).set(PERSON.GOOGLE_SUB, sub)
+                 .where(PERSON.ID.eq(id).and(PERSON.GOOGLE_SUB.isNull()))
+                 .execute() == 1;
     }
 
     /** Verification belongs to the number: a new number starts unverified unless verifiedAt is given. */

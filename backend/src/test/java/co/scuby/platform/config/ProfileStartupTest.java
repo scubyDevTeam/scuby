@@ -28,12 +28,14 @@ class ProfileStartupTest {
             "staging", Map.of(
                     "scuby.web.allowed-origins", "https://staging.scuby.test",
                     "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
-                    "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef"),
+                    "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef",
+                    "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com"),
             "prod", Map.of(
                     "scuby.web.allowed-origins", "https://scuby.test",
                     "scuby.web.origin-secret", "dummy-origin-secret",
                     "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
-                    "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef"));
+                    "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef",
+                    "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com"));
 
     @ParameterizedTest
     @ValueSource(strings = {"staging", "prod"})
