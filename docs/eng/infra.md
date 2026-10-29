@@ -150,14 +150,14 @@ arrives with the backend's upload slots, which know each photo's purpose.
 
 ## Before staging
 
-What the sandbox proved but staging must not inherit as it is. The modules default to throwaway
-behaviour today; staging should opt into it, not out of it.
+What the sandbox proved but staging must not inherit as it is. Where a module has a safe default
+(keep data, 14-day logs), the sandbox opts into the throwaway setting; staging must not copy it.
 
 - **Secrets out of the state** — *Secrets* above.
-- **Data that deletes itself:** the media bucket has `force_destroy = true` and ECR `force_delete =
-  true`, hard-coded in the shared modules. The bucket holds the only copy of every master photo, so
-  both become variables defaulting to `false` (and `prevent_destroy` on the bucket and the data
-  volume outside the sandbox).
+- **Data that deletes itself:** the media and registry modules default to keeping data
+  (`force_destroy` / `force_delete` = `false`); only the sandbox opts into deleting it. The bucket
+  holds the only copy of every master photo, so staging adds `prevent_destroy` on the bucket and
+  the data volume.
 - **The origin secret** reaches CloudFront but has no path to the backend: put it in SSM and check
   it in the backend.
 - **Instance permissions:** `AmazonSSMManagedInstanceCore` grants `ssm:GetParameter(s)` on every
@@ -165,8 +165,8 @@ behaviour today; staging should opt into it, not out of it.
 - **The origin is the instance's public DNS name**, which changes on stop/start; use an Elastic IP.
 - **The GitHub OIDC provider is one per account:** make it optional or read it as data if staging
   and production share an account. The deploy role's `sub` changes if the job uses an `environment`.
-- **Lambdas:** reserved concurrency and async retry settings; log retention as a variable (1 day is
-  hard-coded); `Accept` normalized in a CloudFront Function so it stops fragmenting the image cache.
+- **Lambdas:** reserved concurrency and async retry settings; `Accept` normalized in a CloudFront
+  Function so it stops fragmenting the image cache.
 - **CORS** restricted to the app's origin, on the S3 upload rule and on the image distribution
   (today `Managed-SimpleCORS`, `*`).
 - **Price class** is `PriceClass_100` on both distributions, which leaves out South American edges;
@@ -174,8 +174,6 @@ behaviour today; staging should opt into it, not out of it.
 - **ACM validation** has no timeout; DLM snapshots survive `destroy` (they carry `Project=scuby`).
 - **CI:** a workflow that runs the media Lambda tests and `terraform fmt`/`validate`/`plan` on
   `infra/`; provider lock files need `terraform providers lock -platform=linux_amd64`.
-- **The sandbox scripts** hard-code one person's AWS profile and a scratch directory; make both
-  configurable before anyone else runs them.
 
 ## CI/CD
 
