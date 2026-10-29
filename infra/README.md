@@ -1,9 +1,9 @@
 # infra/ — Infraestructura de Scuby
 
-Imagen de Postgres, Terraform, las Lambdas de fotos y el **sandbox**: un entorno desechable en una
-cuenta AWS de pruebas que se aplica, se prueba de punta a punta y se destruye en la misma corrida,
-para demostrar el Terraform antes de que exista staging. Las decisiones están en
-[`../docs/eng/infra.md`](../docs/eng/infra.md) y [`../docs/eng/media-pipeline.md`](../docs/eng/media-pipeline.md).
+Contiene la imagen de Postgres, el Terraform, las Lambdas de fotos y los scripts para correr el
+**sandbox**. Qué es el sandbox y por qué existe: [`../docs/eng/infra.md`](../docs/eng/infra.md) ·
+Environments ("Sandbox"). Las demás decisiones: ese mismo documento y
+[`../docs/eng/media-pipeline.md`](../docs/eng/media-pipeline.md).
 
 ## Estructura
 
@@ -16,7 +16,7 @@ infra/
 │   └── bootstrap/       Bucket de estado remoto para staging
 ├── lambda/media/        Lambdas de fotos (Node + sharp): ingesta y variantes; build.sh las empaqueta
 ├── compose/sandbox/     Docker Compose que corre en la EC2 (backend + Postgres, con límites de memoria)
-└── scripts/             sandbox-build / deploy / smoke / destroy, más los guardias (abajo)
+└── scripts/             sandbox-build / deploy / smoke / destroy, más las salvaguardas (abajo)
 ```
 
 ## Requisitos
@@ -30,7 +30,16 @@ infra/
 ## Correr el sandbox
 
 Todo con `AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1`. Los comandos largos corren en segundo
-plano (con `nohup`), nunca en primer plano.
+plano (con `nohup`), nunca en primer plano: si se interrumpe la espera de CloudFront, quedan
+recursos fuera del estado de Terraform.
+
+Los scripts guardan sus archivos de trabajo (`sso-login`, `watchdog.log`, `watchdog.fired`) en un
+directorio fijo, y hoy lo tienen escrito a mano (pendiente: hacerlo configurable). Los ejemplos
+de abajo lo llaman `SCRATCH`:
+
+```bash
+SCRATCH=/private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad
+```
 
 **Dónde clonar.** El watchdog corre bajo launchd, y macOS (TCC) no deja que un proceso de launchd
 lea `~/Desktop`, `~/Documents` ni `~/Downloads`. El sandbox se corre desde un clon o worktree fuera
@@ -38,28 +47,41 @@ de esas carpetas (p. ej. `~/scuby-b1-run`), y el estado de Terraform vive en ese
 
 Orden:
 
-1. `aws sso login --profile itslauyalejo-sso`
+1. `aws sso login --profile itslauyalejo-sso && date -u +%s > "$SCRATCH/sso-login"`
+   (`sso-remaining.sh` cuenta desde ese archivo; sin él imprime 0).
 2. `infra/lambda/media/build.sh` (y `infra/scripts/sandbox-build.sh` para las imágenes)
-3. **Arrancar el watchdog antes del apply**:
-   `launchctl submit -l co.scuby.watchdog -- /usr/bin/caffeinate -dims /bin/bash <clon>/infra/scripts/sandbox-watchdog.sh <deadline-epoch>`,
-   con el deadline unos 45 min antes de que expire la sesión SSO. Antes de aplicar, `watchdog.log`
-   debe mostrar las rutas de `terraform` y `aws` (no `MISSING`).
+3. **Arrancar el watchdog antes del apply.** Mínimo **150 min** de SSO restantes antes del apply
+   (`bash infra/scripts/sso-remaining.sh`); el deadline queda 45 min antes de que expire la sesión:
+
+   ```bash
+   left=$(bash infra/scripts/sso-remaining.sh); deadline=$(( $(date -u +%s) + (left - 45) * 60 ))
+   launchctl remove co.scuby.watchdog 2>/dev/null || true
+   launchctl submit -l co.scuby.watchdog -o "$SCRATCH/watchdog.log" -e "$SCRATCH/watchdog.log" -- /usr/bin/caffeinate -dims /bin/bash "$PWD/infra/scripts/sandbox-watchdog.sh" "$deadline"
+   ```
+
+   El log queda en `$SCRATCH/watchdog.log`. Antes de aplicar debe mostrar las rutas de `terraform`
+   y `aws` (no `MISSING`).
 4. `terraform -chdir=infra/terraform/envs/sandbox apply`
 5. `infra/scripts/sandbox-deploy.sh`
-6. `infra/scripts/sandbox-smoke.sh`
-7. **Siempre, al final:** `infra/scripts/sandbox-destroy.sh`
+6. Mínimo **90 min** de SSO restantes (`sso-remaining.sh`); si no, saltar al destroy.
+   Luego `infra/scripts/sandbox-smoke.sh`
+7. **Siempre, al final:** `infra/scripts/sandbox-destroy.sh`, aunque el apply, el deploy o el smoke
+   hayan fallado.
 
 El watchdog quita su propio job de launchd cuando dispara. Si la corrida termina con normalidad,
 se detiene con `launchctl remove co.scuby.watchdog`.
 
-## Guardias
+## Salvaguardas
 
 - `infra/scripts/sso-remaining.sh`: imprime los minutos que le quedan a la sesión SSO (0 si no hay
   sesión). Se exige un mínimo antes de aplicar.
 - `infra/scripts/sandbox-watchdog.sh <deadline>`: al llegar el deadline destruye el sandbox por su
   cuenta, salvo que el estado de Terraform esté vacío. Es la red de seguridad si la corrida se corta.
 
-`infra/scripts/sweep.sh` lista lo que quede con la etiqueta `Project=scuby` después de destruir.
+`infra/scripts/sweep.sh` comprueba, después de destruir, que no quede nada de Scuby (por etiqueta
+`Project=scuby` y por prefijo de nombre `scuby-`, `/scuby/` o `/scuby`) y que la VPC por defecto y el
+bucket ajenos sigan ahí. Imprime `sweep: clean` y sale con 0 si todo está bien; sale con 1 si queda
+algo o si una comprobación falla, y con 2 si las credenciales no sirven.
 
 ## No tocar
 
