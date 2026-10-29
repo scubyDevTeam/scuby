@@ -100,15 +100,11 @@ data "aws_iam_policy_document" "ingest" {
     resources = ["${aws_s3_bucket.media.arn}/media/*"]
   }
   # Without ListBucket a missing key answers AccessDenied instead of NoSuchKey, and ingest's
-  # "already processed" path (duplicate S3 event) would never run.
+  # "already processed" path (duplicate S3 event) would never run. No s3:prefix condition: a
+  # GetObject carries no prefix, so the condition could never match.
   statement {
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.media.arn]
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values   = ["incoming/*"]
-    }
   }
 }
 
@@ -250,8 +246,8 @@ resource "aws_cloudfront_distribution" "images" {
   viewer_certificate { cloudfront_default_certificate = true }
 }
 
-# CloudFront signs requests to the Function URL (OAC); both permissions are granted so the
-# invocation is allowed whichever one Lambda checks.
+# CloudFront signs requests to the Function URL (OAC); a Function URL invoked through OAC needs
+# both permissions.
 resource "aws_lambda_permission" "cloudfront_invokes_url" {
   statement_id           = "cloudfront-invokes-url"
   action                 = "lambda:InvokeFunctionUrl"
