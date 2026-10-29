@@ -36,9 +36,9 @@ comandos de abajo, desde la raíz de ese clon.
 
 Los scripts guardan sus archivos de trabajo (`sso-login`, `watchdog.log`, `watchdog.fired`) en
 `${SCUBY_SANDBOX_DIR:-$HOME/.scuby-sandbox}`; los ejemplos de abajo lo llaman `SCRATCH`. Es una
-carpeta bajo `$HOME` (no en Desktop, Documents ni Downloads) para que launchd pueda leerla. Los
-scripts usan el perfil `itslauyalejo-sso` y la región `us-east-1` por defecto; se pueden cambiar
-exportando `AWS_PROFILE` y `AWS_REGION` antes de correrlos.
+carpeta bajo `$HOME` (no en Desktop, Documents ni Downloads) para que launchd pueda leerla. El
+perfil `itslauyalejo-sso` y la región `us-east-1` están fijos, igual que en el provider de
+Terraform: el sandbox vive en una sola cuenta, y el sweep comprueba recursos ajenos de esa cuenta.
 
 ```bash
 export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end checks against the applied sandbox. Prints PASS/FAIL per check; exit 1 if any fails.
 set -uo pipefail
-export AWS_PROFILE="${AWS_PROFILE:-itslauyalejo-sso}" AWS_REGION="${AWS_REGION:-us-east-1}"
+# Pinned, like the Terraform provider (envs/sandbox/variables.tf): the sandbox lives in one account.
+export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 TF="terraform -chdir=$REPO/infra/terraform/envs/sandbox"
 out() { $TF output -raw "$1"; }

@@ -10,7 +10,8 @@ if [ -z "${HOME:-}" ]; then
 fi
 [ -n "${HOME:-}" ] && [ -d "$HOME" ] || { echo "FATAL: cannot determine HOME" >&2; exit 1; }
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-export AWS_PROFILE="${AWS_PROFILE:-itslauyalejo-sso}" AWS_REGION="${AWS_REGION:-us-east-1}"
+# Pinned, like the Terraform provider (envs/sandbox/variables.tf): the sandbox lives in one account.
+export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
 found=0
 
 if ! aws sts get-caller-identity >/dev/null 2>&1; then

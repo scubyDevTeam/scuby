@@ -8,7 +8,7 @@ SCRATCH="${SCUBY_SANDBOX_DIR:-${HOME:?HOME is not set}/.scuby-sandbox}"
 mkdir -p "$SCRATCH"
 LOGIN_FILE="${SSO_LOGIN_FILE:-$SCRATCH/sso-login}"
 SESSION_MINUTES="${SSO_SESSION_MINUTES:-480}"
-if [ ! -s "$LOGIN_FILE" ] || ! AWS_PROFILE="${AWS_PROFILE:-itslauyalejo-sso}" aws sts get-caller-identity >/dev/null 2>&1; then
+if [ ! -s "$LOGIN_FILE" ] || ! AWS_PROFILE=itslauyalejo-sso aws sts get-caller-identity >/dev/null 2>&1; then
   echo 0
   exit 0
 fi

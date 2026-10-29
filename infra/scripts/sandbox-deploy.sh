@@ -2,7 +2,8 @@
 # Pushes the locally built images to ECR and starts them on the sandbox EC2 through SSM.
 # Run sandbox-build.sh first.
 set -euo pipefail
-export AWS_PROFILE="${AWS_PROFILE:-itslauyalejo-sso}" AWS_REGION="${AWS_REGION:-us-east-1}"
+# Pinned, like the Terraform provider (envs/sandbox/variables.tf): the sandbox lives in one account.
+export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 # HOME can be unset under launchd; set -u would abort otherwise.
 SCRATCH="${SCUBY_SANDBOX_DIR:-${HOME:?HOME is not set}/.scuby-sandbox}"
