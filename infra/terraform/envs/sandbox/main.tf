@@ -1,0 +1,49 @@
+locals {
+  name = "scuby-${var.env}"
+}
+
+resource "random_id" "suffix" {
+  byte_length = 3
+}
+
+variable "instance_type" {
+  description = "One value for the instance and for the AZ check in the network module"
+  type        = string
+  default     = "t4g.small"
+}
+
+module "network" {
+  source        = "../../modules/network"
+  name          = local.name
+  instance_type = var.instance_type
+}
+
+module "registry" {
+  source       = "../../modules/registry"
+  name         = local.name
+  repositories = ["backend", "postgres"]
+}
+
+module "queues" {
+  source = "../../modules/queues"
+  name   = local.name
+}
+
+module "params" {
+  source = "../../modules/params"
+  prefix = "/scuby/${var.env}"
+  secret_names = [
+    "db/password",
+    "twilio/auth-token",
+    "resend/api-key",
+    "vapid/private-key",
+    "google/client-secret",
+    "sentry/dsn",
+  ]
+}
+
+module "dns" {
+  source = "../../modules/dns"
+  count  = var.domain == "" ? 0 : 1
+  domain = var.domain
+}
