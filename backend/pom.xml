@@ -147,6 +147,31 @@
 
   <build>
     <plugins>
+      <!-- thin slice: building with another JDK or an old Maven fails at validate with a clear message -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.6.3</version>
+        <executions>
+          <execution>
+            <id>enforce-java-and-maven</id>
+            <phase>validate</phase>
+            <goals><goal>enforce</goal></goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[25,26)</version>
+                  <message>Scuby's backend builds with Java 25 (backend/.java-version). Export JAVA_HOME=/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home or run `jenv local 25`.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                  <message>Use the wrapper: ./mvnw</message>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <!--
         jOOQ codegen runs the migrations against a throwaway container and writes target/generated-sources/jooq.
         - Plugin 0.0.4 is built for Testcontainers 1.x, so 1.x is pinned here for the plugin only;
@@ -270,7 +295,14 @@
         <version>3.5.2</version>
         <configuration>
           <from>
-            <image>eclipse-temurin:25-jre</image>
+            <!--
+              thin slice: the base image derives from ${java.version} and is pinned to the multi-arch
+              index digest of eclipse-temurin:${java.version}-jre (linux/amd64 + linux/arm64), looked up
+              on 2026-10-29.
+              To bump: docker buildx imagetools inspect eclipse-temurin:${java.version}-jre → the top "Digest:".
+              Changing java.version means changing .java-version and this digest in the same commit.
+            -->
+            <image>eclipse-temurin:${java.version}-jre@sha256:78f1f183913482ef390c2722f46c3f0ce76ada341d69590e7c482ec943ee72d5</image>
             <platforms>
               <platform><architecture>arm64</architecture><os>linux</os></platform>
               <platform><architecture>amd64</architecture><os>linux</os></platform>
