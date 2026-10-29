@@ -20,9 +20,20 @@ aws ecr get-login-password | docker login --username AWS --password-stdin "$REGI
 docker tag scuby/postgres:17 "$POSTGRES_REPO:17" && docker push "$POSTGRES_REPO:17"
 docker tag scuby-backend "$BACKEND_REPO:sandbox" && docker push "$BACKEND_REPO:sandbox"
 
-echo "== database password (set by the CLI, never by Terraform)"
-aws ssm put-parameter --name "$PREFIX/db/password" --type SecureString --overwrite \
-  --value "$(openssl rand -hex 24)" >/dev/null
+echo "== database password (generated once by the CLI, kept across retries)"
+# Terraform creates the parameter with the value "placeholder" and ignores later changes to it, but its
+# refresh does read the real value back into the git-ignored local state. Only the CLI ever writes it.
+# A retry must keep the existing value: the Postgres volume was already initialised with it.
+current=$(aws ssm get-parameter --name "$PREFIX/db/password" --with-decryption \
+  --query Parameter.Value --output text)
+if [ "$current" = "placeholder" ]; then
+  aws ssm put-parameter --name "$PREFIX/db/password" --type SecureString --overwrite \
+    --value "$(openssl rand -hex 24)" >/dev/null
+  echo "generated a new password"
+else
+  echo "password already set — reusing it"
+fi
+unset current
 
 echo "== waiting for the instance to register with SSM"
 status=""
@@ -53,7 +64,7 @@ exit 1
 EOF
 )
 REMOTE_B64=$(printf '%s' "$REMOTE" | base64 | tr -d '\n')
-printf '{"commands":["echo %s | base64 -d > /opt/scuby-run.sh", "bash /opt/scuby-run.sh"]}' "$REMOTE_B64" > "$SCRATCH/ssm-commands.json"
+printf '{"commands":["echo %s | base64 -d > /opt/scuby-run.sh", "bash /opt/scuby-run.sh"],"executionTimeout":["900"]}' "$REMOTE_B64" > "$SCRATCH/ssm-commands.json"
 CMD=$(aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
   --parameters "file://$SCRATCH/ssm-commands.json" --timeout-seconds 900 \
   --query Command.CommandId --output text)

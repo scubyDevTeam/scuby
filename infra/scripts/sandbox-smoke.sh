@@ -14,17 +14,30 @@ BUCKET=$(out media_bucket); IMAGES=$(out image_url)
 body=$(curl -s --max-time 20 "$API/actuator/health"); echo "$body" | grep -q '"status":"UP"'
 check "API health through CloudFront ($API)" $?
 
-curl -s --max-time 8 "http://$ORIGIN:8080/actuator/health" >/dev/null
-[ $? -ne 0 ]; check "the EC2 refuses direct requests" $?
+if [ -z "$ORIGIN" ]; then
+  false
+else
+  curl -s --max-time 8 "http://$ORIGIN:8080/actuator/health" >/dev/null; [ $? -ne 0 ]
+fi; check "the EC2 refuses direct requests" $?
 
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$API/no/such/route")
 [ "$code" = "404" ]; check "unknown route answers 404 through CloudFront (got $code)" $?
 
 token="smoke-$(date +%s)"
 aws sqs send-message --queue-url "$QUEUE" --message-body "$token" >/dev/null
-msg=$(aws sqs receive-message --queue-url "$QUEUE" --wait-time-seconds 10 --query 'Messages[0].[Body,ReceiptHandle]' --output text)
-[ "$(echo "$msg" | cut -f1)" = "$token" ]; check "SQS round trip" $?
-[ -n "$(echo "$msg" | cut -f2)" ] && aws sqs delete-message --queue-url "$QUEUE" --receipt-handle "$(echo "$msg" | cut -f2)"
+msg=$(aws sqs receive-message --queue-url "$QUEUE" --wait-time-seconds 10 --query 'Messages[0].[Body,ReceiptHandle]' --output text 2>&1)
+rc=$?
+if [ "$rc" -eq 0 ] && ! echo "$msg" | grep -q AccessDenied && [ "$(echo "$msg" | cut -f1)" = "$token" ]; then
+  ok=0
+else
+  ok=1
+fi
+check "SQS round trip" $ok
+handle=$(echo "$msg" | cut -f2)
+# An empty queue prints "None"; only delete with a real receipt handle.
+if [ "$rc" -eq 0 ] && [ "$ok" -eq 0 ] && [ -n "$handle" ] && [ "$handle" != "None" ]; then
+  aws sqs delete-message --queue-url "$QUEUE" --receipt-handle "$handle"
+fi
 
 (cd "$REPO/infra/lambda/media" && node smoke/upload-smoke.mjs "$BUCKET" "$IMAGES")
 check "media pipeline (see lines above)" $?
