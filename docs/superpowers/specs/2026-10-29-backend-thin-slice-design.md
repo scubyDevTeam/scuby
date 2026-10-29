@@ -155,6 +155,39 @@ in `platform.web`.
 - Agent instructions live in **`backend/CLAUDE.md`** (as `web/CLAUDE.md` does for the client): the
   package rules, the facts → derivation pattern, where guardrails live, what reviewers check.
 
+## Behaviour decisions (where contract, client mock and product docs disagree)
+
+**Precedence.** The contract fixes the wire shape (fields, types, codes). For behaviour, **the product
+docs win** where the client's emulated backend simplified at the product's expense; the emulated
+backend is the reference only where the docs are silent. A fix that needs a contract change is
+proposed to the client side (list at the end of this section), never made unilaterally.
+
+| Topic | Decision |
+|---|---|
+| Feed order and scope | **Nearest first, recency as tie-break** (`product/02` "proximity + recency"; `web/src/contracts/feed.ts` "nearest first"). With `lat`/`lng`: open cases within 25 km (configurable), ordered by distance band (≤ 2 km, ≤ 5 km, ≤ 10 km, ≤ 25 km) then newest first within a band; scope `local`. No case near, or no `lat`/`lng`: scope `national`, newest first. National capped at the 100 newest (the contract has no paging). Distance via PostGIS on `geography` |
+| Phone step at publish | OTP when `publisher_phone_otp` is on **and** the number is new **or not verified** (stricter than the emulated backend, which skipped a stored-but-unverified number). The first `phone_step: otp` answer sends the code; repeating that call inside the 60 s cooldown answers `otp` again without resending. Flag off: publish directly (`{code}`), number stored E.164 and unverified (open item O22) |
+| Sighting rate limits | Per reporter per case 5 per rolling 24 h; per reporter 20 per rolling 24 h; the 15-minute rule waived inside the earlier pin's correction window (as `product/04`). Reporter = account when signed in, else the device. **The client IP is a second key** (`product/04`, `api.md`): from `CloudFront-Viewer-Address` only when the request carries the origin secret header, else the socket address (local) |
+| Public location floor | The server sends `last_seen.radius_m = max(radius, 200)` to non-owners; the owner gets the stored radius; the center is never moved. Internally the stored radius is used for every computation |
+| `mine` on sightings | The session's account **or** the device matches the reporter |
+| Photos | A photo in a publish/sighting body must have been uploaded by this caller (account or device) for that purpose and be processed, else `validation_failed` on that field. `pet` and `profile` slots need a session (`validation_failed` on `purpose` otherwise). Slots expire in 5 minutes; at most 20 slots per caller per 10 minutes. **Local and test** store bytes through a development-only PUT endpoint that marks the photo processed at once (as the emulated backend does); staging uses S3 + the ingest Lambda |
+| Other verticals | Codes of found/adoption/help answer `not_found` in this slice (none exist yet) |
+| `GET /feed` query parameters | Implemented from the Zod schema (`vertical`, `species`, `lat`, `lng`); their absence from `openapi.json` is reported |
+| Notifications and check-ins | **Not in this slice** (no outbox events, no check-in scheduling): a notification needs its orchestrator, push, email and inbox (backend-plan L.1). **Product risk:** must ship before the first real user |
+| `seen_at` in the future | Tolerate **5 minutes** of device clock drift; beyond that `seen_at_in_future` (`product/04` is corrected to say so) |
+| Email code | 6 digits, stored hashed, 5-minute expiry, 3 attempts, 60 s cooldown, 10 per address per day; address normalised (trim, lower-case); always 204 |
+| Google | Require `email_verified`; identity key = Google `sub`; link to an existing account by verified email |
+| Test bypasses (never prod) | Fixed email code for a test domain (e.g. `*@e2e.scuby.test`); fixed SMS code for a reserved test number range (e.g. `+57 300 000 00xx`); `publisher_phone_otp` off per test account. Enabling a bypass under the `prod` profile fails start-up |
+| Place names | `PlaceNamer` interface; computed once at publish (and on location edit), stored on the case. Behind a new flag **`reverse_geocoding`, default off** → `place_name` is a generic localized label («Zona marcada en el mapa»). A **spike** compares Amazon Location (stored results ≈ $4 per 1,000), Nominatim and PostGIS with open barrio polygons on ~15 Colombian points (Laureles vs Belén, Chapinero, a small municipality, a rural point) before the flag is turned on — previews and posters show the **barrio** (`product/10`) |
+| Feature flags | The flag system of decision #18 (tables, change history, registry, one evaluation function) is built in this slice: `publisher_phone_otp` and `reverse_geocoding` need it |
+| Case codes | Case-insensitive lookup; the purged-code table exists (empty) so `gone` works |
+
+**Queries and indexes.**
+- **N+1 guard on every endpoint test:** a jOOQ execute listener counts statements per request and the test fails above a fixed ceiling (e.g. `GET /cases/{code}` ≤ 3 regardless of how many sightings).
+- **Plan checks only where a query can degrade as a table grows:** the feed, a case's sightings, the rate-limit counts, the `active_case_exists` check. Those get an integration test with seeded volume (thousands of rows) asserting the expected plan (index used, no sequential scan on the large table). Primary-key/unique lookups, single-row writes and small static tables are exempt.
+- **An index is earned, not assumed:** measure first; a proposed index carries, in its migration comment and the task report, the query it serves, the plan before and after, its write cost on that table and any overlap with existing indexes. **Every new index needs human approval** before the branch merges; the final report lists them.
+
+**Proposed to the client side (contract/docs changes):** feed paging; `phone_step: unverified` (O22); feed parameters missing from `openapi.json`; the 5-minute tolerance in `product/04`; nearest-first wording made consistent across contract and docs.
+
 ## Human review focus
 
 Automation covers shape, architecture and test strength. Humans review: the derivation test tables
