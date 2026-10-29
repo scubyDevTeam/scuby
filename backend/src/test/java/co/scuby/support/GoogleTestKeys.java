@@ -37,6 +37,11 @@ public final class GoogleTestKeys {
     private volatile boolean jwksDown;
     private final java.util.concurrent.atomic.AtomicInteger fetches = new java.util.concurrent.atomic.AtomicInteger();
 
+    private volatile Runnable onFetch = () -> {};
+
+    /** Runs at every key-set fetch, on the fetching thread: lets a test observe the caller's context. */
+    public void onFetch(Runnable hook) { onFetch = hook; }
+
     /** How many times the key set was fetched (an outage attempt counts too). */
     public int fetchCount() { return fetches.get(); }
 
@@ -48,6 +53,7 @@ public final class GoogleTestKeys {
         return new RestTemplate((uri, method) -> new MockClientHttpRequest(method, uri) {
             @Override protected org.springframework.http.client.ClientHttpResponse executeInternal() throws IOException {
                 fetches.incrementAndGet();
+                onFetch.run();
                 if (jwksDown) throw new IOException("jwks down");
                 String json = new JWKSet(new RSAKey.Builder(publicKey()).keyID("test").build()).toString();
                 MockClientHttpResponse r = new MockClientHttpResponse(json.getBytes(StandardCharsets.UTF_8), HttpStatus.OK);

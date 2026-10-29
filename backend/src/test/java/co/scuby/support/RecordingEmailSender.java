@@ -2,6 +2,7 @@ package co.scuby.support;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /** Stands in for EmailSender in tests (registered @Primary by TestSupportConfiguration). */
 public class RecordingEmailSender {
@@ -10,7 +11,16 @@ public class RecordingEmailSender {
 
     private final List<Sent> sent = new CopyOnWriteArrayList<>();
 
-    public void record(String email, String code) { sent.add(new Sent(email, code)); }
+    private volatile Consumer<Sent> hook = s -> {};
+
+    /** Runs inside every send, on the sending thread (cleared by clear()): lets a test observe the sender's context. */
+    public void onSend(Consumer<Sent> hook) { this.hook = hook; }
+
+    public void record(String email, String code) {
+        Sent s = new Sent(email, code);
+        hook.accept(s);
+        sent.add(s);
+    }
 
     public List<Sent> sent() { return List.copyOf(sent); }
 
@@ -19,5 +29,8 @@ public class RecordingEmailSender {
                    .orElseThrow(() -> new AssertionError("no code sent to " + email)).code();
     }
 
-    public void clear() { sent.clear(); }
+    public void clear() {
+        sent.clear();
+        hook = s -> {};
+    }
 }

@@ -6,6 +6,7 @@ import co.scuby.platform.security.Caller;
 import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.ErrorCode;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -17,7 +18,10 @@ import java.time.ZoneOffset;
 
 import static co.scuby.db.generated.Tables.EMAIL_CODE;
 
-/** Sign-in codes (design · Behaviour decisions, Email code). Callers run these inside a transaction. */
+/**
+ * Sign-in codes (design · Behaviour decisions, Email code). Callers run these inside a transaction, and send
+ * the returned {@link Outgoing} with {@link #deliver} only after it commits (no network call in a transaction).
+ */
 @Component
 class EmailCodes {
 
@@ -25,6 +29,9 @@ class EmailCodes {
     static final Duration COOLDOWN = Duration.ofSeconds(60);
     static final int MAX_ATTEMPTS = 3;
     static final int MAX_SENDS_PER_DAY = 10;
+
+    /** A code stored and waiting to be sent. */
+    record Outgoing(String email, String code) {}
 
     private final DSLContext db;
     private final Clock clock;
@@ -49,14 +56,14 @@ class EmailCodes {
      * Over the device or IP cap (checked first, for every address): rate_limited. Otherwise sends a new code
      * unless the live one is inside its cooldown or the address is over its daily cap (silent: 204 either way).
      * A test-domain address skips every limit and always gets a fresh row with the fixed code.
+     * Returns the code to send, or null when nothing goes out. The caller delivers it after commit.
      */
-    void start(String email, Caller caller) {
+    @Nullable Outgoing start(String email, Caller caller) {
         Instant now = clock.instant();
         LocalDate today = now.atOffset(ZoneOffset.UTC).toLocalDate();
         if (bypass.emailBypassed(email)) {
             write(email, bypass.code(), now, today, 1);
-            sender.sendSignInCode(email, bypass.code());
-            return;
+            return new Outgoing(email, bypass.code());
         }
         // Serialises concurrent starts for one address: FOR UPDATE locks nothing while no row exists.
         db.fetch("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "email_code:" + email);
@@ -68,14 +75,19 @@ class EmailCodes {
             throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes requested");
         }
         boolean live = row != null && row.getAttempts() < MAX_ATTEMPTS && row.getExpiresAt().toInstant().isAfter(now);
-        if (live && row.getSentAt().toInstant().plus(COOLDOWN).isAfter(now)) return;
+        if (live && row.getSentAt().toInstant().plus(COOLDOWN).isAfter(now)) return null;
         int sendsToday = row != null && row.getSendsDay().equals(today) ? row.getSendsOnDay() : 0;
-        if (sendsToday >= MAX_SENDS_PER_DAY) return;
+        if (sendsToday >= MAX_SENDS_PER_DAY) return null;
 
         String code = Hashing.randomDigits(6);
         write(email, code, now, today, sendsToday + 1);
         sends.record(CodeSends.Channel.email, email, caller.personId(), caller.deviceHash(), caller.ipHash());
-        sender.sendSignInCode(email, code);
+        return new Outgoing(email, code);
+    }
+
+    /** The network call: never inside a transaction. */
+    void deliver(Outgoing outgoing) {
+        sender.sendSignInCode(outgoing.email(), outgoing.code());
     }
 
     /** True once per code: a right code is consumed; a wrong one costs an attempt (the caller's transaction must commit it). */

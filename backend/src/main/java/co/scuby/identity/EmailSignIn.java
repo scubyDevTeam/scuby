@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -22,7 +23,11 @@ class EmailSignIn {
     private final SignInSessions signInSessions;
     private final PhoneOtp phoneOtp;
 
-    EmailSignIn(EmailCodes codes, People people, SessionStore sessions, SignInSessions signInSessions, PhoneOtp phoneOtp) {
+    private final TransactionTemplate tx;
+
+    EmailSignIn(EmailCodes codes, People people, SessionStore sessions, SignInSessions signInSessions, PhoneOtp phoneOtp,
+                TransactionTemplate tx) {
+        this.tx = tx;
         this.phoneOtp = phoneOtp;
         this.codes = codes;
         this.people = people;
@@ -34,9 +39,10 @@ class EmailSignIn {
         return email.strip().toLowerCase(Locale.ROOT);
     }
 
-    @Transactional
+    /** Stores the code in one transaction, then sends it (a failed send leaves the stored code unused: server_error). */
     public void start(String email, Caller caller) {
-        codes.start(normalize(email), caller);
+        EmailCodes.Outgoing outgoing = tx.execute(status -> codes.start(normalize(email), caller));
+        if (outgoing != null) codes.deliver(outgoing);
     }
 
     /**

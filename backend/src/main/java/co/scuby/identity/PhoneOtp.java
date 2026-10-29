@@ -92,9 +92,8 @@ class PhoneOtp {
         if (counts.all() + 1 > limits.alarmDailySends()) {
             log.warn("sms.daily_send_alarm sends_24h={} threshold={}", counts.all() + 1, limits.alarmDailySends());
         }
-        // O23: a real provider must be called AFTER this transaction commits (a TransactionSynchronization
-        // afterCommit), or a rollback would leave a texted code that was never stored. The log adapter needn't.
-        sender.sendCode(phone, code);
+        // After the (possibly outer, e.g. the publish's) transaction commits: see AfterCommit.
+        AfterCommit.run(() -> sender.sendCode(phone, code));
         return Sent.SENT;
     }
 

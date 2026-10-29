@@ -5,7 +5,7 @@ import co.scuby.platform.web.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Optional;
 
@@ -19,7 +19,10 @@ class GoogleSignIn {
     private final People people;
     private final SignInSessions sessions;
 
-    GoogleSignIn(GoogleIdTokens tokens, People people, SignInSessions sessions) {
+    private final TransactionTemplate tx;
+
+    GoogleSignIn(GoogleIdTokens tokens, People people, SignInSessions sessions, TransactionTemplate tx) {
+        this.tx = tx;
         this.tokens = tokens;
         this.people = people;
         this.sessions = sessions;
@@ -36,9 +39,14 @@ class GoogleSignIn {
      * the one that won (ours or an identical racing request's). The resolved row is then locked and its
      * google_sub re-checked, and the session is opened in the same transaction (see {@link EmailSignIn#verify}).
      */
-    @Transactional
     public SignedIn signIn(String credential, Optional<String> carriedTokenHash) {
+        // Verified BEFORE the transaction opens: on a key-cache miss this fetches Google's JWKS over HTTP, and a
+        // slow Google must not hold a pooled connection per waiting sign-in.
         GoogleIdentity google = tokens.verify(credential);
+        return tx.execute(status -> signIn(google, carriedTokenHash));
+    }
+
+    private SignedIn signIn(GoogleIdentity google, Optional<String> carriedTokenHash) {
         Person resolved = resolve(google);
         // Lock the row and look again: an email-code sign-in may have unlinked this identity (and deleted
         // its sessions) between our read and now. Past the lock the link is stable until we commit, and the
