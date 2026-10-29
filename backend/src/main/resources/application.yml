@@ -34,3 +34,11 @@ scuby:
     cache-size: 10000
     cache-ttl: 60s
     lifetime-months: 12
+  auth:
+    code-hash-key: local-only-code-hash-key
+    email-max-per-device: 10
+    email-max-per-ip: 20
+    test-bypass:
+      email-domains: []
+      sms-prefixes: []
+      code: "123456"

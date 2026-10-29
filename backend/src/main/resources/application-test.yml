@@ -4,6 +4,10 @@ scuby:
   web:
     allowed-origins: [ "http://localhost:4173" ]
     origin-secret: test-origin-secret
+  auth:
+    test-bypass:
+      email-domains: [ "e2e.scuby.test" ]
+      sms-prefixes: [ "+5730000000" ]
 # thin slice: each cached test context keeps its own pool against one Postgres container
 # (max_connections 100); small pools keep a dozen contexts under the limit.
 spring:

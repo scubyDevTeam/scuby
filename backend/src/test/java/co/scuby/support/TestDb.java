@@ -18,6 +18,8 @@ public final class TestDb {
             "feature_flag_overrides",
             "feature_flag_changes",
             "session",
+            "email_code",
+            "code_send",
             "person"
     );
 
@@ -26,9 +28,12 @@ public final class TestDb {
     private final MutableClock clock;
     private final StatementRecorder recorder;
     private final ConnectionSampler sampler;
+    private final ObjectProvider<RecordingEmailSender> emails;
 
     TestDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder,
-           ConnectionSampler sampler) {
+           ConnectionSampler sampler,
+           ObjectProvider<RecordingEmailSender> emails) {
+        this.emails = emails;
         this.db = db;
         this.caches = caches;
         this.clock = clock;
@@ -59,5 +64,6 @@ public final class TestDb {
         clock.reset();
         recorder.reset();
         sampler.reset();
+        emails.ifAvailable(RecordingEmailSender::clear);
     }
 }

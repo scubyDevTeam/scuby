@@ -13,12 +13,16 @@ class IdentityPurge {
 
     private final SessionStore sessions;
 
-    IdentityPurge(SessionStore sessions) {
+    private final CodeSends codeSends;
+
+    IdentityPurge(SessionStore sessions, CodeSends codeSends) {
         this.sessions = sessions;
+        this.codeSends = codeSends;
     }
 
     @Scheduled(cron = "${scuby.purge.cron:0 17 3 * * *}", zone = "UTC")
     void purge() {
         log.info("purged {} expired sessions", sessions.purgeExpired());
+        log.info("purged {} code-send rows older than 30 days", codeSends.purgeOlderThan(java.time.Duration.ofDays(30)));
     }
 }

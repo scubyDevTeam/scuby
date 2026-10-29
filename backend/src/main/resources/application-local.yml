@@ -9,3 +9,7 @@ spring:
 scuby:
   web:
     allowed-origins: [ "http://localhost:5173", "http://localhost:4173" ]
+  auth:
+    test-bypass:
+      email-domains: [ "e2e.scuby.test" ]
+      sms-prefixes: [ "+5730000000" ]

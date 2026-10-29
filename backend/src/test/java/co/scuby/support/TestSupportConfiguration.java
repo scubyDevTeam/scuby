@@ -16,6 +16,7 @@ import javax.sql.DataSource;
 
 /** Beans every @IntegrationTest gets. Later tasks add recording senders and test keys here. */
 @TestConfiguration(proxyBeanMethods = false)
+@org.springframework.context.annotation.Import(co.scuby.identity.IdentityTestBeans.class)
 public class TestSupportConfiguration {
 
     @Bean
@@ -59,7 +60,8 @@ public class TestSupportConfiguration {
 
     @Bean
     TestDb testDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder,
-                  ConnectionSampler sampler) {
-        return new TestDb(db, caches, clock, recorder, sampler);
+                  ConnectionSampler sampler,
+                  ObjectProvider<RecordingEmailSender> emails) {
+        return new TestDb(db, caches, clock, recorder, sampler, emails);
     }
 }
