@@ -12,24 +12,33 @@ class ArchitectureTest {
     private static final ArchitectureRules RULES = new ArchitectureRules("co.scuby");
 
     @ArchTest
-    void derivationsArePure(JavaClasses classes) {
-        RULES.derivationsDependOnNothingImpure().check(classes);
-        RULES.derivationsReadNoClockOrRandomness().check(classes);
-    }
+    void derivationsDependOnNothingImpure(JavaClasses classes) { RULES.derivationsDependOnNothingImpure().check(classes); }
 
     @ArchTest
-    void rolesStayApart(JavaClasses classes) {
-        RULES.workersDoNotUseApi().check(classes);
-        RULES.apiDoesNotUseWorkers().check(classes);
-    }
+    void derivationsReadNoClockOrRandomness(JavaClasses classes) { RULES.derivationsReadNoClockOrRandomness().check(classes); }
 
     @ArchTest
-    void dependenciesFormTheDag(JavaClasses classes) {
-        RULES.platformDependsOnNoFeature().check(classes);
+    void workersDoNotUseApi(JavaClasses classes) { RULES.workersDoNotUseApi().check(classes); }
+
+    @ArchTest
+    void apiDoesNotUseWorkers(JavaClasses classes) { RULES.apiDoesNotUseWorkers().check(classes); }
+
+    @ArchTest
+    void platformDependsOnNoFeature(JavaClasses classes) { RULES.platformDependsOnNoFeature().check(classes); }
+
+    @ArchTest
+    void foundationsAreIsolated(JavaClasses classes) {
+        // one check per foundation; the rule's own description names the package on failure
         RULES.foundations().forEach(f -> RULES.foundationIsolated(f).check(classes));
-        RULES.verticals().forEach(v -> RULES.verticalIsolated(v).check(classes));
-        RULES.onlyKnownTopLevelPackages().check(classes);
     }
+
+    @ArchTest
+    void verticalsAreIsolated(JavaClasses classes) {
+        RULES.verticals().forEach(v -> RULES.verticalIsolated(v).check(classes));
+    }
+
+    @ArchTest
+    void onlyKnownTopLevelPackages(JavaClasses classes) { RULES.onlyKnownTopLevelPackages().check(classes); }
 
     @ArchTest
     void crossFeatureUseIsDeclared(JavaClasses classes) {

@@ -12,14 +12,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ArchitectureRulesSelfTest {
 
     private static final JavaClasses FIXTURES = new ClassFileImporter().importPackages("archfixtures");
-    /** Fixtures have one foundation and two verticals, so vertical → vertical can be broken on purpose. */
+    /** Fixtures have two foundations and two verticals, so vertical → vertical can be broken on purpose. */
     private static final ArchitectureRules RULES =
-            new ArchitectureRules("archfixtures", List.of("identity"), List.of("cases", "help"));
+            new ArchitectureRules("archfixtures", List.of("identity", "pets"), List.of("cases", "help"));
 
     @Test
     void aDerivationReadingTheClockFails() {
         assertThatThrownBy(() -> RULES.derivationsReadNoClockOrRandomness().check(FIXTURES))
-                .isInstanceOf(AssertionError.class).hasMessageContaining("ClockReadingDerivation")
+                .isInstanceOf(AssertionError.class).hasMessageContaining("archfixtures.cases.ClockReadingDerivation")
                 .message().doesNotContain("PureDerivation");
     }
 
@@ -33,15 +33,51 @@ class ArchitectureRulesSelfTest {
     }
 
     @Test
-    void aDerivationUsingClockSystemSecureRandomUuidMathRandomOrAMethodReferenceFails() {
+    void aDerivationUsingClockSystemSecureRandomUuidMathRandomFails() {
         assertThatThrownBy(() -> RULES.derivationsReadNoClockOrRandomness().check(FIXTURES))
                 .isInstanceOf(AssertionError.class)
                 .hasMessageContaining("OtherSneakyDerivation")
                 .hasMessageContaining("java.time.Clock.system(java.time.ZoneId)")
                 .hasMessageContaining("java.util.UUID.randomUUID()")
                 .hasMessageContaining("java.lang.Math.random()")
-                .hasMessageContaining("java.security.SecureRandom.<init>()")
-                .hasMessageContaining("java.time.Instant.now()");
+                .hasMessageContaining("java.security.SecureRandom.<init>()");
+    }
+
+    private static void assertClockRuleFlags(String fixture) {
+        assertThatThrownBy(() -> RULES.derivationsReadNoClockOrRandomness().check(FIXTURES))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("archfixtures.cases." + fixture);
+    }
+
+    @Test
+    void aMethodReferenceToTheClockFails() { assertClockRuleFlags("MethodRefClockDerivation"); }
+
+    @Test
+    void aMethodReferenceToRandomnessFails() { assertClockRuleFlags("MethodRefRandomDerivation"); }
+
+    @Test
+    void newDateWithoutAnInstantFails() { assertClockRuleFlags("DateConstructorDerivation"); }
+
+    @Test
+    void anySecureRandomConstructorFails() { assertClockRuleFlags("SeededSecureRandomDerivation"); }
+
+    @Test
+    void anUnseededRandomFails() { assertClockRuleFlags("UnseededRandomDerivation"); }
+
+    @Test
+    void anUnseededSplittableRandomFails() { assertClockRuleFlags("UnseededSplittableRandomDerivation"); }
+
+    @Test
+    void seededGeneratorsAndExplicitInstantDatesPass() {
+        assertThatThrownBy(() -> RULES.derivationsReadNoClockOrRandomness().check(FIXTURES))
+                .isInstanceOf(AssertionError.class)
+                .message().doesNotContain("DeterministicConstructorsDerivation");
+    }
+
+    @Test
+    void aFoundationReachingIntoAnotherFoundationFails() {
+        assertThatThrownBy(() -> RULES.foundationIsolated("pets").check(FIXTURES))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("archfixtures.pets.ReachesIntoIdentity");
     }
 
     @Test
@@ -99,7 +135,7 @@ class ArchitectureRulesSelfTest {
     void anUndeclaredCrossFeatureUseFailsAndADeclaredOnePasses() {
         assertThatThrownBy(() -> RULES.moduleApi("identity").check(FIXTURES))
                 .isInstanceOf(AssertionError.class)
-                .hasMessageContaining("Internal")
+                .hasMessageContaining("archfixtures.identity.Internal")
                 .message().doesNotContain("Exposed");
     }
 }

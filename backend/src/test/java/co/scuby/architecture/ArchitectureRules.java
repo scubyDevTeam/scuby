@@ -4,17 +4,15 @@ import co.scuby.platform.modules.ModuleApi;
 import co.scuby.platform.roles.ApiComponent;
 import co.scuby.platform.roles.WorkerComponent;
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaMethodCall;
+import com.tngtech.archunit.core.domain.AccessTarget;
 import com.tngtech.archunit.lang.ArchRule;
 import org.springframework.stereotype.Component;
 
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
-import java.util.SplittableRandom;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.properties.CanBeAnnotated.Predicates.metaAnnotatedWith;
@@ -55,14 +53,21 @@ final class ArchitectureRules {
     };
 
     /**
-     * Any read of the clock or of randomness, whatever the overload: every `now(..)` on a java.time type
-     * (also `Instant.now(clock)`), Clock.system*, System.currentTimeMillis/nanoTime, UUID.randomUUID,
-     * Math.random, ThreadLocalRandom.current.
+     * Any read of the clock or of randomness, whatever the overload and whether called or taken as a method
+     * reference (`Instant::now`): every `now(..)` on a java.time type, Clock.system*, System.currentTimeMillis/nanoTime,
+     * UUID.randomUUID, Math.random, ThreadLocalRandom.current, SecureRandom.getInstance*; and the constructors
+     * `new SecureRandom(..)`, `new Random()`, `new SplittableRandom()` and `new Date()` (seeded / explicit-instant forms are deterministic and allowed).
      */
-    static final DescribedPredicate<JavaMethodCall> CLOCK_OR_RANDOMNESS = new DescribedPredicate<>("reads the clock or randomness") {
-        @Override public boolean test(JavaMethodCall call) {
-            String owner = call.getTargetOwner().getName();
-            String name = call.getName();
+    static final DescribedPredicate<AccessTarget> CLOCK_OR_RANDOMNESS = new DescribedPredicate<>("reads the clock or randomness") {
+        @Override public boolean test(AccessTarget target) {
+            String owner = target.getOwner().getName();
+            String name = target.getName();
+            if (target instanceof AccessTarget.ConstructorCallTarget ctor) {
+                int params = ctor.getRawParameterTypes().size();
+                return owner.equals("java.security.SecureRandom")
+                        || (params == 0 && (owner.equals("java.util.Random") || owner.equals("java.util.SplittableRandom")
+                        || owner.equals("java.util.Date")));
+            }
             return (owner.startsWith("java.time.") && name.equals("now"))
                     || (owner.equals("java.time.Clock") && (name.startsWith("system") || name.startsWith("tick")))
                     || (owner.equals("java.lang.System") && (name.equals("currentTimeMillis") || name.equals("nanoTime")))
@@ -73,7 +78,13 @@ final class ArchitectureRules {
         }
     };
 
-    /** 1a. Derivations are pure: no Spring, jOOQ, generated tables, I/O, network, NIO or JDBC; no Spring beans. */
+    /**
+     * 1a. Derivations are pure: no Spring, jOOQ, generated tables, I/O, network, NIO or JDBC; no Spring beans.
+     * <p>
+     * Limit: the check is on the derivation's own direct dependencies. A pure-looking derivation can still reach
+     * impure code through a non-derivation helper in the same package; transitive checks are impractical because
+     * JDK internals reach java.io. Reviewers must check the helpers a derivation calls.
+     */
     ArchRule derivationsDependOnNothingImpure() {
         return noClasses().that(DERIVATION).should().dependOnClassesThat(
                         resideInAnyPackage("org.springframework..", "org.jooq..", root + ".db.generated..",
@@ -86,10 +97,7 @@ final class ArchitectureRules {
     /** 1b. Derivations never read the clock or randomness themselves. */
     ArchRule derivationsReadNoClockOrRandomness() {
         return noClasses().that(DERIVATION)
-                .should().callMethodWhere(CLOCK_OR_RANDOMNESS)
-                .orShould().callConstructor(SecureRandom.class)
-                .orShould().callConstructor(Random.class)
-                .orShould().callConstructor(SplittableRandom.class)
+                .should().accessTargetWhere(JavaAccess.Predicates.target(CLOCK_OR_RANDOMNESS))
                 .allowEmptyShould(true)
                 .because("time and randomness are parameters, so derivations are table-testable");
     }
@@ -121,6 +129,10 @@ final class ArchitectureRules {
                 .because("foundations depend only on platform (and the generated tables)");
     }
 
+    /**
+     * Limit: all verticals are peers. When a second vertical arrives and implements `cases`'s CaseKind, this rule
+     * must give `cases` its own tier (verticals may depend on `cases`) instead of forbidding it.
+     */
     ArchRule verticalIsolated(String vertical) {
         List<String> others = new ArrayList<>(verticals);
         others.remove(vertical);
