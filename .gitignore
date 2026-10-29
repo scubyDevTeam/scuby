@@ -1,0 +1,11 @@
+# Terraform: local state holds secrets; provider cache is downloaded
+infra/terraform/**/.terraform/
+infra/terraform/**/*.tfstate
+infra/terraform/**/*.tfstate.*
+infra/terraform/**/*.tfplan
+infra/terraform/**/.terraform.tfstate.lock.info
+infra/terraform/**/crash.log
+# Media Lambdas build output
+infra/lambda/media/node_modules/
+infra/lambda/media/build/
+infra/lambda/media/dist/
