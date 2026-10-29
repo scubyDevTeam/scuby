@@ -19,6 +19,7 @@ final class StatementCeilings {
             Map.entry("POST /auth/email/verify", 8),   // consume select + update, person lookup, person insert + select, session insert (+ filter lookup and old DELETE)
             Map.entry("POST /me/phone", 9),   // exactly: session lookup, supported_countries, 3 advisory locks (IP, device, number), throttle count, otp select, otp upsert, send-log insert
             Map.entry("POST /me/phone/verify", 6),   // exactly: session lookup, supported_countries, attempt reservation (UPDATE ... RETURNING), conditional delete, person update, person select
+            Map.entry("GET /me/profile", 2),       // session lookup + person
             Map.entry("POST /auth/google", 8)   // sub lookup, email lookup, person insert + select, person SELECT ... FOR UPDATE, session insert (+ filter lookup and old DELETE)
     );
 
