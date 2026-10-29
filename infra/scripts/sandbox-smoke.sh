@@ -63,5 +63,10 @@ outp=$(aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTAN
 [ "$st" = "Success" ] && echo "$outp" | grep -q instance-ok
 check "instance role: SQS send/receive and PUT into incoming/ (status $st)" $?
 
+# Backend stdout reaches CloudWatch through Docker's awslogs driver.
+LOG_GROUP=$(out backend_log_group)
+streams=$(aws logs describe-log-streams --log-group-name "$LOG_GROUP" --max-items 1 --query 'length(logStreams)' --output text 2>&1)
+[ "$streams" = "1" ]; check "backend log group $LOG_GROUP has a log stream" $?
+
 [ "$failed" -eq 0 ] && echo "smoke: all passed"
 exit "$failed"

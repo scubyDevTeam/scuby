@@ -65,6 +65,8 @@ resource "random_password" "origin_secret" {
 module "compute" {
   source              = "../../modules/compute"
   name                = local.name
+  env                 = var.env
+  log_retention_days  = 1
   vpc_id              = module.network.vpc_id
   subnet_id           = module.network.public_subnet_id
   availability_zone   = module.network.availability_zone

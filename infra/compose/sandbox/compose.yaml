@@ -29,5 +29,12 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
     ports:
       - "8080:8080"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: us-east-1
+        awslogs-group: ${BACKEND_LOG_GROUP}
+        mode: non-blocking
+        max-buffer-size: 4m
     mem_limit: 1g
     restart: unless-stopped

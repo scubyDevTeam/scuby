@@ -13,6 +13,7 @@ BACKEND_REPO=$(get ecr_repository_urls backend)
 POSTGRES_REPO=$(get ecr_repository_urls postgres)
 INSTANCE=$(get instance_id)
 PREFIX=$(get ssm_prefix)
+LOG_GROUP=$(get backend_log_group)
 REGISTRY="${BACKEND_REPO%%/*}"
 
 echo "== push images"
@@ -56,7 +57,7 @@ echo '$(base64 < "$REPO/infra/compose/sandbox/compose.yaml" | tr -d '\n')' | bas
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REGISTRY
 DB=\$(aws ssm get-parameter --region us-east-1 --name $PREFIX/db/password --with-decryption --query Parameter.Value --output text)
 umask 077
-{ echo "BACKEND_IMAGE=$BACKEND_REPO:sandbox"; echo "POSTGRES_IMAGE=$POSTGRES_REPO:17"; echo "DB_PASSWORD=\$DB"; } > .env
+{ echo "BACKEND_IMAGE=$BACKEND_REPO:sandbox"; echo "POSTGRES_IMAGE=$POSTGRES_REPO:17"; echo "BACKEND_LOG_GROUP=$LOG_GROUP"; echo "DB_PASSWORD=\$DB"; } > .env
 docker compose up -d
 for i in \$(seq 1 90); do curl -sf localhost:8080/actuator/health && exit 0; sleep 5; done
 docker compose logs --tail 100

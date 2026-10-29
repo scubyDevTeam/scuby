@@ -1,4 +1,12 @@
 variable "name" { type = string }
+variable "env" {
+  description = "Environment name; the backend log group is /scuby/<env>/backend."
+  type        = string
+}
+variable "log_retention_days" {
+  description = "Retention of the backend CloudWatch log group."
+  type        = number
+}
 variable "vpc_id" { type = string }
 variable "subnet_id" { type = string }
 variable "availability_zone" { type = string }
@@ -114,11 +122,23 @@ data "aws_iam_policy_document" "instance" {
     actions   = ["s3:GetObject"]
     resources = ["${var.media_bucket_arn}/media/*"]
   }
+  # Docker's awslogs driver (run by the daemon with the instance role) ships backend stdout here.
+  statement {
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${aws_cloudwatch_log_group.backend.arn}:*"]
+  }
   # Lets the backend tell "not processed yet" (404) from "forbidden" (403).
   statement {
     actions   = ["s3:ListBucket"]
     resources = [var.media_bucket_arn]
   }
+}
+
+# --- Backend logs (shipped by Docker's awslogs driver) -----------------------------------------
+
+resource "aws_cloudwatch_log_group" "backend" {
+  name              = "/scuby/${var.env}/backend"
+  retention_in_days = var.log_retention_days
 }
 
 resource "aws_iam_role_policy" "instance" {
@@ -231,3 +251,4 @@ output "instance_id" { value = aws_instance.app.id }
 output "instance_arn" { value = aws_instance.app.arn }
 output "public_dns" { value = aws_instance.app.public_dns }
 output "app_port" { value = var.app_port }
+output "backend_log_group" { value = aws_cloudwatch_log_group.backend.name }

@@ -39,6 +39,7 @@ check "s3 buckets" s3api list-buckets --query "Buckets[?starts_with(Name, 'scuby
 check "ecr repositories" ecr describe-repositories --query "repositories[?starts_with(repositoryName, 'scuby-')].repositoryName" --output text
 check "lambda functions" lambda list-functions --query "Functions[?starts_with(FunctionName, 'scuby-')].FunctionName" --output text
 check "log groups" logs describe-log-groups --log-group-name-prefix /aws/lambda/scuby- --query 'logGroups[].logGroupName' --output text
+check "backend log groups" logs describe-log-groups --log-group-name-prefix /scuby/ --query 'logGroups[].logGroupName' --output text
 check "sqs queues" sqs list-queues --queue-name-prefix scuby- --query 'QueueUrls' --output text
 check "ssm parameters" ssm get-parameters-by-path --path /scuby --recursive --query 'Parameters[].Name' --output text
 check "cloudfront distributions" cloudfront list-distributions --query "DistributionList.Items[?starts_with(Comment, 'scuby')].Id" --output text
