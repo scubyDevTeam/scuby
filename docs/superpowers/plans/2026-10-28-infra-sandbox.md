@@ -160,8 +160,10 @@ if ! arns=$(aws iam list-open-id-connect-providers --query 'OpenIDConnectProvide
   echo "SWEEP ERROR: oidc providers — $arns"; found=1
 else
   for arn in $arns; do
-    if aws iam list-open-id-connect-provider-tags --open-id-connect-provider-arn "$arn" \
-         --query "Tags[?Key=='Project' && Value=='scuby'] | length(@)" --output text | grep -qx 1; then
+    if ! n=$(aws iam list-open-id-connect-provider-tags --open-id-connect-provider-arn "$arn" \
+         --query "Tags[?Key=='Project' && Value=='scuby'] | length(@)" --output text 2>&1); then
+      echo "SWEEP ERROR: oidc provider tags $arn — $n"; found=1
+    elif [ "$n" = "1" ]; then
       echo "LEFTOVER oidc provider: $arn"; found=1
     fi
   done
@@ -923,9 +925,16 @@ resource "random_id" "suffix" {
   byte_length = 3
 }
 
+variable "instance_type" {
+  description = "One value for the instance and for the AZ check in the network module"
+  type        = string
+  default     = "t4g.small"
+}
+
 module "network" {
-  source = "../../modules/network"
-  name   = local.name
+  source        = "../../modules/network"
+  name          = local.name
+  instance_type = var.instance_type
 }
 
 module "registry" {
@@ -1329,6 +1338,13 @@ git commit -m "feat: media on AWS — one bucket, ingest and transform Lambdas, 
 #!/bin/bash
 # Amazon Linux 2023: Docker + Compose, and the Postgres data volume mounted at /srv/pgdata.
 set -euxo pipefail
+
+# Cost backstop for throwaway environments: power off (→ terminate) after N minutes.
+# Armed first, so it holds even if anything below fails.
+if [ "${auto_shutdown_minutes}" -gt 0 ]; then
+  shutdown -h "+${auto_shutdown_minutes}"
+fi
+
 dnf install -y docker
 systemctl enable --now docker
 mkdir -p /usr/local/lib/docker/cli-plugins
@@ -1352,14 +1368,9 @@ grep -q "$uuid" /etc/fstab || echo "UUID=$uuid /srv/pgdata xfs defaults,nofail 0
 mount -a
 mkdir -p /opt/scuby
 touch /opt/scuby/.bootstrapped
-
-# Cost backstop for throwaway environments: power off (→ terminate) after N minutes.
-if [ "${auto_shutdown_minutes}" -gt 0 ]; then
-  shutdown -h "+${auto_shutdown_minutes}"
-fi
 ```
 
-(This file is a Terraform `templatefile`: `${auto_shutdown_minutes}` is filled by Terraform. Any literal `${…}` meant for bash must be written `$${…}`; the script above uses plain `$var` forms for bash, so only `${auto_shutdown_minutes}` is interpolated. `"${root_disk}"` in the grep must become `"$${root_disk}"`.)
+(This file is a Terraform `templatefile`: `${auto_shutdown_minutes}` is filled by Terraform. Any literal `${…}` meant for bash must be written `$${…}`; the script uses plain `$var` forms for bash except the grep, which is already escaped as `"$${root_disk}"` — leave it as is. Only `${auto_shutdown_minutes}` is interpolated.)
 
 - [ ] **Step 2: `modules/compute/main.tf`**
 
@@ -1744,6 +1755,7 @@ module "compute" {
   queue_arns          = [module.queues.queue_arn, module.queues.dlq_arn]
   ssm_prefix          = module.params.prefix
   media_bucket_arn    = module.media.bucket_arn
+  instance_type       = var.instance_type
   # Throwaway: no daily snapshots, and the instance terminates itself after 6 hours.
   snapshots_enabled     = false
   auto_shutdown_minutes = 360
@@ -2068,7 +2080,7 @@ export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 TF="terraform -chdir=$REPO/infra/terraform/envs/sandbox"
 [ -f "$REPO/infra/lambda/media/dist/media-lambdas.zip" ] || "$REPO/infra/lambda/media/build.sh"
-$TF destroy -auto-approve -input=false || $TF destroy -auto-approve -input=false
+$TF destroy -auto-approve -input=false -lock-timeout=30m || $TF destroy -auto-approve -input=false -lock-timeout=30m
 bash "$REPO/infra/scripts/sweep.sh"
 ```
 
@@ -2131,10 +2143,15 @@ git commit -m "feat: sandbox scripts — deploy the backend through SSM, end-to-
 cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo
 left=$(bash infra/scripts/sso-remaining.sh)
 deadline=$(( $(date -u +%s) + (left - 45) * 60 ))     # 45 min before the session ends
-nohup caffeinate -dims -w $$ >/dev/null 2>&1 &         # awake while this shell lives
-nohup caffeinate -dims bash infra/scripts/sandbox-watchdog.sh "$deadline" > /private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad/watchdog.log 2>&1 &
-echo "watchdog pid $! deadline $(date -u -r "$deadline" +%FT%TZ)" | tee -a /private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad/infra-sandbox-report.md
+# launchd owns the watchdog, so it survives the agent session ending; its caffeinate keeps the Mac awake.
+launchctl remove co.scuby.watchdog 2>/dev/null || true
+launchctl submit -l co.scuby.watchdog -o /private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad/watchdog.log -e /private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad/watchdog.log -- \
+  /usr/bin/caffeinate -dims /bin/bash "$PWD/infra/scripts/sandbox-watchdog.sh" "$deadline"
+launchctl list | grep co.scuby.watchdog
+echo "watchdog deadline $(date -u -r "$deadline" +%FT%TZ)" | tee -a /private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad/infra-sandbox-report.md
 ```
+
+Expected: `launchctl list` shows `co.scuby.watchdog` with a PID. If it does not, stop: no apply without a live watchdog.
 
 **From the next step on, Task 8 must run whatever happens.**
 
@@ -2162,13 +2179,13 @@ Expected: every line `PASS` and `smoke: all passed`. A `FAIL`: check the retry i
 
 ---
 
-### Task 8: Destroy and sweep (mandatory once Task 6 Step 2 started)
+### Task 8: Destroy and sweep (mandatory once Task 6 Step 4 — the apply — started)
 
 - [ ] **Step 1: Destroy (background)** — record the start time, then `nohup bash infra/scripts/sandbox-destroy.sh > /private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad/destroy.log 2>&1; echo $? > /private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad/destroy.exit`. Expected: `Destroy complete!` then `sweep: clean`, exit 0. If the watchdog already ran the destroy (see `/private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad/watchdog.log`), run `sandbox-destroy.sh` once more anyway — it is idempotent.
 
 - [ ] **Step 2: If the sweep reports leftovers** — wait 5 minutes and re-run `bash infra/scripts/sweep.sh` (tagging-API lag), then re-run `sandbox-destroy.sh` once. If anything is still reported: **do not delete it by hand.** Write into the run report, for the human, each leftover with the exact command that would remove it, plus `aws sso login --profile itslauyalejo-sso && bash infra/scripts/sandbox-destroy.sh`. A `SWEEP ERROR` (e.g. expired credentials) is reported the same way.
 
-- [ ] **Step 2b: Stop the watchdog** if it has not fired: `pkill -f sandbox-watchdog.sh` (only after the state is empty).
+- [ ] **Step 2b: Stop the watchdog** (only after the state is empty): `launchctl remove co.scuby.watchdog`; confirm `launchctl list | grep co.scuby.watchdog` prints nothing.
 
 - [ ] **Step 3: Confirm the state file is empty** — `terraform -chdir=infra/terraform/envs/sandbox state list | wc -l` → `0`.
 
