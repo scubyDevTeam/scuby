@@ -69,12 +69,20 @@ class NewRelicLicenseKeyCheckTest {
     }
 
     @Test
-    void withoutExportTheCheckIsAbsent() {
-        runner.run(ctx -> assertThat(ctx).doesNotHaveBean(NewRelicLicenseKeyCheck.class));
+    void withoutExportItStartsWithoutAKey() {
+        runner.run(ctx -> assertThat(ctx).hasNotFailed());
     }
 
     @Test
-    void withExportOffTheCheckIsAbsent() {
-        runner.withPropertyValues("scuby.telemetry.export=false").run(ctx -> assertThat(ctx).doesNotHaveBean(NewRelicLicenseKeyCheck.class));
+    void withExportOffItStartsWithoutAKey() {
+        runner.withPropertyValues("scuby.telemetry.export=false").run(ctx -> assertThat(ctx).hasNotFailed());
+    }
+
+    /** The exporters read the switch as a Boolean, which accepts yes/on/1; the check must agree or an export would run unchecked. */
+    @Test
+    void booleanSpellingsTheExportersAcceptAreChecked() {
+        for (String on : new String[] {"yes", "on", "1", "TRUE"}) {
+            runner.withPropertyValues("scuby.telemetry.export=" + on).run(ctx -> assertThat(ctx).as(on).hasFailed());
+        }
     }
 }
