@@ -3,6 +3,13 @@
 # check could not run (fail closed). Pre-existing, not ours, must survive: default VPC
 # vpc-9d15b4e0, bucket wc2026-tfstate-itslauyalejo.
 set -uo pipefail
+# launchd (watchdog) gives only /usr/bin:/bin:/usr/sbin:/sbin; terraform and aws live in ~/.local/bin.
+if [ -z "${HOME:-}" ]; then
+  HOME=$(/usr/bin/dscl . -read "/Users/$(/usr/bin/id -un)" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')
+  export HOME
+fi
+[ -n "${HOME:-}" ] && [ -d "$HOME" ] || { echo "FATAL: cannot determine HOME" >&2; exit 1; }
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
 found=0
 
