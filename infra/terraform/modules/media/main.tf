@@ -99,6 +99,17 @@ data "aws_iam_policy_document" "ingest" {
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.media.arn}/media/*"]
   }
+  # Without ListBucket a missing key answers AccessDenied instead of NoSuchKey, and ingest's
+  # "already processed" path (duplicate S3 event) would never run.
+  statement {
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.media.arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["incoming/*"]
+    }
+  }
 }
 
 data "aws_iam_policy_document" "transform" {
