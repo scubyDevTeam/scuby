@@ -22,7 +22,25 @@
     <testcontainers-codegen.version>1.21.4</testcontainers-codegen.version>
     <!-- Empty default so surefire's @{argLine} resolves when no other plugin (e.g. JaCoCo) sets it. -->
     <argLine></argLine>
+    <!-- thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md): versions Boot does not manage -->
+    <libphonenumber.version>9.0.42</libphonenumber.version>
+    <aws-sdk.version>2.57.6</aws-sdk.version>
+    <pitest.version>1.30.1</pitest.version>
+    <pitest-junit5.version>1.2.3</pitest-junit5.version>
   </properties>
+
+  <!-- thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md): the AWS SDK's own BOM -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws-sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
@@ -85,6 +103,44 @@
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <!-- NimbusJwtDecoder for Google ID tokens; no resource-server auto-configuration on purpose -->
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-oauth2-jose</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.googlecode.libphonenumber</groupId>
+      <artifactId>libphonenumber</artifactId>
+      <version>${libphonenumber.version}</version>
+    </dependency>
+    <dependency>
+      <!-- presigned uploads in staging (plan A2); only the JDK URL client, no Netty or Apache -->
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <exclusions>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache-client</artifactId></exclusion>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache5-client</artifactId></exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>url-connection-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security-test</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

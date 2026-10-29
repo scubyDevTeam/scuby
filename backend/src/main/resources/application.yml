@@ -18,3 +18,11 @@ management:
     web:
       exposure:
         include: health
+
+# thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md)
+scuby:
+  web:
+    allowed-origins: []
+    origin-secret-header: X-Origin-Secret
+    origin-secret: ""
+    ip-hash-key: local-only-ip-hash-key

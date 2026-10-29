@@ -1,1 +1,12 @@
 # Test profile
+# thin slice: integration tests behave like the client's e2e origin
+scuby:
+  web:
+    allowed-origins: [ "http://localhost:4173" ]
+# thin slice: each cached test context keeps its own pool against one Postgres container
+# (max_connections 100); small pools keep a dozen contexts under the limit.
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
