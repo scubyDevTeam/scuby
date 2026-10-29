@@ -11,8 +11,8 @@ import java.util.Map;
 final class StatementCeilings {
 
     private static final Map<String, Integer> CEILINGS = Map.ofEntries(
-            Map.entry("GET /actuator/health", 0)
-            // Each endpoint task adds its line here: Map.entry("GET /config", 1), ...
+            Map.entry("GET /actuator/health", 0),
+            Map.entry("GET /config", 1)
     );
 
     private StatementCeilings() {}
