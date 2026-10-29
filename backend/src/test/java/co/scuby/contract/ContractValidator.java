@@ -52,6 +52,15 @@ public final class ContractValidator {
         return found.stream().map(Error::getMessage).toList();
     }
 
+    /** For answers without a body (204): the status must be documented and have no content. */
+    public List<String> errorsForNoContent(String method, String pathTemplate, int status) {
+        String pointer = "/paths/" + escape(pathTemplate) + "/" + method.toLowerCase(Locale.ROOT) + "/responses/" + status;
+        JsonNode response = document.at(pointer);
+        if (response.isMissingNode()) return List.of("contract has no " + method + " " + pathTemplate + " → " + status);
+        if (response.has("content")) return List.of("contract expects a body for " + method + " " + pathTemplate + " → " + status);
+        return List.of();
+    }
+
     static String escape(String path) {
         return path.replace("~", "~0").replace("/", "~1");
     }

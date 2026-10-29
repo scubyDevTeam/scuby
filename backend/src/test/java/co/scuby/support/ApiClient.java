@@ -1,0 +1,109 @@
+package co.scuby.support;
+
+import co.scuby.contract.ContractValidator;
+import jakarta.servlet.http.Cookie;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+
+/**
+ * One browser: keeps its cookies (session, device) across calls like the client does. Every call to a
+ * contract endpoint is validated against docs/eng/openapi.json and against its statement ceiling.
+ */
+public final class ApiClient {
+
+    private final MockMvc mvc;
+    private final ContractValidator contract;
+    private final StatementRecorder recorder;
+    private final Map<String, Cookie> jar = new LinkedHashMap<>();
+    private final Map<String, String> headers = new LinkedHashMap<>();
+    private String remoteAddr = "203.0.113.10";
+
+    ApiClient(MockMvc mvc, ContractValidator contract, StatementRecorder recorder) {
+        this.mvc = mvc;
+        this.contract = contract;
+        this.recorder = recorder;
+    }
+
+    public ApiClient newBrowser() { return new ApiClient(mvc, contract, recorder); }
+
+    public ApiClient header(String name, String value) { headers.put(name, value); return this; }
+
+    public ApiClient from(String ip) { this.remoteAddr = ip; return this; }
+
+    public void setCookie(String name, String value) { jar.put(name, new Cookie(name, value)); }
+
+    public Optional<String> cookie(String name) { return Optional.ofNullable(jar.get(name)).map(Cookie::getValue); }
+
+    public ApiResponse get(String template, Object... vars) { return call(HttpMethod.GET, template, null, vars); }
+
+    public ApiResponse post(String template, String json, Object... vars) { return call(HttpMethod.POST, template, json, vars); }
+
+    public ApiResponse put(String template, String json, Object... vars) { return call(HttpMethod.PUT, template, json, vars); }
+
+    /** A contract endpoint: checked against the contract and its statement ceiling. */
+    public ApiResponse call(HttpMethod method, String template, String json, Object... vars) {
+        String path = template.contains("?") ? template.substring(0, template.indexOf('?')) : template;
+        int ceiling = StatementCeilings.of(method.name(), path);
+        ApiResponse r = perform(method, template, json, vars);
+        List<String> problems = r.status() == 204
+                ? contract.errorsForNoContent(method.name(), path, r.status())
+                : contract.errors(method.name(), path, r.status(), r.body());
+        assertThat(problems).as("%s %s → %d breaks the contract: %s", method, path, r.status(), r.body()).isEmpty();
+        assertThat(r.statements().size())
+                .as("%s %s executed %d statements (ceiling %d): %s", method, path, r.statements().size(), ceiling, r.statements())
+                .isLessThanOrEqualTo(ceiling);
+        return r;
+    }
+
+    /** Not a contract endpoint (test probes, dev-only routes): no contract or ceiling checks. */
+    public ApiResponse raw(HttpMethod method, String template, String json, Object... vars) {
+        return perform(method, template, json, vars);
+    }
+
+    /** Raw bytes (the dev-only media PUT of plan A2). */
+    public ApiResponse rawBytes(HttpMethod method, String template, byte[] bytes, String contentType, Object... vars) {
+        MockHttpServletRequestBuilder req = request(method, template, vars).content(bytes).contentType(contentType);
+        return execute(req);
+    }
+
+    private ApiResponse perform(HttpMethod method, String template, String json, Object... vars) {
+        MockHttpServletRequestBuilder req = request(method, template, vars);
+        if (json != null) req.contentType(MediaType.APPLICATION_JSON).content(json);
+        return execute(req);
+    }
+
+    private ApiResponse execute(MockHttpServletRequestBuilder req) {
+        req.accept(MediaType.APPLICATION_JSON);
+        headers.forEach(req::header);
+        if (!jar.isEmpty()) req.cookie(jar.values().toArray(Cookie[]::new));
+        String addr = remoteAddr;
+        req.with(r -> { r.setRemoteAddr(addr); return r; });
+        recorder.reset();
+        try {
+            MvcResult result = mvc.perform(req).andReturn();
+            MockHttpServletResponse res = result.getResponse();
+            List<String> sql = recorder.statements();
+            for (Cookie c : res.getCookies()) {
+                if (c.getMaxAge() == 0) jar.remove(c.getName());
+                else jar.put(c.getName(), new Cookie(c.getName(), c.getValue()));
+            }
+            return new ApiResponse(res.getStatus(), res.getContentAsString(StandardCharsets.UTF_8), res, sql,
+                    result.getRequest().getSession(false) != null);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+}
