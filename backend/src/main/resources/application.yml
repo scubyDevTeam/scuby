@@ -12,6 +12,9 @@ spring:
     schemas: scuby
     default-schema: scuby
     create-schemas: true
+    # Migration versions are timestamps; a branch merged later than another may carry an older one, which
+    # must still be applied (so migrations must not depend on each other's order). MigrationNamesTest.
+    out-of-order: true
 
 management:
   endpoints:
