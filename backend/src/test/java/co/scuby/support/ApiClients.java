@@ -9,14 +9,16 @@ public final class ApiClients {
 
     private final MockMvc mvc;
     private final StatementRecorder recorder;
+    private final ConnectionSampler sampler;
 
-    ApiClients(MockMvc mvc, StatementRecorder recorder) {
+    ApiClients(MockMvc mvc, StatementRecorder recorder, ConnectionSampler sampler) {
         this.mvc = mvc;
         this.recorder = recorder;
+        this.sampler = sampler;
     }
 
     /** A fresh browser: no cookies. */
     public ApiClient newBrowser() {
-        return new ApiClient(mvc, CONTRACT, recorder);
+        return new ApiClient(mvc, CONTRACT, recorder, sampler);
     }
 }

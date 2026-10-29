@@ -30,6 +30,7 @@ public final class ConnectionSampler implements HandlerInterceptor {
         return true;
     }
 
+    /** Empty when no handler ran in the latest request (a filter answered it): never the previous call's value. ApiClient resets the sampler before every request. */
     public OptionalInt activeWhenTheHandlerStarted() {
         Integer v = activeAtHandlerStart;
         return v == null ? OptionalInt.empty() : OptionalInt.of(v);

@@ -36,13 +36,13 @@ public class TestSupportConfiguration {
     }
 
     @Bean
-    ApiClients apiClients(MockMvc mvc, StatementRecorder recorder) {
-        return new ApiClients(mvc, recorder);
+    ConnectionSampler connectionSampler(ObjectProvider<DataSource> dataSource) {
+        return new ConnectionSampler(dataSource);
     }
 
     @Bean
-    ConnectionSampler connectionSampler(ObjectProvider<DataSource> dataSource) {
-        return new ConnectionSampler(dataSource);
+    ApiClients apiClients(MockMvc mvc, StatementRecorder recorder, ConnectionSampler sampler) {
+        return new ApiClients(mvc, recorder, sampler);
     }
 
     @Bean

@@ -27,17 +27,19 @@ public final class ApiClient {
     private final MockMvc mvc;
     private final ContractValidator contract;
     private final StatementRecorder recorder;
+    private final ConnectionSampler sampler;
     private final Map<String, Cookie> jar = new LinkedHashMap<>();
     private final Map<String, String> headers = new LinkedHashMap<>();
     private String remoteAddr = "203.0.113.10";
 
-    ApiClient(MockMvc mvc, ContractValidator contract, StatementRecorder recorder) {
+    ApiClient(MockMvc mvc, ContractValidator contract, StatementRecorder recorder, ConnectionSampler sampler) {
         this.mvc = mvc;
         this.contract = contract;
         this.recorder = recorder;
+        this.sampler = sampler;
     }
 
-    public ApiClient newBrowser() { return new ApiClient(mvc, contract, recorder); }
+    public ApiClient newBrowser() { return new ApiClient(mvc, contract, recorder, sampler); }
 
     public ApiClient header(String name, String value) { headers.put(name, value); return this; }
 
@@ -56,14 +58,24 @@ public final class ApiClient {
     /** A contract endpoint: checked against the contract and its statement ceiling. */
     public ApiResponse call(HttpMethod method, String template, String json, Object... vars) {
         String path = template.contains("?") ? template.substring(0, template.indexOf('?')) : template;
-        int ceiling = StatementCeilings.of(method.name(), path);
+        return callChecked(method, path, StatementCeilings.of(method.name(), path), template, json, vars);
+    }
+
+    /**
+     * The checks of {@link #call}, with the contract path and ceiling given: the harness self-tests use it to
+     * send a test-only probe route and judge it as a stand-in contract endpoint.
+     */
+    ApiResponse callChecked(HttpMethod method, String contractPath, int ceiling, String template, String json, Object... vars) {
         ApiResponse r = perform(method, template, json, vars);
         List<String> problems = r.status() == 204
-                ? contract.errorsForNoContent(method.name(), path, r.status())
-                : contract.errors(method.name(), path, r.status(), r.body());
-        assertThat(problems).as("%s %s → %d breaks the contract: %s", method, path, r.status(), r.body()).isEmpty();
+                ? contract.errorsForNoContent(method.name(), contractPath, r.status())
+                : contract.errors(method.name(), contractPath, r.status(), r.body());
+        assertThat(problems).as("%s %s → %d breaks the contract: %s", method, contractPath, r.status(), r.body()).isEmpty();
+        if (r.status() == 204) {
+            assertThat(r.body()).as("%s %s → 204 breaks the contract: the body must be empty", method, contractPath).isEmpty();
+        }
         assertThat(r.statements().size())
-                .as("%s %s executed %d statements (ceiling %d): %s", method, path, r.statements().size(), ceiling, r.statements())
+                .as("%s %s executed %d statements (ceiling %d): %s", method, contractPath, r.statements().size(), ceiling, r.statements())
                 .isLessThanOrEqualTo(ceiling);
         return r;
     }
@@ -92,10 +104,11 @@ public final class ApiClient {
         String addr = remoteAddr;
         req.with(r -> { r.setRemoteAddr(addr); return r; });
         recorder.reset();
+        sampler.reset();
         try {
             MvcResult result = mvc.perform(req).andReturn();
             MockHttpServletResponse res = result.getResponse();
-            List<String> sql = recorder.statements();
+            List<String> sql = recorder.statementsOnCurrentThread();
             for (Cookie c : res.getCookies()) {
                 if (c.getMaxAge() == 0) jar.remove(c.getName());
                 else jar.put(c.getName(), new Cookie(c.getName(), c.getValue()));

@@ -13,7 +13,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public final class StatementRecorder implements ExecuteListener {
 
-    private record Executed(String sql, boolean autoCommit) {}
+    private record Executed(String sql, boolean autoCommit, Thread thread) {}
 
     private final List<Executed> executed = new CopyOnWriteArrayList<>();
 
@@ -22,15 +22,21 @@ public final class StatementRecorder implements ExecuteListener {
         boolean autoCommit = autoCommit(ctx);
         String[] batch = ctx.batchSQL();
         if (batch != null && batch.length > 1) {
-            for (String sql : batch) executed.add(new Executed(sql, autoCommit));
+            for (String sql : batch) executed.add(new Executed(sql, autoCommit, Thread.currentThread()));
         } else {
-            executed.add(new Executed(String.valueOf(ctx.sql()), autoCommit));
+            executed.add(new Executed(String.valueOf(ctx.sql()), autoCommit, Thread.currentThread()));
         }
     }
 
     public void reset() { executed.clear(); }
 
     public List<String> statements() { return executed.stream().map(Executed::sql).toList(); }
+
+    /** Only the statements the calling thread executed (MockMvc runs the request on the test thread). */
+    public List<String> statementsOnCurrentThread() {
+        Thread me = Thread.currentThread();
+        return executed.stream().filter(e -> e.thread() == me).map(Executed::sql).toList();
+    }
 
     public List<Boolean> autoCommits() { return executed.stream().map(Executed::autoCommit).toList(); }
 
