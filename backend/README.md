@@ -26,11 +26,12 @@ Todos los comandos, desde `backend/`.
 | Comando | Qué hace |
 |---|---|
 | `./mvnw verify` | Compila, genera jOOQ y corre las pruebas. Testcontainers usa la imagen de `infra/docker/postgres/Dockerfile`; las pruebas deben correr con `backend/` como directorio de trabajo |
-| `docker compose up -d --wait` | Levanta Postgres local |
+| `COMPOSE_PROJECT_NAME=$(bash compose-project.sh) docker compose up -d --wait` | Levanta Postgres local |
 | `SPRING_PROFILES_ACTIVE=local ./mvnw spring-boot:run` | Arranca la API; salud en `http://localhost:8080/actuator/health` |
 | `bash run-local.sh` | Todo en Docker: construye la imagen `scuby-backend:<checkout>` con Jib, levanta Postgres y la API (perfil `local`) como proyecto de compose propio de este checkout (`bash compose-project.sh` lo imprime) y espera a que la salud diga `UP`. La API queda en `http://localhost:8080` (`SCUBY_API_PORT` la mueve; Postgres en 5433, `SCUBY_DB_PORT`); el cliente (`pnpm dev`, puerto 5173) y su build de e2e (puerto 4173) pueden llamarla con credenciales. Se detiene con `bash run-local.sh down` |
-| `./mvnw -DskipTests package jib:dockerBuild -Djib.from.platforms=linux/arm64` | Solo la imagen local `scuby-backend` (el pom lista arm64 y amd64 para publicar en un registro) |
+| `./mvnw -DskipTests package jib:dockerBuild -Djib.from.platforms=linux/arm64` | Solo la imagen local `scuby-backend` (usa `linux/amd64` en una máquina x86; `run-local.sh` lo elige según el Docker del host; el pom lista ambas para publicar en un registro) |
 
+Las imágenes `scuby-backend:<checkout>` no las borra `down`: `docker image rm scuby-backend:<checkout>`.
 Cada checkout (el principal y cada worktree) es su propio proyecto de compose: contenedores, volumen
 de datos e imagen no se comparten. Para Postgres solo: `COMPOSE_PROJECT_NAME=$(bash compose-project.sh) docker compose up -d`
 (lo que necesitan las pruebas y la generación de jOOQ). En el perfil `local` los códigos de correo y
