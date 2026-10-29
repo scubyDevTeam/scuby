@@ -51,7 +51,7 @@ class GoogleIdTokenConfiguration {
      */
     @Bean
     JwtDecoder googleIdTokenDecoder(GoogleProperties google, Clock clock, Environment env) {
-        Prod.requireDeployed(env, google.clientId() != null && !DEFAULT_CLIENT_ID.equals(google.clientId()),
+        Prod.requireDeployed(env, google.clientId() != null && !google.clientId().isBlank() && !DEFAULT_CLIENT_ID.equals(google.clientId()),
                 "scuby.auth.google.client-id (env SCUBY_AUTH_GOOGLE_CLIENT_ID: the web client's Google OAuth client ID)");
         SimpleClientHttpRequestFactory http = new SimpleClientHttpRequestFactory();
         http.setConnectTimeout(Duration.ofSeconds(2));

@@ -47,4 +47,17 @@ class ProdTest {
             assertThatCode(() -> Prod.requireDeployed(env, false, "x")).doesNotThrowAnyException();
         }
     }
+
+    @Test
+    void localOrTestNeverUnlocksTheDefaultsOfADeployedProfile() {
+        for (String deployed : new String[] {"staging", "prod"}) {
+            for (String lax : new String[] {"local", "test"}) {
+                MockEnvironment env = new MockEnvironment();
+                env.setActiveProfiles(deployed, lax);
+                assertThatThrownBy(() -> Prod.requireDeployed(env, false, "x"))
+                        .as("%s,%s", deployed, lax)
+                        .isInstanceOf(IllegalStateException.class);
+            }
+        }
+    }
 }

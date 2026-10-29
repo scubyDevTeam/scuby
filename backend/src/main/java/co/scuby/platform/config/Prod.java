@@ -6,7 +6,7 @@ import org.springframework.core.env.Environment;
 
 /**
  * Start-up guards. `refuse`: settings that are fine anywhere but production fail start-up under `prod`.
- * `requireDeployed`: settings every deployed environment (anything but `local`/`test`) must provide.
+ * `requireDeployed`: settings every deployed environment (anything but `local`/`test`; a deployed profile mixed with them still counts as deployed) must provide.
  */
 public final class Prod {
 
@@ -22,7 +22,9 @@ public final class Prod {
 
     /** `what` names the property key: ProfileStartupTest matches the message on it. */
     public static void requireDeployed(Environment env, boolean provided, String what) {
-        if (!provided && !env.matchesProfiles("local | test")) {
+        // `staging,local` must not unlock the local defaults: a deployed profile always wins.
+        boolean relaxed = env.matchesProfiles("local | test") && !env.matchesProfiles("prod | staging");
+        if (!provided && !relaxed) {
             throw new IllegalStateException("Refusing to start without " + what
                     + " (required outside the local and test profiles)");
         }

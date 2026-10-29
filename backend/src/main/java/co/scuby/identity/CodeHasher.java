@@ -10,13 +10,19 @@ import org.springframework.stereotype.Component;
 class CodeHasher {
 
     static final String DEFAULT_KEY = "local-only-code-hash-key";
+    static final int MIN_KEY_LENGTH = 32;
 
     private final String key;
 
     CodeHasher(AuthProperties auth, Environment env) {
-        Prod.requireDeployed(env, auth.codeHashKey() != null && !DEFAULT_KEY.equals(auth.codeHashKey()),
-                "scuby.auth.code-hash-key (env SCUBY_AUTH_CODE_HASH_KEY; the local default makes stored codes guessable)");
+        Prod.requireDeployed(env, usable(auth.codeHashKey()),
+                "scuby.auth.code-hash-key (env SCUBY_AUTH_CODE_HASH_KEY; at least " + MIN_KEY_LENGTH
+                        + " characters, not blank, not the local default, which makes stored codes guessable)");
         this.key = auth.codeHashKey();
+    }
+
+    private static boolean usable(String key) {
+        return key != null && !key.isBlank() && !DEFAULT_KEY.equals(key) && key.length() >= MIN_KEY_LENGTH;
     }
 
     String hash(String subject, String code) {

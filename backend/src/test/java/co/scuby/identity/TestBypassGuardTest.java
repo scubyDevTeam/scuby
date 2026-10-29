@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** Unit-level only: ProfileStartupTest.prodRefusesATestBypassInTheRealContext proves the guard is wired into the real app. */
 class TestBypassGuardTest {
 
     @Configuration
@@ -20,14 +21,14 @@ class TestBypassGuardTest {
     void anEmailBypassUnderProdFailsStartUp() {
         runner.withInitializer(ctx -> ctx.getEnvironment().setActiveProfiles("prod"))
               .withPropertyValues("scuby.auth.test-bypass.email-domains=e2e.scuby.test")
-              .run(ctx -> assertThat(ctx).hasFailed());
+              .run(ctx -> assertThat(ctx).hasFailed().getFailure().rootCause().hasMessageContaining("test bypass"));
     }
 
     @Test
     void anSmsBypassUnderProdFailsStartUp() {
         runner.withInitializer(ctx -> ctx.getEnvironment().setActiveProfiles("prod"))
               .withPropertyValues("scuby.auth.test-bypass.sms-prefixes=+5730000000")
-              .run(ctx -> assertThat(ctx).hasFailed());
+              .run(ctx -> assertThat(ctx).hasFailed().getFailure().rootCause().hasMessageContaining("test bypass"));
     }
 
     @Test

@@ -83,11 +83,77 @@ class ProfileStartupTest {
         assertThat(chain.toString()).contains("scuby.web.ip-hash-key");
     }
 
+    static Stream<Arguments> unusableCodeHashKeys() {
+        return Stream.of("staging", "prod").flatMap(profile -> Stream.of(
+                Arguments.of(profile, ""),
+                Arguments.of(profile, "   "),
+                Arguments.of(profile, "changeme"),
+                Arguments.of(profile, "too-short-key-31-characters-xx"),
+                Arguments.of(profile, "local-only-code-hash-key")));
+    }
+
+    /** A blank key makes every code operation a 500 at run time; a short one makes stored codes guessable. */
+    @ParameterizedTest(name = "{0} with code-hash-key \"{1}\"")
+    @MethodSource("unusableCodeHashKeys")
+    void refusesABlankShortOrDefaultCodeHashKey(String profile, String key) {
+        assertRefusedWith(profile, "scuby.auth.code-hash-key", key);
+    }
+
+    static Stream<Arguments> unusableClientIds() {
+        return Stream.of("staging", "prod").flatMap(profile -> Stream.of(
+                Arguments.of(profile, ""),
+                Arguments.of(profile, "   "),
+                Arguments.of(profile, "local-google-client-id")));
+    }
+
+    @ParameterizedTest(name = "{0} with google client-id \"{1}\"")
+    @MethodSource("unusableClientIds")
+    void refusesABlankOrDefaultGoogleClientId(String profile, String id) {
+        assertRefusedWith(profile, "scuby.auth.google.client-id", id);
+    }
+
+    /** `staging,local` must not unlock the local defaults (the public HMAC keys). */
+    @ParameterizedTest
+    @ValueSource(strings = {"staging,local", "prod,local", "staging,test", "prod,test"})
+    void aDeployedProfileMixedWithLocalOrTestStillNeedsItsProperties(String profiles) {
+        Throwable failure = catchThrowable(() -> start(profiles, Map.of()).close());
+        assertThat(failure).as("%s started on local defaults", profiles).isNotNull();
+    }
+
+    /**
+     * The real application context, so deleting @Component from TestBypassGuard (or moving it out of the
+     * scanned packages) makes this fail: prod must refuse a configured test bypass.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"scuby.auth.test-bypass.email-domains=e2e.scuby.test", "scuby.auth.test-bypass.sms-prefixes=+5730000000"})
+    void prodRefusesATestBypassInTheRealContext(String bypass) {
+        String[] kv = bypass.split("=", 2);
+        Map<String, String> props = new LinkedHashMap<>(REQUIRED.get("prod"));
+        props.put(kv[0], kv[1]);
+        Throwable failure = catchThrowable(() -> start("prod", props).close());
+        assertThat(failure).as("prod started with %s", bypass).isNotNull();
+        assertThat(chainOf(failure)).contains("test bypass");
+    }
+
+    private static void assertRefusedWith(String profile, String key, String value) {
+        Map<String, String> props = new LinkedHashMap<>(REQUIRED.get(profile));
+        props.put(key, value);
+        Throwable failure = catchThrowable(() -> start(profile, props).close());
+        assertThat(failure).as("%s started with %s '%s'", profile, key, value).isNotNull();
+        assertThat(chainOf(failure)).contains(key);
+    }
+
+    private static String chainOf(Throwable failure) {
+        StringBuilder chain = new StringBuilder();
+        for (Throwable t = failure; t != null; t = t.getCause()) chain.append(t.getMessage()).append('\n');
+        return chain.toString();
+    }
+
     private static ConfigurableApplicationContext start(String profile, Map<String, String> props) {
         Map<String, String> all = new LinkedHashMap<>(TestcontainersConfiguration.jdbcProperties());
         all.putAll(props);
         all.put("server.port", "0");
         String[] args = all.entrySet().stream().map(e -> "--" + e.getKey() + "=" + e.getValue()).toArray(String[]::new);
-        return new SpringApplicationBuilder(ScubyApplication.class).profiles(profile).run(args);
+        return new SpringApplicationBuilder(ScubyApplication.class).profiles(profile.split(",")).run(args);
     }
 }
