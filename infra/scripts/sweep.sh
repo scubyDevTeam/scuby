@@ -10,11 +10,11 @@ if [ -z "${HOME:-}" ]; then
 fi
 [ -n "${HOME:-}" ] && [ -d "$HOME" ] || { echo "FATAL: cannot determine HOME" >&2; exit 1; }
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
+export AWS_PROFILE="${AWS_PROFILE:-itslauyalejo-sso}" AWS_REGION="${AWS_REGION:-us-east-1}"
 found=0
 
 if ! aws sts get-caller-identity >/dev/null 2>&1; then
-  echo "SWEEP ERROR: credentials expired or invalid — run 'aws sso login --profile itslauyalejo-sso' and re-run"
+  echo "SWEEP ERROR: credentials expired or invalid — run 'aws sso login --profile $AWS_PROFILE' and re-run"
   exit 2
 fi
 
@@ -28,8 +28,47 @@ check() {
   if [ -n "$out" ] && [ "$out" != "None" ]; then echo "LEFTOVER $label: $out"; found=1; fi
 }
 
-check "tagged resources" resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=scuby \
-  --query 'ResourceTagMappingList[].ResourceARN' --output text
+# The Resource Groups Tagging API keeps listing terminated instances and deleted volumes / security
+# group rules for an hour or more after a destroy. ghost_gone <arn> returns 0 only when the EC2 API
+# itself proves the resource is gone; any other ARN type or any other error returns 1 (fail closed).
+ghost_gone() {
+  local arn=$1 region res type id out
+  region=$(printf '%s' "$arn" | cut -d: -f4)
+  res=$(printf '%s' "$arn" | cut -d: -f6-)
+  case "$arn" in arn:aws:ec2:*) ;; *) return 1 ;; esac
+  [ -n "$region" ] || return 1
+  type=${res%%/*}; id=${res#*/}
+  case "$type" in
+    instance)
+      out=$(aws ec2 describe-instances --region "$region" --instance-ids "$id" \
+        --query 'Reservations[].Instances[].State.Name' --output text 2>&1) && [ "$out" = "terminated" ] && return 0
+      case "$out" in *InvalidInstanceID.NotFound*) return 0 ;; esac ;;
+    volume)
+      out=$(aws ec2 describe-volumes --region "$region" --volume-ids "$id" 2>&1) && return 1
+      case "$out" in *InvalidVolume.NotFound*) return 0 ;; esac ;;
+    security-group-rule)
+      out=$(aws ec2 describe-security-group-rules --region "$region" --security-group-rule-ids "$id" 2>&1) && return 1
+      case "$out" in *InvalidSecurityGroupRuleId.NotFound*) return 0 ;; esac ;;
+    security-group)
+      out=$(aws ec2 describe-security-groups --region "$region" --group-ids "$id" 2>&1) && return 1
+      case "$out" in *InvalidGroup.NotFound* | *InvalidGroupId.NotFound*) return 0 ;; esac ;;
+  esac
+  return 1
+}
+
+if ! tagged=$(aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=scuby \
+    --query 'ResourceTagMappingList[].ResourceARN' --output text 2>&1); then
+  echo "SWEEP ERROR: tagged resources — $tagged"; found=1
+else
+  for arn in $tagged; do
+    [ "$arn" = "None" ] && continue
+    if ghost_gone "$arn"; then
+      echo "ghost (tagging index lag, verified gone): $arn"
+    else
+      echo "LEFTOVER tagged resources: $arn"; found=1
+    fi
+  done
+fi
 check "ec2 instances" ec2 describe-instances --filters Name=tag:Project,Values=scuby \
   Name=instance-state-name,Values=pending,running,stopping,stopped --query 'Reservations[].Instances[].InstanceId' --output text
 check "ebs volumes" ec2 describe-volumes --filters Name=tag:Project,Values=scuby --query 'Volumes[].VolumeId' --output text
