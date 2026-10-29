@@ -97,6 +97,17 @@ different rates. The split is a second instance of the same image with `scuby.ro
 
 Each is combined with the role profiles (`api`, `worker`) once they are split.
 
+Two profiles switch telemetry on; the `staging` and `prod` groups pull in both:
+
+- **`newrelic`** — the three OTLP exports (traces, metrics, logs) to New Relic. Off in `local` and
+  `test`; on a laptop it is opt-in as `local,newrelic`. Needs the license key
+  ([infra.md](infra.md) · Secrets); without it the application does not start.
+- **`server`** — the console prints structured JSON (ECS) at WARN and up, the crash record that
+  [infra.md](infra.md) · Logs ships to CloudWatch.
+
+Trace sampling is `management.tracing.sampling.probability` (1.0 to start). The why is in ·
+Observability below.
+
 ## Configuration
 
 **Build once, configure at start-up.** The image carries no environment-specific values and no

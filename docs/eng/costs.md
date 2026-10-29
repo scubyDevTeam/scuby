@@ -14,6 +14,8 @@
 | Twilio Conversations | $0 → usage | 2026-08-23 | First **200 active chat users/mo free**, then $0.05/MAU. Fallback channel — expected $0 for a long time (cost rules in [comms.md](comms.md)) |
 | Hosting — staging (EC2 `t4g.small` + EBS + public IPv4) | ~$18 | 2026-10-23 (approx) | Postgres in Docker on the same instance ([infra.md](infra.md)). Covered by the new account's credits for the first months |
 | Hosting — production adds RDS `db.t4g.micro` + 20 GB | ~$15 | 2026-10-23 (approx) | From the launch phase on ([infra.md](infra.md) · Environments) |
+| New Relic (traces, metrics, logs) | $0 inside 100 GB/month free; beyond that per-GB pricing | 2026-10-29 (approx; not re-verified) | Decision #38; volume guards in [backend.md](backend.md) · Observability. Re-verify the per-GB price before ingest nears the free limit |
+| CloudWatch Logs (backend crash record) | $0 inside 5 GB/month | 2026-10-29 (approx) | WARN-and-up only, megabytes at launch ([infra.md](infra.md) · Logs) |
 | Route 53 hosted zone | $0.50 | 2026-10-23 | |
 | SQS | $0 | 2026-10-23 | 1M requests/month free permanently; every call counts, including empty long polls |
 | Media: S3 + CloudFront + Lambda transforms | ~$0 at launch | 2026-10-23 (approx) | Inside the free tiers at launch volume; decision #32, [infra.md](infra.md) · Media |
@@ -45,4 +47,6 @@
 - **First Twilio invoice**: verify Conversations MAU count matches the lazy-creation rules.
 - **AWS Free Plan** ([infra.md](infra.md) · Account): move to the Paid Plan before month 6, or the
   account closes. AWS Budgets alarm on monthly spend from day one.
+- **New Relic ingest at 50 / 80 GB in a month** → the usage alert emails
+  (`infra/terraform/observability`); lower trace sampling first.
 - **SQS above ~1M requests/month** → starts billing; check long-poll settings before anything else.

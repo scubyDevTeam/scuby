@@ -46,6 +46,29 @@ src/test/java/co/scuby/contract/ContractValidator   Valida respuestas contra doc
 Convención de paquetes: el código del API va en `..api..` y el del trabajo de fondo en `..worker..`;
 una prueba de ArchUnit las mantiene separadas.
 
+## Telemetría
+
+En `local` y `test` no se exporta nada. Para mandar datos reales a New Relic desde el portátil, con
+su propio Postgres y puertos para no chocar con otras ejecuciones locales (con
+`SPRING_PROFILES_ACTIVE=local,newrelic` contra el compose habitual también funciona):
+
+```bash
+docker run --rm --name scuby-obs-pg -p 127.0.0.1:15433:5432 \
+  -e POSTGRES_DB=scuby -e POSTGRES_USER=scuby -e POSTGRES_PASSWORD=scuby scuby/postgres:17   # en otra terminal, o añade -d
+NR_KEY="$(security find-generic-password -s scuby-newrelic-license-key -w)"
+export NEW_RELIC_LICENSE_KEY="$NR_KEY"
+SERVER_PORT=18080 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:15433/scuby \
+  SPRING_PROFILES_ACTIVE=local,newrelic ./mvnw spring-boot:run
+```
+
+La llave sale del Keychain (ítem `scuby-newrelic-license-key`); nunca la imprimas ni la pegues en
+archivos o chats.
+
+Dónde mirar: el dashboard «Scuby — Backend» en New Relic (variable `env`, `local` seleccionable) o
+`bash infra/scripts/nr-query.sh "<NRQL>"` desde la raíz. Los servidores la activan solos con los
+grupos `staging`/`prod`; ver [`backend.md`](../docs/eng/backend.md) · Environments and profiles y
+[`infra.md`](../docs/eng/infra.md) · Secrets.
+
 ## Más
 
 - [`../docs/eng/backend.md`](../docs/eng/backend.md): arquitectura y decisiones.

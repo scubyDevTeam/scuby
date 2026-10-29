@@ -96,6 +96,14 @@ Dashboards and alert conditions live in Terraform with the `newrelic` provider
 provider authenticates with a User API key (`NRAK-…`) from the operator's environment — never in
 the repo, never in Parameter Store.
 
+Applied to account 8675334: the dashboard «Scuby — Backend» and the policy `scuby-backend`, which
+emails scubydev@gmail.com. Its conditions watch `deployment.environment` staging and prod only
+(laptop runs are `local` and never page); the no-data condition stays off until staging runs
+continuously. Apply with `infra/terraform/observability/apply.sh`. State is local to the
+operator's machine and git-ignored until staging's S3 state bucket exists; then it moves to that
+backend. What each resource is and how to rebuild lost state:
+[`infra/terraform/observability/README.md`](../../infra/terraform/observability/README.md).
+
 ## Database
 
 - **PostgreSQL 17 + PostGIS.** `pgvector` joins when photo matching needs it ([O7](../open-items.md)), not before.
@@ -139,6 +147,10 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
 - **Terraform creates each parameter with a placeholder and ignores later value changes**
   (`lifecycle { ignore_changes = [value] }`); a person sets the real value through the CLI or
   console. Terraform state stores values in plain text, so real secrets never pass through it.
+- **New Relic license key:** `/scuby/<env>/newrelic/license-key`, imported as the property
+  `newrelic.license-key`. On a laptop the same value comes from the environment variable
+  `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. (The parameter and the start-up import
+  arrive with staging; the sandbox gets the key the way it gets its database password.)
 
 ## Infrastructure as code
 
