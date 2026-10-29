@@ -32,6 +32,12 @@ class People {
                  .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED, "the account no longer exists"));
     }
 
+    /** Reads the row with `FOR UPDATE`: serialises with the unlink (an UPDATE of the same row) and re-reads the committed state. */
+    Person lock(UUID id) {
+        return db.selectFrom(PERSON).where(PERSON.ID.eq(id)).forUpdate().fetchOptional().map(People::toPerson)
+                 .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED, "the account no longer exists"));
+    }
+
     Optional<Person> byEmail(String normalizedEmail) {
         return db.selectFrom(PERSON).where(PERSON.EMAIL.eq(normalizedEmail)).fetchOptional().map(People::toPerson);
     }

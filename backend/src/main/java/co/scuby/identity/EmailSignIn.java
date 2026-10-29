@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 class EmailSignIn {
@@ -18,11 +19,13 @@ class EmailSignIn {
     private final EmailCodes codes;
     private final People people;
     private final SessionStore sessions;
+    private final SignInSessions signInSessions;
 
-    EmailSignIn(EmailCodes codes, People people, SessionStore sessions) {
+    EmailSignIn(EmailCodes codes, People people, SessionStore sessions, SignInSessions signInSessions) {
         this.codes = codes;
         this.people = people;
         this.sessions = sessions;
+        this.signInSessions = signInSessions;
     }
 
     static String normalize(String email) {
@@ -34,9 +37,14 @@ class EmailSignIn {
         codes.start(normalize(email), caller);
     }
 
-    /** A wrong code throws invalid_code, but the spent attempt is committed (noRollbackFor). */
+    /**
+     * A wrong code throws invalid_code, but the spent attempt is committed (noRollbackFor). The account and
+     * its new session are one transaction: the unlink UPDATE locks the person row until commit, so a Google
+     * sign-in racing it (which locks the same row) either runs wholly before (its session is deleted here)
+     * or wholly after (it finds the link gone).
+     */
     @Transactional(noRollbackFor = ApiException.class)
-    public Person verify(String email, String code) {
+    public SignedIn verify(String email, String code, Optional<String> carriedTokenHash) {
         String normalized = normalize(email);
         if (!codes.consume(normalized, code)) throw new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code");
         Person person = people.byEmail(normalized).orElseGet(() -> people.create(normalized, DisplayNames.fromEmail(normalized), null, false));
@@ -46,8 +54,8 @@ class EmailSignIn {
                 && people.unlinkNonAuthoritativeGoogle(person.id())) {
             sessions.deleteAllOf(person.id());
             log.info("Email-code sign-in unlinked a non-authoritative Google identity from account {} and ended its sessions", person.id());
-            return people.get(person.id());
+            person = people.get(person.id());
         }
-        return person;
+        return new SignedIn(person, signInSessions.open(person.id(), carriedTokenHash));
     }
 }

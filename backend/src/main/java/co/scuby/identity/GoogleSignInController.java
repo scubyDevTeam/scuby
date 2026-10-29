@@ -25,8 +25,8 @@ class GoogleSignInController {
 
     @PostMapping("/auth/google")
     UserView google(@Valid @RequestBody GoogleSignInRequest body, HttpServletRequest request, HttpServletResponse response) {
-        Person person = signIn.signIn(body.credential());
-        sessions.open(person.id(), request, response);
-        return UserView.of(person);
+        SignedIn done = signIn.signIn(body.credential(), sessions.carried(request));
+        sessions.issue(response, done.session());
+        return UserView.of(done.person());
     }
 }

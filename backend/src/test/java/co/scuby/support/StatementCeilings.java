@@ -17,7 +17,7 @@ final class StatementCeilings {
             Map.entry("POST /auth/sign-out", 2),   // lookup + DELETE
             Map.entry("POST /auth/email/start", 6),   // advisory lock, row select, throttle count, upsert, send-log insert (+ the filter's session lookup when the browser is signed in)
             Map.entry("POST /auth/email/verify", 8),   // consume select + update, person lookup, person insert + select, session insert (+ filter lookup and old DELETE)
-            Map.entry("POST /auth/google", 7)   // sub lookup, email lookup, person insert + select, session insert (+ filter lookup and old DELETE)
+            Map.entry("POST /auth/google", 8)   // sub lookup, email lookup, person insert + select, person SELECT ... FOR UPDATE, session insert (+ filter lookup and old DELETE)
     );
 
     private StatementCeilings() {}

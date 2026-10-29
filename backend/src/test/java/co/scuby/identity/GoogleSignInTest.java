@@ -32,6 +32,9 @@ class GoogleSignInTest {
     @Autowired MutableClock clock;
     @Autowired DSLContext db;
     @Autowired RecordingEmailSender emails;
+    @Autowired People people;
+    @Autowired SessionStore sessionStore;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
 
     ApiClient api;
 
@@ -295,6 +298,61 @@ class GoogleSignInTest {
             var results = race(List.of("google-sub-1", "google-sub-1"));
             assertThat(results).extracting(ApiResponse::status).containsOnly(200);
             assertThat(results).extracting(r -> r.str("/id")).containsOnly(id);
+        }
+    }
+
+
+    /**
+     * The owner's email-code reclaim unlinks the attacker's non-authoritative Google identity and deletes its
+     * sessions; a replayed Google token landing between that work and its commit must not keep a session.
+     * The reclaim's transaction is held open by the test (after unlink + deleteAllOf, before commit) while
+     * the attacker signs in; the attacker is either blocked on the person row (new code) or already done (old).
+     */
+    @Test
+    void aReplayedGoogleTokenRacingTheOwnersReclaimKeepsNoSession() throws Exception {
+        String victim = "victim@correo.co";
+        String replay = keys.token(GoogleTestKeys.claims("attacker-sub", victim, clock.instant()));
+        ApiClient attacker = clients.newBrowser();
+        assertThat(attacker.post("/auth/google", "{\"credential\":\"" + replay + "\"}").status()).isEqualTo(200);
+        java.util.UUID personId = db.fetchOne(PERSON).getId();
+
+        var pool = Executors.newFixedThreadPool(2);
+        var reclaimWorkDone = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        try {
+            Future<?> reclaim = pool.submit(() -> new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx -> {
+                assertThat(people.unlinkNonAuthoritativeGoogle(personId)).isTrue();
+                sessionStore.deleteAllOf(personId);
+                reclaimWorkDone.countDown();
+                try {
+                    assertThat(release.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                } catch (InterruptedException e) {
+                    throw new IllegalStateException(e);
+                }
+            }));
+            assertThat(reclaimWorkDone.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+
+            ApiClient replayer = clients.newBrowser();
+            Future<ApiResponse> attack = pool.submit(() -> replayer.post("/auth/google", "{\"credential\":\"" + replay + "\"}"));
+            // Wait until the attacker is blocked on a row lock (new code) or has finished (old code).
+            long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
+            while (!attack.isDone() && System.nanoTime() < deadline) {
+                Integer waiting = db.fetchOne("select count(*) from pg_stat_activity where wait_event_type = 'Lock'").get(0, Integer.class);
+                if (waiting != null && waiting > 0) break;
+                Thread.sleep(20);
+            }
+            release.countDown();
+            reclaim.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            ApiResponse r = attack.get(30, java.util.concurrent.TimeUnit.SECONDS);
+
+            assertThat(r.status()).as("the replayed token after the reclaim").isEqualTo(401);
+            assertThat(db.fetchCount(co.scuby.db.generated.Tables.SESSION)).as("sessions left for the reclaimed account").isZero();
+            assertThat(replayer.get("/session").status()).isEqualTo(401);
+            assertThat(attacker.get("/session").status()).isEqualTo(401);
+            assertThat(db.fetchOne(PERSON).getGoogleSub()).isNull();
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
         }
     }
 

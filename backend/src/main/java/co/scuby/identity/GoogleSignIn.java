@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Service
 class GoogleSignIn {
 
@@ -15,10 +17,12 @@ class GoogleSignIn {
 
     private final GoogleIdTokens tokens;
     private final People people;
+    private final SignInSessions sessions;
 
-    GoogleSignIn(GoogleIdTokens tokens, People people) {
+    GoogleSignIn(GoogleIdTokens tokens, People people, SignInSessions sessions) {
         this.tokens = tokens;
         this.people = people;
+        this.sessions = sessions;
     }
 
     /**
@@ -29,11 +33,25 @@ class GoogleSignIn {
      * (non-authoritative emails may create, flagged so an email-code sign-in can later revoke the link).
      * People.create keeps the row a concurrent sign-in inserted for the same email, so the account we end
      * with is linked with a conditional update and re-checked: exactly one account, and its google_sub is
-     * the one that won (ours or an identical racing request's).
+     * the one that won (ours or an identical racing request's). The resolved row is then locked and its
+     * google_sub re-checked, and the session is opened in the same transaction (see {@link EmailSignIn#verify}).
      */
     @Transactional
-    public Person signIn(String credential) {
+    public SignedIn signIn(String credential, Optional<String> carriedTokenHash) {
         GoogleIdentity google = tokens.verify(credential);
+        Person resolved = resolve(google);
+        // Lock the row and look again: an email-code sign-in may have unlinked this identity (and deleted
+        // its sessions) between our read and now. Past the lock the link is stable until we commit, and the
+        // session is inserted in this same transaction, so a later unlink's deleteAllOf will see it.
+        Person account = people.lock(resolved.id());
+        if (!google.sub().equals(account.googleSub())) {
+            log.warn("Google sign-in refused: account {} is no longer linked to this Google identity", account.id());
+            throw new ApiException(ErrorCode.UNAUTHORIZED, "this Google account is no longer linked");
+        }
+        return new SignedIn(account, sessions.open(account.id(), carriedTokenHash));
+    }
+
+    private Person resolve(GoogleIdentity google) {
         return people.byGoogleSub(google.sub()).orElseGet(() -> {
             String email = EmailSignIn.normalize(google.email());
             boolean authoritative = google.emailAuthoritative();

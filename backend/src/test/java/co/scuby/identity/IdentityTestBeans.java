@@ -30,6 +30,6 @@ public class IdentityTestBeans {
     @Primary
     org.springframework.security.oauth2.jwt.JwtDecoder testGoogleIdTokenDecoder(co.scuby.support.GoogleTestKeys keys, java.time.Clock clock) {
         return GoogleIdTokenConfiguration.decoder("http://google-jwks.test/certs", keys.jwksFetcher(),
-                co.scuby.support.GoogleTestKeys.CLIENT_ID, clock);
+                co.scuby.support.GoogleTestKeys.CLIENT_ID, clock, java.time.Duration.ofMillis(1));
     }
 }

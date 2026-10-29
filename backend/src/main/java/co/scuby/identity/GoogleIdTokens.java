@@ -25,6 +25,13 @@ class GoogleIdTokens {
      * A bad token — signature, algorithm, issuer, audience, expiry, unverified email — is `unauthorized`.
      * Not being able to fetch Google's keys is our outage, not the caller's fault: `server_error`.
      */
+    private static boolean rateLimited(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof com.nimbusds.jose.jwk.source.RateLimitReachedException) return true;
+        }
+        return false;
+    }
+
     GoogleIdentity verify(String credential) {
         Jwt jwt;
         try {
@@ -33,6 +40,10 @@ class GoogleIdTokens {
             log.debug("Google token rejected: {}", e.getMessage());   // never the credential itself
             throw new ApiException(ErrorCode.UNAUTHORIZED, "Google rejected the token");
         } catch (JwtException e) {
+            if (rateLimited(e)) {
+                log.debug("Google token refused: its key id is unknown and the key set was refetched too recently");
+                throw new ApiException(ErrorCode.UNAUTHORIZED, "Google rejected the token");
+            }
             log.error("Google sign-in unavailable: could not fetch or use Google's JWKS key set", e);
             throw new ApiException(ErrorCode.SERVER_ERROR, "Google sign-in is unavailable");
         }

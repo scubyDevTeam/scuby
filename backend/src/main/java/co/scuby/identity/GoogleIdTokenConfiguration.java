@@ -3,7 +3,13 @@ package co.scuby.identity;
 import co.scuby.platform.config.Prod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jose.util.Resource;
+import com.nimbusds.jose.util.ResourceRetriever;
 import org.springframework.core.env.Environment;
+import org.springframework.web.client.RestClientException;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -17,6 +23,11 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +39,9 @@ import java.util.Set;
 class GoogleIdTokenConfiguration {
 
     private static final long SKEW_SECONDS = 60;
+    static final Duration KEY_REFETCH_MIN_INTERVAL = Duration.ofSeconds(30);
+    private static final Duration CACHE_TTL = Duration.ofMinutes(5);
+    private static final Duration CACHE_REFRESH_TIMEOUT = Duration.ofSeconds(15);
     static final String DEFAULT_CLIENT_ID = "local-google-client-id";
     private static final Set<String> ISSUERS = Set.of("https://accounts.google.com", "accounts.google.com");
 
@@ -42,14 +56,38 @@ class GoogleIdTokenConfiguration {
         SimpleClientHttpRequestFactory http = new SimpleClientHttpRequestFactory();
         http.setConnectTimeout(Duration.ofSeconds(2));
         http.setReadTimeout(Duration.ofSeconds(3));
-        return decoder(google.jwkSetUri(), new RestTemplate(http), google.clientId(), clock);
+        return decoder(google.jwkSetUri(), new RestTemplate(http), google.clientId(), clock, KEY_REFETCH_MIN_INTERVAL);
     }
 
-    /** The one decoder recipe (RS256 only, our validators); tests reuse it with their own key fetcher. */
-    static NimbusJwtDecoder decoder(String jwkSetUri, RestOperations rest, String clientId, Clock clock) {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
+    /**
+     * The one decoder recipe (RS256 only, our validators); tests reuse it with their own key fetcher. Keys are
+     * cached (5 min, one refresh at a time) and the key set is refetched at most once per `minRefetchInterval`:
+     * a token naming an unknown `kid` forces a refetch, and /auth/google is open to anyone, so without the
+     * limit each such request would call Google. Past the limit the decode fails with RateLimitReachedException
+     * (see GoogleIdTokens: the caller's 401, not our outage).
+     */
+    static NimbusJwtDecoder decoder(String jwkSetUri, RestOperations rest, String clientId, Clock clock, Duration minRefetchInterval) {
+        URL url;
+        try {
+            url = URI.create(jwkSetUri).toURL();
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("invalid scuby.auth.google.jwk-set-uri: " + jwkSetUri, e);
+        }
+        ResourceRetriever retriever = u -> {
+            try {
+                String body = rest.getForObject(u.toURI(), String.class);
+                if (body == null) throw new IOException("empty JWKS response");
+                return new Resource(body, "application/json");
+            } catch (RestClientException | URISyntaxException e) {
+                throw new IOException("could not fetch Google's JWKS: " + e.getMessage(), e);
+            }
+        };
+        JWKSource<SecurityContext> source = JWKSourceBuilder.<SecurityContext>create(url, retriever)
+                .cache(CACHE_TTL.toMillis(), CACHE_REFRESH_TIMEOUT.toMillis())
+                .rateLimited(minRefetchInterval.toMillis())
+                .build();
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSource(source)
                                                    .jwsAlgorithm(SignatureAlgorithm.RS256)
-                                                   .restOperations(rest)
                                                    .build();
         decoder.setJwtValidator(validator(clientId, clock));
         return decoder;

@@ -31,8 +31,8 @@ class EmailSignInController {
 
     @PostMapping("/auth/email/verify")
     UserView verify(@Valid @RequestBody EmailRequests.Verify body, HttpServletRequest request, HttpServletResponse response) {
-        Person person = signIn.verify(body.email(), body.code());
-        sessions.open(person.id(), request, response);
-        return UserView.of(person);
+        SignedIn done = signIn.verify(body.email(), body.code(), sessions.carried(request));
+        sessions.issue(response, done.session());
+        return UserView.of(done.person());
     }
 }
