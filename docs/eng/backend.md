@@ -105,8 +105,8 @@ text at INFO.
 |---|---|---|---|
 | `SCUBY_ENVIRONMENT` | `local` | `staging` / `prod` | the `deployment.environment` resource attribute |
 | `SCUBY_TELEMETRY_EXPORT` | `false` | `true` | the three OTLP exports (traces, metrics, logs) to New Relic |
-| `SCUBY_CONSOLE_FORMAT` | empty (plain text) | `ecs` | structured JSON console, the crash record that [infra.md](infra.md) · Logs ships to CloudWatch |
-| `SCUBY_CONSOLE_THRESHOLD` | `INFO` | `WARN` | the console's minimum level (INFO goes to New Relic) |
+| `LOGGING_STRUCTURED_FORMAT_CONSOLE` | empty (plain text) | `ecs` | structured JSON console (an unknown format fails startup), the crash record that [infra.md](infra.md) · Logs ships to CloudWatch |
+| `LOGGING_THRESHOLD_CONSOLE` | `INFO` | `WARN` | the console's minimum level; filters stdout only, New Relic still receives INFO |
 | `NEW_RELIC_LICENSE_KEY` | none | from SSM ([infra.md](infra.md) · Secrets) | the OTLP `api-key` header; the property `newrelic.license-key` wins if set |
 
 With `SCUBY_TELEMETRY_EXPORT=true` and no license key the application does not start (the
