@@ -1,1 +1,5 @@
 # Staging environment
+management:
+  opentelemetry:
+    resource-attributes:
+      deployment.environment: staging

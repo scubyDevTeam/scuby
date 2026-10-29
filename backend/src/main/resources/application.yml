@@ -1,4 +1,8 @@
 spring:
+  profiles:
+    group:
+      staging: newrelic, server
+      prod: newrelic, server
   application:
     name: scuby-backend
   threads:
@@ -18,3 +22,25 @@ management:
     web:
       exposure:
         include: health
+  opentelemetry:
+    resource-attributes:
+      service.name: scuby-backend
+      deployment.environment: local
+  tracing:
+    sampling:
+      probability: 1.0   # Boot's default is 0.1; decision #38 starts at 100% (lower via MANAGEMENT_TRACING_SAMPLING_PROBABILITY)
+    export:
+      otlp:
+        enabled: false
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true

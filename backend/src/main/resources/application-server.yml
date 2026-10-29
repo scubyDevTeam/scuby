@@ -1,0 +1,8 @@
+# Every server (staging, prod): stdout is the crash record — WARN and up, as JSON (docs/eng/infra.md · Logs).
+# INFO goes to New Relic through the newrelic profile.
+logging:
+  structured:
+    format:
+      console: ecs
+  threshold:
+    console: WARN

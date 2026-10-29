@@ -1,1 +1,5 @@
 # Production environment
+management:
+  opentelemetry:
+    resource-attributes:
+      deployment.environment: prod
