@@ -1,5 +1,13 @@
 # Observability (Track C) Implementation Plan
 
+> **As built.** The implementation deviates from the plan text below in these ways:
+> - Two critical ingest conditions (50 GB and 80 GB) replace one condition with a warning block: a warning threshold opens no incident, so it would never send an email.
+> - The p95 latency condition and its dashboard widget exclude `/actuator` requests (health checks).
+> - The HTTP and no-data conditions `FACET` by `deployment.environment`, so each environment is evaluated separately.
+> - Log attributes in New Relic are `severity.text` and `otel.library.name`, not `level` and `logger.name`.
+> - `ServerTelemetryTest` also clears Boot's console logging system properties afterwards, so the JSON console does not leak into later test classes.
+> - Startup fails when the `newrelic` profile is active and no license key is set (`NewRelicLicenseKeyCheck`), instead of exporting with an unresolved header.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The backend emits telemetry as decision #38 says — traces, metrics and INFO logs to New Relic over OTLP; on servers, WARN and up as JSON on stdout — verified with real data in the New Relic account, and the New Relic dashboard and alerts exist as Terraform code, applied.

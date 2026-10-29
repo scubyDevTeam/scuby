@@ -99,9 +99,10 @@ the repo, never in Parameter Store.
 Applied to account 8675334: the dashboard «Scuby — Backend» and the policy `scuby-backend`, which
 emails scubydev@gmail.com. The HTTP and no-data conditions watch `deployment.environment` staging
 and prod only (laptop runs are `local` and never page); the ingest conditions (50 and 80 GB) are
-account-wide. The no-data condition stays off until staging runs continuously. Apply with `infra/terraform/observability/apply.sh`. State is local to the
-operator's machine and git-ignored until staging's S3 state bucket exists; then it moves to that
-backend. What each resource is and how to rebuild lost state:
+account-wide. The no-data condition stays off until staging runs continuously. Apply with
+`infra/terraform/observability/apply.sh`. State is local to the operator's machine and git-ignored
+until staging's S3 state bucket exists; then it moves to that backend. What each resource is and
+how to rebuild lost state:
 [`infra/terraform/observability/README.md`](../../infra/terraform/observability/README.md).
 
 ## Database
