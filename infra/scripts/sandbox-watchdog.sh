@@ -3,15 +3,16 @@
 # Launched detached by the controller (launchctl submit -l co.scuby.watchdog ...). Waits for the
 # wall-clock deadline, then destroys the sandbox unless Terraform state is provably empty.
 #
-# CONTROLLER MUST, BEFORE launching:  rm -f "$SCRATCH/watchdog.fired"
-# and AFTER launching check "$SCRATCH/watchdog.log" (start line, deadline, terraform/aws paths).
+# After launching, the controller checks "$SCRATCH/watchdog.log" (start line, deadline,
+# terraform/aws paths) before applying.
 #
 # Safety properties:
 #  - PATH is extended: launchd gives only /usr/bin:/bin:/usr/sbin:/sbin.
 #  - Fail closed: destroy runs unless `terraform state list` exits 0 AND prints nothing.
-#  - Fires once: marker $SCRATCH/watchdog.fired (content = the deadline) is written before the
-#    destroy; a relaunch with the same deadline finds it, removes the launchd job and exits 0.
-#    A marker with a different deadline is stale (previous run): logged and ignored.
+#  - Fires once: every exit removes the launchd job first, so launchd relaunches it only after
+#    an abnormal kill. Marker $SCRATCH/watchdog.fired (content = the deadline) is written before
+#    the destroy; a relaunch that finds it still re-checks the state and destroys again unless it
+#    is provably empty (the kill may have hit mid-destroy). A marker with another deadline is stale.
 #  - The last action is always `launchctl remove co.scuby.watchdog` (tolerates absence).
 #  - Test hook: SCUBY_WATCHDOG_DESTROY_CMD replaces the real destroy command.
 set -uo pipefail
@@ -21,7 +22,7 @@ if [ -z "${HOME:-}" ]; then
   export HOME
 fi
 if [ -z "${HOME:-}" ] || [ ! -d "$HOME" ]; then
-  echo "watchdog: FATAL cannot determine HOME — terraform/aws will likely be missing"
+  echo "watchdog: WARNING cannot determine HOME — terraform/aws will likely be missing; continuing (fail closed)"
 fi
 export PATH="${HOME:-/nonexistent}/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
@@ -51,11 +52,10 @@ command -v terraform >/dev/null 2>&1 && command -v aws >/dev/null 2>&1 || \
 if [ -e "$MARKER" ]; then
   mtime=$(stat -f %m "$MARKER" 2>/dev/null || echo "?")
   if [ "$(cat "$MARKER" 2>/dev/null)" = "$deadline" ]; then
-    echo "watchdog: marker $MARKER exists for this deadline (mtime $mtime) — already fired; removing job, not destroying again"
-    remove_job
-    exit 0
+    echo "watchdog: marker $MARKER exists for this deadline (mtime $mtime) — relaunched after firing; re-checking the state"
+  else
+    echo "watchdog: stale marker from an earlier run (mtime $mtime, content '$(cat "$MARKER" 2>/dev/null)') — ignoring"
   fi
-  echo "watchdog: stale marker from an earlier run (mtime $mtime, content '$(cat "$MARKER" 2>/dev/null)') — ignoring"
 fi
 
 # Wall-clock wait: immune to the Mac sleeping through a single long sleep.
