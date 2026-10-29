@@ -59,8 +59,16 @@ class CodeSends {
                  .and(CODE_SEND.SENT_AT.gt(since.atOffset(ZoneOffset.UTC)));
     }
 
+    /**
+     * The purge names both channels so it can range-scan code_send_channel_sent_at_idx once per channel
+     * (PG17 has no B-tree skip scan: a filter on sent_at alone would not use that index). This corrects the
+     * migration V20261029_1035 comment, which says the index serves a sent_at-only purge; the migration is left
+     * untouched to keep its checksum.
+     */
     int purgeOlderThan(Duration age) {
         OffsetDateTime cutoff = clock.instant().minus(age).atOffset(ZoneOffset.UTC);
-        return db.deleteFrom(CODE_SEND).where(CODE_SEND.SENT_AT.lt(cutoff)).execute();
+        return db.deleteFrom(CODE_SEND)
+                 .where(CODE_SEND.CHANNEL.in(Channel.email.name(), Channel.sms.name()))
+                 .and(CODE_SEND.SENT_AT.lt(cutoff)).execute();
     }
 }

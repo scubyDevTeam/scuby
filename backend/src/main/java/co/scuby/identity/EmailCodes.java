@@ -46,8 +46,8 @@ class EmailCodes {
     }
 
     /**
-     * Sends a new code unless the live one is inside its cooldown or the address is over its daily cap
-     * (silent: the caller answers 204 either way). Over the device or IP cap: rate_limited.
+     * Over the device or IP cap (checked first, for every address): rate_limited. Otherwise sends a new code
+     * unless the live one is inside its cooldown or the address is over its daily cap (silent: 204 either way).
      * A test-domain address skips every limit and always gets a fresh row with the fixed code.
      */
     void start(String email, Caller caller) {
@@ -61,15 +61,17 @@ class EmailCodes {
         // Serialises concurrent starts for one address: FOR UPDATE locks nothing while no row exists.
         db.fetch("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "email_code:" + email);
         EmailCodeRecord row = db.selectFrom(EMAIL_CODE).where(EMAIL_CODE.EMAIL.eq(email)).forUpdate().fetchOne();
+        // The device/IP caps come first: a capped caller gets 429 for every address, so the answer never tells
+        // whether some address is in cooldown or over its daily cap (no enumeration oracle).
+        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.email, email, caller.deviceHash(), caller.ipHash());
+        if (counts.device() >= limits.emailMaxPerDevice() || counts.ip() >= limits.emailMaxPerIp()) {
+            throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes requested");
+        }
         boolean live = row != null && row.getAttempts() < MAX_ATTEMPTS && row.getExpiresAt().toInstant().isAfter(now);
         if (live && row.getSentAt().toInstant().plus(COOLDOWN).isAfter(now)) return;
         int sendsToday = row != null && row.getSendsDay().equals(today) ? row.getSendsOnDay() : 0;
         if (sendsToday >= MAX_SENDS_PER_DAY) return;
 
-        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.email, email, caller.deviceHash(), caller.ipHash());
-        if (counts.device() >= limits.emailMaxPerDevice() || counts.ip() >= limits.emailMaxPerIp()) {
-            throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes requested");
-        }
         String code = Hashing.randomDigits(6);
         write(email, code, now, today, sendsToday + 1);
         sends.record(CodeSends.Channel.email, email, caller.personId(), caller.deviceHash(), caller.ipHash());
@@ -90,6 +92,19 @@ class EmailCodes {
         // so the next start sends a fresh code at once.
         db.update(EMAIL_CODE).set(EMAIL_CODE.ATTEMPTS, MAX_ATTEMPTS).where(EMAIL_CODE.EMAIL.eq(email)).execute();
         return true;
+    }
+
+    /**
+     * Data minimisation: drops rows whose send counters can no longer matter (sends_day before yesterday,
+     * so the daily cap stays correct across the UTC day boundary) and whose code has expired.
+     */
+    int purgeStale() {
+        Instant now = clock.instant();
+        LocalDate yesterday = now.atOffset(ZoneOffset.UTC).toLocalDate().minusDays(1);
+        return db.deleteFrom(EMAIL_CODE)
+                 .where(EMAIL_CODE.SENDS_DAY.lt(yesterday))
+                 .and(EMAIL_CODE.EXPIRES_AT.le(now.atOffset(ZoneOffset.UTC)))
+                 .execute();
     }
 
     private void write(String email, String code, Instant now, LocalDate today, int sendsOnDay) {

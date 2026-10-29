@@ -27,6 +27,7 @@ class EmailSignInTest {
     @Autowired RecordingEmailSender emails;
     @Autowired MutableClock clock;
     @Autowired DSLContext db;
+    @Autowired EmailCodes codes;
 
     ApiClient api;
 
@@ -110,7 +111,8 @@ class EmailSignInTest {
         assertThat(emails.sent()).hasSize(1);
         for (int i = 0; i < 12; i++) {
             clock.advance(Duration.ofSeconds(61));
-            assertThat(start("ana@correo.co").status()).isEqualTo(204);
+            // A fresh device each time: the device cap (also 10) is checked first and would otherwise answer 429.
+            assertThat(clients.newBrowser().post("/auth/email/start", "{\"email\":\"ana@correo.co\"}").status()).isEqualTo(204);
         }
         assertThat(emails.sent()).hasSize(10);
         // The next UTC day, and more than 24 h after these sends (so the device's rolling cap is clear too).
@@ -228,5 +230,44 @@ class EmailSignInTest {
         assertThat(verify("e2e-3@e2e.scuby.test", "123456").errorCode()).isEqualTo("invalid_code");
         start("e2e-3@e2e.scuby.test");   // rewritten: works again
         assertThat(verify("e2e-3@e2e.scuby.test", "123456").status()).isEqualTo(200);
+    }
+
+    @Test
+    void aCappedDeviceGetsRateLimitedEvenForAnAddressInCooldown() {
+        // The cap check runs before the cooldown/daily-cap early returns, so the answer is the same for every address.
+        for (int i = 0; i < 10; i++) assertThat(start("p" + i + "@correo.co").status()).isEqualTo(204);
+        assertThat(start("p9@correo.co").errorCode()).isEqualTo("rate_limited");   // in cooldown
+        assertThat(start("p0@correo.co").errorCode()).isEqualTo("rate_limited");
+        assertThat(start("never@correo.co").errorCode()).isEqualTo("rate_limited");
+    }
+
+    @Test
+    void anAddressLongerThanTheRfcLimitIsRejectedWithTheField() {
+        String longEmail = "a".repeat(250) + "@b.co";   // 255 chars
+        ApiResponse r = start(longEmail);
+        assertThat(r.status()).isEqualTo(422);
+        assertThat(r.json().at("/error/fields").has("email")).isTrue();
+        assertThat(start("a".repeat(248) + "@b.co").status()).isEqualTo(204);   // 253 chars is fine
+    }
+
+    @Test
+    void aDottedCapitalIWithDotAbovePassesThroughJavaAndTheDbCheckWithoutA500() {
+        // U+0130 lower-cases (Locale.ROOT) to "i" + U+0307; the DB CHECK email = lower(btrim(email)) must agree.
+        String address = "\u0130van@correo.co";
+        assertThat(start(address).status()).isEqualTo(204);   // Java and the DB CHECK agree: no constraint violation
+        String stored = db.select(EMAIL_CODE.EMAIL).from(EMAIL_CODE).fetchOne().value1();
+        assertThat(stored).isEqualTo(EmailSignIn.normalize(address));
+        assertThat(verify(address, emails.lastCodeFor(stored)).status()).isEqualTo(200);
+    }
+
+    @Test
+    void staleEmailCodesArePurgedButTodaysAndYesterdaysCountersStay() {
+        start("old@correo.co");
+        start("recent@correo.co");
+        clock.advance(Duration.ofDays(1));
+        start("today@correo.co");
+        clock.advance(Duration.ofDays(1));   // old/recent are now 2 days back, expired; today@ is 1 day back
+        assertThat(codes.purgeStale()).isEqualTo(2);
+        assertThat(db.select(EMAIL_CODE.EMAIL).from(EMAIL_CODE).fetch(EMAIL_CODE.EMAIL)).containsExactly("today@correo.co");
     }
 }
