@@ -24,6 +24,13 @@ public final class TestDb {
             "person"
     );
 
+    /**
+     * Tables a test never writes: seeded by migrations and restored by reset() (feature_flags) or read-only
+     * (supported_countries), plus Flyway's own history. A new table is in exactly one of the two lists;
+     * HarnessSelfTest fails otherwise.
+     */
+    static final List<String> REFERENCE_TABLES = List.of("feature_flags", "supported_countries", "flyway_schema_history");
+
     private final DSLContext db;
     private final ObjectProvider<ClearableCache> caches;
     private final MutableClock clock;

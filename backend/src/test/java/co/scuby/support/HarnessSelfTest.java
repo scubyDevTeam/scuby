@@ -64,6 +64,31 @@ class HarnessSelfTest {
         assertThat(r.str("/status")).isEqualTo("UP");
     }
 
+    /** A new writable table whose line is forgotten in MUTABLE_TABLES would leak rows between tests. */
+    @Test
+    void everyTableIsEitherResetOrDeclaredReference() {
+        var tables = db.fetch("SELECT table_name FROM information_schema.tables WHERE table_schema = 'scuby' AND table_type = 'BASE TABLE'")
+                       .getValues(0, String.class);
+        assertThat(tables).isNotEmpty();
+        var known = new java.util.ArrayList<>(TestDb.MUTABLE_TABLES);
+        known.addAll(TestDb.REFERENCE_TABLES);
+        assertThat(tables).as("tables in schema scuby that are in neither TestDb.MUTABLE_TABLES nor TestDb.REFERENCE_TABLES")
+                          .allSatisfy(t -> assertThat(known).contains(t));
+        assertThat(TestDb.MUTABLE_TABLES).as("the two lists must not overlap").doesNotContainAnyElementsOf(TestDb.REFERENCE_TABLES);
+    }
+
+    @Test
+    void rawRefusesAContractRouteButUncheckedNamesItsReason() {
+        ApiClient api = clients.newBrowser();
+        assertThatThrownBy(() -> api.raw(HttpMethod.GET, "/session", null))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("is a contract route");
+        assertThatThrownBy(() -> api.raw(HttpMethod.GET, "/cases/{code}", null, "ABC"))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("is a contract route");
+        assertThatThrownBy(() -> api.unchecked(HttpMethod.GET, "/session", null, " "))
+                .isInstanceOf(AssertionError.class);
+        assertThat(api.unchecked(HttpMethod.GET, "/session", null, "self-test: the call itself is the point").status()).isEqualTo(401);
+    }
+
     @Test
     void resetEmptiesTheMutableTables() {
         db.execute("INSERT INTO scuby.outbox_events (id, payload_json) VALUES (gen_random_uuid(), '{}')");
