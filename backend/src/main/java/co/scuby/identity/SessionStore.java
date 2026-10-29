@@ -3,6 +3,8 @@ package co.scuby.identity;
 import co.scuby.platform.crypto.Hashing;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -43,6 +45,19 @@ class SessionStore {
 
     void delete(String tokenHash) {
         db.deleteFrom(SESSION).where(SESSION.TOKEN_HASH.eq(tokenHash)).execute();
+        evictAfterCommit(tokenHash);
+    }
+
+    /**
+     * Evicting before the commit lets a concurrent request still see the row and re-cache the session; so
+     * inside a transaction the eviction runs after it commits (and also now, to shorten the window).
+     */
+    private void evictAfterCommit(String tokenHash) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { lookup.evict(tokenHash); }
+            });
+        }
         lookup.evict(tokenHash);
     }
 

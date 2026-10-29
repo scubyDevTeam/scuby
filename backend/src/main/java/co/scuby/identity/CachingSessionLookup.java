@@ -34,9 +34,9 @@ final class CachingSessionLookup implements SessionLookup, ClearableCache {
             cache.invalidate(tokenHash);
             return Optional.empty();
         }
-        Optional<ActiveSession> found = delegate.find(tokenHash);
-        found.ifPresent(s -> cache.put(tokenHash, s));
-        return found;
+        // Atomic load: evict() of the same key waits for an in-flight load, so a fill racing a sign-out
+        // can never re-cache a revoked token. A null result is not cached.
+        return Optional.ofNullable(cache.get(tokenHash, k -> delegate.find(k).orElse(null)));
     }
 
     @Override

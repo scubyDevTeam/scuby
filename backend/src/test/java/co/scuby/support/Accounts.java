@@ -5,6 +5,7 @@ import org.jooq.DSLContext;
 
 import java.time.Clock;
 import java.time.ZoneOffset;
+import java.util.Locale;
 import java.util.UUID;
 
 import static co.scuby.db.generated.Tables.PERSON;
@@ -26,7 +27,7 @@ public final class Accounts {
         db.insertInto(PERSON)
           .set(PERSON.ID, id)
           .set(PERSON.DISPLAY_NAME, email.substring(0, email.indexOf('@')))
-          .set(PERSON.EMAIL, email.toLowerCase())
+          .set(PERSON.EMAIL, email.toLowerCase(Locale.ROOT))
           .set(PERSON.CREATED_AT, clock.instant().atOffset(ZoneOffset.UTC))
           .execute();
         return id;

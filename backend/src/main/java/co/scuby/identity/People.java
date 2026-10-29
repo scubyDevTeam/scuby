@@ -15,7 +15,7 @@ import java.util.UUID;
 
 import static co.scuby.db.generated.Tables.PERSON;
 
-/** The only writer of `person`. Emails arrive already normalised (trimmed, lower-case). */
+/** The only writer of `person`. Emails arrive already normalised: trim + lower(Locale.ROOT); the DB CHECK enforces it. */
 @Component
 class People {
 

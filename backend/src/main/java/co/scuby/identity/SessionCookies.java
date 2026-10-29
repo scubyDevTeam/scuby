@@ -23,11 +23,9 @@ class SessionCookies {
     static final String NAME = "__Host-session";
     private static final Pattern TOKEN = Pattern.compile("^[A-Za-z0-9_-]{43}$");
 
-    private final CookieProperties cookies;
     private final Clock clock;
 
-    SessionCookies(CookieProperties cookies, Clock clock) {
-        this.cookies = cookies;
+    SessionCookies(Clock clock) {
         this.clock = clock;
     }
 
@@ -53,7 +51,8 @@ class SessionCookies {
         response.addHeader(HttpHeaders.SET_COOKIE, base("").maxAge(Duration.ZERO).build().toString());
     }
 
+    /** Always Secure: a `__Host-` cookie without it is dropped by browsers, so `scuby.cookies.secure` does not apply here. */
     private ResponseCookie.ResponseCookieBuilder base(String value) {
-        return ResponseCookie.from(NAME, value).httpOnly(true).secure(cookies.secure()).sameSite("Lax").path("/");
+        return ResponseCookie.from(NAME, value).httpOnly(true).secure(true).sameSite("Lax").path("/");
     }
 }

@@ -17,7 +17,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
@@ -38,6 +43,7 @@ class SessionTest {
     @Autowired MockMvc mvc;
     @Autowired SessionLookup lookup;
     @Autowired SessionStore store;
+    @Autowired PlatformTransactionManager transactionManager;
 
     ApiClient api;
 
@@ -96,9 +102,45 @@ class SessionTest {
         NewSession session = store.create(id);
         assertThat(session.expiresAt()).isEqualTo(MutableClock.START.atOffset(ZoneOffset.UTC).plusMonths(12).toInstant());
         var response = new org.springframework.mock.web.MockHttpServletResponse();
-        new SessionCookies(new CookieProperties(true), clock).issue(response, session);
+        new SessionCookies(clock).issue(response, session);
         assertThat(response.getHeader("Set-Cookie")).startsWith("__Host-session=" + session.token() + ";")
                 .contains("Max-Age=" + seconds).contains("Secure").contains("Path=/").doesNotContain("Domain");
+    }
+
+    @Test
+    void theSessionCookieIsSecureEvenWhenTheDeviceCookieIsNot() {
+        // __Host- cookies must be Secure or browsers drop them; scuby.cookies.secure governs the device cookie only.
+        NewSession session = store.create(accounts.person("ana.gomez@correo.co"));
+        var issued = new org.springframework.mock.web.MockHttpServletResponse();
+        var cleared = new org.springframework.mock.web.MockHttpServletResponse();
+        var cookies = new SessionCookies(clock);
+        cookies.issue(issued, session);
+        cookies.clear(cleared);
+        assertThat(issued.getHeader("Set-Cookie")).contains("Secure");
+        assertThat(cleared.getHeader("Set-Cookie")).contains("Secure");
+    }
+
+    @Test
+    void anExpiredSessionRowIsRejectedOnTheUncachedPath() {
+        accounts.signIn(api, "ana.gomez@correo.co");
+        clock.set(MutableClock.START.atOffset(ZoneOffset.UTC).plusMonths(12).plusSeconds(1).toInstant());
+        // nothing was read since sign-in, so the cache is empty and the DB lookup decides
+        assertThat(api.get("/session").status()).isEqualTo(401);
+    }
+
+    @Test
+    void aSignOutInsideATransactionCannotLeaveTheOldTokenAccepted() throws Exception {
+        accounts.signIn(api, "ana.gomez@correo.co");
+        String hash = Hashing.sha256Hex(api.cookie("__Host-session").orElseThrow());
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            store.delete(hash);
+            // A concurrent request (another connection) still sees the uncommitted delete's row and fills the cache.
+            try {
+                assertThat(CompletableFuture.supplyAsync(() -> lookup.find(hash)).get(5, TimeUnit.SECONDS)).isPresent();
+            } catch (Exception e) { throw new IllegalStateException(e); }
+        });
+        assertThat(lookup.find(hash)).isEmpty();
+        assertThat(db.fetchCount(SESSION, SESSION.TOKEN_HASH.eq(hash))).isZero();
     }
 
     @Test
