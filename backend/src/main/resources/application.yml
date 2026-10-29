@@ -71,6 +71,6 @@ management:
 logging:
   structured:
     format:
-      console: ${SCUBY_CONSOLE_FORMAT:}      # "ecs" on servers: stdout is the crash record (docs/eng/infra.md · Logs)
+      console: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:}   # ecs | gelf | logstash (or a formatter class); "ecs" on servers. Empty = plain text
   threshold:
-    console: ${SCUBY_CONSOLE_THRESHOLD:INFO} # "WARN" on servers; INFO goes to New Relic
+    console: ${LOGGING_THRESHOLD_CONSOLE:INFO}         # "WARN" on servers: filters stdout only; New Relic still receives INFO

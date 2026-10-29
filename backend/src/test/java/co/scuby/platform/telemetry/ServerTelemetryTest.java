@@ -30,8 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** What the server variables switch on: New Relic export settings and the WARN-and-up JSON console (decision #38). */
 @SpringBootTest(properties = {
         "SCUBY_ENVIRONMENT=staging",
-        "SCUBY_CONSOLE_FORMAT=ecs",
-        "SCUBY_CONSOLE_THRESHOLD=WARN",
+        "LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs",
+        "LOGGING_THRESHOLD_CONSOLE=WARN",
         "NEW_RELIC_LICENSE_KEY=test-not-a-key",
         "SCUBY_TELEMETRY_EXPORT=false" // nothing may leave the machine
 })
