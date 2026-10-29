@@ -54,6 +54,11 @@ then; unused credits keep applying. AWS Budgets alarms from day one ([costs.md](
 Moving staging data to RDS, if any is worth keeping, is `pg_dump` / `pg_restore`; the application
 only changes its connection settings.
 
+**Sandbox.** A throwaway environment in a separate test AWS account
+(`infra/terraform/envs/sandbox`, local state): applied, smoke-tested end to end and destroyed in the
+same run, to prove the Terraform before staging exists. It uses the CloudFront default domains, so
+it needs no domain. How to run it: `infra/README.md`.
+
 ## Edge: CloudFront, ACM, Route 53
 
 - **TLS lives at CloudFront.** ACM certificates are free but attach only to CloudFront, load
@@ -76,6 +81,9 @@ only changes its connection settings.
   carries the permissions it needs.
 - Docker Compose runs the backend image (and Postgres, in staging). The JVM is tuned for the
   instance's RAM.
+- **Memory budget on the 2 GB instance:** the backend container is capped at 1 GB (`mem_limit`, so
+  the JVM's `MaxRAMPercentage=60` sizes the heap from that) and Postgres at 512 MB; the rest is the
+  OS and Docker.
 
 ## Database
 
@@ -108,6 +116,10 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
 | Restricted images (claim proof, orphan sightings) | **CloudFront signed URLs**, short TTL, issued by the backend to the viewer allowed to see them |
 | CORS for the poster canvas | Response headers on the image distribution |
 | `og` variant | Plain cover crop in v1. Status text composited on the image («YA ESTÁ EN CASA», [10](../product/10-sharing.md)) is later |
+
+Not built yet: restricted images (claim proofs, orphan sightings) still need a visibility in the
+upload key and CloudFront signed URLs; until then every master is reachable through `/img/…`. It
+arrives with the backend's upload slots, which know each photo's purpose.
 
 ## Secrets
 
