@@ -28,7 +28,7 @@ door open without paying for it now.
 | Data access | **jOOQ** (open-source edition), reads and writes — *Data access* below |
 | Queue | **Amazon SQS** behind a transactional outbox — *Async work* below |
 | Scheduled jobs | **db-scheduler** (state in Postgres, cluster-safe) — cron-style work only |
-| Rate limiting | **Bucket4j** with its Postgres-backed store |
+| Rate limiting | Counts over the rows themselves (rolling windows with SQL, indexed where measured) — the limits in this slice key on rows that exist anyway (sends, sightings, uploads). **Bucket4j** with its Postgres store if a limit ever needs tokens without rows |
 | Phone numbers | libphonenumber ([auth.md](auth.md)) |
 | Observability | **OpenTelemetry → New Relic** (traces, metrics, logs over OTLP); **Sentry** for errors |
 | Tests | JUnit 5, **Testcontainers** (one static container per JVM, started lazily and wired with a `DynamicPropertyRegistrar`, not a Spring bean, so closing a test context cannot stop it), **WireMock** for Twilio/Resend/Google, **ElasticMQ** for SQS |
@@ -170,12 +170,95 @@ The source of truth moves to a neutral `openapi.yaml` both sides generate from, 
 (decision #34, [api.md](api.md) · Where the contract lives); the document stays committed and the
 backend still never generates a competing one.
 
+## Code structure
+
+*Decided 2026-10-29 — decision #40 ([00](../product/00-product-map.md)).* Agent-facing rules:
+[`backend/CLAUDE.md`](../../backend/CLAUDE.md).
+
+**Package by feature, flat, package-private by default.** `co.scuby.platform` is technical and
+domain-free (roles, web envelope, PostGIS helpers, security wiring, flags, time); foundations
+`identity`, `uploads`, `pets` depend only on `platform`; verticals (`cases` today) depend on
+foundations and `platform`, never on each other. A class used from another feature carries
+`@ModuleApi`; everything else stays package-private. Reads may join any table; each table has one
+writing feature; cross-feature side effects go through the outbox. Background code stays in its
+feature, marked `@WorkerComponent`. When a second vertical arrives, `cases` keeps what every case
+shares and defines a `@ModuleApi` `CaseKind` each vertical implements.
+
+**Viewer-dependent responses: access → facts → derivation → record.** One policy decides the
+access (`PUBLIC`, `OWNER`); facts are loaded according to it, so private facts are never queried
+for the public; a pure `*Derivation` (time and viewer as parameters) builds the response; the
+record is serialised. Request/response records are written by hand next to their feature
+(generation was rejected: openapi-generator turns the contract's unions into unusable classes).
+
+**Guardrails that fail the build:** ArchUnit (derivation purity — no Spring, jOOQ, I/O, clock or
+randomness; roles by annotation; the DAG; the declared surface), PIT mutation testing on
+derivations (≥ 80 %), contract conformance of every response an integration test produces, leak
+tests on viewer-dependent endpoints, statement-count ceilings per request (an N+1 fails the test),
+plan checks on growth-sensitive queries only, and indexes added only with a measured plan and human
+approval. Flyway versions are timestamps on every branch so parallel branches never collide.
+
+## Security
+
+One Spring Security filter chain, stateless (`platform.security`): no HTTP session, form login,
+basic auth or logout filter. Features declare their own route rules (`SecurityRules` beans). The
+authentication filter is domain-free and lives in `platform`; `identity` supplies who is signed in
+through a `RequestAuthenticator` (so `platform` depends on no feature). `401`/`403`, and a `500`
+when the authenticator fails (the database is down), come in the contract's envelope through the
+same mapper as every other error.
+
+**CSRF without a token** (the client sends none): an unsafe request (`POST`/`PUT`/`PATCH`/`DELETE`)
+whose `Origin` is not an allowed client origin, or that has no `Origin` but `Sec-Fetch-Site:
+cross-site`, is `forbidden`. The check runs before CORS, so the refusal comes in the envelope; a
+cross-origin `GET` from a non-allowed origin still gets CORS's plain-text `403`. `SameSite=Lax`
+cookies are the second layer. Rejected: Spring's token CSRF (needs a contract change for no gain
+here); `SameSite` alone (a sibling subdomain is same-site). **CORS** allows only the client's
+origins (`scuby.web.allowed-origins`), with credentials.
+
+**Cookie tossing:** a sibling subdomain can set cookies for the parent domain. The session cookie is
+`__Host-session` (browsers refuse a `__Host-` cookie that names a `Domain`), and both cookie readers
+treat a name sent twice as absent. The device cookie keeps the name `device` until the client side
+agrees to `__Host-device` (proposed).
+
+**Caching:** every response carries `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`
+(Spring Security's default, kept on purpose): answers are per viewer, and a CDN must never store
+one. An endpoint that wants caching sets it explicitly and says why.
+
+**Deployed profiles are configured, never defaulted:** outside `local` and `test`, start-up is
+refused without the allowed origins, the IP-hash key, the code-hash key and the Google client ID;
+under `prod` also without the origin secret (under `staging` a missing one is a start-up warning:
+every per-IP limit would key on CloudFront's address). A start-up test keeps every deployed profile
+startable with exactly those settings.
+
+**Client IP** (a rate-limit key): `CloudFront-Viewer-Address` only when the request carries the
+origin secret header, else the socket address. IPs are stored only as an HMAC.
+
+**Device cookie** (decision #35): only its SHA-256 is used; it is set when missing and renewed on
+unsafe requests by a `Set-Cookie` header. There is no `device` table: the hash is stored on the rows
+that need it, so reads never write. A table arrives with the first consumer of device-level data.
+
+## Sessions
+
+An **opaque** 256-bit token in the `__Host-session` cookie (decision #37); the database stores only
+its SHA-256, with `expires_at` = sign-in + 12 months (absolute); the cookie's `Max-Age` is computed
+from that `expires_at`, so both end together. **Reading a session never writes** — no
+`last_seen_at`, no sliding expiry; writes happen on sign-in, sign-out, account deletion and a daily
+purge. A bounded in-process cache (10,000 entries, 60 s) sits in front of the lookup behind
+`SessionLookup`; sign-out evicts locally; size `0` disables it. **Connection hygiene:** the lookup
+runs outside any transaction and returns its connection at once; transactions live in service
+methods, never across a request — a test asserts the lookup ran in autocommit, the pool had 0 active
+connections when the controller started (sampled during the request, not after it), no servlet
+session was created, and a session read issues no `INSERT`/`UPDATE`. Rejected: JWT sessions (cannot be revoked
+before they expire — sign-out, account deletion, a stolen phone); a short JWT plus refresh token
+(more code and keys for nothing at one instance).
+
 ## Testing
 
 - **Integration tests are the default** for anything touching the database, a queue or a provider:
   Testcontainers singletons (Postgres with PostGIS — the project image, see [infra.md](infra.md)
   · Database), ElasticMQ, WireMock.
 - **Contract conformance** as above.
+- **Statement ceilings and plan checks** (*Code structure*): every endpoint test counts SQL
+  statements per request; growth-sensitive queries get a plan check against seeded volume.
 - **Behaviour parity:** the scenarios in `web/src/mocks/backend.test.ts` describe what the emulated
   backend does; the real backend has a test for each one it implements.
 - **Acceptance of the plug:** the client's Playwright suite runs green against a deployed backend

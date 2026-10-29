@@ -82,6 +82,7 @@ event vocabulary.
 | Key | Default | Gates | Off-path | Owning doc | Exit |
 |---|---|---|---|---|---|
 | `publisher_phone_otp` | **on** | SMS OTP verification of the publisher's phone at publish | Number still required, format-validated and stored E.164, but no OTP; `phone_verified_at` stays null. The publish form response says `phone_step: unverified`, so the UI skips the code entry | [auth.md · phone step](auth.md) | Permanent kill switch — also the lever if the SMS spend alarm fires before Twilio Verify is installed |
+| `reverse_geocoding` | **off** | Place names (`place_name` on cases and feed items) from a reverse-geocoding provider, computed once at publish | A generic localized label («Zona marcada en el mapa») | [backend.md](backend.md) · Place names (added by the lost-case work) | Deleted once a provider is chosen and stable |
 
 ## Rejected alternatives
 

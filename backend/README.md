@@ -44,11 +44,10 @@ El código de jOOQ se regenera en cada build en `target/generated-sources/jooq`;
 
 ```
 src/main/java/co/scuby/
-├── platform/
-│   ├── roles/   Anotaciones de rol: @ApiComponent y @WorkerComponent
-│   ├── web/     Sobre de errores: ApiException → ProblemDetail → ContractErrors → {"error":{…}} del contrato
-│   └── db/      GeoPoint y Spatial (ayudas de PostGIS)
-src/test/java/co/scuby/contract/ContractValidator   Valida respuestas contra docs/eng/openapi.json
+├── platform/    técnico, sin dominio: roles, web (sobre de errores), db (PostGIS), security, flags, time
+├── identity/    cuentas, sesiones, cookie de dispositivo, código por correo, Google, OTP por SMS, GET /config, GET /me/profile
+src/test/java/co/scuby/support/     arnés de pruebas: ApiClient (contrato + techo de sentencias), TestDb, MutableClock
+src/test/java/co/scuby/architecture/ reglas de ArchUnit que fallan el build
 ```
 
 Convención de paquetes: por funcionalidad y plano (`platform`, `identity`, `uploads`, `pets`, `cases`);
