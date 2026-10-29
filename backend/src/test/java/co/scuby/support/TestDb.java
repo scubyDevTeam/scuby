@@ -16,7 +16,9 @@ public final class TestDb {
     static final List<String> MUTABLE_TABLES = List.of(
             "outbox_events",
             "feature_flag_overrides",
-            "feature_flag_changes"
+            "feature_flag_changes",
+            "session",
+            "person"
     );
 
     private final DSLContext db;

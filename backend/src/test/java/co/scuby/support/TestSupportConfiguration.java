@@ -53,6 +53,11 @@ public class TestSupportConfiguration {
     }
 
     @Bean
+    Accounts accounts(DSLContext db, java.time.Clock clock) {
+        return new Accounts(db, clock);
+    }
+
+    @Bean
     TestDb testDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder,
                   ConnectionSampler sampler) {
         return new TestDb(db, caches, clock, recorder, sampler);

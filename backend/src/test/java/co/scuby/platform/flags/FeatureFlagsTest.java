@@ -59,7 +59,6 @@ class FeatureFlagsTest {
         assertThat(flags.isEnabled(Flag.REVERSE_GEOCODING, null)).isFalse();
     }
 
-    @org.junit.jupiter.api.Disabled("needs the person table — enabled in Task 7")
     @Test
     void anOverrideWinsInEitherDirection() {
         UUID ana = UUID.randomUUID();

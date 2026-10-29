@@ -12,7 +12,9 @@ final class StatementCeilings {
 
     private static final Map<String, Integer> CEILINGS = Map.ofEntries(
             Map.entry("GET /actuator/health", 0),
-            Map.entry("GET /config", 1)
+            Map.entry("GET /config", 1),
+            Map.entry("GET /session", 2),          // lookup + person
+            Map.entry("POST /auth/sign-out", 2)    // lookup + DELETE
     );
 
     private StatementCeilings() {}
