@@ -40,7 +40,8 @@ final class RequestAuthenticationFilter extends OncePerRequestFilter {
             try {
                 person = authenticator.authenticate(request);
             } catch (RuntimeException e) {
-                log.error("Authenticating {} {} failed", request.getMethod(), request.getRequestURI(), e);
+                // Method only: a path may carry a bearer-like token (a check-in link).
+                log.error("Authenticating a {} request failed", request.getMethod(), e);
                 errors.write(response, ErrorCode.SERVER_ERROR);
                 return;
             }
