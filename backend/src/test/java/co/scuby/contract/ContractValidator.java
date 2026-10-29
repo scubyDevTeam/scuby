@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -40,6 +41,34 @@ public final class ContractValidator {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /** One operation of the contract; {@code sessionRequired} when it declares {@code security: [{session: []}]}. */
+    public record Operation(String method, String path, boolean sessionRequired) {}
+
+    private static final List<String> METHODS = List.of("get", "post", "put", "patch", "delete");
+
+    public List<Operation> operations() {
+        List<Operation> found = new ArrayList<>();
+        document.get("paths").properties().forEach(path -> {
+            for (String method : METHODS) {
+                JsonNode op = path.getValue().get(method);
+                if (op == null) continue;
+                boolean session = op.has("security") && op.get("security").toString().contains("\"session\"");
+                found.add(new Operation(method.toUpperCase(Locale.ROOT), path.getKey(), session));
+            }
+        });
+        return found;
+    }
+
+    /** True when a concrete request path (query string allowed) is an instance of a documented path template. */
+    public boolean documents(String concretePath) {
+        String path = concretePath.contains("?") ? concretePath.substring(0, concretePath.indexOf('?')) : concretePath;
+        for (var it = document.get("paths").propertyNames().iterator(); it.hasNext(); ) {
+            String template = it.next();
+            if (path.matches(template.replaceAll("\\{[^/}]+}", "[^/]+"))) return true;
+        }
+        return false;
     }
 
     public List<String> errors(String method, String pathTemplate, int status, String jsonBody) {

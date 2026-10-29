@@ -24,6 +24,12 @@ class ArchitectureTest {
     void apiDoesNotUseWorkers(JavaClasses classes) { RULES.apiDoesNotUseWorkers().check(classes); }
 
     @ArchTest
+    void restControllersAreApiComponents(JavaClasses classes) { RULES.restControllersAreApiComponents().check(classes); }
+
+    @ArchTest
+    void workerEntryPointsLiveInWorkerComponents(JavaClasses classes) { RULES.workerEntryPointsLiveInWorkerComponents().check(classes); }
+
+    @ArchTest
     void platformDependsOnNoFeature(JavaClasses classes) { RULES.platformDependsOnNoFeature().check(classes); }
 
     @ArchTest

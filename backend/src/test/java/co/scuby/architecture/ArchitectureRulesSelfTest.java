@@ -102,6 +102,27 @@ class ArchitectureRulesSelfTest {
     }
 
     @Test
+    void aRestControllerWithoutTheApiRoleFails() {
+        assertThatThrownBy(() -> RULES.restControllersAreApiComponents().check(FIXTURES))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("FixtureBareController")
+                .message().doesNotContain("FixtureApiController");
+    }
+
+    @Test
+    void aScheduledMethodOutsideAWorkerComponentFails() {
+        assertThatThrownBy(() -> RULES.workerEntryPointsLiveInWorkerComponents().check(FIXTURES))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("FixtureStrayScheduled")
+                .message().doesNotContain("FixtureWorkerScheduled");
+    }
+
+    @Test
+    void aQueueListenerOutsideAWorkerComponentFailsToo() {
+        assertThatThrownBy(() -> RULES.workerEntryPointsLiveInWorkerComponents(List.of("archfixtures.roles.FixtureListener")).check(FIXTURES))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("FixtureStrayListener")
+                .message().doesNotContain("FixtureWorkerListener");
+    }
+
+    @Test
     void anApiComponentUsingAWorkerFails() {
         assertThatThrownBy(() -> RULES.apiDoesNotUseWorkers().check(FIXTURES))
                 .isInstanceOf(AssertionError.class).hasMessageContaining("FixtureApi");

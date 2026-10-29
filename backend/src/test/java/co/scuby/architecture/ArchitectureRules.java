@@ -113,6 +113,34 @@ final class ArchitectureRules {
                 .should().dependOnClassesThat().areAnnotatedWith(WorkerComponent.class).allowEmptyShould(true);
     }
 
+    /** Annotations that make a method a worker entry point (a scheduler tick, a queue consumer). */
+    static final List<String> WORKER_ENTRY_POINTS = List.of(
+            "org.springframework.scheduling.annotation.Scheduled",
+            "io.awspring.cloud.sqs.annotation.SqsListener");
+
+    /** 2b. Every web controller declares the api role: a bare @RestController would run under any role setting. */
+    ArchRule restControllersAreApiComponents() {
+        return classes().that().areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+                .should().beAnnotatedWith(ApiComponent.class).allowEmptyShould(true)
+                .because("a controller without @ApiComponent ignores scuby.roles.api and can depend on workers freely");
+    }
+
+    /** 2c. Every scheduled or queue-consuming method lives in a @WorkerComponent: otherwise it runs on every api instance too. */
+    ArchRule workerEntryPointsLiveInWorkerComponents() {
+        return workerEntryPointsLiveInWorkerComponents(WORKER_ENTRY_POINTS);
+    }
+
+    ArchRule workerEntryPointsLiveInWorkerComponents(List<String> annotations) {
+        DescribedPredicate<com.tngtech.archunit.core.domain.JavaMethod> entryPoint = new DescribedPredicate<>("annotated as a worker entry point") {
+            @Override public boolean test(com.tngtech.archunit.core.domain.JavaMethod m) {
+                return annotations.stream().anyMatch(a -> m.isAnnotatedWith(a));
+            }
+        };
+        return com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods().that(entryPoint)
+                .should().beDeclaredInClassesThat().areAnnotatedWith(WorkerComponent.class).allowEmptyShould(true)
+                .because("a @Scheduled/@SqsListener method outside a @WorkerComponent runs on every api instance as well as the worker");
+    }
+
     /** 3. The DAG: platform → nothing of ours; foundations → platform only; verticals → foundations + platform, never each other. */
     ArchRule platformDependsOnNoFeature() {
         return noClasses().that().resideInAPackage(root + ".platform..")

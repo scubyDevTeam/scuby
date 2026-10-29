@@ -80,8 +80,26 @@ public final class ApiClient {
         return r;
     }
 
-    /** Not a contract endpoint (test probes, dev-only routes): no contract or ceiling checks. */
+    /**
+     * Not a contract endpoint (test probes, dev-only routes): no contract or ceiling checks. Refuses a path the
+     * contract documents, so a contract route cannot be tested without its checks by accident; the deliberate
+     * exceptions go through {@link #unchecked}.
+     */
     public ApiResponse raw(HttpMethod method, String template, String json, Object... vars) {
+        String path = org.springframework.web.util.UriComponentsBuilder.fromUriString(template).buildAndExpand(vars).getPath();
+        assertThat(contract.documents(path))
+                .as("%s %s is a contract route: use call/get/post/put (checked), or unchecked(...) with a reason", method, template)
+                .isFalse();
+        return perform(method, template, json, vars);
+    }
+
+    /**
+     * A contract route WITHOUT the contract and ceiling checks, for the answers the contract cannot describe
+     * (e.g. the Origin check's 403 on an endpoint that does not list it). {@code reason} is mandatory and read
+     * by whoever reviews the call.
+     */
+    public ApiResponse unchecked(HttpMethod method, String template, String json, String reason, Object... vars) {
+        assertThat(reason).as("why this contract route is called unchecked").isNotBlank();
         return perform(method, template, json, vars);
     }
 
