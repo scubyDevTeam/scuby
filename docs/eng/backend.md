@@ -30,7 +30,7 @@ door open without paying for it now.
 | Scheduled jobs | **db-scheduler** (state in Postgres, cluster-safe) — cron-style work only |
 | Rate limiting | **Bucket4j** with its Postgres-backed store |
 | Phone numbers | libphonenumber ([auth.md](auth.md)) |
-| Observability | **OpenTelemetry → New Relic** (traces, metrics, logs over OTLP); **Sentry** for errors |
+| Observability | **OpenTelemetry → New Relic** (traces, metrics, logs from INFO over OTLP); **stdout (WARN and up) → CloudWatch Logs** as the crash record; **Sentry** for errors |
 | Tests | JUnit 5, **Testcontainers** (one static container per JVM, started lazily and wired with a `DynamicPropertyRegistrar`, not a Spring bean, so closing a test context cannot stop it), **WireMock** for Twilio/Resend/Google, **ElasticMQ** for SQS |
 | Container image | **Jib** — builds the ARM64 image without Docker or QEMU on any CI runner |
 | Build | **Maven** with the wrapper committed (`backend/mvnw`); Java version pinned for jenv in `backend/.java-version` |
@@ -183,9 +183,24 @@ backend still never generates a competing one.
 
 ## Observability
 
-- **OpenTelemetry** (Spring Boot's built-in support) exports traces, metrics and logs over OTLP to
-  **New Relic** (free tier). No proprietary agent and no log-shipping sidecar: both cost RAM the
-  instance does not have.
+Decision [00 · #38](../product/00-product-map.md). Two sinks, split by log level so nothing is paid
+for twice:
+
+| Signal | Emitted as | Goes to | Why |
+|---|---|---|---|
+| Traces, metrics | OTLP (OpenTelemetry, Spring Boot's built-in support) | **New Relic** (US, `otlp.nr-data.net`), license key from SSM | 100 GB/month free; traces are the bulk of the volume |
+| Logs, INFO and up | OTLP log records, with `trace_id`/`span_id` | **New Relic** | The day-to-day view: a log opens from its trace |
+| Logs, WARN and up | **Structured JSON on stdout** (`logging.structured.format.console`) | **CloudWatch Logs** through Docker's `awslogs` driver ([infra.md](infra.md) · Logs) | The crash record: what is written before OpenTelemetry starts (a failed migration, a bad config) only reaches stdout; it sits beside the Lambdas' logs |
+
+- **No agent, no sidecar.** OTLP is sent by the application; stdout is shipped by Docker itself.
+  Both cost no RAM the instance does not have.
+- **Vendor-neutral on purpose.** OTLP and JSON-on-stdout are standards: moving to another backend
+  (Grafana Cloud, Loki, Honeycomb…) is an endpoint and a log-driver change, not code.
+- **Budget guards.** Logs at INFO with no per-request access log (traces cover requests); trace
+  sampling is a property (start at 100%, lower to 10–25% when volume demands); a New Relic usage
+  alert at 50 and 80 GB/month and a CloudWatch alarm on incoming log bytes (dashboards and alerts
+  are code — [infra.md](infra.md) · Observability as code).
+- **Local and test** export nothing; stdout shows everything at INFO.
 - **Sentry** for errors — the client already uses it, so one tool covers both and a trace crosses
   from the browser into the API.
 - Health: Spring Boot Actuator.

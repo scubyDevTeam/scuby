@@ -77,6 +77,25 @@ only changes its connection settings.
 - Docker Compose runs the backend image (and Postgres, in staging). The JVM is tuned for the
   instance's RAM.
 
+## Logs
+
+- **Backend:** the container's stdout carries only WARN and above, as JSON ([backend.md](backend.md)
+  · Observability). Docker's **`awslogs` driver** ships it to the CloudWatch log group
+  `/scuby/<env>/backend` — mode `non-blocking`, so a CloudWatch hiccup never stalls the container;
+  **retention 7 days** (it is the crash record; day-to-day logs are in New Relic). The log group is
+  Terraform-managed and the instance role may only `logs:CreateLogStream` / `logs:PutLogEvents` on
+  it.
+- **Lambdas:** their logs go to CloudWatch, as Lambda does; retention set per group.
+- **Cost:** CloudWatch Logs ingests 5 GB/month free; with WARN-and-up only, launch volume is
+  megabytes. An alarm on the groups' `IncomingBytes` catches a runaway logger.
+
+## Observability as code
+
+Dashboards and alert conditions live in Terraform with the `newrelic` provider
+(`infra/terraform/observability/`, its own state), applied to the real New Relic account (US). The
+provider authenticates with a User API key (`NRAK-…`) from the operator's environment — never in
+the repo, never in Parameter Store.
+
 ## Database
 
 - **PostgreSQL 17 + PostGIS.** `pgvector` joins when photo matching needs it ([O7](../open-items.md)), not before.
