@@ -125,7 +125,7 @@ in `platform.web`.
 - **Email code and SMS OTP:** behind `EmailSender` and `SmsSender`. In `local`, `test` and `staging`
   the senders write the code to the log. For e2e runs, a **fixed code for addresses on a test
   domain** (configurable, e.g. `*@e2e.scuby.test`) can be enabled — **refused at start-up in
-  `prod`**. Real providers come with the domain (email leaning SES — open item O21).
+  `prod`**. Real providers come with the domain (email leaning SES — open item O23).
 
 ## Guardrails that fail the build
 
@@ -165,7 +165,7 @@ proposed to the client side (list at the end of this section), never made unilat
 | Topic | Decision |
 |---|---|
 | Feed order and scope | **Nearest first, recency as tie-break** (`product/02` "proximity + recency"; `web/src/contracts/feed.ts` "nearest first"). With `lat`/`lng`: open cases within 25 km (configurable), ordered by distance band (≤ 2 km, ≤ 5 km, ≤ 10 km, ≤ 25 km) then newest first within a band; scope `local`. No case near, or no `lat`/`lng`: scope `national`, newest first. National capped at the 100 newest (the contract has no paging). Distance via PostGIS on `geography` |
-| Phone step at publish | OTP when `publisher_phone_otp` is on **and** the number is new **or not verified** (stricter than the emulated backend, which skipped a stored-but-unverified number). The first `phone_step: otp` answer sends the code; repeating that call inside the 60 s cooldown answers `otp` again without resending. Flag off: publish directly (`{code}`), number stored E.164 and unverified (open item O22) |
+| Phone step at publish | OTP when `publisher_phone_otp` is on **and** the number is new **or not verified** (stricter than the emulated backend, which skipped a stored-but-unverified number). The first `phone_step: otp` answer sends the code; repeating that call inside the 60 s cooldown answers `otp` again without resending. Flag off: publish directly (`{code}`), number stored E.164 and unverified (open item O24) |
 | Sighting rate limits | Per reporter per case 5 per rolling 24 h; per reporter 20 per rolling 24 h; the 15-minute rule waived inside the earlier pin's correction window (as `product/04`). Reporter = account when signed in, else the device. **The client IP is a second key** (`product/04`, `api.md`): from `CloudFront-Viewer-Address` only when the request carries the origin secret header, else the socket address (local) |
 | Public location floor | The server sends `last_seen.radius_m = max(radius, 200)` to non-owners; the owner gets the stored radius; the center is never moved. Internally the stored radius is used for every computation |
 | `mine` on sightings | The session's account **or** the device matches the reporter |
@@ -186,7 +186,7 @@ proposed to the client side (list at the end of this section), never made unilat
 - **Plan checks only where a query can degrade as a table grows:** the feed, a case's sightings, the rate-limit counts, the `active_case_exists` check. Those get an integration test with seeded volume (thousands of rows) asserting the expected plan (index used, no sequential scan on the large table). Primary-key/unique lookups, single-row writes and small static tables are exempt.
 - **An index is earned, not assumed:** measure first; a proposed index carries, in its migration comment and the task report, the query it serves, the plan before and after, its write cost on that table and any overlap with existing indexes. **Every new index needs human approval** before the branch merges; the final report lists them.
 
-**Proposed to the client side (contract/docs changes):** feed paging; `phone_step: unverified` (O22); feed parameters missing from `openapi.json`; the 5-minute tolerance in `product/04`; nearest-first wording made consistent across contract and docs.
+**Proposed to the client side (contract/docs changes):** feed paging; `phone_step: unverified` (O24); feed parameters missing from `openapi.json`; the 5-minute tolerance in `product/04`; nearest-first wording made consistent across contract and docs.
 
 ## Human review focus
 
