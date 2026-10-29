@@ -35,7 +35,7 @@ class CodeSendPlanTest {
                        ?::timestamptz + interval '3 hours' - g * interval '86.4 seconds'
                 FROM generate_series(1, 30000) g""", since.toString());
         db.execute("ANALYZE scuby.code_send");
-        var query = sends.throttleQuery(CodeSends.Channel.sms, "+573007152284", "d", "i", since);
+        var query = sends.throttleQuery(CodeSends.Channel.sms, "+573007152284", java.util.UUID.randomUUID(), "d", "i", since);
         int inWindow = db.fetchOne("SELECT count(*) FROM scuby.code_send WHERE channel = 'sms' AND sent_at > ?::timestamptz",
                 since.toString()).get(0, Integer.class);
         assertThat(inWindow).as("rows of the channel inside the window").isBetween(20, 300);

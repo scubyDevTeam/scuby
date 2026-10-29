@@ -63,7 +63,7 @@ class EmailCodes {
         EmailCodeRecord row = db.selectFrom(EMAIL_CODE).where(EMAIL_CODE.EMAIL.eq(email)).forUpdate().fetchOne();
         // The device/IP caps come first: a capped caller gets 429 for every address, so the answer never tells
         // whether some address is in cooldown or over its daily cap (no enumeration oracle).
-        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.email, email, caller.deviceHash(), caller.ipHash());
+        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.email, email, null, caller.deviceHash(), caller.ipHash());
         if (counts.device() >= limits.emailMaxPerDevice() || counts.ip() >= limits.emailMaxPerIp()) {
             throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes requested");
         }

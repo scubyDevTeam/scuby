@@ -134,10 +134,70 @@ class PhoneEndpointsTest {
 
     @Test
     void oneDeviceIsThrottledAcrossNumbersAndAccounts() {
+        // Two accounts on one browser profile (one device cookie): 5 numbers each, then the cap answers both.
+        startChange(api, "+573001000100");   // sets the device cookie
+        ApiClient second = clients.newBrowser();
+        accounts.signIn(second, "second@correo.co");
+        second.setCookie("device", api.cookie("device").orElseThrow());
+        for (int i = 1; i < 5; i++) assertThat(startChange(api, "+57300100%04d".formatted(100 + i)).status()).isEqualTo(204);
+        for (int i = 5; i < 10; i++) assertThat(startChange(second, "+57300100%04d".formatted(100 + i)).status()).isEqualTo(204);
+        assertThat(startChange(api, "+573001000200").errorCode()).isEqualTo("rate_limited");
+        assertThat(startChange(second, "+573001000201").errorCode()).isEqualTo("rate_limited");
+        assertThat(db.fetchCount(CODE_SEND)).isEqualTo(10);
+    }
+
+    @Test
+    void oneAccountIsCappedAtTenSendsADayWhateverTheDevice() {
         for (int i = 0; i < 10; i++) {
-            assertThat(startChange(api, "+57300000%04d".formatted(100 + i)).status()).isEqualTo(204);
+            ApiClient device = clients.newBrowser();   // a fresh device each time: only the account cap can bite
+            device.setCookie("__Host-session", api.cookie("__Host-session").orElseThrow());
+            assertThat(startChange(device, "+57300110%04d".formatted(i)).status()).isEqualTo(204);
         }
-        assertThat(startChange(api, "+573000000200").errorCode()).isEqualTo("rate_limited");
+        ApiClient another = clients.newBrowser();
+        another.setCookie("__Host-session", api.cookie("__Host-session").orElseThrow());
+        assertThat(startChange(another, "+573001109999").errorCode()).isEqualTo("rate_limited");
+        clock.advance(Duration.ofHours(24).plusSeconds(1));   // rolling 24 h
+        assertThat(startChange(another, "+573001109999").status()).isEqualTo(204);
+    }
+
+    @Test
+    void theNumberCapCountsSendsFromAllAccounts() {
+        ApiClient other = clients.newBrowser();
+        accounts.signIn(other, "other@correo.co");
+        for (int i = 0; i < 2; i++) {
+            assertThat(startChange(api, PHONE).status()).isEqualTo(204);
+            assertThat(startChange(other, PHONE).status()).isEqualTo(204);
+            clock.advance(Duration.ofSeconds(61));
+        }
+        assertThat(sms.sent()).hasSize(4);
+        assertThat(startChange(api, PHONE).errorCode()).isEqualTo("rate_limited");
+        assertThat(startChange(other, PHONE).errorCode()).isEqualTo("rate_limited");
+    }
+
+    @Test
+    void aCodeForOneNumberFailsForAnother() {
+        String other = "+573009998866";
+        startChange(api, PHONE);
+        startChange(api, other);
+        String forPhone = sms.lastCodeFor(PHONE);
+        String forOther = sms.lastCodeFor(other);
+        // Only a code that differs proves the binding; with equal codes the test has nothing to show.
+        org.junit.jupiter.api.Assumptions.assumeTrue(!forPhone.equals(forOther));
+        assertThat(verify(other, forPhone).errorCode()).isEqualTo("invalid_code");
+        assertThat(verify(PHONE, forOther).errorCode()).isEqualTo("invalid_code");
+        assertThat(verify(PHONE, forPhone).status()).isEqualTo(200);
+    }
+
+    @Test
+    void aCodeForOneAccountFailsForAnother() {
+        startChange(api, PHONE);
+        String code = sms.lastCodeFor(PHONE);
+        ApiClient intruder = clients.newBrowser();
+        accounts.signIn(intruder, "intruder@correo.co");
+        assertThat(intruder.post("/me/phone/verify", "{\"phone\":\"" + PHONE + "\",\"code\":\"" + code + "\"}").errorCode())
+                .isEqualTo("invalid_code");
+        assertThat(intruder.get("/session").isNull("/phone")).isTrue();
+        assertThat(verify(PHONE, code).status()).isEqualTo(200);   // the owner's code is untouched
     }
 
     @Test

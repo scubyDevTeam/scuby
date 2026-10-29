@@ -34,6 +34,7 @@ scuby:
     max-per-number: 4
     max-per-device: 10
     max-per-ip: 20
+    max-per-account: 10
     alarm-daily-sends: 50
   sessions:
     cache-size: 10000

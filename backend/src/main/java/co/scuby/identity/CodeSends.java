@@ -1,7 +1,7 @@
 package co.scuby.identity;
 
 import org.jooq.DSLContext;
-import org.jooq.Record4;
+import org.jooq.Record5;
 import org.jooq.Select;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
@@ -22,7 +22,7 @@ class CodeSends {
 
     enum Channel { email, sms }
 
-    record Counts(int target, int device, int ip, int all) {}
+    record Counts(int target, int account, int device, int ip, int all) {}
 
     private final DSLContext db;
     private final Clock clock;
@@ -32,10 +32,11 @@ class CodeSends {
         this.clock = clock;
     }
 
-    Counts last24h(Channel channel, String target, String deviceHash, String ipHash) {
-        Record4<Integer, Integer, Integer, Integer> r =
-                throttleQuery(channel, target, deviceHash, ipHash, clock.instant().minus(Duration.ofHours(24))).fetchOne();
-        return new Counts(r.value1(), r.value2(), r.value3(), r.value4());
+    /** {@code personId} null: no per-account count (the email channel's sends are not capped per account). */
+    Counts last24h(Channel channel, String target, @Nullable UUID personId, String deviceHash, String ipHash) {
+        Record5<Integer, Integer, Integer, Integer, Integer> r =
+                throttleQuery(channel, target, personId, deviceHash, ipHash, clock.instant().minus(Duration.ofHours(24))).fetchOne();
+        return new Counts(r.value1(), r.value2(), r.value3(), r.value4(), r.value5());
     }
 
     void record(Channel channel, String target, @Nullable UUID personId, String deviceHash, String ipHash) {
@@ -46,11 +47,12 @@ class CodeSends {
           .execute();
     }
 
-    /** One pass over one channel's last 24 h: per target, per device, per IP, and all (the SMS alarm). */
-    Select<Record4<Integer, Integer, Integer, Integer>> throttleQuery(Channel channel, String target, String deviceHash,
-                                                                      String ipHash, Instant since) {
+    /** One pass over one channel's last 24 h: per target, per account, per device, per IP, and all (the SMS alarm). */
+    Select<Record5<Integer, Integer, Integer, Integer, Integer>> throttleQuery(
+            Channel channel, String target, @Nullable UUID personId, String deviceHash, String ipHash, Instant since) {
         return db.select(
                          DSL.count().filterWhere(CODE_SEND.TARGET.eq(target)),
+                         DSL.count().filterWhere(personId == null ? DSL.falseCondition() : CODE_SEND.PERSON_ID.eq(personId)),
                          DSL.count().filterWhere(CODE_SEND.DEVICE_HASH.eq(deviceHash)),
                          DSL.count().filterWhere(CODE_SEND.IP_HASH.eq(ipHash)),
                          DSL.count())

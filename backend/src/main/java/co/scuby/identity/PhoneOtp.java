@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Optional;
 import java.util.UUID;
 
 import static co.scuby.db.generated.Tables.PHONE_OTP;
@@ -40,10 +41,9 @@ class PhoneOtp {
     private final SmsProperties limits;
     private final CodeHasher hasher;
     private final CodeSends sends;
-    private final PhoneOtpMisses misses;
 
     PhoneOtp(DSLContext db, Clock clock, SmsSender sender, TestBypass bypass, SmsProperties limits,
-             CodeHasher hasher, CodeSends sends, PhoneOtpMisses misses) {
+             CodeHasher hasher, CodeSends sends) {
         this.db = db;
         this.clock = clock;
         this.sender = sender;
@@ -51,7 +51,6 @@ class PhoneOtp {
         this.limits = limits;
         this.hasher = hasher;
         this.sends = sends;
-        this.misses = misses;
     }
 
     /**
@@ -67,10 +66,16 @@ class PhoneOtp {
             write(personId, phone, bypass.code(), now);
             return Sent.SENT;
         }
-        // Serialises concurrent starts for one number: nothing to lock while no row exists yet.
-        db.fetch("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "phone_otp:" + phone);
-        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.sms, phone, caller.deviceHash(), caller.ipHash());
-        if (counts.device() >= limits.maxPerDevice() || counts.ip() >= limits.maxPerIp()) {
+        // Caps are counted from rows other transactions may be about to insert, so each cap's counter is
+        // serialised: IP, then device, then number, always in that order (no deadlock). Without the first two,
+        // a parallel burst across different numbers all read the same count and overshoots the IP/device cap.
+        // Nothing to row-lock for the number while no row exists yet, hence the advisory lock.
+        lock("sms_ip:" + caller.ipHash());
+        lock("sms_dev:" + caller.deviceHash());
+        lock("phone_otp:" + phone);
+        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.sms, phone, personId, caller.deviceHash(), caller.ipHash());
+        if (counts.device() >= limits.maxPerDevice() || counts.ip() >= limits.maxPerIp()
+                || counts.account() >= limits.maxPerAccount()) {
             throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes sent");
         }
         PhoneOtpRecord pending = db.selectFrom(PHONE_OTP)
@@ -94,29 +99,60 @@ class PhoneOtp {
     }
 
     /**
-     * True once per code, inside the caller's transaction (MANDATORY): the right code is consumed by a
-     * conditional DELETE that commits only with the caller, so a rolled-back publish leaves it usable.
-     * A wrong code is counted by PhoneOtpMisses in its own transaction, so the miss survives the
-     * caller's rollback. The row is read without FOR UPDATE: the miss's UPDATE must not wait on a lock
-     * held by its own caller.
+     * A correct code whose attempt is already counted; consume it inside the transaction that does the work.
+     * Opaque: only {@link #reserveAndCheck} makes one.
+     */
+    static final class Reservation {
+        private final UUID personId;
+        private final String phone;
+        private final String codeHash;
+
+        private Reservation(UUID personId, String phone, String codeHash) {
+            this.personId = personId;
+            this.phone = phone;
+            this.codeHash = codeHash;
+        }
+    }
+
+    /**
+     * Step 1 of a code check, RESERVE FIRST: counts the attempt in its own autocommit statement, before the
+     * caller opens any transaction (NEVER: fails fast if one is open). A miss therefore survives the caller's
+     * rollback without a second connection (a REQUIRES_NEW inside the caller's transaction needs two
+     * connections per request and stalls the pool under concurrent wrong codes). The single conditional
+     * UPDATE is atomic, so concurrent attempts can never exceed {@link #MAX_ATTEMPTS}.
+     * Returns empty for a wrong, expired, exhausted or absent code; a reservation for a right one.
+     * A rolled-back caller still spent the attempt.
+     */
+    @Transactional(propagation = Propagation.NEVER)
+    public Optional<Reservation> reserveAndCheck(UUID personId, String phone, String code) {
+        OffsetDateTime now = clock.instant().atOffset(ZoneOffset.UTC);
+        String hash = db.update(PHONE_OTP)
+                        .set(PHONE_OTP.ATTEMPTS, PHONE_OTP.ATTEMPTS.plus(1))
+                        .where(PHONE_OTP.PERSON_ID.eq(personId), PHONE_OTP.PHONE.eq(phone),
+                               PHONE_OTP.EXPIRES_AT.gt(now), PHONE_OTP.ATTEMPTS.lt(MAX_ATTEMPTS))
+                        .returning(PHONE_OTP.CODE_HASH)
+                        .fetchOptional().map(PhoneOtpRecord::getCodeHash).orElse(null);
+        if (hash == null || !hasher.matches(hash, phone, code)) return Optional.empty();
+        return Optional.of(new Reservation(personId, phone, hash));
+    }
+
+    /**
+     * Step 2, inside the caller's transaction (MANDATORY): true once per reserved code. The conditional DELETE
+     * commits only with the caller, so a rolled-back publish leaves the code usable (its attempt stays spent).
+     * Of two concurrent reservations of one code, one deletes the row and the other gets false; a resend
+     * in between changes the hash and also gets false.
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    public boolean check(UUID personId, String phone, String code) {
-        OffsetDateTime now = clock.instant().atOffset(ZoneOffset.UTC);
-        PhoneOtpRecord row = db.selectFrom(PHONE_OTP)
-                               .where(PHONE_OTP.PERSON_ID.eq(personId), PHONE_OTP.PHONE.eq(phone))
-                               .fetchOne();
-        if (row == null || row.getAttempts() >= MAX_ATTEMPTS || !row.getExpiresAt().isAfter(now)) return false;
-        if (!hasher.matches(row.getCodeHash(), phone, code)) {
-            misses.record(personId, phone);
-            return false;
-        }
-        // Atomic consume: a concurrent check of the same code deletes nothing and gets false.
+    public boolean consume(Reservation r) {
         return db.deleteFrom(PHONE_OTP)
-                 .where(PHONE_OTP.PERSON_ID.eq(personId), PHONE_OTP.PHONE.eq(phone),
-                        PHONE_OTP.CODE_HASH.eq(row.getCodeHash()),
-                        PHONE_OTP.ATTEMPTS.lt(MAX_ATTEMPTS), PHONE_OTP.EXPIRES_AT.gt(now))
+                 .where(PHONE_OTP.PERSON_ID.eq(r.personId), PHONE_OTP.PHONE.eq(r.phone),
+                        PHONE_OTP.CODE_HASH.eq(r.codeHash),
+                        PHONE_OTP.EXPIRES_AT.gt(clock.instant().atOffset(ZoneOffset.UTC)))
                  .execute() == 1;
+    }
+
+    private void lock(String key) {
+        db.fetch("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", key);
     }
 
     /** Drops every pending code of an account (an account reclaim: codes requested while an attacker held it). */
