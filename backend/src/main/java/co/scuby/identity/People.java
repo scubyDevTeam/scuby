@@ -72,11 +72,13 @@ class People {
     /**
      * Drops the Google identity (and its flag) only while it is still non-authoritative; false if nothing changed.
      * In the same statement it forgets the phone and its verification: whoever held the account through that
-     * link may have attached a number of their own.
+     * link may have attached a number of their own, and the display name came from their Google profile, so it
+     * goes back to {@code resetDisplayName}.
      */
-    boolean unlinkNonAuthoritativeGoogle(UUID id) {
+    boolean unlinkNonAuthoritativeGoogle(UUID id, String resetDisplayName) {
         return db.update(PERSON).setNull(PERSON.GOOGLE_SUB).setNull(PERSON.GOOGLE_EMAIL_AUTHORITATIVE)
                  .setNull(PERSON.PHONE).setNull(PERSON.PHONE_VERIFIED_AT)
+                 .set(PERSON.DISPLAY_NAME, resetDisplayName)
                  .where(PERSON.ID.eq(id).and(PERSON.GOOGLE_EMAIL_AUTHORITATIVE.isFalse()))
                  .execute() == 1;
     }

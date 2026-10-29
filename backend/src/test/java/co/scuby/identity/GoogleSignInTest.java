@@ -281,6 +281,24 @@ class GoogleSignInTest {
     }
 
     @Test
+    void aReclaimFromABrowserThatCarriesASessionStaysInsideItsStatementCeiling() {
+        assertThat(clients.newBrowser().post("/auth/google", "{\"credential\":\""
+                + keys.token(GoogleTestKeys.claims("attacker-sub", "victim@correo.co", clock.instant())) + "\"}").status()).isEqualTo(200);
+        ApiClient owner = clients.newBrowser();
+        assertThat(emailSignIn(owner, "someone.else@correo.co").status()).isEqualTo(200);   // the browser now carries a session
+        assertThat(emailSignIn(owner, "victim@correo.co").status()).isEqualTo(200);         // reclaim: ceiling checked by ApiClient
+        assertThat(db.selectFrom(PERSON).where(PERSON.EMAIL.eq("victim@correo.co")).fetchOne().getGoogleSub()).isNull();
+    }
+
+    @Test
+    void aReclaimDropsTheDisplayNameTheAttackerSetThroughGoogle() {
+        clients.newBrowser().post("/auth/google", "{\"credential\":\""
+                + keys.token(GoogleTestKeys.claims("attacker-sub", "victim@correo.co", clock.instant())) + "\"}");
+        assertThat(db.fetchOne(PERSON).getDisplayName()).isEqualTo("Carolina Mejía");
+        assertThat(emailSignIn(clients.newBrowser(), "victim@correo.co").str("/display_name")).isEqualTo("Victim");
+    }
+
+    @Test
     void anEmailCodeSignInKeepsAnAuthoritativeGoogleLinkAndItsSessions() {
         ApiClient google = clients.newBrowser();
         google.post("/auth/google", "{\"credential\":\"" + keys.token(claims()) + "\"}");
@@ -321,7 +339,7 @@ class GoogleSignInTest {
         var release = new java.util.concurrent.CountDownLatch(1);
         try {
             Future<?> reclaim = pool.submit(() -> new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx -> {
-                assertThat(people.unlinkNonAuthoritativeGoogle(personId)).isTrue();
+                assertThat(people.unlinkNonAuthoritativeGoogle(personId, "Victim")).isTrue();
                 sessionStore.deleteAllOf(personId);
                 reclaimWorkDone.countDown();
                 try {

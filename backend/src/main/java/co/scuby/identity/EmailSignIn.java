@@ -59,7 +59,7 @@ class EmailSignIn {
         // Proving the mailbox beats a Google link that only vouched for it non-authoritatively (someone may
         // have created a Google account with this address): drop the link and every session it opened.
         if (person.googleSub() != null && Boolean.FALSE.equals(person.googleEmailAuthoritative())
-                && people.unlinkNonAuthoritativeGoogle(person.id())) {
+                && people.unlinkNonAuthoritativeGoogle(person.id(), DisplayNames.fromEmail(normalized))) {
             sessions.deleteAllOf(person.id());
             // The unlink also cleared a phone the attacker may have verified; their pending phone codes go too.
             phoneOtp.discardAllOf(person.id());
