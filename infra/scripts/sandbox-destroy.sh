@@ -8,7 +8,7 @@ if [ -z "${HOME:-}" ]; then
 fi
 [ -n "${HOME:-}" ] && [ -d "$HOME" ] || { echo "FATAL: cannot determine HOME" >&2; exit 1; }
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
+export AWS_PROFILE="${AWS_PROFILE:-itslauyalejo-sso}" AWS_REGION="${AWS_REGION:-us-east-1}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 TF="terraform -chdir=$REPO/infra/terraform/envs/sandbox"
 [ -f "$REPO/infra/lambda/media/dist/media-lambdas.zip" ] || "$REPO/infra/lambda/media/build.sh"

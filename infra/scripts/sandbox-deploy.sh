@@ -2,9 +2,11 @@
 # Pushes the locally built images to ECR and starts them on the sandbox EC2 through SSM.
 # Run sandbox-build.sh first.
 set -euo pipefail
-export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
+export AWS_PROFILE="${AWS_PROFILE:-itslauyalejo-sso}" AWS_REGION="${AWS_REGION:-us-east-1}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRATCH="/private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad"
+# HOME can be unset under launchd; set -u would abort otherwise.
+SCRATCH="${SCUBY_SANDBOX_DIR:-${HOME:?HOME is not set}/.scuby-sandbox}"
+mkdir -p "$SCRATCH"
 TF="terraform -chdir=$REPO/infra/terraform/envs/sandbox"
 json=$($TF output -json)
 get() { python3 -I -c "import json,sys; d=json.loads(sys.argv[1]); v=d[sys.argv[2]]['value']; print(v[sys.argv[3]] if len(sys.argv) > 3 else v)" "$json" "$@"; }

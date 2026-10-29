@@ -27,7 +27,8 @@ fi
 export PATH="${HOME:-/nonexistent}/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-SCRATCH="/private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad"
+SCRATCH="${SCUBY_SANDBOX_DIR:-${HOME:-/nonexistent}/.scuby-sandbox}"
+mkdir -p "$SCRATCH" 2>/dev/null || true
 MARKER="$SCRATCH/watchdog.fired"
 JOB="co.scuby.watchdog"
 TFDIR="$REPO/infra/terraform/envs/sandbox"

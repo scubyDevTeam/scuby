@@ -34,13 +34,15 @@ lea `~/Desktop`, `~/Documents` ni `~/Downloads`. El sandbox se corre desde un cl
 de esas carpetas (p. ej. `~/scuby-b1-run`), y el estado de Terraform vive en ese clon. Todos los
 comandos de abajo, desde la raíz de ese clon.
 
-Los scripts guardan sus archivos de trabajo (`sso-login`, `watchdog.log`, `watchdog.fired`) en un
-directorio fijo, y hoy lo tienen escrito a mano (pendiente: hacerlo configurable). Los ejemplos
-de abajo lo llaman `SCRATCH`; `/private/tmp` se vacía al reiniciar, de ahí el `mkdir`:
+Los scripts guardan sus archivos de trabajo (`sso-login`, `watchdog.log`, `watchdog.fired`) en
+`${SCUBY_SANDBOX_DIR:-$HOME/.scuby-sandbox}`; los ejemplos de abajo lo llaman `SCRATCH`. Es una
+carpeta bajo `$HOME` (no en Desktop, Documents ni Downloads) para que launchd pueda leerla. Los
+scripts usan el perfil `itslauyalejo-sso` y la región `us-east-1` por defecto; se pueden cambiar
+exportando `AWS_PROFILE` y `AWS_REGION` antes de correrlos.
 
 ```bash
 export AWS_PROFILE=itslauyalejo-sso AWS_REGION=us-east-1
-SCRATCH=/private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad
+SCRATCH="${SCUBY_SANDBOX_DIR:-$HOME/.scuby-sandbox}"
 mkdir -p "$SCRATCH"
 ```
 
@@ -89,7 +91,10 @@ se detiene con `launchctl remove co.scuby.watchdog`.
 
 `infra/scripts/sweep.sh` comprueba, después de destruir, que no quede nada de Scuby (por etiqueta
 `Project=scuby` y por prefijo de nombre `scuby…`, `/scuby/` o `/aws/lambda/scuby-`) y que los
-recursos ajenos (la VPC por defecto y el bucket) sigan ahí. Imprime `sweep: clean` y sale con 0 si todo está bien; sale con 1 si queda
+recursos ajenos (la VPC por defecto y el bucket) sigan ahí. La API de etiquetas sigue listando por
+una hora o más instancias terminadas y volúmenes o reglas de security group ya borrados: el sweep
+los confirma contra la API de EC2 y los imprime como `ghost (tagging index lag, verified gone)`
+sin contarlos como sobras; cualquier otro tipo de recurso o error cuenta como sobra. Imprime `sweep: clean` y sale con 0 si todo está bien; sale con 1 si queda
 algo o si una comprobación falla, y con 2 si las credenciales no sirven.
 
 ## No tocar
