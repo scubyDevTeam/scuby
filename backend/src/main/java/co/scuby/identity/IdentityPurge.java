@@ -17,7 +17,10 @@ class IdentityPurge {
 
     private final EmailCodes emailCodes;
 
-    IdentityPurge(SessionStore sessions, CodeSends codeSends, EmailCodes emailCodes) {
+    private final PhoneOtp phoneOtp;
+
+    IdentityPurge(SessionStore sessions, CodeSends codeSends, EmailCodes emailCodes, PhoneOtp phoneOtp) {
+        this.phoneOtp = phoneOtp;
         this.sessions = sessions;
         this.codeSends = codeSends;
         this.emailCodes = emailCodes;
@@ -28,5 +31,6 @@ class IdentityPurge {
         log.info("purged {} expired sessions", sessions.purgeExpired());
         log.info("purged {} code-send rows older than 30 days", codeSends.purgeOlderThan(java.time.Duration.ofDays(30)));
         log.info("purged {} stale email codes", emailCodes.purgeStale());
+        log.info("purged {} stale OTP rows older than 30 days", phoneOtp.purgeExpiredBefore(java.time.Duration.ofDays(30)));
     }
 }

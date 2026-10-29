@@ -21,6 +21,17 @@ public class IdentityTestBeans {
     }
 
     @Bean
+    co.scuby.support.RecordingSmsSender recordingSmsSender() {
+        return new co.scuby.support.RecordingSmsSender();
+    }
+
+    @Bean
+    @Primary
+    SmsSender testSmsSender(co.scuby.support.RecordingSmsSender recorder) {
+        return recorder::record;
+    }
+
+    @Bean
     co.scuby.support.GoogleTestKeys googleTestKeys() {
         return new co.scuby.support.GoogleTestKeys();
     }

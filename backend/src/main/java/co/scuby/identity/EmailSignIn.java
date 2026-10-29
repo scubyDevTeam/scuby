@@ -20,8 +20,10 @@ class EmailSignIn {
     private final People people;
     private final SessionStore sessions;
     private final SignInSessions signInSessions;
+    private final PhoneOtp phoneOtp;
 
-    EmailSignIn(EmailCodes codes, People people, SessionStore sessions, SignInSessions signInSessions) {
+    EmailSignIn(EmailCodes codes, People people, SessionStore sessions, SignInSessions signInSessions, PhoneOtp phoneOtp) {
+        this.phoneOtp = phoneOtp;
         this.codes = codes;
         this.people = people;
         this.sessions = sessions;
@@ -53,6 +55,8 @@ class EmailSignIn {
         if (person.googleSub() != null && Boolean.FALSE.equals(person.googleEmailAuthoritative())
                 && people.unlinkNonAuthoritativeGoogle(person.id())) {
             sessions.deleteAllOf(person.id());
+            // The unlink also cleared a phone the attacker may have verified; their pending phone codes go too.
+            phoneOtp.discardAllOf(person.id());
             log.info("Email-code sign-in unlinked a non-authoritative Google identity from account {} and ended its sessions", person.id());
             person = people.get(person.id());
         }

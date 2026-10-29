@@ -61,7 +61,7 @@ public class TestSupportConfiguration {
     @Bean
     TestDb testDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder,
                   ConnectionSampler sampler,
-                  ObjectProvider<RecordingEmailSender> emails) {
-        return new TestDb(db, caches, clock, recorder, sampler, emails);
+                  ObjectProvider<RecordingEmailSender> emails, ObjectProvider<RecordingSmsSender> sms) {
+        return new TestDb(db, caches, clock, recorder, sampler, emails, sms);
     }
 }

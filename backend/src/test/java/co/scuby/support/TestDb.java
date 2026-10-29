@@ -20,6 +20,7 @@ public final class TestDb {
             "session",
             "email_code",
             "code_send",
+            "phone_otp",
             "person"
     );
 
@@ -29,11 +30,13 @@ public final class TestDb {
     private final StatementRecorder recorder;
     private final ConnectionSampler sampler;
     private final ObjectProvider<RecordingEmailSender> emails;
+    private final ObjectProvider<RecordingSmsSender> sms;
 
     TestDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder,
            ConnectionSampler sampler,
-           ObjectProvider<RecordingEmailSender> emails) {
+           ObjectProvider<RecordingEmailSender> emails, ObjectProvider<RecordingSmsSender> sms) {
         this.emails = emails;
+        this.sms = sms;
         this.db = db;
         this.caches = caches;
         this.clock = clock;
@@ -65,5 +68,6 @@ public final class TestDb {
         recorder.reset();
         sampler.reset();
         emails.ifAvailable(RecordingEmailSender::clear);
+        sms.ifAvailable(RecordingSmsSender::clear);
     }
 }

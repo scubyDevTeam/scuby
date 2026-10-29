@@ -30,6 +30,11 @@ scuby:
     secure: true
   flags:
     cache-ttl: 30s
+  sms:
+    max-per-number: 4
+    max-per-device: 10
+    max-per-ip: 20
+    alarm-daily-sends: 50
   sessions:
     cache-size: 10000
     cache-ttl: 60s

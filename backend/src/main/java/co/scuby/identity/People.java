@@ -69,9 +69,14 @@ class People {
                  .execute() == 1;
     }
 
-    /** Drops the Google identity (and its flag) only while it is still non-authoritative; false if nothing changed. */
+    /**
+     * Drops the Google identity (and its flag) only while it is still non-authoritative; false if nothing changed.
+     * In the same statement it forgets the phone and its verification: whoever held the account through that
+     * link may have attached a number of their own.
+     */
     boolean unlinkNonAuthoritativeGoogle(UUID id) {
         return db.update(PERSON).setNull(PERSON.GOOGLE_SUB).setNull(PERSON.GOOGLE_EMAIL_AUTHORITATIVE)
+                 .setNull(PERSON.PHONE).setNull(PERSON.PHONE_VERIFIED_AT)
                  .where(PERSON.ID.eq(id).and(PERSON.GOOGLE_EMAIL_AUTHORITATIVE.isFalse()))
                  .execute() == 1;
     }
