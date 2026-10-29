@@ -35,12 +35,13 @@ class PublisherPhoneTest {
     @Autowired TransactionTemplate tx;
 
     UUID ana;
-    final Caller caller = new Caller(null, "d".repeat(64), "i".repeat(64));
+    Caller caller;
 
     @BeforeEach
     void setUp() {
         testDb.reset();
         ana = accounts.person("ana.gomez@correo.co");
+        caller = new Caller(ana, "d".repeat(64), "i".repeat(64));
     }
 
     /** What the publish does: reserve any code attempt first (no transaction), then resolve inside its transaction. */
@@ -133,6 +134,30 @@ class PublisherPhoneTest {
         var person = db.selectFrom(PERSON).where(PERSON.ID.eq(ana)).fetchOne();
         assertThat(person.getPhone()).isEqualTo(PHONE);
         assertThat(person.getPhoneVerifiedAt()).isNull();
+        assertThat(sms.sent()).isEmpty();
+    }
+
+    @Test
+    void aReservationForOneNumberDoesNotVerifyAnother() {
+        String other = "+573001234567";
+        db.update(PERSON).set(PERSON.PHONE, PHONE).where(PERSON.ID.eq(ana)).execute();   // stored, unverified
+        resolve(null, null);                                                              // sends a code to PHONE
+        String code = sms.lastCodeFor(PHONE);
+        PublisherPhone.Prepared prepared = publisherPhone.prepare(ana, null, code);       // reserves PHONE's code
+        db.update(PERSON).set(PERSON.PHONE, other).where(PERSON.ID.eq(ana)).execute();   // the stored number moves on
+        assertThatThrownBy(() -> tx.execute(s -> publisherPhone.resolve(prepared, caller)))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(codeOf(e)).isEqualTo("invalid_code"));
+        var person = db.selectFrom(PERSON).where(PERSON.ID.eq(ana)).fetchOne();
+        assertThat(person.getPhone()).isEqualTo(other);
+        assertThat(person.getPhoneVerifiedAt()).as("the other number must not become verified").isNull();
+    }
+
+    @Test
+    void aPreparedPhoneStepCannotBeResolvedForAnotherCaller() {
+        PublisherPhone.Prepared prepared = publisherPhone.prepare(ana, PHONE, null);
+        Caller someoneElse = new Caller(UUID.randomUUID(), "d".repeat(64), "i".repeat(64));
+        assertThatThrownBy(() -> tx.execute(s -> publisherPhone.resolve(prepared, someoneElse)))
+                .isInstanceOf(IllegalArgumentException.class);
         assertThat(sms.sent()).isEmpty();
     }
 }

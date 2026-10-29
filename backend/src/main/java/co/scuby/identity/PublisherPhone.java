@@ -80,10 +80,21 @@ public class PublisherPhone {
         return new Prepared(personId, bodyPhone, otpCode != null, reservation);
     }
 
+    /**
+     * Must run in the publish's transaction. {@code rate_limited} (from the SMS send) and {@code invalid_code}
+     * must propagate out of that transaction: either one leaves it rollback-only, so catching it and carrying on
+     * ends in an UnexpectedRollbackException. The SMS itself goes out after that transaction commits.
+     * Takes the person row lock first (the order every identity path uses; see PhoneChange).
+     *
+     * @throws IllegalArgumentException when {@code caller} is not the account {@code prepared} was made for
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     public Outcome resolve(Prepared prepared, Caller caller) {
         UUID personId = prepared.personId;
-        Person person = people.get(personId);
+        if (!personId.equals(caller.personId())) {
+            throw new IllegalArgumentException("the phone step was prepared for another account");
+        }
+        Person person = people.lock(personId);
         String target = target(person, prepared.bodyPhone);
         return switch (decide(person, target, prepared.codeGiven)) {
             case USE_VERIFIED -> new Ready(target, true);
@@ -92,7 +103,9 @@ public class PublisherPhone {
                 yield new CodeSent();
             }
             case CHECK_CODE -> {
-                if (prepared.reservation == null || !otp.consume(prepared.reservation)) {
+                // The code was reserved for one number: it verifies that number only (the stored number may
+                // have changed between prepare and resolve).
+                if (prepared.reservation == null || !prepared.reservation.isFor(target) || !otp.consume(prepared.reservation)) {
                     throw new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code");
                 }
                 people.setPhone(personId, target, clock.instant());

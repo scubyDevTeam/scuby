@@ -31,6 +31,9 @@ class PhoneChange {
         PhoneOtp.Reservation reservation = otp.reserveAndCheck(personId, phone, code)
                 .orElseThrow(() -> new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code"));
         return tx.execute(status -> {
+            // Person row first, then phone_otp: the order an email-code reclaim takes (unlink, then discard the
+            // codes). The other way round deadlocks with it; after a reclaim commits there is no code to consume.
+            people.lock(personId);
             if (!otp.consume(reservation)) throw new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code");
             people.setPhone(personId, phone, clock.instant());
             return people.get(personId);

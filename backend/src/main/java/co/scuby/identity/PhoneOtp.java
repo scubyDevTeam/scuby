@@ -111,6 +111,10 @@ class PhoneOtp {
             this.phone = phone;
             this.codeHash = codeHash;
         }
+
+        boolean isFor(String otherPhone) {
+            return phone.equals(otherPhone);
+        }
     }
 
     /**
