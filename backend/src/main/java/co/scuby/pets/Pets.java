@@ -4,8 +4,11 @@ import co.scuby.platform.modules.ModuleApi;
 import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.ErrorCode;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -39,6 +42,7 @@ public class Pets {
     }
 
     /** The pet and its active owner link, in the caller's transaction (04 · Publishing: one transaction). */
+    @Transactional(propagation = Propagation.MANDATORY)
     public UUID createOwned(UUID ownerPersonId, NewPet pet) {
         UUID id = UUID.randomUUID();
         OffsetDateTime now = clock.instant().atOffset(ZoneOffset.UTC);
@@ -75,7 +79,7 @@ public class Pets {
         boolean owned = db.fetchExists(RESPONSIBILITY_LINK,
                 RESPONSIBILITY_LINK.PET_ID.eq(id),
                 RESPONSIBILITY_LINK.PERSON_ID.eq(personId),
-                RESPONSIBILITY_LINK.ROLE.eq("owner"),
+                RESPONSIBILITY_LINK.ROLE.eq(DSL.inline("owner")),
                 RESPONSIBILITY_LINK.ACTIVE_TO.isNull());
         if (!owned) throw new ApiException(ErrorCode.NOT_FOUND, "no such pet");
     }

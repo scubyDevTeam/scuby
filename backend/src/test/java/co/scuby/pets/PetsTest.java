@@ -1,13 +1,16 @@
 package co.scuby.pets;
 
 import co.scuby.platform.web.ApiException;
+import co.scuby.platform.web.ErrorCode;
 import co.scuby.support.Accounts;
 import co.scuby.support.IntegrationTest;
+import co.scuby.support.MutableClock;
 import co.scuby.support.TestDb;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
@@ -27,6 +30,7 @@ class PetsTest {
     @Autowired TestDb testDb;
     @Autowired DSLContext db;
     @Autowired TransactionTemplate tx;
+    @Autowired MutableClock clock;
 
     static final Pets.NewPet KIRA = new Pets.NewPet("Kira", Pets.Species.dog, Pets.Size.medium,
             List.of(Pets.Color.brown), null, null, List.of());
@@ -40,12 +44,41 @@ class PetsTest {
         UUID pet = tx.execute(s -> pets.createOwned(ana, KIRA));
         var row = db.selectFrom(PET).where(PET.ID.eq(pet)).fetchOne();
         assertThat(row.getName()).isEqualTo("Kira");
+        assertThat(row.getSpecies()).isEqualTo("dog");
+        assertThat(row.getSize()).isEqualTo("medium");
+        assertThat(row.getPhotoUrls()).isEmpty();
+        assertThat(row.getCreatedAt().toInstant()).isEqualTo(clock.instant());
         assertThat(row.getCustodyState()).isEqualTo("claimed");
         assertThat(row.getColors()).containsExactly("brown");
         var link = db.selectFrom(RESPONSIBILITY_LINK).where(RESPONSIBILITY_LINK.PET_ID.eq(pet)).fetchOne();
         assertThat(link.getPersonId()).isEqualTo(ana);
         assertThat(link.getRole()).isEqualTo("owner");
         assertThat(link.getActiveTo()).isNull();
+        assertThat(link.getActiveFrom().toInstant()).isEqualTo(clock.instant());
+    }
+
+    @Test
+    void createOwnedOutsideATransactionIsRefused() {
+        UUID ana = accounts.person("ana@correo.co");
+        assertThatThrownBy(() -> pets.createOwned(ana, KIRA)).isInstanceOf(IllegalTransactionStateException.class);
+        assertThat(db.fetchCount(PET)).isZero();
+    }
+
+    @Test
+    void aFormerOwnerGetsNotFoundAndANewOwnerCanBeLinked() {
+        UUID ana = accounts.person("ana@correo.co");
+        UUID bob = accounts.person("bob@correo.co");
+        UUID pet = tx.execute(s -> pets.createOwned(ana, KIRA));
+        db.execute("UPDATE scuby.responsibility_link SET active_to = now() WHERE pet_id = ?", pet);
+        assertNotFound(() -> pets.requireOwnedBy(pet.toString(), ana));
+        db.execute("INSERT INTO scuby.responsibility_link (id, person_id, pet_id, role, active_from) VALUES (gen_random_uuid(), ?, ?, 'owner', now())",
+                bob, pet);
+        assertThatCode(() -> pets.requireOwnedBy(pet.toString(), bob)).doesNotThrowAnyException();
+    }
+
+    private static void assertNotFound(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
+        assertThatThrownBy(call).isInstanceOf(ApiException.class)
+                .satisfies(e -> assertThat(((ApiException) e).code()).isEqualTo(ErrorCode.NOT_FOUND));
     }
 
     @Test
@@ -54,9 +87,9 @@ class PetsTest {
         UUID bob = accounts.person("bob@correo.co");
         UUID pet = tx.execute(s -> pets.createOwned(ana, KIRA));
         assertThatCode(() -> pets.requireOwnedBy(pet.toString(), ana)).doesNotThrowAnyException();
-        assertThatThrownBy(() -> pets.requireOwnedBy(pet.toString(), bob)).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> pets.requireOwnedBy(UUID.randomUUID().toString(), ana)).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> pets.requireOwnedBy("pet-1", ana)).isInstanceOf(ApiException.class);
+        assertNotFound(() -> pets.requireOwnedBy(pet.toString(), bob));
+        assertNotFound(() -> pets.requireOwnedBy(UUID.randomUUID().toString(), ana));
+        assertNotFound(() -> pets.requireOwnedBy("pet-1", ana));
     }
 
     @Test
