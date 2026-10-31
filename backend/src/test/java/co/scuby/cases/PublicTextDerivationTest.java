@@ -47,4 +47,11 @@ class PublicTextDerivationTest {
     void whatsappUrlDropsThePlus() {
         assertThat(PublicTextDerivation.whatsappUrl("+573007152284")).isEqualTo("https://wa.me/573007152284");
     }
+
+    @Test
+    void lookTitleAsTheMockComposesIt() {
+        assertThat(PublicTextDerivation.lookTitle("dog", "small", List.of("black", "tan"), ES)).isEqualTo("Perro negro, pequeño");
+        assertThat(PublicTextDerivation.lookTitle("cat", null, List.of(), ES)).isEqualTo("Gato");
+        assertThat(PublicTextDerivation.lookTitle("other", "large", List.of("white"), EN)).isEqualTo("Animal white, large");
+    }
 }

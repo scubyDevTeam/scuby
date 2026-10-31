@@ -52,6 +52,15 @@ final class PublicTextDerivation {
                 .collect(Collectors.joining(" · "));
     }
 
+    /** «Perro negro, pequeño» — the title of a pet without a name (web/src/mocks/rules.ts · lookTitle). */
+    static String lookTitle(String species, @Nullable String size, List<String> colors, Locale locale) {
+        boolean en = english(locale);
+        String head = (en ? SPECIES_EN : SPECIES_ES).get(species);
+        if (!colors.isEmpty()) head = head + " " + (en ? COLOR_EN : COLOR_ES).get(colors.getFirst());
+        String title = size == null ? head : head + ", " + (en ? SIZE_EN : SIZE_ES).get(size);
+        return Character.toUpperCase(title.charAt(0)) + title.substring(1);
+    }
+
     static String whatsappUrl(String e164) {
         return "https://wa.me/" + e164.substring(1);
     }

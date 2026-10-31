@@ -12,5 +12,6 @@ class CasesSecurityRules implements SecurityRules {
     @Override
     public void authorize(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry rules) {
         rules.requestMatchers(HttpMethod.POST, "/lost-cases").authenticated();
+        rules.requestMatchers(HttpMethod.GET, "/me/cases").authenticated();
     }
 }
