@@ -81,4 +81,11 @@ class CaseStatementsTest {
         assertThat(pub.statements()).filteredOn(s -> s.contains("\"lost_case\".\"contact_phone\""))
                 .hasSize(1).allSatisfy(s -> assertThat(s).contains("case when"));
     }
+
+    @Test
+    void aPublicReadOnlyQueriesVisibleSightings() {
+        ApiResponse pub = cold(clients.newBrowser());
+        assertThat(pub.statements()).filteredOn(s -> s.contains("from \"scuby\".\"sighting\"") || s.contains("\"sighting\""))
+                .isNotEmpty().allSatisfy(s -> assertThat(s).contains("\"sighting\".\"status\" = ?"));
+    }
 }

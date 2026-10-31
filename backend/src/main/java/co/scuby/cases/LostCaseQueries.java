@@ -73,7 +73,7 @@ class LostCaseQueries {
                          SIGHTING.STATUS, SIGHTING.HIGHLIGHTED_BY_OWNER)
                  .from(SIGHTING)
                  .where(SIGHTING.CASE_CODE.eq(code)).and(visibility)
-                 .orderBy(SIGHTING.SEEN_AT);
+                 .orderBy(SIGHTING.SEEN_AT, SIGHTING.ID);
     }
 
     private static LostCaseFacts.SightingFacts toSighting(Record r) {

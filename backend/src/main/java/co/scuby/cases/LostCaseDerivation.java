@@ -24,7 +24,7 @@ final class LostCaseDerivation {
         var pet = facts.pet();
         List<LostCaseView.SightingView> sightings = facts.sightings().stream()
                 .filter(s -> owner || !s.hidden())
-                .sorted(Comparator.comparing(LostCaseFacts.SightingFacts::seenAt))
+                .sorted(Comparator.comparing(LostCaseFacts.SightingFacts::seenAt).thenComparing(LostCaseFacts.SightingFacts::id))
                 .map(s -> sighting(s, viewer, owner, now))
                 .toList();
         return new LostCaseView(

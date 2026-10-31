@@ -34,6 +34,12 @@ public final class CaseFixtures {
 
     public String lostCase(UUID owner, String code, String petName, String species, GeoPoint at, double radiusM,
                            String status, Instant publishedAt) {
+        return lostCase(owner, code, petName, species, at, radiusM, status, publishedAt, true);
+    }
+
+    /** As above, with the publisher's number flagged as on WhatsApp or not. */
+    public String lostCase(UUID owner, String code, String petName, String species, GeoPoint at, double radiusM,
+                           String status, Instant publishedAt, boolean phoneHasWhatsapp) {
         UUID pet = UUID.randomUUID();
         db.insertInto(PET).set(PET.ID, pet).set(PET.NAME, petName).set(PET.SPECIES, species)
           .set(PET.SIZE, "small").set(PET.COLORS, new String[]{"black", "tan"})
@@ -46,7 +52,7 @@ public final class CaseFixtures {
           .set(LOST_CASE.CODE, code).set(LOST_CASE.PET_ID, pet).set(LOST_CASE.CREATED_BY, owner)
           .set(LOST_CASE.STATUS, status).set(LOST_CASE.PUBLISHED_AT, publishedAt.atOffset(ZoneOffset.UTC))
           .set(LOST_CASE.RESOLVED_AT, "active".equals(status) ? null : publishedAt.plusSeconds(86_400).atOffset(ZoneOffset.UTC))
-          .set(LOST_CASE.CONTACT_PHONE, LUNA_PHONE).set(LOST_CASE.PHONE_HAS_WHATSAPP, true)
+          .set(LOST_CASE.CONTACT_PHONE, LUNA_PHONE).set(LOST_CASE.PHONE_HAS_WHATSAPP, phoneHasWhatsapp)
           .set(LOST_CASE.EXPOSE_WHATSAPP, true).set(LOST_CASE.EXPOSE_EMAIL, false).set(LOST_CASE.IN_APP_ONLY, false)
           .set(LOST_CASE.LAST_SEEN_LAT, at.lat()).set(LOST_CASE.LAST_SEEN_LNG, at.lng())
           .set(LOST_CASE.LAST_SEEN_RADIUS_M, radiusM).set(LOST_CASE.LAST_SEEN_AT, publishedAt.atOffset(ZoneOffset.UTC))
