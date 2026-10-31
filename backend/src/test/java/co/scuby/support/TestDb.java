@@ -24,6 +24,8 @@ public final class TestDb {
             "person",
             "upload",
             "pet",
+            "lost_case",
+            "purged_case_code",
             "responsibility_link"
     );
 
