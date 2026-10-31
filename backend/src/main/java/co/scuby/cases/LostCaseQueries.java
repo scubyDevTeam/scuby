@@ -34,7 +34,7 @@ class LostCaseQueries {
      * Otherwise NULL — never loaded.
      */
     static final Field<String> WHATSAPP_PHONE = DSL.when(
-                    DSL.condition(LOST_CASE.EXPOSE_WHATSAPP).and(LOST_CASE.PHONE_HAS_WHATSAPP).and(LOST_CASE.CONTACT_PHONE_VERIFIED).and(LOST_CASE.IN_APP_ONLY.not()).and(LOST_CASE.STATUS.eq(DSL.inline("active"))),
+                    DSL.condition(LOST_CASE.EXPOSE_WHATSAPP).and(LOST_CASE.PHONE_HAS_WHATSAPP).and(LOST_CASE.CONTACT_PHONE_VERIFIED).and(LOST_CASE.IN_APP_ONLY.isFalse()).and(LOST_CASE.STATUS.eq(DSL.inline("active"))),
                     LOST_CASE.CONTACT_PHONE)
             .as("whatsapp_phone");
 
