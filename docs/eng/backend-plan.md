@@ -72,7 +72,7 @@ response against `openapi.json`. Spike: does openapi-generator produce usable Ja
 3.1 document (the gate to stage 2 of decision #34)? *Done when:* a deliberately wrong response fails a test.
 
 **0.5 Observability and CI.** *Do:* OpenTelemetry export to New Relic, Sentry; GitHub Actions
-backend workflow (path filter, tests, Jib ARM64 image). *Done when:* a PR runs the suite and
+backend workflow (path filter, tests, ARM64 image). *Done when:* a PR runs the suite and
 produces an image.
 
 ## Phase I — Staging infrastructure

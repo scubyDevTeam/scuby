@@ -10,6 +10,7 @@ Behaviour lives in `../docs/` and wins over this code. Architecture: `../docs/en
 |---|---|
 | `./mvnw verify` | Everything CI runs: jOOQ codegen, tests, ArchUnit, PIT on derivations |
 | `./mvnw test -Dtest=X` | One test class |
+| `bash build.sh [--verify]` | Same build with only Docker (Maven in a container), then the image `scuby-backend:${SCUBY_IMAGE_TAG:-local}`; `--verify` runs the full suite |
 | `bash run-local.sh` | Postgres + the API in Docker on http://localhost:8080 (profile `local`), as this checkout's own compose project; `bash run-local.sh down` stops it |
 | `COMPOSE_PROJECT_NAME=$(bash compose-project.sh) docker compose up -d` | Postgres only. Never run compose without this checkout's project name: the default (`backend`) is shared with every other checkout |
 
@@ -17,9 +18,9 @@ Behaviour lives in `../docs/` and wins over this code. Architecture: `../docs/en
 
 One version, three places that must agree — change them in one commit:
 
-1. `pom.xml` `<java.version>` — compilation, and Jib's base image `eclipse-temurin:${java.version}-jre@sha256:…`.
+1. `pom.xml` `<java.version>` — compilation.
 2. `.java-version` — jenv locally; CI reads it (`java-version-file` in `.github/workflows/backend.yml`).
-3. The Jib base-image digest in `pom.xml` — look it up with `docker buildx imagetools inspect eclipse-temurin:<version>-jre` (the top-level index `Digest:`, whose manifests list linux/amd64 and linux/arm64), verify it with `docker buildx imagetools inspect eclipse-temurin:<version>-jre@<digest>`; never copy a digest from a plan or a chat.
+3. `ARG JAVA_VERSION` and the base-image digest in `Dockerfile` (`eclipse-temurin:<version>-jre@sha256:…`) — look it up with `docker buildx imagetools inspect eclipse-temurin:<version>-jre` (the top-level index `Digest:`, whose manifests list linux/amd64 and linux/arm64), verify it with `docker buildx imagetools inspect eclipse-temurin:<version>-jre@<digest>`; never copy a digest from a plan or a chat.
 
 The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older than 3.9.
 

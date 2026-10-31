@@ -132,7 +132,7 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
 
 - **GitHub Actions**, a backend workflow beside the client's `web.yml`, triggered by path filters.
 - **OIDC from GitHub to AWS** — no stored AWS keys.
-- Build and test; Jib builds the ARM64 image and pushes it to **ECR**.
+- Build and test; the image is built from `backend/Dockerfile` for ARM64 and pushed to **ECR**.
 - Deploy: SSM Run Command on the instance pulls the new image and restarts the Compose service.
   Flyway migrates at application start-up.
 
