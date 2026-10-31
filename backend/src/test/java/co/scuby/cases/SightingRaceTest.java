@@ -167,4 +167,35 @@ class SightingRaceTest {
     }
 
     static final int RACE_PATH_WITHOUT_SESSION = 6;   // +1 for the session lookup on a cache miss = the ceiling, 7
+
+    /**
+     * The real longest path: a queued retry (client_id, phone, photo) whose case closes after the service read it.
+     * The request is parked on supported_countries (an ACCESS EXCLUSIVE lock held by the test) after its case and
+     * replay reads; the case is closed and committed; then the request goes on: the conditional insert is empty,
+     * it re-selects the replay key, then reads the status, and answers 409. Eight statements with the session.
+     */
+    @Test
+    void theLongestPathIsEightStatementsARetryWithPhoneAndPhotoOnACaseThatClosesMidRequest() throws Exception {
+        byte[] bytes = "closing-photo".getBytes();
+        String sha = Hashing.sha256Hex(bytes);
+        String url = api.post("/uploads", """
+                {"purpose":"sighting","sha256":"%s","content_type":"image/jpeg","bytes":%d}""".formatted(sha, bytes.length)).str("/url");
+        api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", bytes, "image/jpeg", sha);
+        String extra = ",\"photo_urls\":[\"" + url + "\"],\"client_id\":\"closing-1\"";
+        caches.orderedStream().filter(c -> c.getClass().getSimpleName().equals("CachingSessionLookup")).forEach(ClearableCache::clear);
+        hold("LOCK TABLE scuby.supported_countries IN ACCESS EXCLUSIVE MODE");
+        Future<ApiResponse> f = pool.submit(() -> api.post("/cases/{code}/sightings",
+                body(extra).replace("\"contact_phone\":null", "\"contact_phone\":\"+573001112233\""), "7K3PQ"));
+        waitUntilWaiting(1);
+        db.update(co.scuby.db.generated.Tables.LOST_CASE).set(co.scuby.db.generated.Tables.LOST_CASE.STATUS, "reunited").execute();
+        holder.commit();
+        holder.close();
+        ApiResponse refused = f.get(30, TimeUnit.SECONDS);
+        assertThat(refused.status()).isEqualTo(409);
+        assertThat(refused.errorCode()).isEqualTo("invalid_transition");
+        assertThat(db.fetchCount(SIGHTING)).isZero();
+        assertThat(refused.statements()).as("%s", refused.statements()).hasSize(CLOSING_PATH);
+    }
+
+    static final int CLOSING_PATH = 8;   // = the ceiling
 }

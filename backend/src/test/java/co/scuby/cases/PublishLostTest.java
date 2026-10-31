@@ -331,7 +331,7 @@ class PublishLostTest {
     }
 
     /**
-     * The correct code is consumed inside the publish's transaction; the publish then loses the one-active-case race
+     * The correct code is consumed only after the case insert; the publish loses the one-active-case race
      * and rolls back. The code must still be usable (its attempt stays spent) once the pet is free again.
      */
     @Test
@@ -355,7 +355,7 @@ class PublishLostTest {
             }));
             assertThat(rivalHolds.await(30, TimeUnit.SECONDS)).isTrue();
             Future<ApiResponse> mine = pool.submit(() -> publish(body));
-            awaitBlockedOn("lost_case");           // the code is consumed; our INSERT waits on the rival's index entry
+            awaitBlockedOn("lost_case");           // our INSERT waits on the rival's index entry
             release.countDown();
             rival.get(30, TimeUnit.SECONDS);
             ApiResponse refused = mine.get(30, TimeUnit.SECONDS);
@@ -371,6 +371,50 @@ class PublishLostTest {
         ApiResponse again = publish(body);
         assertThat(again.status()).as("same code, second try: %s", again.body()).isEqualTo(200);
         assertThat(again.str("/code")).isNotBlank();
+    }
+
+    /**
+     * The double tap of «Publicar» at the code step: the same correct SMS code, the same existing pet. Sequentially
+     * and concurrently, one case is created and the other request is a 409 with the winner's case code, never a
+     * 422 invalid_code and never a 500 (the code is consumed after the case insert, so the loser waits on the
+     * unique index, not on the code row).
+     */
+    @Test
+    void aDoubleTapWithTheSameCorrectCodeOnAnExistingPetGivesOneCaseAndOne409() throws Exception {
+        publishVerified();
+        UUID petId = db.select(LOST_CASE.PET_ID).from(LOST_CASE).fetchOne().value1();
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < 8; round++) {
+                db.update(LOST_CASE).set(LOST_CASE.STATUS, "expired").execute();   // the pet is free again
+                clock.advance(Duration.ofMinutes(2));
+                String other = "+57300123450" + round;
+                assertThat(api.post("/me/phone", "{\"phone\":\"" + other + "\"}").status()).isEqualTo(204);
+                String body = PublishBodies.withPetId(petId.toString(), other)
+                        .replace("\"otp_code\":null", "\"otp_code\":\"" + sms.lastCodeFor(other) + "\"");
+                int casesBefore = db.fetchCount(LOST_CASE);
+                java.util.List<ApiResponse> answers = new java.util.ArrayList<>();
+                if (round % 2 == 0) {
+                    answers.add(publish(body));
+                    answers.add(publish(body));      // sequential: the pre-check answers 409
+                } else {
+                    var barrier = new java.util.concurrent.CyclicBarrier(2);
+                    var calls = java.util.List.of(
+                            pool.submit(() -> { barrier.await(); return publish(body); }),
+                            pool.submit(() -> { barrier.await(); return publish(body); }));
+                    for (var f : calls) answers.add(f.get(30, TimeUnit.SECONDS));
+                }
+                assertThat(answers).extracting(ApiResponse::status).as("round %d: %s", round, answers.stream().map(ApiResponse::body).toList())
+                                   .containsExactlyInAnyOrder(200, 409);
+                ApiResponse loser = answers.stream().filter(r -> r.status() == 409).findFirst().orElseThrow();
+                ApiResponse winner = answers.stream().filter(r -> r.status() == 200).findFirst().orElseThrow();
+                assertThat(loser.errorCode()).isEqualTo("active_case_exists");
+                assertThat(loser.str("/error/details/case_code")).isEqualTo(winner.str("/code"));
+                assertThat(db.fetchCount(LOST_CASE)).isEqualTo(casesBefore + 1);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     @Test

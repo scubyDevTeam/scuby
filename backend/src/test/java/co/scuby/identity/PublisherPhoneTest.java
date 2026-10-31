@@ -47,7 +47,11 @@ class PublisherPhoneTest {
     /** What the publish does: reserve any code attempt first (no transaction), then resolve inside its transaction. */
     private PublisherPhone.Outcome resolve(String phone, String code) {
         PublisherPhone.Prepared prepared = publisherPhone.prepare(ana, phone, code);
-        PublisherPhone.Outcome outcome = tx.execute(s -> publisherPhone.resolve(prepared, caller));
+        PublisherPhone.Outcome outcome = tx.execute(s -> {
+            PublisherPhone.Outcome o = publisherPhone.resolve(prepared, caller);
+            if (o instanceof PublisherPhone.Ready ready) publisherPhone.confirm(ready);   // the publish does this after its case insert
+            return o;
+        });
         if (outcome instanceof PublisherPhone.CodeSent sent) publisherPhone.deliver(sent);   // after the transaction, like the publish
         return outcome;
     }
@@ -60,11 +64,11 @@ class PublisherPhoneTest {
     void aNewNumberGetsACodeThenTheRightCodeVerifiesIt() {
         assertThat(resolve(PHONE, null)).isInstanceOf(PublisherPhone.CodeSent.class);
         assertThat(sms.sent()).hasSize(1);
-        assertThat(resolve(PHONE, sms.lastCodeFor(PHONE))).isEqualTo(new PublisherPhone.Ready(PHONE, true));
+        assertThat(resolve(PHONE, sms.lastCodeFor(PHONE))).usingRecursiveComparison().ignoringFields("pendingCode").isEqualTo(new PublisherPhone.Ready(PHONE, true));
         var person = db.selectFrom(PERSON).where(PERSON.ID.eq(ana)).fetchOne();
         assertThat(person.getPhone()).isEqualTo(PHONE);
         assertThat(person.getPhoneVerifiedAt()).isNotNull();
-        assertThat(resolve(null, null)).isEqualTo(new PublisherPhone.Ready(PHONE, true));   // later publishes: no SMS
+        assertThat(resolve(null, null)).usingRecursiveComparison().ignoringFields("pendingCode").isEqualTo(new PublisherPhone.Ready(PHONE, true));   // later publishes: no SMS
         assertThat(sms.sent()).hasSize(1);
     }
 
@@ -94,7 +98,7 @@ class PublisherPhoneTest {
             publisherPhone.resolve(prepared, caller);
             throw new IllegalStateException("the publish failed after the phone step");
         })).isInstanceOf(IllegalStateException.class);
-        assertThat(resolve(PHONE, code)).isEqualTo(new PublisherPhone.Ready(PHONE, true));   // same code, still good
+        assertThat(resolve(PHONE, code)).usingRecursiveComparison().ignoringFields("pendingCode").isEqualTo(new PublisherPhone.Ready(PHONE, true));   // same code, still good
     }
 
     @Test
@@ -132,7 +136,7 @@ class PublisherPhoneTest {
     @Test
     void flagOffStoresTheNumberUnverifiedAndPublishes() {
         db.execute("INSERT INTO scuby.feature_flag_overrides (flag_key, person_id, enabled, reason) VALUES ('publisher_phone_otp', ?, false, 'test')", ana);
-        assertThat(resolve(PHONE, null)).isEqualTo(new PublisherPhone.Ready(PHONE, false));
+        assertThat(resolve(PHONE, null)).usingRecursiveComparison().ignoringFields("pendingCode").isEqualTo(new PublisherPhone.Ready(PHONE, false));
         var person = db.selectFrom(PERSON).where(PERSON.ID.eq(ana)).fetchOne();
         assertThat(person.getPhone()).isEqualTo(PHONE);
         assertThat(person.getPhoneVerifiedAt()).isNull();

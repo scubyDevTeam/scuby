@@ -34,9 +34,9 @@ import static co.scuby.db.generated.Tables.LOST_CASE;
  * (it may call S3: {@code PhotoAttachments} is {@code Propagation.NEVER}) and, with {@code pet_id}, ownership and the
  * {@code active_case_exists} pre-check; (2) {@code PublisherPhone.prepare}, with no transaction open (it counts a code
  * attempt in its own statement); (3) the place name (possibly a network call), then one transaction that calls
- * {@code PublisherPhone.resolve} ({@code Propagation.MANDATORY}: stores the code to send, or consumes the reserved
- * one) and inserts the case; the unique index on the active case per pet arbitrates racing publishes (the loser
- * gets {@code active_case_exists}, never a 500, and its consumed code rolls back with it). On {@code CodeSent}
+ * {@code PublisherPhone.resolve} ({@code Propagation.MANDATORY}: stores the code to send, or approves the reserved
+ * one) and inserts the case, then {@code confirm} consumes the code; the unique index on the active case per pet arbitrates racing publishes (the loser
+ * gets {@code active_case_exists}, never a 500 or an invalid_code: its code is consumed only after the insert succeeds). On {@code CodeSent}
  * the transaction commits and no case is written; the SMS is sent AFTER it returned, with no connection held.
  */
 @Service
@@ -136,7 +136,11 @@ class PublishLostService {
                     .set(LOST_CASE.PLACE_NAME, placeName)
                     .onConflictDoNothing()
                     .execute();
-            if (inserted == 1) return new PublishView.Published(code);
+            if (inserted == 1) {
+                // The case is in: only now is the SMS code spent. A loser of the race never gets here.
+                publisherPhone.confirm(ready);
+                return new PublishView.Published(code);
+            }
             // Nothing inserted: either a concurrent publish won the one-active-case-per-pet race
             // (→ active_case_exists, rolling back the consumed code too), or the code collided
             // between newCode's check and the insert (→ draw another code).

@@ -358,11 +358,10 @@ is wired yet; the comparison is in `docs/superpowers/specs/2026-10-30-place-name
 
 ## Rate limits on rows
 
-Only code sends are limited in the backend (decisions #56, #57): SMS at most 5 per number and email at most
-10 per address, each in a rolling 24 h, plus a 60 s cooldown, all counted over `code_send` (a log purged at
-30 days, so bounded and without a performance index). The count and the insert are separate statements with
-no lock, so simultaneous requests for one number or address can overshoot a cap (see *Concurrency*). The
-rules live in [auth.md](auth.md); «Lo vi» and uploads have no limits ([04](../product/04-lost-workflow.md) · Validation,
+Only code sends are limited in the backend (decisions #56, #57): the numbers (caps, cooldown) live in
+[auth.md](auth.md). The daily caps are counted over `code_send` (a log purged at 30 days, so bounded and
+without a performance index); the email cooldown is a guard on `email_code.sent_at`, the SMS cooldown reads
+`code_send`. Overshoot is described once, in *Concurrency*. «Lo vi» and uploads have no limits ([04](../product/04-lost-workflow.md) · Validation,
 *Uploads and media* above), and per-IP abuse limits are an edge matter
 ([O30](../open-items.md)).
 
@@ -403,7 +402,7 @@ invariant**, not from row or advisory locks:
   the right code cannot both pass the `attempts < max` guard. SMS: `UPDATE phone_otp SET attempts = attempts + 1
   … RETURNING code_hash` counts the attempt before the caller's transaction, and a conditional `DELETE … WHERE
   code_hash = ?` inside it consumes the code once; a publish that rolls back after it leaves the code in place.
-- **One live code per address or number.** One upsert, `INSERT … ON CONFLICT DO UPDATE … WHERE <cooldown passed>`;
+- **One live code per address, and per account and number.** One upsert, `INSERT … ON CONFLICT DO UPDATE … WHERE <cooldown passed>`;
   a second simultaneous start finds the guard false and sends nothing.
 - **One active case per pet, one sighting per replay key.** Unique indexes with `ON CONFLICT DO NOTHING`; the
   loser reads the winner's row (`active_case_exists` with its code; the same sighting id).

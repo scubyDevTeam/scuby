@@ -21,8 +21,12 @@ import java.util.UUID;
  *   <li>{@link #prepare}, with NO transaction open: validates the number and, when a code was given for a number
  *       that needs one, reserves the attempt (a wrong code is {@code invalid_code} right here);</li>
  *   <li>{@link #resolve}, INSIDE the publish's transaction and after the publish's own validation (fields,
- *       photos, {@code active_case_exists}): stores the code to send, consumes the reserved one, or stores the
- *       number. A rolled-back publish leaves a right code usable; its attempt stays spent;</li>
+ *       photos, {@code active_case_exists}): stores the code to send, stores the number, or, for a reserved
+ *       code, says it is still to be consumed ({@link Ready#pendingCode});</li>
+ *   <li>{@link #confirm}, in the same transaction, AFTER the caller's own write succeeded (the case insert):
+ *       consumes that code. A publish that is refused or loses the one-active-case race never reaches it, so a
+ *       right code stays usable (its attempt stays spent), and a double tap with the same code waits on the
+ *       case's unique index and gets {@code active_case_exists}, not {@code invalid_code};</li>
  *   <li>{@link #deliver}, AFTER the publish's transaction returned (no connection held): sends the SMS of a
  *       {@link CodeSent}.</li>
  * </ol>
@@ -35,7 +39,11 @@ public class PublisherPhone {
     public sealed interface Outcome permits Ready, CodeSent {}
 
     /** Publish with this number; {@code verified} is false only with publisher_phone_otp off (O24). */
-    public record Ready(String phone, boolean verified) implements Outcome {}
+    public record Ready(String phone, boolean verified, PhoneOtp.@Nullable Reservation pendingCode) implements Outcome {
+        public Ready(String phone, boolean verified) {
+            this(phone, verified, null);
+        }
+    }
 
     /**
      * A code was stored (or the number is inside its cooldown, so nothing is pending to send): answer
@@ -115,17 +123,28 @@ public class PublisherPhone {
             case CHECK_CODE -> {
                 // The code was reserved for one number: it verifies that number only (the stored number may
                 // have changed between prepare and resolve).
-                if (prepared.reservation == null || !prepared.reservation.isFor(target) || !otp.consume(prepared.reservation)) {
+                if (prepared.reservation == null || !prepared.reservation.isFor(target)) {
                     throw new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code");
                 }
                 people.setPhone(personId, target, clock.instant());
-                yield new Ready(target, true);
+                yield new Ready(target, true, prepared.reservation);
             }
             case STORE_UNVERIFIED -> {
                 if (!target.equals(person.phone()) || person.phoneVerifiedAt() != null) people.setPhone(personId, target, null);
                 yield new Ready(target, false);
             }
         };
+    }
+
+    /**
+     * Consumes the code a {@link Ready} still holds (a no-op when it holds none). Call it in the resolving
+     * transaction once the publish's own write is in; {@code invalid_code} rolls that transaction back.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void confirm(Ready ready) {
+        if (ready.pendingCode() != null && !otp.consume(ready.pendingCode())) {
+            throw new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code");
+        }
     }
 
     /** Sends the SMS of a {@link CodeSent}. Call it after the transaction that produced it has returned: no network call holds a connection. */
