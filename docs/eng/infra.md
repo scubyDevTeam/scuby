@@ -177,8 +177,9 @@ arrives with the backend's upload slots, which know each photo's purpose.
   (`openssl rand -hex 32`), outside the repo and the chat. In the sandbox the deploy script creates
   it when missing (Terraform does not manage it) and keeps an existing value. **Rotation:** replace
   the value and restart the backend; it invalidates only the codes in flight (they expire in
-  minutes), never accounts or sessions. The sandbox parameter outlives `terraform destroy`; it is a
-  free standard parameter and is reused by the next run.
+  minutes), never accounts or sessions. Until `auth/code-hash-key` is added to the
+  sandbox's `secret_names` (`envs/sandbox/main.tf`), the sandbox parameter outlives `terraform
+  destroy` and the sweep reports it; delete it with `aws ssm delete-parameter`.
 - **New Relic license key:** `/scuby/<env>/newrelic/license-key`, imported as the property
   `newrelic.license-key`. On a laptop the same value comes from the environment variable
   `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. The parameter and the start-up import
