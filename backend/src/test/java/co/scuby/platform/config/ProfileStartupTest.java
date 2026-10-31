@@ -35,7 +35,6 @@ class ProfileStartupTest {
                     "scuby.media.public-base-url", "https://img.staging.scuby.test"),
             "prod", Map.of(
                     "scuby.web.allowed-origins", "https://scuby.test",
-                    "scuby.web.origin-secret", "dummy-origin-secret",
                     "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef",
                     "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com",
                     "scuby.media.bucket", "dummy-media-bucket",

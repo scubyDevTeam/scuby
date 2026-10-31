@@ -31,8 +31,6 @@ management:
 scuby:
   web:
     allowed-origins: []
-    origin-secret-header: X-Origin-Secret
-    origin-secret: ""
   cookies:
     secure: true
   flags:
