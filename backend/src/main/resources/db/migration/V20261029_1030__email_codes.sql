@@ -14,7 +14,7 @@ CREATE TABLE email_code (
 -- alarm. kind 'fail' is a wrong code that was checked against a live one: behind the cap of 10 failed checks per
 -- target in a rolling 24 h, which a new code does not reset (docs/eng/auth.md · Guessing budget). A wrong check
 -- with no live code writes nothing, so a failure row always follows a send row. Rows older than 30 days are purged
--- (IdentityPurge). The caps' index is V20261031_0940. Nothing about the requester is stored beyond the account, if any.
+-- (IdentityPurge). Its index: V20261031_0940. Nothing about the requester is stored beyond the account, if any.
 CREATE TABLE code_send (
   id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   channel      text NOT NULL CHECK (channel IN ('email', 'sms')),
