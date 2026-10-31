@@ -27,6 +27,12 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/scuby
       SPRING_DATASOURCE_USERNAME: scuby
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      # Telemetry (docs/eng/backend.md · Environments and profiles). The deploy script turns export
+      # on only when a real license key is in SSM; SCUBY_ENVIRONMENT is left to the staging profile.
+      SCUBY_TELEMETRY_EXPORT: ${SCUBY_TELEMETRY_EXPORT:-false}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_THRESHOLD_CONSOLE: WARN
     ports:
       - "8080:8080"
     logging:

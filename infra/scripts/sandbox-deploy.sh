@@ -39,6 +39,26 @@ else
 fi
 unset current
 
+echo "== New Relic license key (copied once from the Keychain; without it, export stays off)"
+# The key goes Keychain -> 0600 file -> SSM, never through argv or a file in the repo.
+current=$(aws ssm get-parameter --name "$PREFIX/newrelic/license-key" --with-decryption \
+  --query Parameter.Value --output text)
+if [ "$current" != "placeholder" ]; then
+  echo "license key already set — reusing it"
+elif key=$(security find-generic-password -s scuby-newrelic-license-key -w 2>/dev/null); then
+  keyfile=$(umask 077; mktemp "$SCRATCH/nr-key.XXXXXX")
+  trap 'rm -f "$keyfile"' EXIT
+  printf '%s' "$key" > "$keyfile"
+  unset key
+  aws ssm put-parameter --name "$PREFIX/newrelic/license-key" --type SecureString --overwrite \
+    --value "file://$keyfile" >/dev/null
+  rm -f "$keyfile"
+  echo "copied the license key from the Keychain"
+else
+  echo "no Keychain item scuby-newrelic-license-key — telemetry export stays off"
+fi
+unset current
+
 echo "== waiting for the instance to register with SSM"
 status=""
 for _ in $(seq 1 60); do
@@ -59,8 +79,11 @@ cd /opt/scuby
 echo '$(base64 < "$REPO/infra/compose/sandbox/compose.yaml" | tr -d '\n')' | base64 -d > compose.yaml
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REGISTRY
 DB=\$(aws ssm get-parameter --region us-east-1 --name $PREFIX/db/password --with-decryption --query Parameter.Value --output text)
+NR=\$(aws ssm get-parameter --region us-east-1 --name $PREFIX/newrelic/license-key --with-decryption --query Parameter.Value --output text)
+if [ "\$NR" = placeholder ]; then NR=""; EXPORT=false; else EXPORT=true; fi
 umask 077
-{ echo "BACKEND_IMAGE=$BACKEND_REPO:sandbox"; echo "POSTGRES_IMAGE=$POSTGRES_REPO:17"; echo "BACKEND_LOG_GROUP=$LOG_GROUP"; echo "DB_PASSWORD=\$DB"; } > .env
+{ echo "BACKEND_IMAGE=$BACKEND_REPO:sandbox"; echo "POSTGRES_IMAGE=$POSTGRES_REPO:17"; echo "BACKEND_LOG_GROUP=$LOG_GROUP"; echo "DB_PASSWORD=\$DB"; echo "SCUBY_TELEMETRY_EXPORT=\$EXPORT"; echo "NEW_RELIC_LICENSE_KEY=\$NR"; } > .env
+echo "telemetry export: \$EXPORT"
 docker compose up -d
 for i in \$(seq 1 90); do curl -sf localhost:8080/actuator/health && exit 0; sleep 5; done
 docker compose logs --tail 100

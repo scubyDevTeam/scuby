@@ -40,6 +40,7 @@ module "params" {
     "vapid/private-key",
     "google/client-secret",
     "sentry/dsn",
+    "newrelic/license-key",
   ]
 }
 
