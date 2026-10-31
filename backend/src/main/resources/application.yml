@@ -54,3 +54,14 @@ scuby:
     google:
       client-id: local-google-client-id
       jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+  media:
+    store: local
+    public-base-url: http://localhost:8080/dev-media
+    # Relative to the working directory: per checkout/worktree when run from Maven (backend/target is
+    # git-ignored); inside the Docker container SCUBY_MEDIA_LOCAL_DIR points at the container's own path.
+    local-dir: target/dev-media
+    bucket: ""
+    region: ""
+    slot-ttl: 5m
+    max-slots-per10-min: 20
+    attach-window: 24h

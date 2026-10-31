@@ -25,6 +25,14 @@ public final class Hashing {
         }
     }
 
+    public static String sha256Hex(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     public static String hmacSha256Hex(String key, String value) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");

@@ -34,7 +34,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ContractCoverageTest {
 
     /** Routes that exist on purpose without being in the contract. Anything else must be documented. */
-    static final Set<String> ALLOWED_UNDOCUMENTED_PREFIXES = Set.of("/actuator", "/error");
+    static final Set<String> ALLOWED_UNDOCUMENTED_PREFIXES = Set.of(
+            "/actuator", "/error",
+            // Development bucket (profiles local and test only): stands in for the presigned S3 PUT and the image CDN, so it has no contract.
+            "/dev-media");
 
     /** Test-only controllers (src/test) and Boot's own error controller. */
     private static boolean isInfrastructure(HandlerMethod handler) {

@@ -21,7 +21,8 @@ public final class TestDb {
             "email_code",
             "code_send",
             "phone_otp",
-            "person"
+            "person",
+            "upload"
     );
 
     /**
