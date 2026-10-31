@@ -458,6 +458,14 @@ an uncommitted row from another connection, and assert the invariants: a code is
 publishes for one pet give one case and one `409` and never a `500`, a correct code is still usable after a
 refused publish.
 
+## Migrations and indexes: kept performance indexes
+
+The performance indexes are those of decisions #53, #61, #66 and #68. Over `sighting`: `sighting_by_case_recent_idx
+(case_code, seen_at DESC, id DESC) INCLUDE (status)` (decision #68) serves the capped list of a case's sightings
+(a top-N in index order, no sort) and the feed's per-case counts; it is not partial because the owner's list and the
+public one filter status differently. `sighting_replay_key` is an integrity UNIQUE and stays; reads do not use it.
+The migration `V20261030_1040` holds the growth answers and `CaseSightingsPlanTest` the plan check.
+
 ## Migrations and indexes: partial indexes need literals
 
 A query served by a partial index (`… WHERE status = 'active'`) writes that predicate as a literal
