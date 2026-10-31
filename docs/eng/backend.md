@@ -103,7 +103,7 @@ text at INFO.
 
 | Variable | Default | On servers | Drives |
 |---|---|---|---|
-| `SCUBY_ENVIRONMENT` | `local` | `staging` / `prod` | the `deployment.environment` resource attribute |
+| `SCUBY_ENVIRONMENT` | `local`; `staging` / `prod` under those profiles, so a server that forgets it never reports as `local` | `staging` / `prod` | the `deployment.environment` resource attribute |
 | `SCUBY_TELEMETRY_EXPORT` | `false` | `true` | the three OTLP exports (traces, metrics, logs) to New Relic |
 | `LOGGING_STRUCTURED_FORMAT_CONSOLE` | empty (plain text) | `ecs` | structured JSON console (an unknown format fails startup), the crash record that [infra.md](infra.md) · Logs ships to CloudWatch |
 | `LOGGING_THRESHOLD_CONSOLE` | `INFO` | `WARN` | the console's minimum level; filters stdout only, New Relic still receives INFO |
