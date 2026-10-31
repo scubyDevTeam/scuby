@@ -198,8 +198,8 @@ confirmation copy says, what an optimistic update may assume. It never enforces 
 ### Rule 3 — no flags, no rules the backend owns
 
 The frontend never reads a feature flag ([feature-flags.md](feature-flags.md)). When a flag changes
-a screen, the response carries the outcome — e.g. publish returns `phone_step: otp | unverified`
-and the form renders the code entry only for `otp`. Same for rate limits, schedules, purge,
+a screen, the response carries the outcome — e.g. publish returns `phone_step: otp` (and, once
+[O24](../open-items.md) lands, `unverified`) and the form renders the code entry only for `otp`. Same for rate limits, schedules, purge,
 matching, merge: backend. The client may *pre-check* for feedback (sighting distance/time,
 [04](../product/04-lost-workflow.md) · Validation); the server re-checks.
 

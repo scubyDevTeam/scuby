@@ -107,15 +107,16 @@ through a presigned URL with a matching checksum appears as a master and serves 
 PUT → URL ([api.md](api.md) · Uploads). *Do:* implement both against `openapi.json`; the emulated
 bucket (`web/src/mocks/api/media.ts`) is the behaviour to match.
 
-**S.1 Auth.** Email code (Resend), Google sign-in, session cookie, `GET /session`, sign-out,
+**S.1 Auth.** Email code (provider open, [O23](../open-items.md); log-only sender until then), Google sign-in, session cookie, `GET /session`, sign-out,
 `GET /config` from `supported_countries`.
 
-**S.2 Phone step.** `POST /me/phone` + verify; SMS OTP over Twilio with the safety checklist of
+**S.2 Phone step.** `POST /me/phone` + verify; SMS OTP (provider open, [O23](../open-items.md); log-only sender until then) with the safety checklist of
 [auth.md](auth.md) (limits counted over rows in Postgres, spend alarm); the `publisher_phone_otp` flag
 ([feature-flags.md](feature-flags.md)).
 
 **S.3 Publish and view a lost case.** `POST /lost-cases`, `GET /cases/{code}` with the
-publisher-only fields, `GET /feed` (newest first, as the contract says today).
+publisher-only fields, `GET /feed` (nearest first with a national fallback — decision #41 in
+[00](../product/00-product-map.md); the contract's wording still says newest first).
 
 **S.4 «Lo vi».** `POST /cases/{code}/sightings` with server-side validation, the `client_id` replay
 key (no rate limits: decision #54); photos through the upload flow.

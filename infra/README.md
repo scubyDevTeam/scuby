@@ -25,7 +25,7 @@ infra/
 - **AWS CLI v2** con SSO.
 - **Node ≥ 22** (las Lambdas corren en `nodejs22.x`).
 - **Docker**.
-- El Java del backend (ver [`../backend/README.md`](../backend/README.md)): el sandbox construye la imagen del backend.
+- Nada más: `sandbox-build.sh` construye el backend con `backend/build.sh`, que corre Maven en un contenedor (solo hace falta Docker; el script necesita un checkout de git).
 
 ## Correr el sandbox
 

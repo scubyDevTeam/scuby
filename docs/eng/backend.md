@@ -27,7 +27,7 @@ door open without paying for it now.
 | Migrations | **Flyway** — the only way the schema changes |
 | Data access | **jOOQ** (open-source edition), reads and writes — *Data access* below |
 | Queue | **Amazon SQS** behind a transactional outbox — *Async work* below |
-| Scheduled jobs | **db-scheduler** (state in Postgres, cluster-safe) — cron-style work only |
+| Scheduled jobs | **db-scheduler** (state in Postgres, cluster-safe) — cron-style work only. Not added yet: the daily purges that exist today (`IdentityPurge`, `UploadPurge`) are Spring `@Scheduled` methods on `@WorkerComponent` beans, which is enough on one instance |
 | Rate limiting | Only SMS and email code sends are limited in the backend, as counts over the send log (rolling windows with SQL) — *Rate limits on rows* below. Per-IP limits belong at the edge ([O30](../open-items.md)). **Bucket4j** with its Postgres store if a limit ever needs tokens without rows |
 | Phone numbers | libphonenumber ([auth.md](auth.md)) |
 | Observability | **OpenTelemetry → New Relic** (traces, metrics, logs from INFO over OTLP); **stdout (WARN and up) → CloudWatch Logs** as the crash record; **Sentry** for errors |
@@ -494,7 +494,7 @@ for twice:
 
 ## What the backend owns
 
-Everything the emulated backend simplifies — uploads, reverse geocoding, rate-limit keys,
+Everything the emulated backend simplifies — uploads, reverse geocoding, device identity,
 matching, the follow-up loop as scheduled jobs, deliveries, nearby alerts, Twilio Conversations —
 is listed in [api.md](api.md) · What the emulated backend does — and does not. That table is the
 backend's scope; this doc does not restate it.

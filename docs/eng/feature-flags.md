@@ -54,7 +54,8 @@ with no UI difference at all (which provider sends, whether a job runs, which ru
 
 When a flag *does* change what a screen shows, the backend expresses the **outcome as data** in
 the response the screen already consumes, not as a flag. Example: the publish form response
-carries `phone_step: otp | unverified`, not `publisher_phone_otp: true`. The frontend renders what
+carries `phone_step: otp | unverified`, not `publisher_phone_otp: true` (the `unverified` outcome is not
+in the contract yet — [O24](../open-items.md)). The frontend renders what
 it is told, and an API response is its whole contract. This keeps the frontend free of flag logic,
 lets a flag be removed without a frontend release, and means a tampered client can never switch
 behavior on, since the server enforces the action either way.
@@ -81,7 +82,7 @@ event vocabulary.
 
 | Key | Default | Gates | Off-path | Owning doc | Exit |
 |---|---|---|---|---|---|
-| `publisher_phone_otp` | **on** | SMS OTP verification of the publisher's phone at publish | Number still required, format-validated and stored E.164, but no OTP; `phone_verified_at` stays null, and the case shows no public phone contact until the number is verified ([04](../product/04-lost-workflow.md) · Contact visibility). The publish form response says `phone_step: unverified`, so the UI skips the code entry | [auth.md · phone step](auth.md) | Permanent kill switch — also the lever if the SMS spend alarm fires before Twilio Verify is installed |
+| `publisher_phone_otp` | **on** | SMS OTP verification of the publisher's phone at publish | Number still required, format-validated and stored E.164, but no OTP; `phone_verified_at` stays null, and the case shows no public phone contact until the number is verified ([04](../product/04-lost-workflow.md) · Contact visibility). The publish answers `{code}` at once (no code entry); the contract cannot yet say `phone_step: unverified`, so the UI cannot tell the number went unverified ([O24](../open-items.md)) | [auth.md · phone step](auth.md) | Permanent kill switch — also the lever if the SMS spend alarm fires before Twilio Verify is installed |
 | `reverse_geocoding` | **off** | Place names (`place_name` on cases and feed items) from a reverse-geocoding provider, computed once at publish | A generic localized label («Zona marcada en el mapa») | [backend.md](backend.md) · Place names (added by the lost-case work) | Deleted once a provider is chosen and stable |
 
 ## Rejected alternatives

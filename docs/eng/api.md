@@ -153,7 +153,7 @@ Simplified on purpose — the real backend must do better:
 |---|---|
 | Uploads: the same three steps against an emulated bucket (`api/media.ts`), bytes kept as data URLs; nobody checks who may attach which photo | Presigned S3 PUTs, the ingest Lambda and CloudFront variants ([infra.md](infra.md) · Media); ownership of a photo enforced at publish |
 | Neighbourhood = nearest of a fixed list | Reverse geocoding |
-| The `device` cookie = a random id in localStorage (the client never reads it) | The API-set cookie of *Device identity*; IP as a second key |
+| The `device` cookie = a random id in localStorage (the client never reads it) | The API-set cookie of *Device identity*; the backend keeps no IP (decisions #54, #55) |
 | Matching = same species within 5 km | The matching contract in [05](../product/05-found-workflow.md) (O7) |
 | Follow-up loop runs on each request | A scheduled job; push and email deliveries ([comms.md](comms.md)) |
 | Nearby alerts stored as a zone on the account; nothing sends them | The matching/broadcast job that notifies by zone ([08](../product/08-notifications.md)) |

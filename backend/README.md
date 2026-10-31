@@ -1,8 +1,9 @@
 # backend/ — API y trabajo de fondo de Scuby
 
 Backend de Scuby: Java 25, Spring Boot y Maven. Implementa el contrato `../docs/eng/openapi.json`
-(ver `../docs/eng/api.md`). Todavía no expone endpoints del contrato; esta carpeta es la base sobre
-la que se construyen.
+(ver `../docs/eng/api.md`). Hoy implementa 15 endpoints del contrato: los de identidad (sesión, correo,
+Google, teléfono, `GET /config`, `GET /me/profile`), las subidas y el caso perdido (publicar, ver, «Lo vi», el
+feed y «Mis casos»); `ContractCoverageTest` los compara con `openapi.json`.
 
 ## Requisitos
 

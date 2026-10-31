@@ -106,8 +106,9 @@ required, format-validated and stored E.164 exactly like a claimant's, the case 
 the flag on, which runs the OTP step then, and **an unverified number is never public**: the case has
 no phone contact until it is verified ([04](../product/04-lost-workflow.md) · Contact visibility). Turning the flag off gives up the three reasons above
 for that account; it exists for testing and as the kill switch if SMS pumping outruns the alarm.
-The frontend never reads the flag. The publish form response tells it `phone_step: otp` or
-`unverified`, and it renders the code entry only for `otp`. The flag gates the publish step only; changing the number in settings always verifies it.
+The frontend never reads the flag. The publish form response tells it `phone_step: otp`, and it renders the
+code entry only then; with the flag off the publish answers the case `code` at once, because the contract has no
+`phone_step: unverified` yet ([O24](../open-items.md)). The flag gates the publish step only; changing the number in settings always verifies it.
 
 ### UI contract — the phone step in every publish flow
 
