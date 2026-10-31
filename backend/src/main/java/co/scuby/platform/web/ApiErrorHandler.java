@@ -2,6 +2,7 @@ package co.scuby.platform.web;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import tools.jackson.core.JacksonException;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -69,6 +71,40 @@ public class ApiErrorHandler extends ResponseEntityExceptionHandler {
         pd.setProperty(ContractErrors.CODE, ErrorCode.VALIDATION_FAILED.wire());
         pd.setProperty(ContractErrors.FIELDS, fields);
         return handleExceptionInternal(ex, pd, headers, status, request);
+    }
+
+    /**
+     * A body Jackson could not bind: an absent required field (Jackson's {@code required = true}), a wrong type, a value
+     * not in an enum. The contract wants the field named, so the wire path comes from Jackson's path and, for an absent
+     * creator property, from its message; the message itself is never sent or logged.
+     */
+    @Override
+    protected @Nullable ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail pd = ProblemDetail.forStatus(status);
+        pd.setDetail("request does not match the contract");
+        pd.setProperty(ContractErrors.CODE, ErrorCode.VALIDATION_FAILED.wire());
+        for (Throwable t = ex; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof JacksonException je) {
+                String field = fieldOf(je);
+                if (field != null) pd.setProperty(ContractErrors.FIELDS, Map.of(field, "missing or not valid"));
+                break;
+            }
+        }
+        return handleExceptionInternal(ex, pd, headers, status, request);
+    }
+
+    private static final java.util.regex.Pattern MISSING = java.util.regex.Pattern.compile("Missing required creator property '([^']+)'");
+
+    /** «pet.marks»: Jackson's path (it already ends with the absent creator property), else the property named by the message. */
+    private static @Nullable String fieldOf(JacksonException je) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        for (JacksonException.Reference ref : je.getPath()) {
+            if (ref.getPropertyName() != null) parts.add(ref.getPropertyName());
+        }
+        var missing = MISSING.matcher(String.valueOf(je.getOriginalMessage()));
+        if (missing.find() && (parts.isEmpty() || !parts.getLast().equals(missing.group(1)))) parts.add(missing.group(1));
+        return parts.isEmpty() ? null : String.join(".", parts);
     }
 
     /** Mirrors `spring.jackson.property-naming-strategy: SNAKE_CASE`: fields are named by wire path (docs/eng/api.md · Errors). */

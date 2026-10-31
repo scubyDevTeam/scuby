@@ -110,8 +110,12 @@ class SightingEndpointTest {
                 {"point":{"lat":6.2455,"lng":-75.5905},"seen_at":"%s","contact_phone":null}""".formatted(clock.instant());
         String noPhone = """
                 {"point":{"lat":6.2455,"lng":-75.5905},"seen_at":"%s","note":null}""".formatted(clock.instant());
-        assertThat(api.post("/cases/{code}/sightings", noNote, "7K3PQ").errorCode()).isEqualTo("validation_failed");
-        assertThat(api.post("/cases/{code}/sightings", noPhone, "7K3PQ").errorCode()).isEqualTo("validation_failed");
+        ApiResponse missingNote = api.post("/cases/{code}/sightings", noNote, "7K3PQ");
+        ApiResponse missingPhone = api.post("/cases/{code}/sightings", noPhone, "7K3PQ");
+        assertThat(missingNote.errorCode()).isEqualTo("validation_failed");
+        assertThat(missingNote.json().at("/error/fields").has("note")).as(missingNote.body()).isTrue();
+        assertThat(missingPhone.errorCode()).isEqualTo("validation_failed");
+        assertThat(missingPhone.json().at("/error/fields").has("contact_phone")).as(missingPhone.body()).isTrue();
         assertThat(db.fetchCount(SIGHTING)).isZero();
         assertThat(report(api, "").status()).isEqualTo(201);   // explicit nulls are fine
     }

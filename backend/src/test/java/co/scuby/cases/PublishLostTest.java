@@ -107,6 +107,32 @@ class PublishLostTest {
         assertThat(clients.newBrowser().get("/cases/{code}", code).str("/contact/whatsapp_url")).isEqualTo("https://wa.me/573007152284");
     }
 
+    /** Contract: pet_id, phone, otp_code, pet.marks and pet.chip_number are required but nullable: absent is refused, null is fine. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "\"pet_id\":null,,                pet_id",
+            "\"phone\":null,,                 phone",
+            "\"otp_code\":null,,              otp_code",
+            "\"marks\":null,,                 pet.marks",
+            "\"chip_number\":null,,           pet.chip_number"})
+    void anAbsentRequiredNullableFieldIsValidationFailedNamingIt(String fragment, String ignored, String field) {
+        db.update(PERSON).set(PERSON.PHONE, PHONE).set(PERSON.PHONE_VERIFIED_AT, clock.instant().atOffset(java.time.ZoneOffset.UTC))
+          .where(PERSON.ID.eq(ana)).execute();                    // so null phone and null code are a complete body
+        String full = PublishBodies.kira(null, null);
+        assertThat(full).contains(fragment);
+        tools.jackson.databind.node.ObjectNode tree = (tools.jackson.databind.node.ObjectNode) new tools.jackson.databind.json.JsonMapper().readTree(full);
+        if (field.startsWith("pet.")) ((tools.jackson.databind.node.ObjectNode) tree.get("pet")).remove(field.substring(4));
+        else tree.remove(field);
+        String without = tree.toString();
+        ApiResponse r = publish(without);
+        assertThat(r.status()).isEqualTo(422);
+        assertThat(r.errorCode()).isEqualTo("validation_failed");
+        assertThat(r.json().at("/error/fields").has(field)).as("fields name %s: %s", field, r.body()).isTrue();
+        assertThat(db.fetchCount(LOST_CASE)).isZero();
+        assertThat(sms.sent()).isEmpty();
+        assertThat(publish(full).status()).as("the same body with the field present and null").isEqualTo(200);
+    }
+
     @Test
     void theNextPublishWithTheVerifiedNumberGoesStraightThrough() {
         publishVerified();
