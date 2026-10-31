@@ -1,7 +1,6 @@
 package co.scuby.platform.security;
 
 import co.scuby.platform.web.ApiException;
-import co.scuby.platform.web.ClientAddress;
 import co.scuby.platform.web.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.MethodParameter;
@@ -14,12 +13,6 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 import java.util.UUID;
 
 final class CallerArgumentResolver implements HandlerMethodArgumentResolver {
-
-    private final ClientAddress address;
-
-    CallerArgumentResolver(ClientAddress address) {
-        this.address = address;
-    }
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
@@ -41,6 +34,6 @@ final class CallerArgumentResolver implements HandlerMethodArgumentResolver {
         if (!(device instanceof String hash)) {
             throw new IllegalStateException("the device-cookie filter did not run for " + request.getRequestURI());
         }
-        return new Caller(person, hash, address.ipHash(request));
+        return new Caller(person, hash);
     }
 }

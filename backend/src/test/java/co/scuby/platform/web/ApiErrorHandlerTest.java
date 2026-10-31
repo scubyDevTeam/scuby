@@ -82,8 +82,8 @@ class ApiErrorHandlerTest {
         }
 
         private void insertBadSighting() {
-            db.execute("insert into scuby.sighting (id, case_code, lat, lng, seen_at, created_at, reporter_device_hash, reporter_ip_hash, contact_phone, client_id) "
-                    + "values (gen_random_uuid(), 'ZZZZZ', 1, 1, now(), now(), repeat('a', 64), repeat('b', 64), ?, ?)", "+573156677889", "short");
+            db.execute("insert into scuby.sighting (id, case_code, lat, lng, seen_at, created_at, reporter_device_hash, contact_phone, client_id) "
+                    + "values (gen_random_uuid(), 'ZZZZZ', 1, 1, now(), now(), repeat('a', 64), ?, ?)", "+573156677889", "short");
         }
 
         @PostMapping("/probe/validate")

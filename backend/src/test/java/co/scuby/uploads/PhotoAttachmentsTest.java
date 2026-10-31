@@ -47,7 +47,7 @@ class PhotoAttachmentsTest {
         String sha = Hashing.sha256Hex(bytes);
         var slot = api.post("/uploads", UploadsTest.slotBody(purpose, sha, bytes.length));
         if (sendBytes) api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", bytes, "image/jpeg", sha);
-        Caller caller = new Caller(null, Hashing.sha256Hex(api.cookie("device").orElseThrow()), "i".repeat(64));
+        Caller caller = new Caller(null, Hashing.sha256Hex(api.cookie("device").orElseThrow()));
         return Map.entry(slot.str("/url"), caller);
     }
 
@@ -65,7 +65,7 @@ class PhotoAttachmentsTest {
     @Test
     void anotherCallersPhotoIsRefused() {
         var up = upload("sighting", true);
-        Caller stranger = new Caller(null, "e".repeat(64), "i".repeat(64));
+        Caller stranger = new Caller(null, "e".repeat(64));
         assertThatThrownBy(() -> attachments.requireAttachable(List.of(up.getKey()), UploadPurpose.sighting, stranger, "photo_urls"))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(reasonOf(e)).contains("photo_urls"));
     }
@@ -94,7 +94,7 @@ class PhotoAttachmentsTest {
 
     @Test
     void aForeignUrlIsRefusedAndAnEmptyListPasses() {
-        Caller c = new Caller(UUID.randomUUID(), "d".repeat(64), "i".repeat(64));
+        Caller c = new Caller(UUID.randomUUID(), "d".repeat(64));
         assertThatThrownBy(() -> attachments.requireAttachable(List.of("https://evil.example/x.jpg"), UploadPurpose.sighting, c, "photo_urls"))
                 .isInstanceOf(ApiException.class);
         assertThatCode(() -> attachments.requireAttachable(List.of(), UploadPurpose.sighting, c, "photo_urls")).doesNotThrowAnyException();
@@ -110,7 +110,7 @@ class PhotoAttachmentsTest {
 
     /** The Caller of a browser, with the person it is signed in as (null: anonymous). */
     private Caller callerOf(ApiClient browser, UUID person) {
-        return new Caller(person, Hashing.sha256Hex(browser.cookie("device").orElseThrow()), "i".repeat(64));
+        return new Caller(person, Hashing.sha256Hex(browser.cookie("device").orElseThrow()));
     }
 
     @Test

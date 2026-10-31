@@ -111,14 +111,6 @@ class SightingPrecedenceTest {
     }
 
     @Test
-    void aBadPhotoBeatsTheRateLimit() {
-        for (int i = 0; i < 5; i++) assertThat(post(api, "7K3PQ", json(6.2455, -75.5905, ok(), null, "")).status()).isEqualTo(201);
-        ApiResponse r = post(api, "7K3PQ", json(6.2455, -75.5905, ok(), null, ",\"photo_urls\":[\"http://localhost/dev-media/" + "0".repeat(64) + ".jpg\"]"));
-        assertThat(r.errorCode()).isEqualTo("validation_failed");
-        assertThat(r.json().at("/error/fields").has("photo_urls")).isTrue();
-    }
-
-    @Test
     void aRefusedSightingStoresNothing() {
         post(api, "7K3PQ", json(4.711, -74.07, ok(), null, ""));
         assertThat(db.fetchCount(SIGHTING)).isZero();
@@ -139,7 +131,7 @@ class SightingPrecedenceTest {
         accounts.signIn(api, "helper@correo.co");
         caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
         ApiResponse full = post(api, "7K3PQ", json(6.2455, -75.5905, ok(), "+573001112233", ",\"client_id\":\"statements-1\""));
-        assertThat(full.statements()).hasSize(10);   // session, case, replay, supported_countries, 2 locks, status, 2 counts, insert
+        assertThat(full.statements()).hasSize(6);   // session, case, replay, supported_countries, status FOR SHARE, insert
         caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
         ApiResponse replay = post(api, "7K3PQ", json(6.2455, -75.5905, ok(), "+573001112233", ",\"client_id\":\"statements-1\""));
         assertThat(replay.statements()).hasSize(3);   // session, case, replay

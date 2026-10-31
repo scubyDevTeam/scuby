@@ -60,7 +60,7 @@ class PhoneSendLockOrderTest {
     }
 
     private Caller caller(UUID id) {
-        return new Caller(id, "d".repeat(64), "i".repeat(64));
+        return new Caller(id, "d".repeat(64));
     }
 
     private void awaitBlockedQuery() throws InterruptedException {

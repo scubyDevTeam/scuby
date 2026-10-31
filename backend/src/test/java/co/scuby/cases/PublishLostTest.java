@@ -242,7 +242,7 @@ class PublishLostTest {
 
     @Test
     void theSmsCapAnswers429AndWritesNoCase() {
-        for (int i = 0; i < 4; i++) {           // max-per-number is 4 in 24 h; each resend waits out the 60 s cooldown
+        for (int i = 0; i < 5; i++) {           // max-per-number is 5 in a rolling 24 h; each resend waits out the 60 s cooldown
             assertThat(publish(PublishBodies.kira(PHONE, null)).str("/phone_step")).isEqualTo("otp");
             clock.advance(Duration.ofSeconds(61));
         }
@@ -251,7 +251,7 @@ class PublishLostTest {
         assertThat(capped.errorCode()).isEqualTo("rate_limited");
         assertThat(db.fetchCount(LOST_CASE)).isZero();
         assertThat(db.fetchCount(PET)).isZero();
-        assertThat(sms.sent()).hasSize(4);
+        assertThat(sms.sent()).hasSize(5);
     }
 
     // ---- concurrency ----------------------------------------------------------------------------------------

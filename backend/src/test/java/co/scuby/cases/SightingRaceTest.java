@@ -33,8 +33,9 @@ import static co.scuby.db.generated.Tables.SIGHTING;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Requests that overlap in time, made deterministic: the test holds the reporter's advisory lock, lets the
- * requests pile up behind it (each has passed every check outside the transaction), then releases it.
+ * Requests that overlap in time, made deterministic: the test holds the case row's lock, lets the requests pile
+ * up behind it (each has passed every check outside the transaction and waits at the FOR SHARE status read),
+ * then releases it.
  */
 @IntegrationTest
 class SightingRaceTest {
@@ -76,22 +77,28 @@ class SightingRaceTest {
         return api.post("/cases/{code}/sightings", body(extra), "7K3PQ");
     }
 
-    private void holdTheReporterLock() throws Exception {
+    /** Locks the case row, as a close or a purge would: the sightings queue at their FOR SHARE read. */
+    private void holdTheCaseLock(String update) throws Exception {
         holder = dataSource.getConnection();
         holder.setAutoCommit(false);
-        try (PreparedStatement ps = holder.prepareStatement("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))")) {
-            ps.setString(1, "sighting-reporter:p:" + me);
+        try (PreparedStatement ps = holder.prepareStatement(update)) {
             ps.execute();
         }
     }
 
+    private void holdTheCaseLock() throws Exception {
+        holdTheCaseLock("SELECT 1 FROM scuby.lost_case WHERE code = '7K3PQ' FOR UPDATE");
+    }
+
+    private static final String WAITING = "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()";
+
     private void waitUntilWaiting(int requests) throws Exception {
         for (int i = 0; i < 500; i++) {
-            Integer waiting = db.fetchOne("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())").get(0, Integer.class);
+            Integer waiting = db.fetchOne(WAITING).get(0, Integer.class);
             if (waiting == requests) return;
             Thread.sleep(20);
         }
-        throw new AssertionError("the requests never queued behind the lock (waiting: " + db.fetchOne("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())") + ")");
+        throw new AssertionError("the requests never queued behind the lock (waiting: " + db.fetchOne(WAITING) + ")");
     }
 
     private void release() throws Exception {
@@ -109,38 +116,26 @@ class SightingRaceTest {
     }
 
     @Test
-    void aRetryThatQueuedBehindItsOriginalAtTheLimitGetsTheStoredIdNotRateLimited() throws Exception {
-        for (int i = 0; i < 4; i++) assertThat(post("").status()).isEqualTo(201);
-        holdTheReporterLock();
-        Callable<ApiResponse> send = () -> post(",\"client_id\":\"fifth-retry-1\"");
+    void twoConcurrentSendsOfOneClientIdAreTheSameSightingAndOneRow() throws Exception {
+        holdTheCaseLock();
+        Callable<ApiResponse> send = () -> post(",\"client_id\":\"queued-retry-1\"");
         List<ApiResponse> both = concurrently(List.of(send, send));
         assertThat(both).extracting(ApiResponse::status).containsExactly(201, 201);
         assertThat(both.get(0).str("/id")).isEqualTo(both.get(1).str("/id"));
-        assertThat(db.fetchCount(SIGHTING)).isEqualTo(5);
+        assertThat(db.fetchCount(SIGHTING)).isEqualTo(1);
     }
 
     @Test
-    void aRetryAtTheLimitAfterTheOriginalCommittedIsTheStoredIdNotRateLimited() {
-        for (int i = 0; i < 4; i++) assertThat(post("").status()).isEqualTo(201);
-        String first = post(",\"client_id\":\"fifth-retry-2\"").str("/id");
-        ApiResponse retry = post(",\"client_id\":\"fifth-retry-2\"");
-        assertThat(retry.status()).isEqualTo(201);
-        assertThat(retry.str("/id")).isEqualTo(first);
-        assertThat(post("").errorCode()).isEqualTo("rate_limited");   // a new send at the limit is still refused
-    }
-
-    @Test
-    void aCaseClosedWhileTheRequestWaitedForTheLockIsRefused() throws Exception {
-        holdTheReporterLock();
+    void aCaseClosedWhileTheRequestWaitedIsRefused() throws Exception {
+        holdTheCaseLock("UPDATE scuby.lost_case SET status = 'reunited' WHERE code = '7K3PQ'");
         Future<ApiResponse> f = pool.submit(() -> post(""));
         waitUntilWaiting(1);
-        db.execute("UPDATE scuby.lost_case SET status = 'reunited' WHERE code = '7K3PQ'");
         release();
         assertThat(f.get(30, TimeUnit.SECONDS).errorCode()).isEqualTo("invalid_transition");
         assertThat(db.fetchCount(SIGHTING)).isZero();
     }
 
-    /** Both passed the replay check, both counted below the limit; the second hits ON CONFLICT and re-selects: the longest path. */
+    /** Both passed the replay check; the second hits ON CONFLICT and re-selects: the longest path. */
     @Test
     void theLongestPathIsMeasuredExactlyOnTheConflictRaceWithPhotosAndAPhone() throws Exception {
         byte[] bytes = "race-photo".getBytes();
@@ -151,7 +146,7 @@ class SightingRaceTest {
         String extra = ",\"photo_urls\":[\"" + url + "\"],\"client_id\":\"long-path-1\"";
         Callable<ApiResponse> send = () -> api.post("/cases/{code}/sightings",
                 body(extra).replace("\"contact_phone\":null", "\"contact_phone\":\"+573001112233\""), "7K3PQ");
-        holdTheReporterLock();
+        holdTheCaseLock();
         caches.orderedStream().filter(c -> c.getClass().getSimpleName().equals("CachingSessionLookup")).forEach(ClearableCache::clear);   // the session lookup counts; the stored photo stays
         List<ApiResponse> both = concurrently(List.of(send, send));
         assertThat(both).extracting(ApiResponse::status).containsExactly(201, 201);
@@ -159,8 +154,8 @@ class SightingRaceTest {
         // The loser re-selects the winner's row. Whether its session lookup hit the cache depends on timing, so the
         // session SELECT is counted apart: the ceiling is this count plus that one.
         int loser = both.stream().mapToInt(r -> (int) r.statements().stream().filter(q -> !q.contains("\"session\"")).count()).max().orElseThrow();
-        assertThat(loser).isEqualTo(RACE_PATH_WITHOUT_SESSION);   // case, replay, supported_countries, upload lookup, 2 locks, status, 2 counts, insert, re-select
+        assertThat(loser).isEqualTo(RACE_PATH_WITHOUT_SESSION);   // case, replay, supported_countries, upload lookup, status, insert, re-select
     }
 
-    static final int RACE_PATH_WITHOUT_SESSION = 11;   // +1 for the session lookup on a cache miss = the ceiling, 12
+    static final int RACE_PATH_WITHOUT_SESSION = 7;   // +1 for the session lookup on a cache miss = the ceiling, 8
 }

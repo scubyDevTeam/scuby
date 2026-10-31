@@ -42,10 +42,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <li>(191) national fallback → FeedEndpointTest.nothingNearFallsBackToTheWholeCountry</li>
  * <li>(215) a sighting is visible at once → aSightingIsVisibleAtOnce — no notification (not in the slice)</li>
  * <li>(229) the three refusals → refusals</li>
- * <li>(237) five per reporter per case a day → fivePerReporterPerCaseADay</li>
+ * <li>(237) five per reporter per case a day → override: deferred, decision #54 (docs/product/00-product-map.md). No limit exists in
+ *     the backend; fiveSightingsInARowAreNotLimited pins it</li>
  * <li>(244) «otra vez» inside the correction window → againInsideTheCorrectionWindow</li>
- * <li>(252) client_id replay → aReplayIsTheSameSighting — the replay is answered before the rate limits (and
- *     before every other check), so it still answers the same sighting after the limit is reached</li>
+ * <li>(252) client_id replay → aReplayIsTheSameSighting — the replay is answered before every other check</li>
  * <li>(264) not on a closed case → notOnAClosedCase</li>
  * <li>(286) SMS code first, then into the feed → asksForTheSmsCodeFirstThenPublishesIntoTheFeed —
  *     place_name is the generic label (reverse_geocoding off), not «Laureles»; /me/cases checked, /me/pets not in the slice</li>
@@ -58,7 +58,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *     UploadsTest.petAndProfileSlotsNeedASession covers the refusal</li>
  * </ul>
  * Behaviour that changed after the plan was written, and is asserted as built: the client_id replay comes
- * before the rate limits, and an absent note or contact_phone is validation_failed (null is fine).
+ * before every other check, and an absent note or contact_phone is validation_failed (null is fine).
  * <p>
  * Not in this slice (every other scenario of the mock; the backend has no endpoint for it):
  * <ul>
@@ -223,9 +223,8 @@ class LostParityTest {
     }
 
     @Test
-    void fivePerReporterPerCaseADay() {                                      // (237)
-        for (int i = 0; i < 5; i++) assertThat(sighting(api, "").status()).isEqualTo(201);
-        assertThat(sighting(api, "").errorCode()).isEqualTo("rate_limited");
+    void fiveSightingsInARowAreNotLimited() {                                // (237) override: deferred, decision #54
+        for (int i = 0; i < 6; i++) assertThat(sighting(api, "").status()).isEqualTo(201);
         clock.advance(Duration.ofHours(25));
         assertThat(sighting(api, "").status()).isEqualTo(201);
     }
@@ -244,9 +243,8 @@ class LostParityTest {
         assertThat(sighting(api, ",\"client_id\":\"c0ffee-replay-1\"").str("/id")).isEqualTo(first);
         assertThat(sighting(api, ",\"client_id\":\"c0ffee-replay-2\"").str("/id")).isNotEqualTo(first);
         assertThat(api.get("/cases/{code}", "7K3PQ").json().get("sightings")).hasSize(4);
-        // Changed after the plan: the replay is answered before the rate limits. Fill the limit, then replay.
+        // Changed after the plan: the replay is answered before every other check, so it stays the same sighting later.
         for (int i = 0; i < 3; i++) assertThat(sighting(api, "").status()).isEqualTo(201);
-        assertThat(sighting(api, "").errorCode()).isEqualTo("rate_limited");
         ApiResponse replay = sighting(api, ",\"client_id\":\"c0ffee-replay-1\"");
         assertThat(replay.status()).isEqualTo(201);
         assertThat(replay.str("/id")).isEqualTo(first);

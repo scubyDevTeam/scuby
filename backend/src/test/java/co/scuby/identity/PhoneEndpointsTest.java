@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
+import java.time.Instant;
 
 import static co.scuby.db.generated.Tables.CODE_SEND;
 import static co.scuby.db.generated.Tables.PERSON;
@@ -35,6 +36,7 @@ class PhoneEndpointsTest {
     @Autowired GoogleTestKeys keys;
     @Autowired MutableClock clock;
     @Autowired DSLContext db;
+    @Autowired org.springframework.beans.factory.ObjectProvider<co.scuby.platform.cache.ClearableCache> caches;
 
     ApiClient api;
 
@@ -67,6 +69,13 @@ class PhoneEndpointsTest {
         assertThat(profile.json().at("/notification_prefs/lost").asBoolean()).isTrue();
         assertThat(profile.isNull("/photo_url")).isTrue();
         assertThat(api.get("/session").str("/phone")).isEqualTo(PHONE);
+    }
+
+    /** Pins the ceiling in StatementCeilings: session lookup, supported_countries, person lock, number lock, otp select, send count, otp upsert, send-log insert. */
+    @Test
+    void aSendOnASessionCacheMissIsExactlyEightStatements() {
+        caches.orderedStream().filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags)).forEach(co.scuby.platform.cache.ClearableCache::clear);
+        assertThat(startChange(api, PHONE).statements()).hasSize(8);
     }
 
     @Test
@@ -122,42 +131,45 @@ class PhoneEndpointsTest {
     }
 
     @Test
-    void fourSendsPerNumberPerDayThenRateLimited() {
-        for (int i = 0; i < 4; i++) {
+    void fiveSendsPerNumberInARollingDayThenRateLimited() {
+        for (int i = 0; i < 5; i++) {
             assertThat(startChange(api, PHONE).status()).isEqualTo(204);
             clock.advance(Duration.ofSeconds(61));
         }
+        assertThat(sms.sent()).hasSize(5);
         assertThat(startChange(api, PHONE).errorCode()).isEqualTo("rate_limited");
-        clock.advance(Duration.ofHours(24));
+        // The first send was at START; the window is rolling, so it is still full a minute before 24 h have passed...
+        clock.set(MutableClock.START.plus(Duration.ofHours(24)).minusSeconds(60));
+        assertThat(startChange(api, PHONE).errorCode()).isEqualTo("rate_limited");
+        // ...and frees one place as soon as the first send is older than 24 h.
+        clock.set(MutableClock.START.plus(Duration.ofHours(24)).plusSeconds(1));
         assertThat(startChange(api, PHONE).status()).isEqualTo(204);
+        assertThat(sms.sent()).hasSize(6);
     }
 
     @Test
-    void oneDeviceIsThrottledAcrossNumbersAndAccounts() {
-        // Two accounts on one browser profile (one device cookie): 5 numbers each, then the cap answers both.
-        startChange(api, "+573001000100");   // sets the device cookie
-        ApiClient second = clients.newBrowser();
-        accounts.signIn(second, "second@correo.co");
-        second.setCookie("device", api.cookie("device").orElseThrow());
-        for (int i = 1; i < 5; i++) assertThat(startChange(api, "+57300100%04d".formatted(100 + i)).status()).isEqualTo(204);
-        for (int i = 5; i < 10; i++) assertThat(startChange(second, "+57300100%04d".formatted(100 + i)).status()).isEqualTo(204);
-        assertThat(startChange(api, "+573001000200").errorCode()).isEqualTo("rate_limited");
-        assertThat(startChange(second, "+573001000201").errorCode()).isEqualTo("rate_limited");
-        assertThat(db.fetchCount(CODE_SEND)).isEqualTo(10);
-    }
-
-    @Test
-    void oneAccountIsCappedAtTenSendsADayWhateverTheDevice() {
-        for (int i = 0; i < 10; i++) {
-            ApiClient device = clients.newBrowser();   // a fresh device each time: only the account cap can bite
-            device.setCookie("__Host-session", api.cookie("__Host-session").orElseThrow());
-            assertThat(startChange(device, "+57300110%04d".formatted(i)).status()).isEqualTo(204);
+    void theDayIsRollingNotTheCalendarDay() {
+        // Five sends just before UTC midnight; a calendar-day counter would reset at 00:00.
+        clock.set(Instant.parse("2026-10-14T23:50:00Z"));
+        for (int i = 0; i < 5; i++) {
+            startChange(api, PHONE);
+            clock.advance(Duration.ofSeconds(61));
         }
-        ApiClient another = clients.newBrowser();
-        another.setCookie("__Host-session", api.cookie("__Host-session").orElseThrow());
-        assertThat(startChange(another, "+573001109999").errorCode()).isEqualTo("rate_limited");
-        clock.advance(Duration.ofHours(24).plusSeconds(1));   // rolling 24 h
-        assertThat(startChange(another, "+573001109999").status()).isEqualTo(204);
+        clock.set(Instant.parse("2026-10-15T00:30:00Z"));
+        assertThat(startChange(api, PHONE).errorCode()).isEqualTo("rate_limited");
+        assertThat(sms.sent()).hasSize(5);
+    }
+
+    @Test
+    void thereIsNoCapPerDeviceAccountOrIpOnlyPerNumber() {
+        // One account, one device, one IP: twelve different numbers are all sent (the only caps are per number and the cooldown).
+        for (int i = 0; i < 12; i++) assertThat(startChange(api, "+57300100%04d".formatted(100 + i)).status()).isEqualTo(204);
+        assertThat(sms.sent()).hasSize(12);
+        for (int i = 0; i < 12; i++) {
+            ApiClient other = clients.newBrowser().from("198.51.100.99");
+            accounts.signIn(other, "p" + i + "@correo.co");
+            assertThat(startChange(other, "+57300101%04d".formatted(i)).status()).isEqualTo(204);
+        }
     }
 
     @Test
@@ -170,6 +182,8 @@ class PhoneEndpointsTest {
             clock.advance(Duration.ofSeconds(61));
         }
         assertThat(sms.sent()).hasSize(4);
+        assertThat(startChange(api, PHONE).status()).isEqualTo(204);   // the fifth send, by whichever account
+        clock.advance(Duration.ofSeconds(61));
         assertThat(startChange(api, PHONE).errorCode()).isEqualTo("rate_limited");
         assertThat(startChange(other, PHONE).errorCode()).isEqualTo("rate_limited");
     }
@@ -201,25 +215,6 @@ class PhoneEndpointsTest {
     }
 
     @Test
-    void aCappedDeviceGetsRateLimitedEvenForANumberInCooldown() {
-        // No enumeration oracle: the device cap answers before the cooldown does.
-        for (int i = 0; i < 10; i++) startChange(api, "+57300000%04d".formatted(100 + i));
-        assertThat(startChange(api, "+573000000100").errorCode()).isEqualTo("rate_limited");
-    }
-
-    @Test
-    void oneIpIsThrottledAcrossDevices() {
-        for (int i = 0; i < 20; i++) {
-            ApiClient other = clients.newBrowser().from("198.51.100.99");
-            accounts.signIn(other, "p" + i + "@correo.co");
-            assertThat(startChange(other, "+57300100%04d".formatted(i)).status()).isEqualTo(204);
-        }
-        ApiClient last = clients.newBrowser().from("198.51.100.99");
-        accounts.signIn(last, "last@correo.co");
-        assertThat(startChange(last, "+573001009999").errorCode()).isEqualTo("rate_limited");
-    }
-
-    @Test
     void aTestNumberUsesTheFixedCodeAndSendsNothing() {
         startChange(api, "+573000000001");
         assertThat(sms.sent()).isEmpty();
@@ -235,12 +230,6 @@ class PhoneEndpointsTest {
         }
         assertThat(sms.sent()).isEmpty();
         assertThat(db.fetchCount(CODE_SEND)).isZero();
-    }
-
-    @Test
-    void aTestNumberIsNotCountedAgainstTheDeviceCap() {
-        for (int i = 0; i < 15; i++) startChange(api, "+573000000003");
-        assertThat(startChange(api, PHONE).status()).isEqualTo(204);
     }
 
     @Test

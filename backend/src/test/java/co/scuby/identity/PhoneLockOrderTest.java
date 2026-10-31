@@ -48,7 +48,7 @@ class PhoneLockOrderTest {
     @Test
     void aPhoneVerifyRacingAReclaimNeitherDeadlocksNorKeepsTheNumber() throws Exception {
         UUID ana = accounts.person("ana@correo.co");
-        tx.executeWithoutResult(s -> phoneOtp.send(ana, PHONE, new Caller(ana, "d".repeat(64), "i".repeat(64))));
+        tx.executeWithoutResult(s -> phoneOtp.send(ana, PHONE, new Caller(ana, "d".repeat(64))));
         String code = sms.lastCodeFor(PHONE);
 
         var pool = Executors.newFixedThreadPool(2);

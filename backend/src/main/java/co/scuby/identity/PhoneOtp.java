@@ -61,10 +61,9 @@ class PhoneOtp {
     }
 
     /**
-     * Sends a code to a number already validated by PhoneNumbers. The device and IP caps are checked first, for
-     * every number (a capped caller learns nothing about any number's cooldown or count). Inside the cooldown:
-     * no resend. A test number skips the cooldown and the throttles, sends nothing, writes no send record and
-     * always gets the fixed code.
+     * Sends a code to a number already validated by PhoneNumbers (a mobile of a supported country). Inside the
+     * 60 s cooldown: no resend, answered as sent. At most 5 sends per number in a rolling 24 h, from any account.
+     * A test number skips the cooldown and the cap, sends nothing, writes no send record and always gets the fixed code.
      */
     @Transactional
     public Sent send(UUID personId, String phone, Caller caller) {
@@ -86,29 +85,21 @@ class PhoneOtp {
             write(personId, phone, bypass.code(), now);
             return Sent.SENT;
         }
-        // Caps are counted from rows other transactions may be about to insert, so each cap's counter is
-        // serialised: IP, then device, then number, always in that order (no deadlock). Without the first two,
-        // a parallel burst across different numbers all read the same count and overshoots the IP/device cap.
-        // Nothing to row-lock for the number while no row exists yet, hence the advisory lock.
-        lock("sms_ip:" + caller.ipHash());
-        lock("sms_dev:" + caller.deviceHash());
+        // The cap is counted from rows other transactions may be about to insert, so the number's counter is
+        // serialised. Nothing to row-lock for the number while no row exists yet, hence the advisory lock.
         lock("phone_otp:" + phone);
-        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.sms, phone, personId, caller.deviceHash(), caller.ipHash());
-        if (counts.device() >= limits.maxPerDevice() || counts.ip() >= limits.maxPerIp()
-                || counts.account() >= limits.maxPerAccount()) {
-            throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes sent");
-        }
         PhoneOtpRecord pending = db.selectFrom(PHONE_OTP)
                                    .where(PHONE_OTP.PERSON_ID.eq(personId), PHONE_OTP.PHONE.eq(phone))
                                    .fetchOne();
         if (pending != null && pending.getSentAt().toInstant().plus(COOLDOWN).isAfter(now)) return Sent.COOLDOWN;
+        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.sms, phone);
         if (counts.target() >= limits.maxPerNumber()) {
             throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes sent");
         }
 
         String code = Hashing.randomDigits(6);
         write(personId, phone, code, now);
-        sends.record(CodeSends.Channel.sms, phone, personId, caller.deviceHash(), caller.ipHash());
+        sends.record(CodeSends.Channel.sms, phone, personId, caller.deviceHash());
         if (counts.all() + 1 > limits.alarmDailySends()) {
             log.warn("sms.daily_send_alarm sends_24h={} threshold={}", counts.all() + 1, limits.alarmDailySends());
         }

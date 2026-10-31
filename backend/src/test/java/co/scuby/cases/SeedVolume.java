@@ -24,11 +24,11 @@ final class SeedVolume {
                 FROM generate_series(1, ?) g""", cases);
         db.execute("""
                 INSERT INTO scuby.sighting (id, case_code, lat, lng, seen_at, created_at, reporter_person_id,
-                  reporter_device_hash, reporter_ip_hash, status)
+                  reporter_device_hash, status)
                 SELECT gen_random_uuid(), 'C' || upper(lpad(to_hex(1 + g % ?), 4, '0')), 6.25, -75.59,
                   timestamptz '2026-01-01' + g * interval '5 minutes', timestamptz '2026-01-01' + g * interval '5 minutes',
                   CASE WHEN g % 4 = 0 THEN '00000000-0000-0000-0000-000000000001'::uuid END,
-                  md5((g % 3000)::text) || md5('d'), md5((g % 700)::text) || md5('i'),
+                  md5((g % 3000)::text) || md5('d'),
                   CASE WHEN g % 10 = 0 THEN 'hidden_by_owner' ELSE 'visible' END
                 FROM generate_series(1, ?) g""", cases, sightings);
         db.execute("ANALYZE scuby.lost_case");

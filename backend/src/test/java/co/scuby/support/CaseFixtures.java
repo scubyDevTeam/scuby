@@ -74,7 +74,7 @@ public final class CaseFixtures {
           .set(SIGHTING.LAT, at.lat()).set(SIGHTING.LNG, at.lng())
           .set(SIGHTING.SEEN_AT, seenAt.atOffset(ZoneOffset.UTC)).set(SIGHTING.CREATED_AT, createdAt.atOffset(ZoneOffset.UTC))
           .set(SIGHTING.REPORTER_PERSON_ID, reporterPerson).set(SIGHTING.REPORTER_DEVICE_HASH, reporterDeviceHash)
-          .set(SIGHTING.REPORTER_IP_HASH, "f".repeat(64)).set(SIGHTING.CONTACT_PHONE, contactPhone)
+          .set(SIGHTING.CONTACT_PHONE, contactPhone)
           .set(SIGHTING.STATUS, status)
           .execute();
         return id;

@@ -13,7 +13,7 @@ class LocalMediaStoreTest {
     void refusesAnythingButALowercaseSha256() throws Exception {
         var dir = Files.createTempDirectory("scuby-local-media-test");
         var store = new LocalMediaStore(new MediaProperties("local", "http://localhost/dev-media", dir.toString(), null, null,
-                Duration.ofMinutes(5), 20, 60, Duration.ofHours(24)));
+                Duration.ofMinutes(5), Duration.ofHours(24)));
         assertThatThrownBy(() -> store.isStored("../../etc/passwd")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> store.store("../x", new byte[1])).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> store.read("A".repeat(64))).isInstanceOf(IllegalArgumentException.class);

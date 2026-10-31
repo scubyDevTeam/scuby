@@ -1,7 +1,7 @@
 -- «Lo vi» sightings on a lost case (docs/product/04-lost-workflow.md · Sightings, Validation).
 -- Written only by the cases feature. Visible at once; the owner may hide (status) or highlight.
--- Reporter = reporter_person_id when signed in, else the device (reporter_device_hash); the IP is
--- kept only as an HMAC (reporter_ip_hash) for the second rate-limit key. contact_phone is owner-only.
+-- Reporter = reporter_person_id when signed in, else the device (reporter_device_hash): domain data,
+-- read by `mine` and the 15-minute edit window. No IP is stored. contact_phone is owner-only.
 -- (case_code, client_id) is the replay key of an offline retry (docs/eng/api.md · Conventions); its
 -- unique index also serves "a case's sightings" (case_code prefix) — no separate index needed.
 -- No geography column: nothing in the slice reads a sighting's point spatially (the 30 km check
@@ -18,7 +18,6 @@ CREATE TABLE sighting (
   photo_urls            text[] NOT NULL DEFAULT '{}' CHECK (cardinality(photo_urls) <= 3),
   reporter_person_id    uuid REFERENCES person (id) ON DELETE SET NULL,
   reporter_device_hash  text NOT NULL CHECK (reporter_device_hash ~ '^[0-9a-f]{64}$'),
-  reporter_ip_hash      text NOT NULL CHECK (reporter_ip_hash ~ '^[0-9a-f]{64}$'),
   contact_phone         text CHECK (contact_phone ~ '^\+[1-9][0-9]{6,14}$'),
   status                text NOT NULL DEFAULT 'visible' CHECK (status IN ('visible', 'hidden_by_owner', 'removed_by_moderation')),
   highlighted_by_owner  boolean NOT NULL DEFAULT false,

@@ -14,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -120,37 +119,23 @@ class UploadsTest {
     }
 
     @Test
-    void twentySlotsPerCallerPerTenMinutes() {
-        for (int i = 0; i < 20; i++) {
-            assertThat(api.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
-        }
-        assertThat(api.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).errorCode()).isEqualTo("rate_limited");
-        clock.advance(Duration.ofMinutes(10).plusSeconds(1));
-        assertThat(api.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
-    }
-
-    /** Session lookup, the two slot counts in one statement, the upsert: exactly the ceiling, so the ceiling is not padded. */
-    @Test
     void aSlotOnASessionCacheMissIsExactlyThreeStatements() {
         accounts.signIn(api, "ana@correo.co");
         caches.orderedStream().filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags)).forEach(co.scuby.platform.cache.ClearableCache::clear);
-        assertThat(api.post("/uploads", slotBody("pet", Hashing.sha256Hex(photo()), 3)).statements()).hasSize(3);
+        assertThat(api.post("/uploads", slotBody("pet", Hashing.sha256Hex(photo()), 3)).statements()).hasSize(2);
     }
 
     /** A script without cookies is a new device (a new owner key) on every request: only the IP bounds it. */
     @Test
-    void sixtySlotsPerIpPerTenMinutesAcrossCallersWithNoCookies() {
-        for (int i = 0; i < 60; i++) {
+    void thereIsNoCapOnSlots() {
+        // 70 slots from one caller and 70 from one IP of cookie-less scripts: none is refused (abuse by IP is the edge's job).
+        for (int i = 0; i < 70; i++) {
+            assertThat(api.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
+        }
+        for (int i = 0; i < 70; i++) {
             ApiClient fresh = clients.newBrowser().from("198.51.100.7");
             assertThat(fresh.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
         }
-        ApiClient another = clients.newBrowser().from("198.51.100.7");
-        assertThat(another.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).errorCode()).isEqualTo("rate_limited");
-        // another address is unaffected; so is the same address once the window has passed
-        assertThat(clients.newBrowser().from("198.51.100.8").post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status())
-                .isEqualTo(201);
-        clock.advance(Duration.ofMinutes(10).plusSeconds(1));
-        assertThat(another.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
     }
 
     @Test

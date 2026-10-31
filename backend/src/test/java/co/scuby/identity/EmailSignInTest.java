@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
+import java.time.Instant;
 
 import static co.scuby.db.generated.Tables.CODE_SEND;
 import static co.scuby.db.generated.Tables.EMAIL_CODE;
@@ -28,6 +29,8 @@ class EmailSignInTest {
     @Autowired MutableClock clock;
     @Autowired DSLContext db;
     @Autowired EmailCodes codes;
+    @Autowired org.springframework.beans.factory.ObjectProvider<co.scuby.platform.cache.ClearableCache> caches;
+    @Autowired co.scuby.support.Accounts accounts;
 
     ApiClient api;
 
@@ -106,20 +109,57 @@ class EmailSignInTest {
     }
 
     @Test
-    void resendingWaitsSixtySecondsAndStopsAtTenADayButAlwaysAnswers204() {
+    void resendingWaitsSixtySecondsAndStopsAtTenInARollingDayButAlwaysAnswers204() {
         start("ana@correo.co");
         assertThat(start("ana@correo.co").status()).isEqualTo(204);
         assertThat(emails.sent()).hasSize(1);
         for (int i = 0; i < 12; i++) {
             clock.advance(Duration.ofSeconds(61));
-            // A fresh device each time: the device cap (also 10) is checked first and would otherwise answer 429.
-            assertThat(clients.newBrowser().post("/auth/email/start", "{\"email\":\"ana@correo.co\"}").status()).isEqualTo(204);
+            assertThat(start("ana@correo.co").status()).isEqualTo(204);
         }
         assertThat(emails.sent()).hasSize(10);
-        // The next UTC day, and more than 24 h after these sends (so the device's rolling cap is clear too).
-        clock.set(MutableClock.START.plus(Duration.ofDays(1)).plus(Duration.ofHours(1)));
+        // The first send was at START: still inside 24 h a minute early, free one place a second after.
+        clock.set(MutableClock.START.plus(Duration.ofHours(24)).minusSeconds(60));
+        start("ana@correo.co");
+        assertThat(emails.sent()).hasSize(10);
+        clock.set(MutableClock.START.plus(Duration.ofHours(24)).plusSeconds(1));
         start("ana@correo.co");
         assertThat(emails.sent()).hasSize(11);
+    }
+
+    @Test
+    void theDayIsRollingNotTheCalendarDay() {
+        // Ten sends just before UTC midnight; a calendar-day counter would reset at 00:00 and send an eleventh.
+        clock.set(Instant.parse("2026-10-14T23:30:00Z"));
+        for (int i = 0; i < 10; i++) {
+            start("ana@correo.co");
+            clock.advance(Duration.ofSeconds(61));
+        }
+        assertThat(emails.sent()).hasSize(10);
+        clock.set(Instant.parse("2026-10-15T01:00:00Z"));
+        assertThat(start("ana@correo.co").status()).isEqualTo(204);
+        assertThat(emails.sent()).hasSize(10);
+    }
+
+    /** Pins the ceiling in StatementCeilings: advisory lock, row select, send count, upsert, send-log insert (+ the session lookup when signed in). */
+    @Test
+    void aStartIsExactlyFiveStatementsOrSixOnASessionCacheMiss() {
+        assertThat(start("ana@correo.co").statements()).hasSize(5);
+        clock.advance(Duration.ofMinutes(2));
+        accounts.signIn(api, "bea@correo.co");
+        caches.orderedStream().filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags)).forEach(co.scuby.platform.cache.ClearableCache::clear);
+        assertThat(start("ana@correo.co").statements()).hasSize(6);
+    }
+
+    @Test
+    void thereIsNoCapPerDeviceOrIp() {
+        for (int i = 0; i < 25; i++) {
+            ApiResponse r = clients.newBrowser().from("198.51.100.77")
+                    .post("/auth/email/start", "{\"email\":\"q" + i + "@correo.co\"}");
+            assertThat(r.status()).isEqualTo(204);
+        }
+        for (int i = 0; i < 12; i++) assertThat(start("p" + i + "@correo.co").status()).isEqualTo(204);   // one device
+        assertThat(emails.sent()).hasSize(37);
     }
 
     @Test
@@ -147,23 +187,6 @@ class EmailSignInTest {
         ApiClient old = clients.newBrowser();
         old.setCookie("__Host-session", first);
         assertThat(old.get("/session").status()).isEqualTo(401);
-    }
-
-    @Test
-    void oneDeviceIsThrottledAcrossAddresses() {
-        for (int i = 0; i < 10; i++) assertThat(start("p" + i + "@correo.co").status()).isEqualTo(204);
-        assertThat(start("p10@correo.co").errorCode()).isEqualTo("rate_limited");
-    }
-
-    @Test
-    void oneIpIsThrottledAcrossDevices() {
-        for (int i = 0; i < 20; i++) {
-            ApiResponse r = clients.newBrowser().from("198.51.100.77")
-                    .post("/auth/email/start", "{\"email\":\"q" + i + "@correo.co\"}");
-            assertThat(r.status()).isEqualTo(204);
-        }
-        ApiResponse last = clients.newBrowser().from("198.51.100.77").post("/auth/email/start", "{\"email\":\"q20@correo.co\"}");
-        assertThat(last.errorCode()).isEqualTo("rate_limited");
     }
 
     @Test
@@ -234,15 +257,6 @@ class EmailSignInTest {
     }
 
     @Test
-    void aCappedDeviceGetsRateLimitedEvenForAnAddressInCooldown() {
-        // The cap check runs before the cooldown/daily-cap early returns, so the answer is the same for every address.
-        for (int i = 0; i < 10; i++) assertThat(start("p" + i + "@correo.co").status()).isEqualTo(204);
-        assertThat(start("p9@correo.co").errorCode()).isEqualTo("rate_limited");   // in cooldown
-        assertThat(start("p0@correo.co").errorCode()).isEqualTo("rate_limited");
-        assertThat(start("never@correo.co").errorCode()).isEqualTo("rate_limited");
-    }
-
-    @Test
     void anAddressLongerThanTheRfcLimitIsRejectedWithTheField() {
         String longEmail = "a".repeat(250) + "@b.co";   // 255 chars
         ApiResponse r = start(longEmail);
@@ -262,13 +276,12 @@ class EmailSignInTest {
     }
 
     @Test
-    void staleEmailCodesArePurgedButTodaysAndYesterdaysCountersStay() {
+    void onlyExpiredEmailCodesArePurgedSendCountsLiveInTheSendLog() {
         start("old@correo.co");
-        start("recent@correo.co");
-        clock.advance(Duration.ofDays(1));
-        start("today@correo.co");
-        clock.advance(Duration.ofDays(1));   // old/recent are now 2 days back, expired; today@ is 1 day back
-        assertThat(codes.purgeStale()).isEqualTo(2);
-        assertThat(db.select(EMAIL_CODE.EMAIL).from(EMAIL_CODE).fetch(EMAIL_CODE.EMAIL)).containsExactly("today@correo.co");
+        clock.advance(Duration.ofMinutes(10));   // old@ has expired
+        start("live@correo.co");
+        assertThat(codes.purgeStale()).isEqualTo(1);
+        assertThat(db.select(EMAIL_CODE.EMAIL).from(EMAIL_CODE).fetch(EMAIL_CODE.EMAIL)).containsExactly("live@correo.co");
+        assertThat(db.fetchCount(CODE_SEND)).isEqualTo(2);   // the cap's counter is untouched
     }
 }

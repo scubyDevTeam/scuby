@@ -60,7 +60,7 @@ public class PhotoAttachments {
             hashes.add(sha.get());
         }
         // The account's slots, and the device's (a slot taken before sign-in); both keys come from Caller.ownerKey().
-        List<String> owners = List.of(caller.ownerKey(), new Caller(null, caller.deviceHash(), caller.ipHash()).ownerKey());
+        List<String> owners = List.of(caller.ownerKey(), new Caller(null, caller.deviceHash()).ownerKey());
         Set<String> slotted = db.select(UPLOAD.SHA256).from(UPLOAD)
                                 .where(UPLOAD.OWNER_KEY.in(owners))
                                 .and(UPLOAD.SHA256.in(hashes))

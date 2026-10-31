@@ -101,7 +101,7 @@ class PublishStatementsTest {
         System.out.println("STMTS " + counts);
         System.out.println("STMTS-SQL " + worst.statements());
         // Pinned (not just recorded): the highest path is the ceiling in StatementCeilings, with a session-cache miss.
-        assertThat(counts).containsEntry("pet_id, a new number (code sent)", 16);
-        assertThat(counts.values()).allSatisfy(n -> assertThat(n).isBetween(1, 16));
+        assertThat(counts).containsEntry("pet_id, a new number (code sent)", 14);
+        assertThat(counts.values()).allSatisfy(n -> assertThat(n).isBetween(1, 14));
     }
 }

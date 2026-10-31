@@ -141,35 +141,16 @@ class SightingEndpointTest {
         assertThat(report(api, withPhoto).status()).isEqualTo(201);
     }
 
+    /** Rate limits are deferred (decision log): one reporter, one device, one IP can report as often as they like. */
     @Test
-    void fivePerReporterPerCaseADayAndTheAccountIsTheKeyWhenSignedIn() {
-        for (int i = 0; i < 5; i++) assertThat(report(api, "").status()).isEqualTo(201);
-        assertThat(report(api, "").errorCode()).isEqualTo("rate_limited");
-        accounts.signIn(api, "helper@correo.co");                 // same device, now an account: a different reporter
-        assertThat(report(api, "").status()).isEqualTo(201);
-        clock.advance(Duration.ofHours(25));
-        assertThat(report(clients.newBrowser(), "").status()).isEqualTo(201);
-    }
-
-    @Test
-    void twentyPerReporterOverall() {
-        UUID owner = accounts.person("owner2@correo.co");
-        for (int c = 0; c < 4; c++) {
-            String code = cases.lostCase(owner, "R%04d".formatted(c), "P" + c, "dog", CaseFixtures.MEDELLIN, 300, "active", MutableClock.START.minusSeconds(3600));
-            for (int i = 0; i < 5; i++) {
-                assertThat(api.post("/cases/{code}/sightings", body(clock.instant().toString(), ""), code).status()).isEqualTo(201);
-            }
-        }
-        assertThat(report(api, "").errorCode()).isEqualTo("rate_limited");
-    }
-
-    @Test
-    void theIpIsASecondKeyAcrossDevices() {
-        for (int i = 0; i < 20; i++) {
+    void thereAreNoRateLimits() {
+        for (int i = 0; i < 30; i++) assertThat(report(api, "").status()).isEqualTo(201);
+        for (int i = 0; i < 30; i++) {
             assertThat(report(clients.newBrowser().from("198.51.100.20"), "").status()).isEqualTo(201);
         }
-        assertThat(report(clients.newBrowser().from("198.51.100.20"), "").errorCode()).isEqualTo("rate_limited");
-        assertThat(report(clients.newBrowser().from("198.51.100.21"), "").status()).isEqualTo(201);
+        accounts.signIn(api, "helper@correo.co");
+        for (int i = 0; i < 30; i++) assertThat(report(api, "").status()).isEqualTo(201);
+        assertThat(db.fetchCount(SIGHTING)).isEqualTo(90);
     }
 
     @Test
@@ -185,7 +166,7 @@ class SightingEndpointTest {
         caches.orderedStream().filter(c -> c.getClass().getSimpleName().equals("CachingSessionLookup")).forEach(ClearableCache::clear);
         ApiResponse r = api.post("/cases/{code}/sightings", full, "7K3PQ");
         assertThat(r.status()).isEqualTo(201);
-        // session, case, replay, supported_countries, upload lookup, 2 locks, status, 2 counts, insert
-        assertThat(r.statements()).hasSize(11);
+        // session, case, replay, supported_countries, upload lookup, status FOR SHARE, insert
+        assertThat(r.statements()).hasSize(7);
     }
 }

@@ -9,7 +9,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** docs/product/04-lost-workflow.md · Validation, and the design's rate limits. Human review: these tables are the rules. */
+/** docs/product/04-lost-workflow.md · Validation, (the rate limits are deferred: decision log). Human review: these tables are the rules. */
 class SightingRulesDerivationTest {
 
     static final Instant NOW = Instant.parse("2026-10-14T17:00:00Z");
@@ -31,20 +31,5 @@ class SightingRulesDerivationTest {
         Optional<SightingRulesDerivation.Refusal> r = SightingRulesDerivation.check(
                 NOW.plus(Duration.ofMinutes(minutesFromNow)), NOW, LAST_SEEN, distance);
         assertThat(r.map(Enum::name).orElse(null)).isEqualTo(expected);
-    }
-
-    @ParameterizedTest(name = "reporter {0}/{1}, ip {2}/{3} → {4}")
-    @CsvSource({
-            "0,  0,  0,  0,  false",
-            "4,  19, 19, 79, false",
-            "5,  5,  0,  0,  true",     // 5 per reporter per case
-            "0,  20, 0,  0,  true",     // 20 per reporter
-            "0,  0,  20, 20, true",     // 20 per IP per case
-            "0,  0,  0,  80, true",     // 80 per IP
-    })
-    void rateLimits(int onCase, int total, int ipOnCase, int ipTotal, boolean limited) {
-        var limits = new SightingRulesDerivation.Limits(5, 20, 20, 80);
-        assertThat(SightingRulesDerivation.limited(new SightingRulesDerivation.Counts(onCase, total),
-                new SightingRulesDerivation.Counts(ipOnCase, ipTotal), limits)).isEqualTo(limited);
     }
 }

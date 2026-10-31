@@ -36,7 +36,7 @@ class DeviceCookieTest {
     static class Probe {
         @GetMapping("/probe/caller")
         Map<String, Object> caller(Caller caller) {
-            return Map.of("device", caller.deviceHash(), "ip", caller.ipHash(), "signed_in", caller.signedIn());
+            return Map.of("device", caller.deviceHash(), "signed_in", caller.signedIn());
         }
 
         @PostMapping("/probe/caller")
@@ -108,47 +108,6 @@ class DeviceCookieTest {
         String a = clients.newBrowser().raw(HttpMethod.GET, "/probe/caller", null).str("/device");
         String b = clients.newBrowser().raw(HttpMethod.GET, "/probe/caller", null).str("/device");
         assertThat(a).isNotEqualTo(b);
-    }
-
-    @Test
-    void theIpIsTheSocketUnlessTheOriginSecretVouchesForCloudFront() {
-        ApiClient spoofer = clients.newBrowser().from("198.51.100.7").header("CloudFront-Viewer-Address", "192.0.2.1:443");
-        ApiClient direct = clients.newBrowser().from("198.51.100.7");
-        assertThat(spoofer.raw(HttpMethod.GET, "/probe/caller", null).str("/ip"))
-                .isEqualTo(direct.raw(HttpMethod.GET, "/probe/caller", null).str("/ip"));
-        ApiClient viaCloudFront = clients.newBrowser().from("10.0.0.5")
-                .header("X-Origin-Secret", "test-origin-secret")
-                .header("CloudFront-Viewer-Address", "198.51.100.7:51234");
-        assertThat(viaCloudFront.raw(HttpMethod.GET, "/probe/caller", null).str("/ip"))
-                .isEqualTo(direct.raw(HttpMethod.GET, "/probe/caller", null).str("/ip"));
-    }
-
-    private String ipVia(String viewerAddress, String secret) {
-        return clients.newBrowser().from("10.0.0.5")
-                .header("X-Origin-Secret", secret)
-                .header("CloudFront-Viewer-Address", viewerAddress)
-                .raw(HttpMethod.GET, "/probe/caller", null).str("/ip");
-    }
-
-    private String ipOfSocket(String ip) {
-        return clients.newBrowser().from(ip).raw(HttpMethod.GET, "/probe/caller", null).str("/ip");
-    }
-
-    @Test
-    void aCorrectViewerHeaderWithAWrongSecretUsesTheSocketAddress() {
-        String viewed = ipVia("198.51.100.7:51234", "wrong-secret");
-        assertThat(viewed).isEqualTo(ipOfSocket("10.0.0.5")).isNotEqualTo(ipOfSocket("198.51.100.7"));
-    }
-
-    @Test
-    void ipv6ViewerAddressesAreParsedBracketedOrNot() {
-        assertThat(ipVia("[::1]:443", "test-origin-secret")).isEqualTo(ipOfSocket("::1"));
-        assertThat(ipVia("2001:db8::1:443", "test-origin-secret")).isEqualTo(ipOfSocket("2001:db8::1"));
-    }
-
-    @Test
-    void aValidSecretWithoutAParseableViewerAddressFallsBackToTheSocket() {
-        assertThat(ipVia("garbage", "test-origin-secret")).isEqualTo(ipOfSocket("10.0.0.5"));
     }
 
     @Test

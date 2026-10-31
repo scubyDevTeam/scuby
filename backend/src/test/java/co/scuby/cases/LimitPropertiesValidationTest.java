@@ -8,18 +8,17 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** A dropped limit would bind to 0: every «Lo vi» rate_limited, an empty feed. Start-up must fail naming the key instead. */
+/** A dropped feed limit would bind to 0: an empty feed. Start-up must fail naming the key instead. */
 class LimitPropertiesValidationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(ValidationAutoConfiguration.class))
             .withUserConfiguration(Enabled.class);
 
-    @EnableConfigurationProperties({SightingProperties.class, FeedProperties.class})
+    @EnableConfigurationProperties({FeedProperties.class})
     static class Enabled {}
 
     private static final String[] COMPLETE = {
-            "scuby.sightings.per-case=5", "scuby.sightings.per-reporter=20", "scuby.sightings.per-case-per-ip=20", "scuby.sightings.per-ip=80",
             "scuby.feed.near-radius-m=25000", "scuby.feed.max-items=100"};
 
     @Test

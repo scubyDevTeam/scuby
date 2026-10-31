@@ -28,7 +28,6 @@ class ProfileStartupTest {
     static final Map<String, Map<String, String>> REQUIRED = Map.of(
             "staging", Map.of(
                     "scuby.web.allowed-origins", "https://staging.scuby.test",
-                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
                     "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef",
                     "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com",
                     "scuby.media.bucket", "dummy-media-bucket",
@@ -37,7 +36,6 @@ class ProfileStartupTest {
             "prod", Map.of(
                     "scuby.web.allowed-origins", "https://scuby.test",
                     "scuby.web.origin-secret", "dummy-origin-secret",
-                    "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
                     "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef",
                     "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com",
                     "scuby.media.bucket", "dummy-media-bucket",
@@ -103,26 +101,6 @@ class ProfileStartupTest {
         StringBuilder chain = new StringBuilder();
         for (Throwable t = failure; t != null; t = t.getCause()) chain.append(t.getMessage()).append('\n');
         assertThat(chain.toString()).contains(key);
-    }
-
-    static Stream<Arguments> unusableIpHashKeys() {
-        return Stream.of("staging", "prod").flatMap(profile -> Stream.of(
-                Arguments.of(profile, ""),
-                Arguments.of(profile, "   "),
-                Arguments.of(profile, "too-short-key-31-characters-xx"),
-                Arguments.of(profile, "local-only-ip-hash-key")));
-    }
-
-    @ParameterizedTest(name = "{0} with ip-hash-key \"{1}\"")
-    @MethodSource("unusableIpHashKeys")
-    void refusesABlankShortOrDefaultIpHashKey(String profile, String key) {
-        Map<String, String> props = new LinkedHashMap<>(REQUIRED.get(profile));
-        props.put("scuby.web.ip-hash-key", key);
-        Throwable failure = catchThrowable(() -> start(profile, props).close());
-        assertThat(failure).as("%s started with ip-hash-key '%s'", profile, key).isNotNull();
-        StringBuilder chain = new StringBuilder();
-        for (Throwable t = failure; t != null; t = t.getCause()) chain.append(t.getMessage()).append('\n');
-        assertThat(chain.toString()).contains("scuby.web.ip-hash-key");
     }
 
     static Stream<Arguments> unusableCodeHashKeys() {

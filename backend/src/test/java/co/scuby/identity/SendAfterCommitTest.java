@@ -49,7 +49,7 @@ class SendAfterCommitTest {
     @Autowired GoogleTestKeys keys;
     @Autowired MutableClock clock;
 
-    final Caller caller = new Caller(null, "d".repeat(64), "i".repeat(64));
+    final Caller caller = new Caller(null, "d".repeat(64));
 
     @BeforeEach
     void setUp() {

@@ -41,7 +41,7 @@ class PublisherPhoneTest {
     void setUp() {
         testDb.reset();
         ana = accounts.person("ana.gomez@correo.co");
-        caller = new Caller(ana, "d".repeat(64), "i".repeat(64));
+        caller = new Caller(ana, "d".repeat(64));
     }
 
     /** What the publish does: reserve any code attempt first (no transaction), then resolve inside its transaction. */
@@ -155,7 +155,7 @@ class PublisherPhoneTest {
     @Test
     void aPreparedPhoneStepCannotBeResolvedForAnotherCaller() {
         PublisherPhone.Prepared prepared = publisherPhone.prepare(ana, PHONE, null);
-        Caller someoneElse = new Caller(UUID.randomUUID(), "d".repeat(64), "i".repeat(64));
+        Caller someoneElse = new Caller(UUID.randomUUID(), "d".repeat(64));
         assertThatThrownBy(() -> tx.execute(s -> publisherPhone.resolve(prepared, someoneElse)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(sms.sent()).isEmpty();

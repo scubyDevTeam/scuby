@@ -11,18 +11,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * «Lo vi». The checks read and call S3 (photos) outside any transaction; only the rate-limit decision
- * and the insert run in one, behind two advisory locks (reporter, then IP — always that order, so
- * two requests can never wait on each other in a cycle). Without the locks, parallel requests from
- * one reporter would each count fewer than the limit and all insert (READ COMMITTED). The case status is
- * read once outside (for the cheap refusals) and again inside, FOR SHARE, so a sighting never lands on a
- * case closed or purged in between.
+ * «Lo vi». The checks read and call S3 (photos) outside any transaction; only the insert runs in one. The case
+ * status is read once outside (for the cheap refusals) and again inside, FOR SHARE, so a sighting never lands on a
+ * case closed or purged in between. There are no rate limits here: they are deferred until real patterns are
+ * seen (docs/product/00-product-map.md, decision log; docs/open-items.md).
  */
 @Service
 class SightingService {
@@ -30,16 +27,14 @@ class SightingService {
     private final SightingQueries queries;
     private final PhoneNumbers phones;
     private final PhotoAttachments photos;
-    private final SightingProperties properties;
     private final Clock clock;
     private final TransactionTemplate tx;
 
     SightingService(SightingQueries queries, PhoneNumbers phones, PhotoAttachments photos,
-                    SightingProperties properties, Clock clock, TransactionTemplate tx) {
+                    Clock clock, TransactionTemplate tx) {
         this.queries = queries;
         this.phones = phones;
         this.photos = photos;
-        this.properties = properties;
         this.clock = clock;
         this.tx = tx;
     }
@@ -63,21 +58,9 @@ class SightingService {
         photos.requireAttachable(request.photos(), UploadPurpose.sighting, caller, "photo_urls");
 
         return tx.execute(status -> {
-            queries.lockReporterThenIp(caller);   // serialises this reporter's and this IP's count-then-insert
             // The case may have closed or been purged since the read above: look again under a share lock.
             String current = queries.statusForShare(code).orElseThrow(SightingService::notFound);
             if (!"active".equals(current)) throw new ApiException(ErrorCode.INVALID_TRANSITION, "the case is not active");
-            Instant since = now.minus(Duration.ofHours(24));
-            var reporter = queries.reporterCountsQuery(caller, code, since).fetchOne();
-            var ip = queries.ipCountsQuery(caller.ipHash(), code, since).fetchOne();
-            if (SightingRulesDerivation.limited(new SightingRulesDerivation.Counts(reporter.value1(), reporter.value2()),
-                    new SightingRulesDerivation.Counts(ip.value1(), ip.value2()), properties.limits())) {
-                // A retry that queued behind its own original finds the limit reached by that very row: a replay
-                // comes before any rate limit (docs/eng/api.md · Replays).
-                Optional<UUID> original = request.clientId() == null ? Optional.empty() : queries.replay(code, request.clientId());
-                if (original.isPresent()) return original.get();
-                throw new ApiException(ErrorCode.RATE_LIMITED, "too many sightings");
-            }
             return queries.insert(code, point, seenAt, now, request.note(), request.photos(), caller, contact, request.clientId());
         });
     }

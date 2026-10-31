@@ -32,16 +32,16 @@ INSERT INTO scuby.lost_case (code, pet_id, created_by, status, published_at, res
    '+573000000003', true, true, true, false, false, 6.24829, -75.59431, 300, now() - interval '10 days', 'Laureles');
 
 INSERT INTO scuby.sighting (id, case_code, lat, lng, seen_at, created_at, note, reporter_person_id, reporter_device_hash,
-  reporter_ip_hash, contact_phone, status) VALUES
+  contact_phone, status) VALUES
   -- fixtures.ts:669-672 (s1: offset(-90, -80), 46 h ago)
   (gen_random_uuid(), '7K3PQ', 6.24389, -75.59232, now() - interval '46 hours', now() - interval '46 hours', 'Corría asustada por la 70',
-   NULL, repeat('a', 64), repeat('f', 64), NULL, 'visible'),
+   NULL, repeat('a', 64), NULL, 'visible'),
   -- fixtures.ts:674-677 (s2: offset(60, 240), 17 h ago)
   (gen_random_uuid(), '7K3PQ', 6.24524, -75.58943, now() - interval '17 hours', now() - interval '17 hours', NULL,
-   NULL, repeat('b', 64), repeat('f', 64), '+573156677889', 'visible'),
+   NULL, repeat('b', 64), '+573156677889', 'visible'),
   -- fixtures.ts:679-685 (s3: offset(260, 310), 2 h ago, by Andrés; its mock photo is not seeded)
   (gen_random_uuid(), '7K3PQ', 6.24704, -75.58880, now() - interval '2 hours', now() - interval '2 hours', 'Iba hacia el parque, con collar rojo',
-   '00000000-0000-0000-0000-00000000ca03', repeat('c', 64), repeat('f', 64), '+573000000001', 'visible');
+   '00000000-0000-0000-0000-00000000ca03', repeat('c', 64), '+573000000001', 'visible');
 
 -- fixtures.ts:666
 INSERT INTO scuby.purged_case_code (code, purged_at) VALUES ('GONE5', now() - interval '40 days');

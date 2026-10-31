@@ -33,22 +33,13 @@ scuby:
     allowed-origins: []
     origin-secret-header: X-Origin-Secret
     origin-secret: ""
-    ip-hash-key: local-only-ip-hash-key
   cookies:
     secure: true
   flags:
     cache-ttl: 30s
   sms:
-    max-per-number: 4
-    max-per-device: 10
-    max-per-ip: 20
-    max-per-account: 10
+    max-per-number: 5
     alarm-daily-sends: 50
-  sightings:
-    per-case: 5
-    per-reporter: 20
-    per-case-per-ip: 20
-    per-ip: 80
   feed:
     near-radius-m: 25000
     max-items: 100
@@ -58,8 +49,6 @@ scuby:
     lifetime-months: 12
   auth:
     code-hash-key: local-only-code-hash-key
-    email-max-per-device: 10
-    email-max-per-ip: 20
     test-bypass:
       email-domains: []
       sms-prefixes: []
@@ -76,7 +65,4 @@ scuby:
     bucket: ""
     region: ""
     slot-ttl: 5m
-    max-slots-per10-min: 20
-    # Per client IP across all callers (a script without cookies is a new device on every request).
-    max-slots-per-ip10-min: 60
     attach-window: 24h

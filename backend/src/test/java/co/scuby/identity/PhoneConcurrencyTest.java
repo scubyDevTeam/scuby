@@ -97,15 +97,16 @@ class PhoneConcurrencyTest {
                 .isEqualTo("invalid_code");
     }
 
+    /** Thirty accounts ask for a code for one number at once: only the advisory lock keeps the count at the cap of 5. */
     @Test
-    void aParallelBurstOfSendsToDifferentNumbersStopsAtTheIpCap() throws Exception {
+    void aParallelBurstOfSendsToOneNumberStopsAtTheNumberCap() throws Exception {
         List<ApiResponse> answers = burst(30, i -> () -> {
-            ApiClient c = clients.newBrowser().from("198.51.100.77");
+            ApiClient c = clients.newBrowser();
             accounts.signIn(c, "p" + i + "@correo.co");
-            return c.post("/me/phone", "{\"phone\":\"" + "+57300120%04d".formatted(i) + "\"}");
+            return c.post("/me/phone", "{\"phone\":\"" + PHONE + "\"}");
         });
-        assertThat(answers).filteredOn(r -> r.status() == 204).hasSize(20);
-        assertThat(answers).filteredOn(r -> r.status() == 429).hasSize(10);
-        assertThat(db.fetchCount(CODE_SEND)).isEqualTo(20);
+        assertThat(answers).filteredOn(r -> r.status() == 204).hasSize(5);
+        assertThat(answers).filteredOn(r -> r.status() == 429).hasSize(25);
+        assertThat(db.fetchCount(CODE_SEND)).isEqualTo(5);
     }
 }
