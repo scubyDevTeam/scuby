@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 project="$(bash compose-project.sh)" || { echo "run-local.sh: cannot determine the compose project name" >&2; exit 1; }
 [[ -n "$project" ]] || { echo "run-local.sh: empty compose project name" >&2; exit 1; }
 export COMPOSE_PROJECT_NAME="$project"
-export SCUBY_IMAGE_TAG="${COMPOSE_PROJECT_NAME#scuby-backend-}"
+export SCUBY_IMAGE_TAG="${COMPOSE_PROJECT_NAME#scuby-backend-}" # build.sh tags the image with it
 export SCUBY_DB_PORT="${SCUBY_DB_PORT:-5433}"
 export SCUBY_API_PORT="${SCUBY_API_PORT:-8080}"
 
@@ -32,23 +32,8 @@ check_port() { # <host port> <service> <container port>
 check_port "$SCUBY_DB_PORT" postgres 5432
 check_port "$SCUBY_API_PORT" backend 8080
 
-# Java 25 (backend/.java-version); the Maven enforcer refuses any other JDK.
-export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home}"
-export PATH="$JAVA_HOME/bin:$PATH"
-
-# The build needs Docker (jOOQ codegen) and the image scuby/postgres:17.
-docker image inspect scuby/postgres:17 >/dev/null 2>&1 || docker build -t scuby/postgres:17 ../infra/docker/postgres
-
-# Build for the Docker host's architecture (the pom lists arm64 and amd64; dockerBuild needs one).
-arch="$(docker info --format '{{.Architecture}}')"
-case "$arch" in
-  aarch64|arm64) platform=linux/arm64 ;;
-  x86_64|amd64)  platform=linux/amd64 ;;
-  *) echo "run-local.sh: unsupported Docker architecture '$arch'" >&2; exit 1 ;;
-esac
-echo "Platform: $platform"
-
-./mvnw -q -DskipTests package jib:dockerBuild -Djib.from.platforms="$platform" -Djib.to.image="scuby-backend:${SCUBY_IMAGE_TAG}"
+# Build (Maven in a container, then the runtime image): only Docker is needed on the host.
+bash build.sh
 docker compose --profile app up -d --wait
 
 health="http://localhost:${SCUBY_API_PORT}/actuator/health"

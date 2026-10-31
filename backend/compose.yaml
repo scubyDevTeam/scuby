@@ -2,8 +2,8 @@
 # Always run compose with this checkout's project name (bash compose-project.sh) — run-local.sh does —
 # so worktrees never share containers, volumes or ports.
 # `docker compose up -d` starts only Postgres (tests, jOOQ codegen, the API run from Maven).
-# `docker compose --profile app up -d --wait` also starts the API from the Jib image
-# `scuby-backend:${SCUBY_IMAGE_TAG}` (backend/run-local.sh builds it first).
+# `docker compose --profile app up -d --wait` also starts the API from the image
+# `scuby-backend:${SCUBY_IMAGE_TAG}` (backend/build.sh builds it; compose has no `build:` on purpose, the jar must exist first).
 services:
   postgres:
     build: ../infra/docker/postgres

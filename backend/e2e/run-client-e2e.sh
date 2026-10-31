@@ -35,17 +35,8 @@ for port in "$SCUBY_DB_PORT" "$SCUBY_API_PORT" 4173; do
 done
 
 cd "$backend"
-export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home}"
-export PATH="$JAVA_HOME/bin:$PATH"
-docker image inspect scuby/postgres:17 >/dev/null 2>&1 || docker build -t scuby/postgres:17 ../infra/docker/postgres
-# Build for the Docker host's architecture (the pom lists arm64 and amd64; dockerBuild needs one).
-arch="$(docker info --format '{{.Architecture}}')"
-case "$arch" in
-  aarch64|arm64) platform=linux/arm64 ;;
-  x86_64|amd64)  platform=linux/amd64 ;;
-  *) echo "run-client-e2e.sh: unsupported Docker architecture '$arch'" >&2; exit 1 ;;
-esac
-./mvnw -q -DskipTests package jib:dockerBuild -Djib.from.platforms="$platform" -Djib.to.image="scuby-backend:$SCUBY_IMAGE_TAG"
+# Maven runs in a container (build.sh), so the host needs only Docker; it tags scuby-backend:$SCUBY_IMAGE_TAG.
+bash ./build.sh
 "${compose[@]}" --profile app up -d --wait
 for _ in $(seq 1 90); do curl -sf --max-time 2 "http://localhost:$SCUBY_API_PORT/actuator/health" >/dev/null && break; sleep 1; done
 curl -sf --max-time 2 "http://localhost:$SCUBY_API_PORT/actuator/health" >/dev/null || { echo "run-client-e2e.sh: the API did not become healthy on port $SCUBY_API_PORT" >&2; exit 1; }
