@@ -45,6 +45,8 @@ class GoogleSignIn {
      * </ul>
      * No row locks: the link is a conditional UPDATE (`google_sub IS NULL`), and People.create keeps the row a
      * concurrent sign-in inserted for the same email.
+     * People.createIfNew does the opposite on purpose: on a conflict it never returns a row inserted concurrently
+     * by email, only the row already carrying this sub and email, so Google never links into another account.
      *
      * @param sessionPersonId the account of the session the browser carries, if any
      */

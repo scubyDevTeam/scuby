@@ -38,8 +38,9 @@ class EmailSignIn {
 
     /**
      * A wrong code throws invalid_code, but the spent attempt is committed (noRollbackFor). The account and its
-     * new session are one transaction. Google never reaches this row on its own for a non-authoritative address,
-     * so proving the mailbox here needs no reclaim logic: the code just signs in (and creates the account).
+     * new session are one transaction. Google can create the account for a non-authoritative address that has none
+     * (decision #70), so this may sign in to an account Google created first. There is no reclaim logic: the code
+     * just signs in (and creates the account when none exists). See open item O33 for the pre-hijack risk.
      */
     @Transactional(noRollbackFor = ApiException.class)
     public SignedIn verify(String email, String code, Optional<String> carriedTokenHash) {
