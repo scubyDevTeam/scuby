@@ -186,22 +186,27 @@ class ProfileStartupTest {
             props.put("scuby.media.local-dir", "target/deployed-must-not-use-this");
             Throwable failure = catchThrowable(() -> start(profile, props).close());
             assertThat(failure).as("%s started with the local media store", profile).isNotNull();
-            assertThat(chainOf(failure)).contains("scuby.media.store=");
+            assertThat(chainOf(failure)).contains("scuby.media.store=local").contains("not allowed in a deployed profile")
+                    .doesNotContain("required outside");
         }
     }
 
     /** A blank store must fail naming the key, not die on a missing MediaStore bean. */
     @org.junit.jupiter.api.Test
     void aBlankMediaStoreIsRefusedByName() {
-        assertRefusedWith("staging", "scuby.media.store", "");
+        assertRefusedWith("staging", "scuby.media.store", "", "must be local or s3");
     }
 
     private static void assertRefusedWith(String profile, String key, String value) {
+        assertRefusedWith(profile, key, value, key);
+    }
+
+    private static void assertRefusedWith(String profile, String key, String value, String message) {
         Map<String, String> props = new LinkedHashMap<>(REQUIRED.get(profile));
         props.put(key, value);
         Throwable failure = catchThrowable(() -> start(profile, props).close());
         assertThat(failure).as("%s started with %s '%s'", profile, key, value).isNotNull();
-        assertThat(chainOf(failure)).contains(key);
+        assertThat(chainOf(failure)).contains(key).contains(message);
     }
 
     private static String chainOf(Throwable failure) {

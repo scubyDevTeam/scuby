@@ -48,6 +48,7 @@ esac
 ./mvnw -q -DskipTests package jib:dockerBuild -Djib.from.platforms="$platform" -Djib.to.image="scuby-backend:$SCUBY_IMAGE_TAG"
 "${compose[@]}" --profile app up -d --wait
 for _ in $(seq 1 90); do curl -sf --max-time 2 "http://localhost:$SCUBY_API_PORT/actuator/health" >/dev/null && break; sleep 1; done
+curl -sf --max-time 2 "http://localhost:$SCUBY_API_PORT/actuator/health" >/dev/null || { echo "run-client-e2e.sh: the API did not become healthy on port $SCUBY_API_PORT" >&2; exit 1; }
 "${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U scuby -d scuby < "$here/seed.sql"
 
 cd "$web"

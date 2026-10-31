@@ -128,7 +128,9 @@ class PhotoAttachmentsTest {
         UUID ana = accounts.signIn(api, "ana@correo.co");
         var up = upload("pet", true);
         UUID luis = accounts.person("luis@correo.co");
-        Caller otherAccount = new Caller(luis, "f".repeat(64), "i".repeat(64));
+        // Luis signs in on the SAME browser (device) that took Ana's slot, so only the account keeps the slot out of reach.
+        Caller otherAccount = callerOf(api, luis);
+        assertThat(otherAccount.deviceHash()).isEqualTo(callerOf(api, ana).deviceHash());
         assertThatThrownBy(() -> attachments.requireAttachable(List.of(up.getKey()), UploadPurpose.pet, otherAccount, "photo_urls"))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(reasonOf(e)).contains("photo_urls"));
         assertThat(ana).isNotEqualTo(luis);

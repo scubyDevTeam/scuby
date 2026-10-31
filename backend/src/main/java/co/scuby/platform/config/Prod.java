@@ -30,6 +30,14 @@ public final class Prod {
         }
     }
 
+    /** A setting no deployed environment may have; `what` names it (the message says it is refused, not required). */
+    public static void refuseDeployed(Environment env, String what) {
+        boolean relaxed = env.matchesProfiles("local | test") && !env.matchesProfiles("prod | staging");
+        if (!relaxed) {
+            throw new IllegalStateException("Refusing to start: " + what + " is not allowed in a deployed profile (anything but local and test)");
+        }
+    }
+
     public static void warnDeployed(Environment env, boolean suspicious, String what) {
         if (suspicious && !env.matchesProfiles("local | test")) {
             log.warn("Start-up check: {}", what);

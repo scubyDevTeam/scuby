@@ -60,4 +60,21 @@ class ProdTest {
             }
         }
     }
+
+    @Test
+    void refuseDeployedSaysRefusedNotRequired() {
+        for (String profile : new String[] {"staging", "prod", "staging,local"}) {
+            MockEnvironment env = new MockEnvironment();
+            env.setActiveProfiles(profile.split(","));
+            assertThatThrownBy(() -> Prod.refuseDeployed(env, "x=local"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("x=local is not allowed in a deployed profile")
+                    .hasMessageNotContaining("required");
+        }
+        for (String profile : new String[] {"local", "test"}) {
+            MockEnvironment env = new MockEnvironment();
+            env.setActiveProfiles(profile);
+            assertThatCode(() -> Prod.refuseDeployed(env, "x")).doesNotThrowAnyException();
+        }
+    }
 }

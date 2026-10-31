@@ -17,8 +17,7 @@ class MediaConfiguration {
     @ConditionalOnExpression("!'s3'.equals('${scuby.media.store:}')")
     LocalMediaStore localMediaStore(MediaProperties properties, Environment env) {
         // No deployed profile (staging included) runs on the local directory.
-        String why = "scuby.media.store=local: photos live in a local directory and the /dev-media routes are off, so uploads cannot work";
-        Prod.requireDeployed(env, false, why);
+        Prod.refuseDeployed(env, "scuby.media.store=local (photos live in a local directory and the /dev-media routes are off, so uploads cannot work)");
         return new LocalMediaStore(properties);
     }
 
