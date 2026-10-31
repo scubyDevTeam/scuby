@@ -20,7 +20,7 @@ import static co.scuby.db.generated.Tables.LOST_CASE;
 import static co.scuby.db.generated.Tables.PET;
 import static co.scuby.db.generated.Tables.SIGHTING;
 
-/** The feed in one query per branch; per-row sighting counts are correlated subqueries on the replay-key index. */
+/** The feed in one query per branch; per-row sighting counts are correlated subqueries on sighting_by_case_recent_idx. */
 @Component
 class FeedQueries {
 
