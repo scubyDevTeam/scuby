@@ -173,10 +173,10 @@ arrives with the backend's upload slots, which know each photo's purpose.
   ([staging-rollout.md](staging-rollout.md)).
 - **New Relic license key:** `/scuby/<env>/newrelic/license-key`, imported as the property
   `newrelic.license-key`. On a laptop the same value comes from the environment variable
-  `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. (The parameter and the start-up import
-  arrive with staging. Until then a deploy reads the parameter on the instance into its mode-600
-  environment file and passes it to the backend container as `NEW_RELIC_LICENSE_KEY`, next to the
-  other telemetry variables listed in [backend.md](backend.md) · Environments and profiles.)
+  `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. The parameter and the start-up import
+  arrive with staging ([staging-rollout.md](staging-rollout.md)). The sandbox exports no telemetry:
+  it neither creates the parameter nor sets the variables listed in [backend.md](backend.md) ·
+  Environments and profiles.
 
 ## Infrastructure as code
 
