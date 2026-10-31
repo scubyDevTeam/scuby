@@ -271,6 +271,60 @@ session was created, and a session read issues no `INSERT`/`UPDATE`. Rejected: J
 before they expire — sign-out, account deletion, a stolen phone); a short JWT plus refresh token
 (more code and keys for nothing at one instance).
 
+## Uploads and media
+
+`POST /uploads` records who took a slot for which photo and purpose (account when signed in, else
+device) and answers where to PUT the bytes. A publish or sighting attaches only photos its caller
+took a slot for, for that purpose, within 24 h, and whose bytes are processed. Bytes go through a
+`MediaStore`: **S3** in staging and production (a presigned PUT into `incoming/` signed with the
+photo's SHA-256; "processed" = the ingest Lambda wrote `media/{sha}.jpg` — [infra.md](infra.md) ·
+Media), a **development directory** in `local` and `test` (a dev-only `PUT/GET /dev-media/{sha}.jpg`
+that checks the hash and counts as processed at once; refused under `prod`). At most 20 slots per
+caller per 10 minutes (count then insert without a lock: concurrent requests can exceed it by the
+number in flight — accepted, a slot is only a row).
+
+S3 calls never run inside a database transaction: the attach check (`PhotoAttachments`, a HeadObject
+per photo in S3 mode) runs before the publish or sighting opens its transaction, and refuses to run
+inside one. The instance role needs `s3:PutObject` on `incoming/*` (through the presign),
+`s3:GetObject` on `media/*` and `s3:ListBucket` on the bucket with prefix `media/` — without
+ListBucket, HeadObject on a missing key answers 403 instead of 404 and every first upload fails.
+The bucket's CORS allows `PUT` from the web origins with the headers `content-type`,
+`content-length` and `x-amz-checksum-sha256`.
+
+**Handoff to the infrastructure doc.** [infra.md](infra.md) must pick up, for staging and for
+production (production refuses to start without them): the environment variables
+`SCUBY_MEDIA_BUCKET`, `SCUBY_MEDIA_REGION` and `SCUBY_MEDIA_PUBLIC_BASE_URL`; the instance-role
+permissions above; and the bucket's CORS rule above. The presign path has not been run against a
+real bucket yet.
+
+**Known limitation.** "Uploaded by this caller" means "took a slot for this hash". Every public
+photo URL contains its hash, so anyone can take a slot for a photo they have seen (the answer is
+`upload: null`) and attach it to their own case or sighting. Enforcing a fresh upload (refusing
+`upload: null` slots for `pet`, `claim` and `evidence`) is an open question for when it matters.
+
+## Place names
+
+`place_name` is computed once at publish by a `PlaceNamer` and stored on the case. Behind the flag
+`reverse_geocoding` (off): while off, or when the namer has no answer, nothing is stored and the
+response carries a generic label in the request's language («Zona marcada en el mapa»). No provider
+is wired yet; the comparison is in `docs/superpowers/specs/2026-10-30-place-names-spike.md`.
+
+## Rate limits on rows
+
+A rate limit is a count over the rows the action writes anyway — one indexed query per key, over a
+rolling window — never a separate counter table. Where a limit must hold under parallel requests
+(«Lo vi»), the count and the insert run in one transaction behind transaction-scoped advisory locks
+on each key, always taken in the same order (reporter, then IP) so two requests cannot wait on
+each other. The numbers live with their flows: «Lo vi» in [04](../product/04-lost-workflow.md) ·
+Validation, SMS in [auth.md](auth.md) · OTP mechanics, upload slots above.
+
+## Migrations and indexes: partial indexes need literals
+
+A query served by a partial index (`… WHERE status = 'active'`) writes that predicate as a literal
+(`DSL.inline("active")`), never a bind value: with `$1` Postgres cannot prove the index predicate
+under a generic prepared plan and falls back to a sequential scan. Plan checks run on inlined SQL,
+so they would not catch it.
+
 ## Testing
 
 - **Integration tests are the default** for anything touching the database, a queue or a provider:

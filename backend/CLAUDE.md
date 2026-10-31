@@ -27,6 +27,7 @@ The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older 
 
 - Enforced by ArchUnit (the build fails): package by feature, **flat**: `platform` (domain-free), foundations `identity`, `uploads`, `pets`,
   verticals `cases` (later `adoption`, `help`…). No layer subpackages.
+  Foundations today: identity (accounts, sessions, phone), uploads (slots, media store), pets (pet + responsibility). Vertical: cases (lost cases, sightings, feed, the caller's cases).
 - Package-private by default. A class another feature uses is `public` **and** `@ModuleApi`.
 - Dependencies: `platform` → nothing of ours; foundations → `platform` only; verticals →
   foundations + `platform`, never another vertical. A new feature package is added to
@@ -50,6 +51,7 @@ The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older 
    viewer, now, …)` is pure (no Spring, jOOQ, I/O, clock or randomness) and table-tested in
    `XDerivationTest` (PIT mutates it; ≥ 80 %).
 6. Errors: throw `ApiException(ErrorCode…, message, fields, details)`; fields are wire paths.
+7. Never call S3 (`PhotoAttachments`, `MediaStore.isStored`) inside a transaction: check photos first, then open a `TransactionTemplate` for the writes.
 
 ## Tests
 
@@ -81,6 +83,7 @@ The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older 
   thousands of rows). Write the failing plan check first, then the index; its migration comment
   carries the query, the plan before/after, the write cost and overlaps. Every new index is listed
   for human approval in the task report (review-enforced).
+- A predicate a partial index depends on (`status = 'active'`) is a literal in jOOQ — `DSL.inline("active")` — never a bind value ([backend.md](../docs/eng/backend.md) · Migrations and indexes).
 
 ## What reviewers check (humans)
 

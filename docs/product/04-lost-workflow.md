@@ -120,7 +120,7 @@ searcher who trusts it wastes time on one corner.
 
 | Location | Owner sees | Public / helpers see | Why |
 |---|---|---|---|
-| `last_seen` | the circle they drew | the circle, **radius floored at 200 m** | The circle is usually around a home. A 50 m circle on a shared WhatsApp card is a doorstep — personal data under Ley 1581 and a safety exposure. The floor is applied at render, never stored |
+| `last_seen` | the circle they drew | the circle, **radius floored at 200 m** | The circle is usually around a home. A 50 m circle on a shared WhatsApp card is a doorstep — personal data under Ley 1581 and a safety exposure. The server sends the floored radius to everyone but the owner; never stored |
 | Sighting pins | exact | **exact** | Street corners are nobody's personal data, and «¿qué esquina?» is the entire value of a sighting |
 | Reporter contact | visible | **hidden** | Given to the owner, not to the internet |
 
@@ -195,10 +195,11 @@ saved yet. After submit, the reporter can edit or delete their own sighting unti
 | Check | Bound | Where | Error copy |
 |---|---|---|---|
 | Distance from `last_seen_point` | ≤ 30 km | FE + BE | «Ese punto está muy lejos del último lugar donde se vio a Luna» |
-| `seen_at` in the future | reject | FE + BE | «La hora no puede ser en el futuro» |
+| `seen_at` in the future | reject beyond 5 minutes (device clock drift) | FE + BE | «La hora no puede ser en el futuro» |
 | `seen_at` before the case | ≥ `last_seen_at − 24h` | FE + BE | «Luna se perdió después de esa hora» |
-| Rate, per reporter per case | 1 per 15 min, 5 per day — **the 15-minute rule is waived while the reporter's earlier pin is still inside its correction window**, so «Lo vi otra vez» is never refused as «hace poco» | BE only | «Ya registraste un avistamiento hace poco» |
+| Rate, per reporter per case | 1 per 15 min, 5 per day — **the 15-minute rule is waived while the reporter's earlier pin is still inside its correction window**, so «Lo vi otra vez» is never refused as «hace poco» (as written the waiver covers the whole 15 minutes, so the rule never fires — [O25](../open-items.md)) | BE only | «Ya registraste un avistamiento hace poco» |
 | Rate, per reporter global | 20 per day | BE only | same |
+| Rate, per IP (second key) | 20 per case, 80 per day (thin-slice choice: 4× the per-reporter limits so shared networks — NAT, public wifi — are not punished; configurable) | BE only | same |
 
 **FE validates for feedback, BE enforces.** The distance and time checks are trivial math, so the
 form runs them the moment the pin lands or the time is picked — the user never waits on a round

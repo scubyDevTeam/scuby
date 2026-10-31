@@ -188,9 +188,54 @@ contract change with the feature that needs it. The two that blocked the backend
   on intent (cost rule 1).
 - **Phone on «Me interesa».** [auth.md](auth.md) says interest askers are never asked for a phone;
   the contract requires a verified one.
-- **Feed order.** The contract says newest first; [02](../product/02-flows.md) says proximity +
-  recency.
+- **Feed order** — settled by the backend's thin slice (2026-10-29): nearest first by distance band
+  (≤ 2, 5, 10, 25 km), newest first within a band, then `code` as a final tiebreak; national, newest
+  first (then `code`), when nothing is near or no point is sent; at most 100 items. The contract's
+  wording is to follow (below). Decision #41 in [00](../product/00-product-map.md).
 - **Smaller:** `contact.opened {whatsapp_click}` ([04](../product/04-lost-workflow.md) · Events) has
   no endpoint; a found-case claimant cannot withdraw «es mío»; match rejections leave no record
   ([05](../product/05-found-workflow.md) · Events); unmerge has no surface.
 
+
+### Proposals from the backend thin slice (2026-10-29)
+
+Contract or client changes the backend needs; each is made on the client side, which owns the pen
+until the contract moves to `openapi.yaml` (decision #34). The device cookie rename to
+`__Host-device` is already [O27](../open-items.md).
+
+- **Feed paging** — the feed is capped at 100 items with no way to ask for more.
+- **`phone_step: unverified`** on publish responses ([O24](../open-items.md)) — with
+  `publisher_phone_otp` off the backend publishes and the client cannot tell the number is unverified.
+- **`GET /feed` query parameters** (`vertical`, `species`, `lat`, `lng`) are missing from
+  `openapi.json` (`parameters: []`) although `web/src/contracts/feed.ts` defines them.
+- **`seen_at` tolerance** — the server accepts up to 5 minutes in the future (device clock drift);
+  the client's own check rejects any future time.
+- **Nearest-first wording** — the contract's summary says "newest first"; `feed.ts` and
+  [02](../product/02-flows.md) say proximity; align them on the rule above.
+- **Feed point** — the client never sends `lat`/`lng` (`FeedPage.tsx` builds the query from
+  `vertical`/`species` only), so the feed is national for everyone. The client should send the
+  device position when the user grants it, else the selected country's `default_center` from
+  `/config`. The server rule is ready; its spatial index (a GiST index on the case's last-seen
+  point) waits for the first request that uses it.
+- **Publish idempotency** — a double tap on «Publicar» creates two pets and two active cases; add a
+  `client_id` to `publishLost`, replayed like a sighting's.
+- **Connecting Google to an email-code account** — the backend answers `401` when an account created
+  by email code meets a non-authoritative Google identity ([auth.md](auth.md) · When Google may
+  link). Add a distinct error code the client can turn into «Inicia sesión con tu código por correo
+  y luego conecta Google».
+- **E2E test identities** — the client's e2e specs sign in with `ana.gomez@correo.co` and the phone
+  `+573007152284`, which the backend's test bypass accepts only through an extra compose override.
+  Use `*@e2e.scuby.test` and `+57 300 000 00xx` (the bypass defaults) and the override is not needed.
+- **E2E Google sign-in** — the «Continuar con Google» button is hidden when the build has no real
+  Google client id (`web/.env` has a `mock-` one), so the three Google specs (@AUTH-002, @PLOST-002,
+  @PLOST-004) cannot run against the backend; they need a documented e2e environment or a backend
+  bypass, planned with the phase that adds Google.
+- **@LINK-001** asserts «Posible hallazgo» (which needs an open claim, outside the first backend
+  slice) in the same step as the sightings trajectory, so everything after it is hidden behind the
+  claims dependency. Move that assertion to its own `test.step` (or tag).
+- **Endpoints the e2e specs need beyond the first backend slice** — `/me/pets` (the lost-pet
+  re-publish flow of @PLOST-002 and @PLOST-004), case edit (@PLOST-004), Google sign-in
+  (@AUTH-002, @PLOST-002, @PLOST-004) and claims (the «Posible hallazgo» state of @LINK-001).
+- **English look title** — the title composed for a case in English reads «Dog black, small»
+  (species, colour, size in Spanish word order); it needs a human copy review («Black dog, small»).
+  The backend owns the text; the review is a copy decision, not a contract change.
