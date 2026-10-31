@@ -44,9 +44,9 @@ fi
 unset current
 
 echo "== code-hash key (generated once by the CLI, kept across runs)"
-# The backend refuses to start on a deployed profile without a key of 32+ characters. Terraform does
-# not manage this parameter (it is not in secret_names), so this script creates it when missing,
-# with openssl at deploy time only: the value never appears in the repo, the state or the log.
+# The backend refuses to start on a deployed profile without a key of 32+ characters. Terraform creates
+# this parameter with a short placeholder (secret_names), so this script replaces any value under 32
+# characters with openssl at deploy time only: the value never appears in the repo, the state or the log.
 # An existing value is kept: replacing it would invalidate live sign-in codes.
 if key_now=$(aws ssm get-parameter --name "$PREFIX/auth/code-hash-key" --with-decryption \
   --query Parameter.Value --output text 2>/dev/null) && [ "${#key_now}" -ge 32 ]; then
