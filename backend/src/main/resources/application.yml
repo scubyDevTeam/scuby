@@ -6,6 +6,19 @@ spring:
       enabled: true
   jackson:
     property-naming-strategy: SNAKE_CASE
+    factory:
+      constraints:
+        read:
+          # Bodies are small JSON (photos go to S3, never in JSON). Defaults are unbounded (document, tokens) or
+          # 100 MB (a string), so one anonymous request could exhaust the heap before @Size runs. The largest real
+          # body is a publish (a few KB; the longest field is the 4096-char Google credential). Over a limit the
+          # request is `validation_failed` (the contract has no 413). RequestBodyLimitsTest.
+          max-document-length: 65536
+          max-string-length: 8192
+          max-name-length: 100
+          max-nesting-depth: 16
+          max-number-length: 32
+          max-token-count: 2000
   datasource:
     hikari:
       data-source-properties:
