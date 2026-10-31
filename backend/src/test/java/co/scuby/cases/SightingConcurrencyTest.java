@@ -2,6 +2,7 @@ package co.scuby.cases;
 
 import co.scuby.platform.security.Caller;
 import co.scuby.platform.web.ApiException;
+import co.scuby.platform.web.ErrorCode;
 import co.scuby.support.Accounts;
 import co.scuby.support.CaseFixtures;
 import co.scuby.support.IntegrationTest;
@@ -52,7 +53,8 @@ class SightingConcurrencyTest {
                     service.report("7K3PQ", request, device);
                     return true;
                 } catch (ApiException e) {
-                    return false;   // rate_limited
+                    assertThat(e.code()).isEqualTo(ErrorCode.RATE_LIMITED);
+                    return false;
                 }
             }));
         }
@@ -61,5 +63,33 @@ class SightingConcurrencyTest {
         for (Future<Boolean> r : results) if (r.get(60, TimeUnit.SECONDS)) created++;
         pool.shutdown();
         assertThat(created).isEqualTo(5);
+    }
+
+    /** Distinct devices share an IP: only the IP lock serialises them, and the IP limit (20 on one case) must hold. */
+    @Test
+    void twentyFiveParallelReportsFromDistinctDevicesOnOneIpInsertExactlyTwenty() throws Exception {
+        SightingRequest request = new SightingRequest(new PointInput(6.2455, -75.5905),
+                OffsetDateTime.ofInstant(MutableClock.START, ZoneOffset.UTC), null, null, null, null);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(25);
+        List<Future<Boolean>> results = new ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            Caller device = new Caller(null, "%064d".formatted(i), "9".repeat(64));
+            results.add(pool.submit(() -> {
+                start.await();
+                try {
+                    service.report("7K3PQ", request, device);
+                    return true;
+                } catch (ApiException e) {
+                    assertThat(e.code()).isEqualTo(ErrorCode.RATE_LIMITED);
+                    return false;
+                }
+            }));
+        }
+        start.countDown();
+        int created = 0;
+        for (Future<Boolean> r : results) if (r.get(60, TimeUnit.SECONDS)) created++;
+        pool.shutdown();
+        assertThat(created).isEqualTo(20);
     }
 }

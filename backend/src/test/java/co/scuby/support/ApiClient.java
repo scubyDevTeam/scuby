@@ -121,7 +121,7 @@ public final class ApiClient {
         if (!jar.isEmpty()) req.cookie(jar.values().toArray(Cookie[]::new));
         String addr = remoteAddr;
         req.with(r -> { r.setRemoteAddr(addr); return r; });
-        recorder.reset();
+        recorder.resetCurrentThread();
         sampler.reset();
         try {
             MvcResult result = mvc.perform(req).andReturn();

@@ -30,6 +30,12 @@ public final class StatementRecorder implements ExecuteListener {
 
     public void reset() { executed.clear(); }
 
+    /** Forgets only the calling thread's statements: overlapping requests from several threads must not wipe each other's. */
+    public void resetCurrentThread() {
+        Thread me = Thread.currentThread();
+        executed.removeIf(e -> e.thread() == me);
+    }
+
     public List<String> statements() { return executed.stream().map(Executed::sql).toList(); }
 
     /** Only the statements the calling thread executed (MockMvc runs the request on the test thread).

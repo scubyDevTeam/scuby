@@ -48,6 +48,12 @@ class SightingQueries {
         db.execute("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "sighting-ip:" + caller.ipHash());
     }
 
+    /** The case's status under a share lock (held to commit): a purge or a close waits for this insert. */
+    Optional<String> statusForShare(String code) {
+        return db.select(LOST_CASE.STATUS).from(LOST_CASE).where(LOST_CASE.CODE.eq(code)).forShare()
+                 .fetchOptional(r -> r.value1());
+    }
+
     Optional<UUID> replay(String code, String clientId) {
         return db.select(SIGHTING.ID).from(SIGHTING)
                  .where(SIGHTING.CASE_CODE.eq(code)).and(SIGHTING.CLIENT_ID.eq(clientId))

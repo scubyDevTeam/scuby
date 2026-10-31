@@ -3,7 +3,7 @@
 --   WHERE <reporter_person_id = ? | reporter_device_hash = ? | reporter_ip_hash = ?> AND created_at > now - 24 h
 -- Plans before (40,000 sightings, cost 1850): Seq Scan on sighting for each of the three counts. After: an index range scan
 -- per key over the last day's rows of that reporter or IP.
--- Write cost: three index entries per sighting (sightings are low-volume writes; reads per sighting
+-- Write cost: two index entries per anonymous sighting and three per signed-in one (sightings are low-volume writes; reads per sighting
 -- are 2 counts). The person index is partial (anonymous pins never need it).
 -- Overlaps: sighting_replay_key (case_code, client_id) — different leading column, no overlap.
 -- Need human approval before merge.

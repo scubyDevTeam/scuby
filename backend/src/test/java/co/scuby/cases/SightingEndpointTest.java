@@ -1,5 +1,6 @@
 package co.scuby.cases;
 
+import co.scuby.platform.cache.ClearableCache;
 import co.scuby.platform.crypto.Hashing;
 import co.scuby.platform.db.GeoPoint;
 import co.scuby.support.Accounts;
@@ -13,6 +14,7 @@ import co.scuby.support.TestDb;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 
@@ -31,6 +33,7 @@ class SightingEndpointTest {
     @Autowired CaseFixtures cases;
     @Autowired MutableClock clock;
     @Autowired DSLContext db;
+    @Autowired ObjectProvider<ClearableCache> caches;
 
     ApiClient api;
 
@@ -102,6 +105,18 @@ class SightingEndpointTest {
     }
 
     @Test
+    void noteAndContactPhoneAreRequiredButMayBeNull() {
+        String noNote = """
+                {"point":{"lat":6.2455,"lng":-75.5905},"seen_at":"%s","contact_phone":null}""".formatted(clock.instant());
+        String noPhone = """
+                {"point":{"lat":6.2455,"lng":-75.5905},"seen_at":"%s","note":null}""".formatted(clock.instant());
+        assertThat(api.post("/cases/{code}/sightings", noNote, "7K3PQ").errorCode()).isEqualTo("validation_failed");
+        assertThat(api.post("/cases/{code}/sightings", noPhone, "7K3PQ").errorCode()).isEqualTo("validation_failed");
+        assertThat(db.fetchCount(SIGHTING)).isZero();
+        assertThat(report(api, "").status()).isEqualTo(201);   // explicit nulls are fine
+    }
+
+    @Test
     void aContactPhoneMustBeASupportedMobile() {
         String withLandline = body(clock.instant().toString(), "").replace("\"contact_phone\":null", "\"contact_phone\":\"+5716012345\"");
         ApiResponse r = api.post("/cases/{code}/sightings", withLandline, "7K3PQ");
@@ -163,6 +178,10 @@ class SightingEndpointTest {
         api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", bytes, "image/jpeg", sha);
         String full = body(clock.instant().toString(), ",\"photo_urls\":[\"" + url + "\"],\"client_id\":\"full-path-1\"")
                 .replace("\"contact_phone\":null", "\"contact_phone\":\"+573001112233\"");
-        assertThat(api.post("/cases/{code}/sightings", full, "7K3PQ").status()).isEqualTo(201);   // ceiling enforced
+        caches.orderedStream().filter(c -> c.getClass().getSimpleName().equals("CachingSessionLookup")).forEach(ClearableCache::clear);
+        ApiResponse r = api.post("/cases/{code}/sightings", full, "7K3PQ");
+        assertThat(r.status()).isEqualTo(201);
+        // session, case, replay, supported_countries, upload lookup, 2 locks, status, 2 counts, insert
+        assertThat(r.statements()).hasSize(11);
     }
 }
