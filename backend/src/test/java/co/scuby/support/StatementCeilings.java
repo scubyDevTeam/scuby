@@ -24,6 +24,7 @@ final class StatementCeilings {
             Map.entry("POST /lost-cases", 16),   // worst path: pet_id with a new number, code sent, on a session-cache miss (16, measured by PublishStatementsTest, which pins every path): session lookup, ownership + active-case pre-check, PublisherPhone.prepare, person row lock + SMS send, ownership + active-case re-check. Excludes the process-wide flag snapshot load (+2, once per 30 s)
             Map.entry("GET /cases/{code}", 3),   // exactly 3 on a session-cache miss (owner or signed-in stranger; CaseStatementsTest pins it, anonymous is 2): session lookup, case (+ pet, publisher), sightings. Excludes the flag snapshot load
             Map.entry("GET /feed", 3),   // session lookup when signed in, local query, national fallback. Excludes the flag snapshot load
+            Map.entry("POST /cases/{code}/sightings", 10),   // session lookup, case + distance, replay, supported_countries, upload lookup, two advisory locks, reporter counts, IP counts, insert
             Map.entry("POST /auth/google", 8)   // sub lookup, email lookup, person insert + select, person SELECT ... FOR UPDATE, session insert (+ filter lookup and old DELETE)
     );
 
