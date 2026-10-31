@@ -1,0 +1,14 @@
+-- Performance index. GET /feed, national branch (FeedQueries.nationalQuery):
+--   status = 'active' ORDER BY published_at DESC LIMIT 100.
+-- Growth questions (backend/CLAUDE.md · Migrations and indexes):
+--   1. Can the table grow without bound? Yes: a lost case is never deleted, only closed.
+--   2. How often does the query run? On every feed view without a nearby result: the hottest read of the app.
+--   3. Without the index? The whole history of cases is filtered and sorted on each page view; the cost grows
+--      with every case ever published, not with the open ones.
+-- The index is partial, so closed cases leave it and it stays the size of the open set. It reads in order and
+-- stops after 100 rows. Write cost: one entry per active case, removed when it closes; none for sightings.
+-- Overlaps: lost_case_one_active_per_pet (pet_id): different column.
+-- Plan check (the index would be used, not the justification): FeedPlanTest.
+-- The local branch's GiST index on last_seen_public_point is deferred until the web client sends a point.
+-- Needs human approval before merge.
+CREATE INDEX lost_case_active_published_idx ON lost_case (published_at DESC) WHERE status = 'active';

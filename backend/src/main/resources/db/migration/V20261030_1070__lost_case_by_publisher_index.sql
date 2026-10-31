@@ -1,0 +1,13 @@
+-- Performance index. GET /me/cases (MyCasesQueries.query): every case the caller published, any status,
+-- ORDER BY published_at DESC, code.
+-- Growth questions (backend/CLAUDE.md · Migrations and indexes):
+--   1. Can the table grow without bound? Yes: a lost case is never deleted, only closed.
+--   2. How often does the query run? Each time a publisher opens «Mis casos» (and after each publish): frequent.
+--   3. Without the index? A full scan of lost_case per visit, growing with every case ever published by anyone,
+--      to return a handful of rows.
+-- Write cost: one entry per case, for its whole life (cases are low-volume writes).
+-- Overlaps: lost_case_one_active_per_pet (pet_id) and lost_case_active_published_idx (published_at, active only):
+-- neither leads with created_by. Not partial: «Mis casos» lists every status.
+-- Plan check (the index would be used, not the justification): OwnCasesPlanTest.
+-- Needs human approval before merge.
+CREATE INDEX lost_case_by_publisher_idx ON lost_case (created_by, published_at DESC);

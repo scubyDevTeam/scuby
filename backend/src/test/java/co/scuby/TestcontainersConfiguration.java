@@ -8,6 +8,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * Connects every Spring test context that imports it to one PostGIS container per test JVM,
@@ -60,5 +61,13 @@ public class TestcontainersConfiguration {
             registry.add("spring.datasource.username", () -> postgres().getUsername());
             registry.add("spring.datasource.password", () -> postgres().getPassword());
         };
+    }
+
+    /** The shared container's coordinates, for tests that start the app without Spring's test framework. */
+    public static Map<String, String> jdbcProperties() {
+        return Map.of(
+                "spring.datasource.url", postgres().getJdbcUrl(),
+                "spring.datasource.username", postgres().getUsername(),
+                "spring.datasource.password", postgres().getPassword());
     }
 }

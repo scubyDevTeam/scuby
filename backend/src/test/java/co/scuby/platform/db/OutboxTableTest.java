@@ -6,6 +6,7 @@ import org.jooq.JSONB;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.context.annotation.Import;
 
 import java.util.UUID;
@@ -14,6 +15,7 @@ import static co.scuby.db.generated.Tables.OUTBOX_EVENTS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @Import(TestcontainersConfiguration.class)
 class OutboxTableTest {
 

@@ -48,4 +48,10 @@ class ContractValidatorTest {
                 ApiErrorBody.of(ErrorCode.RATE_LIMITED, "slow down", Map.of(), Map.of()));
         assertThat(contract.errors("GET", "/config", 429, body)).isEmpty();
     }
+
+    @Test
+    void aDocumentedNoContentStatusHasNoErrors() {
+        assertThat(contract.errorsForNoContent("POST", "/auth/sign-out", 204)).isEmpty();
+        assertThat(contract.errorsForNoContent("POST", "/auth/sign-out", 201)).isNotEmpty();
+    }
 }

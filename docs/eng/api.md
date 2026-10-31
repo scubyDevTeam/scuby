@@ -49,7 +49,7 @@ it, so neither can use an endpoint the contract does not list.
   the outcome — `phone_step: otp` — never the flag.
 - **Replays are idempotent where the client queues.** «Lo vi» (`POST /cases/:code/sightings`) carries
   a `client_id` the client makes once and sends again on every retry: the same key on the same case
-  answers the sighting it already created — before any rate limit — so a send whose answer was lost
+  answers the sighting it already created — before every validation — so a send whose answer was lost
   on the way never becomes two pins ([frontend.md](frontend.md) · Risks §6).
 - **The email's one-tap links are public** (`/checkin-links/:token`): the token is the auth — single
   use, expiring, bound to one check-in and one answer. A GET applies only a safe answer; a
@@ -67,9 +67,8 @@ Someone without an account is a **device**: an opaque `device` cookie that the A
   year, renewed when used. The client reads nothing and sends nothing extra: it already sends every
   request with credentials (`api-client/http.ts`). The server keeps only a hash of the value.
 - **What it identifies.** The anonymous reporter or claimant of a sighting or a «lo tengo»: it
-  authorizes correcting or deleting their own sighting inside its window, marks it `mine` on the
-  case, and is the key of the per-reporter rate limits (with the IP as a second key —
-  [04](../product/04-lost-workflow.md)). It also scopes an anonymous upload slot (*Uploads*).
+  authorizes correcting or deleting their own sighting inside its window, and marks it `mine` on the
+  case (there are no per-reporter rate limits for now — [04](../product/04-lost-workflow.md) · Validation). It also scopes an anonymous upload slot (*Uploads*).
 - **Not an account, never a login.** A signed-in session wins when both are present; the cookie
   proves nothing about who someone is, only that this is the same browser. Clearing cookies forgets
   it — the person loses the right to correct what they sent, nothing else. Moving an anonymous
@@ -96,8 +95,8 @@ A photo reaches storage in three steps (decision #36; the pipeline's rules are
 
 Rules the server enforces, and the client may not predict:
 
-- **Limits per purpose** ([media-pipeline.md](media-pipeline.md) §1) and rate limits on slots,
-  inherited from what the photo is for. A refused slot is `rate_limited` or `validation_failed`.
+- **Limits per purpose** ([media-pipeline.md](media-pipeline.md) §1). Slots have no rate limit
+  ([backend.md](backend.md) · Uploads and media). A refused slot is `validation_failed`.
 - **A photo in a publish body must be one this caller uploaded for that purpose** (or one already on
   the row being edited); anything else is `validation_failed` on that field. So is a photo whose
   bytes have not been processed yet — it takes seconds, normally done before the form is.
@@ -115,7 +114,7 @@ logs:
 
 | Code | Status | When |
 |---|---|---|
-| `validation_failed` | 422 | Body or query breaks the schema; `fields` maps each wire path to what is wrong |
+| `validation_failed` | 422 | Body or query breaks the schema; `fields` maps each wire path to what is wrong. A required field that is absent is an error naming it (nested ones by path, e.g. `pet.marks`); an explicit `null` is accepted where the contract allows it (decision #51 in [00](../product/00-product-map.md)) |
 | `unauthorized` | 401 | No session on a `session` endpoint |
 | `forbidden` | 403 | Signed in, but it is someone else's case, claim or notification |
 | `not_found` · `gone` | 404 · 410 | Unknown · purged (a printed poster's code still resolves) |
@@ -123,11 +122,11 @@ logs:
 | `active_case_exists` | 409 | The pet already has an active lost case; `details.case_code` |
 | `invalid_code` · `phone_required` | 422 | The emailed/SMS code is wrong · publishing with no verified number |
 | `sighting_too_far` · `seen_at_in_future` · `seen_at_before_case` | 422 | [04 · Validation](../product/04-lost-workflow.md) |
-| `rate_limited` | 429 | Per reporter, per case and global ([04](../product/04-lost-workflow.md)) |
+| `rate_limited` | 429 | Too many SMS codes requested for one number ([auth.md](auth.md)); an email start never answers it (it answers `204` and sends nothing) |
 | `server_error` | 500 | — |
 
 Any endpoint may answer `validation_failed`, `rate_limited` and `server_error`; every other code
-must be in that endpoint's `errors`. The emulated backend enforces this, so the list stays true.
+must be in that endpoint's `errors`. The emulated backend enforces this, so the list stays true. One known exception: the real backend also answers `forbidden` to an unsafe request from a disallowed origin, on every endpoint, before it is routed ([backend.md](backend.md) · Security); the contract does not list it yet ([O27](../open-items.md)).
 
 ## Plugging in the real backend
 
@@ -154,7 +153,7 @@ Simplified on purpose — the real backend must do better:
 |---|---|
 | Uploads: the same three steps against an emulated bucket (`api/media.ts`), bytes kept as data URLs; nobody checks who may attach which photo | Presigned S3 PUTs, the ingest Lambda and CloudFront variants ([infra.md](infra.md) · Media); ownership of a photo enforced at publish |
 | Neighbourhood = nearest of a fixed list | Reverse geocoding |
-| The `device` cookie = a random id in localStorage (the client never reads it) | The API-set cookie of *Device identity*; IP as a second key |
+| The `device` cookie = a random id in localStorage (the client never reads it) | The API-set cookie of *Device identity*; the backend keeps no IP (decisions #54, #55) |
 | Matching = same species within 5 km | The matching contract in [05](../product/05-found-workflow.md) (O7) |
 | Follow-up loop runs on each request | A scheduled job; push and email deliveries ([comms.md](comms.md)) |
 | Nearby alerts stored as a zone on the account; nothing sends them | The matching/broadcast job that notifies by zone ([08](../product/08-notifications.md)) |
@@ -188,9 +187,60 @@ contract change with the feature that needs it. The two that blocked the backend
   on intent (cost rule 1).
 - **Phone on «Me interesa».** [auth.md](auth.md) says interest askers are never asked for a phone;
   the contract requires a verified one.
-- **Feed order.** The contract says newest first; [02](../product/02-flows.md) says proximity +
-  recency.
+- **Feed order** — settled by decision #41 in [00](../product/00-product-map.md), which owns the
+  rule. The contract's wording is to follow (Proposals, below).
 - **Smaller:** `contact.opened {whatsapp_click}` ([04](../product/04-lost-workflow.md) · Events) has
   no endpoint; a found-case claimant cannot withdraw «es mío»; match rejections leave no record
   ([05](../product/05-found-workflow.md) · Events); unmerge has no surface.
 
+
+### Proposals from the first backend release (2026-10-29)
+
+Contract or client changes the backend needs; each is made on the client side, which owns the pen
+until the contract moves to `openapi.yaml` (decision #34). The backend's first release is the
+lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the caller's own cases. The device cookie rename to
+`__Host-device` is already [O27](../open-items.md).
+
+- **Feed paging** — the feed is capped at 100 items with no way to ask for more.
+- **`phone_step: unverified`** on publish responses — proposed in [O24](../open-items.md).
+- **`GET /feed` query parameters** (`vertical`, `species`, `lat`, `lng`) are missing from
+  `openapi.json` (`parameters: []`) although `web/src/contracts/feed.ts` defines them.
+- **`seen_at` tolerance** — the server accepts up to 5 minutes in the future (device clock drift);
+  the client's own check rejects any future time.
+- **Nearest-first wording** — the contract's summary says "newest first"; `feed.ts` and
+  [02](../product/02-flows.md) say proximity; align them on the rule above.
+- **Feed point** — the client never sends `lat`/`lng` (`FeedPage.tsx` builds the query from
+  `vertical`/`species` only), so the feed is national for everyone. The client should send the
+  device position when the user grants it, else the selected country's `default_center` from
+  `/config`. The server rule is ready; its spatial index (a GiST index on the case's last-seen
+  point) waits for the first request that uses it.
+- **Publish idempotency** — a double tap on «Publicar» creates two pets and two active cases; add a
+  `client_id` to `publishLost`, replayed like a sighting's.
+- **Google with a non-Google address** — the backend answers `401` when the Google address is not
+  one Google vouches for and the browser has no email-code session of that same address (or has one
+  of another address) ([auth.md](auth.md) · Sign-in, the "One account per email" rule). Add a distinct error code the
+  client can turn into «Entra primero con tu código de correo»; with a session of the same address,
+  signing in with Google links it.
+- **E2E test identities** — the client's e2e specs sign in with `ana.gomez@correo.co` and the phone
+  `+573007152284`, which the backend's test bypass accepts only through an extra compose override.
+  Use `*@e2e.scuby.test` and `+57 300 000 00xx` (the bypass defaults) and the override is not needed.
+- **E2E Google sign-in** — the «Continuar con Google» button is hidden when the build has no real
+  Google client id (`web/.env` has a `mock-` one), so the three Google specs (@AUTH-002, @PLOST-002,
+  @PLOST-004) cannot run against the backend; they need a documented e2e environment or a backend
+  bypass, planned with the phase that adds Google.
+- **@LINK-001** ends its first step ("who is missing, and what a stranger can do") with the
+  «Posible hallazgo» assertion, which needs an open claim, outside the first backend release. A
+  failing `expect` inside a `test.step` still ends the test, so the steps after it (the sightings
+  trajectory among them) never run. Move that assertion to the end of the spec, make it
+  `expect.soft`, or split it into its own `test` (or tag).
+- **`point` comment in `feed.ts`** — it says "public precision, never a doorstep", which is now true: the
+  server snaps the center to a ~200 m grid for every feed caller ([04](../product/04-lost-workflow.md) ·
+  Location precision, decision #63). The mock's feed still returns exact points.
+- **Paging for `GET /me/cases`** — it returns every case of the caller, with no way to page.
+- **Endpoints the e2e specs need beyond the first backend release** — `/me/pets` (the lost-pet
+  re-publish flow of @PLOST-002 and @PLOST-004), case edit (@PLOST-004), Google sign-in
+  (@AUTH-002, @PLOST-002, @PLOST-004) and claims (the «Posible hallazgo» state of @LINK-001).
+- **Not a proposal: the English look title.** `GET /me/cases` titles a case whose pet has no name
+  from species, first colour and size; in English it reads «Dog black, small» (Spanish word order).
+  It needs a human copy review («Black dog, small»). The backend owns the text, so this is a copy
+  decision, not a contract change.

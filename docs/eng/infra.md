@@ -171,6 +171,14 @@ arrives with the backend's upload slots, which know each photo's purpose.
 - **Sandbox exceptions:** the deploy script generates the database password and the instance passes
   it to the containers through a `.env` file; nothing is imported from the prefix at start-up yet
   ([staging-rollout.md](staging-rollout.md)).
+- **Code-hash key:** `/scuby/<env>/auth/code-hash-key` (`SecureString`, 32+ characters), the HMAC key
+  that hashes sign-in codes ([backend.md](backend.md) · Security); the backend refuses to start on a
+  deployed profile without it (`SCUBY_AUTH_CODE_HASH_KEY`). A person creates it once per environment
+  (`openssl rand -hex 32`), outside the repo and the chat. In the sandbox Terraform creates it with a placeholder
+  (it is in `secret_names`, so `terraform destroy` removes it) and the deploy script replaces any value
+  shorter than 32 characters, keeping a real one across runs. **Rotation:** replace
+  the value and restart the backend; it invalidates only the codes in flight (they expire in
+  minutes), never accounts or sessions.
 - **New Relic license key:** `/scuby/<env>/newrelic/license-key`, imported as the property
   `newrelic.license-key`. On a laptop the same value comes from the environment variable
   `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. The parameter and the start-up import
@@ -194,7 +202,7 @@ What the sandbox proved but staging must not inherit as it is: [staging-rollout.
 
 - **GitHub Actions**, a backend workflow beside the client's `web.yml`, triggered by path filters.
 - **OIDC from GitHub to AWS** — no stored AWS keys.
-- Build and test; Jib builds the ARM64 image and pushes it to **ECR**.
+- Build and test; the image is built from `backend/Dockerfile` for ARM64 ([decision #62](../product/00-product-map.md)) and pushed to **ECR**.
 - Deploy: SSM Run Command on the instance pulls the new image and restarts the Compose service.
   Flyway migrates at application start-up.
 

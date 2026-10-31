@@ -1,0 +1,9 @@
+# Compose override for running the web client's e2e specs against the local backend
+# (backend/e2e/run-client-e2e.sh, compose project scuby-e2e-<checkout>).
+# The specs sign in as *@correo.co with code 123456 and verify +57 300 715 2284 with 123456
+# (web/e2e/pages/parts.ts DEMO_CODE), so the test bypass covers exactly those for this run.
+services:
+  backend:
+    environment:
+      SCUBY_AUTH_TESTBYPASS_EMAILDOMAINS: correo.co,e2e.scuby.test
+      SCUBY_AUTH_TESTBYPASS_SMSPREFIXES: "+573007152284,+5730000000"

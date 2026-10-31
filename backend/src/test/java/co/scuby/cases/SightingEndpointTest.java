@@ -1,0 +1,211 @@
+package co.scuby.cases;
+
+import co.scuby.platform.cache.ClearableCache;
+import co.scuby.platform.crypto.Hashing;
+import co.scuby.support.Accounts;
+import co.scuby.support.ApiClient;
+import co.scuby.support.ApiClients;
+import co.scuby.support.ApiResponse;
+import co.scuby.support.CaseFixtures;
+import co.scuby.support.IntegrationTest;
+import co.scuby.support.MutableClock;
+import co.scuby.support.TestDb;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpMethod;
+
+import java.time.Duration;
+import java.util.UUID;
+
+import static co.scuby.db.generated.Tables.SIGHTING;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@IntegrationTest
+class SightingEndpointTest {
+
+    @Autowired ApiClients clients;
+    @Autowired TestDb testDb;
+    @Autowired Accounts accounts;
+    @Autowired CaseFixtures cases;
+    @Autowired MutableClock clock;
+    @Autowired DSLContext db;
+    @Autowired ObjectProvider<ClearableCache> caches;
+
+    ApiClient api;
+
+    @BeforeEach
+    void setUp() {
+        testDb.reset();
+        api = clients.newBrowser();
+        cases.luna(accounts.person("carolina@correo.co"));
+    }
+
+    static String body(String seenAt, String extra) {
+        return """
+                {"point":{"lat":6.2455,"lng":-75.5905},"seen_at":"%s","note":null,"contact_phone":null%s}""".formatted(seenAt, extra);
+    }
+
+    private ApiResponse report(ApiClient as, String extra) {
+        return as.post("/cases/{code}/sightings", body(clock.instant().toString(), extra), "7K3PQ");
+    }
+
+    @Test
+    void anAnonymousSightingIsVisibleAtOnceAndKeyedToTheDevice() {
+        ApiResponse r = report(api, "");
+        assertThat(r.status()).isEqualTo(201);
+        UUID id = UUID.fromString(r.str("/id"));
+        var row = db.selectFrom(SIGHTING).where(SIGHTING.ID.eq(id)).fetchOne();
+        assertThat(row.getStatus()).isEqualTo("visible");
+        assertThat(row.getReporterPersonId()).isNull();
+        assertThat(row.getReporterDeviceHash()).isEqualTo(Hashing.sha256Hex(api.cookie("device").orElseThrow()));
+        ApiResponse luna = api.get("/cases/{code}", "7K3PQ");
+        assertThat(luna.json().at("/sightings/0/mine").asBoolean()).isTrue();
+        assertThat(luna.str("/sightings/0/editable_until")).isEqualTo("2026-10-14T17:15:00Z");
+    }
+
+    @Test
+    void aSignedInReporterIsTheAccount() {
+        UUID me = accounts.signIn(api, "helper@correo.co");
+        UUID id = UUID.fromString(report(api, "").str("/id"));
+        assertThat(db.selectFrom(SIGHTING).where(SIGHTING.ID.eq(id)).fetchOne().getReporterPersonId()).isEqualTo(me);
+    }
+
+    @Test
+    void aReplayIsTheSameSightingBeforeAnyCheckEvenOnAClosedCase() {
+        String first = report(api, ",\"client_id\":\"c0ffee-replay-1\"").str("/id");
+        db.execute("UPDATE scuby.lost_case SET status = 'reunited' WHERE code = '7K3PQ'");
+        ApiResponse again = clients.newBrowser().post("/cases/{code}/sightings",
+                body(clock.instant().toString(), ",\"client_id\":\"c0ffee-replay-1\""), "7K3PQ");
+        assertThat(again.status()).isEqualTo(201);
+        assertThat(again.str("/id")).isEqualTo(first);
+        assertThat(db.fetchCount(SIGHTING)).isEqualTo(1);
+    }
+
+    @Test
+    void unknownAndPurgedCodesAreNotFoundAndAClosedCaseIsInvalidTransition() {
+        cases.purge("GONE5");
+        assertThat(api.post("/cases/{code}/sightings", body(clock.instant().toString(), ""), "ZZZZZ").errorCode()).isEqualTo("not_found");
+        assertThat(api.post("/cases/{code}/sightings", body(clock.instant().toString(), ""), "GONE5").errorCode()).isEqualTo("not_found");
+        db.execute("UPDATE scuby.lost_case SET status = 'reunited' WHERE code = '7K3PQ'");
+        assertThat(report(api, "").errorCode()).isEqualTo("invalid_transition");
+    }
+
+    @Test
+    void timeAndDistanceRulesWithFiveMinutesOfClockDrift() {
+        assertThat(api.post("/cases/{code}/sightings", body(clock.instant().plusSeconds(240).toString(), ""), "7K3PQ").status()).isEqualTo(201);
+        assertThat(api.post("/cases/{code}/sightings", body(clock.instant().plusSeconds(360).toString(), ""), "7K3PQ").errorCode()).isEqualTo("seen_at_in_future");
+        assertThat(api.post("/cases/{code}/sightings", body(clock.instant().minus(Duration.ofDays(4)).toString(), ""), "7K3PQ").errorCode()).isEqualTo("seen_at_before_case");
+        String bogota = """
+                {"point":{"lat":4.711,"lng":-74.0721},"seen_at":"%s","note":null,"contact_phone":null}""".formatted(clock.instant());
+        assertThat(api.post("/cases/{code}/sightings", bogota, "7K3PQ").errorCode()).isEqualTo("sighting_too_far");
+    }
+
+    /**
+     * Oracle test (decision 69). The «Lo vi» 30 km rule is answered before the contact-phone check, so an anonymous
+     * caller who sends a non-mobile number learns "too far or not" for any point. That answer must be a function of
+     * the SNAPPED public center only. Luna's exact point is 90 m west of her snapped center; sweep points due east
+     * across the 30 km boundary in 2 m steps (the boundary of the exact point lies up to 90 m away from the snapped
+     * one) and require every answer to match the distance from the snapped center, never from the exact one.
+     */
+    @Test
+    void theThirtyKmAnswerIsAFunctionOfTheSnappedCenterNotTheExactPoint() {
+        var exact = CaseFixtures.MEDELLIN;
+        var snapped = LocationPrecisionDerivation.publicCenter(exact);
+        assertThat(snapped.lng()).isNotEqualTo(exact.lng());
+        double lo = snapped.lng(), hi = snapped.lng() + 1;      // bisect the 30 km boundary of the snapped center (due east)
+        for (int i = 0; i < 40; i++) {
+            double mid = (lo + hi) / 2;
+            if (metersFrom(snapped.lat(), snapped.lng(), snapped.lat(), mid) > 30_000) hi = mid; else lo = mid;
+        }
+        double boundaryLng = lo;
+        int witnesses = 0;
+        for (int step = -60; step <= 60; step++) {
+            double lng = boundaryLng + step * 0.00002;        // about 2.2 m per step
+            double fromSnapped = metersFrom(snapped.lat(), snapped.lng(), snapped.lat(), lng);
+            double fromExact = metersFrom(exact.lat(), exact.lng(), snapped.lat(), lng);
+            String body = """
+                    {"point":{"lat":%s,"lng":%s},"seen_at":"%s","note":null,"contact_phone":"+571234567"}"""
+                    .formatted(snapped.lat(), lng, clock.instant());
+            String answer = api.post("/cases/{code}/sightings", body, "7K3PQ").errorCode();
+            assertThat(answer).as("lng %s: %s m from the snapped center, %s m from the exact point", lng, fromSnapped, fromExact)
+                    .isEqualTo(fromSnapped > 30_000 ? "sighting_too_far" : "validation_failed");
+            if ((fromSnapped > 30_000) != (fromExact > 30_000)) witnesses++;
+        }
+        assertThat(witnesses).as("the sweep must straddle both boundaries, or it proves nothing").isGreaterThan(10);
+    }
+
+    /** Geodesic meters between two points, from PostGIS (the same function the rule uses). */
+    private double metersFrom(double lat1, double lng1, double lat2, double lng2) {
+        return db.fetchSingle("SELECT ST_Distance(ST_MakePoint(?, ?)::geography, ST_MakePoint(?, ?)::geography)",
+                lng1, lat1, lng2, lat2).get(0, Double.class);
+    }
+
+    @Test
+    void noteAndContactPhoneAreRequiredButMayBeNull() {
+        String noNote = """
+                {"point":{"lat":6.2455,"lng":-75.5905},"seen_at":"%s","contact_phone":null}""".formatted(clock.instant());
+        String noPhone = """
+                {"point":{"lat":6.2455,"lng":-75.5905},"seen_at":"%s","note":null}""".formatted(clock.instant());
+        ApiResponse missingNote = api.post("/cases/{code}/sightings", noNote, "7K3PQ");
+        ApiResponse missingPhone = api.post("/cases/{code}/sightings", noPhone, "7K3PQ");
+        assertThat(missingNote.errorCode()).isEqualTo("validation_failed");
+        assertThat(missingNote.json().at("/error/fields").has("note")).as(missingNote.body()).isTrue();
+        assertThat(missingPhone.errorCode()).isEqualTo("validation_failed");
+        assertThat(missingPhone.json().at("/error/fields").has("contact_phone")).as(missingPhone.body()).isTrue();
+        assertThat(db.fetchCount(SIGHTING)).isZero();
+        assertThat(report(api, "").status()).isEqualTo(201);   // explicit nulls are fine
+    }
+
+    @Test
+    void aContactPhoneMustBeASupportedMobile() {
+        String withLandline = body(clock.instant().toString(), "").replace("\"contact_phone\":null", "\"contact_phone\":\"+5716012345\"");
+        ApiResponse r = api.post("/cases/{code}/sightings", withLandline, "7K3PQ");
+        assertThat(r.errorCode()).isEqualTo("validation_failed");
+        assertThat(r.json().at("/error/fields").has("contact_phone")).isTrue();
+    }
+
+    @Test
+    void photosMustBeThisCallersProcessedSightingUploads() {
+        byte[] bytes = "pin-photo".getBytes();
+        String sha = Hashing.sha256Hex(bytes);
+        String url = api.post("/uploads", """
+                {"purpose":"sighting","sha256":"%s","content_type":"image/jpeg","bytes":%d}""".formatted(sha, bytes.length)).str("/url");
+        api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", bytes, "image/jpeg", sha);
+        String withPhoto = ",\"photo_urls\":[\"" + url + "\"]";
+        ApiResponse stranger = report(clients.newBrowser(), withPhoto);
+        assertThat(stranger.json().at("/error/fields").has("photo_urls")).isTrue();
+        assertThat(report(api, withPhoto).status()).isEqualTo(201);
+    }
+
+    /** Rate limits are deferred (decision log): one reporter or device can report as often as they like. */
+    @Test
+    void thereAreNoRateLimits() {
+        for (int i = 0; i < 30; i++) assertThat(report(api, "").status()).isEqualTo(201);
+        for (int i = 0; i < 30; i++) {
+            assertThat(report(clients.newBrowser(), "").status()).isEqualTo(201);
+        }
+        accounts.signIn(api, "helper@correo.co");
+        for (int i = 0; i < 30; i++) assertThat(report(api, "").status()).isEqualTo(201);
+        assertThat(db.fetchCount(SIGHTING)).isEqualTo(90);
+    }
+
+    @Test
+    void theStatementCeilingHoldsOnTheFullPath() {
+        byte[] bytes = "pin-photo-2".getBytes();
+        String sha = Hashing.sha256Hex(bytes);
+        accounts.signIn(api, "helper@correo.co");
+        String url = api.post("/uploads", """
+                {"purpose":"sighting","sha256":"%s","content_type":"image/jpeg","bytes":%d}""".formatted(sha, bytes.length)).str("/url");
+        api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", bytes, "image/jpeg", sha);
+        String full = body(clock.instant().toString(), ",\"photo_urls\":[\"" + url + "\"],\"client_id\":\"full-path-1\"")
+                .replace("\"contact_phone\":null", "\"contact_phone\":\"+573001112233\"");
+        caches.orderedStream().filter(c -> c.getClass().getSimpleName().equals("CachingSessionLookup")).forEach(ClearableCache::clear);
+        ApiResponse r = api.post("/cases/{code}/sightings", full, "7K3PQ");
+        assertThat(r.status()).isEqualTo(201);
+        // session, case, replay, supported_countries, upload lookup, conditional insert
+        assertThat(r.statements()).hasSize(6);
+    }
+}

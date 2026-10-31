@@ -1,0 +1,67 @@
+package co.scuby.cases;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import java.util.List;
+import java.util.Locale;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** Display text the server composes (docs/eng/api.md · Language). Human review: the copy. */
+class PublicTextDerivationTest {
+
+    static final Locale ES = Locale.forLanguageTag("es");
+    static final Locale EN = Locale.forLanguageTag("en");
+
+    @ParameterizedTest
+    @CsvSource({
+            "Carolina Mejía, Carolina M.",
+            "ana gomez ruiz, ana G.",
+            "Carolina, Carolina",
+            "'  Juan   Perez ', Juan P.",
+    })
+    void publicName(String displayName, String expected) {
+        assertThat(PublicTextDerivation.publicName(displayName, ES)).isEqualTo(expected);
+    }
+
+    /** Review I3: no name chosen → the mock's «Alguien», never something made from the email. */
+    @Test
+    void anUnnamedPublisherIsAGenericWordInTheRequestLanguage() {
+        assertThat(PublicTextDerivation.publicName(null, ES)).isEqualTo("Alguien");
+        assertThat(PublicTextDerivation.publicName(null, EN)).isEqualTo("Someone");
+        assertThat(PublicTextDerivation.publicName(null, Locale.FRENCH)).isEqualTo("Alguien");
+        assertThat(PublicTextDerivation.publicName("   ", EN)).isEqualTo("Someone");
+        assertThat(PublicTextDerivation.publicName("Carolina Mejía", EN)).isEqualTo("Carolina M.");
+    }
+
+    @Test
+    void placeNameIsTheStoredOneOrTheGenericLabelInTheRequestLanguage() {
+        assertThat(PublicTextDerivation.placeName("Laureles", EN)).isEqualTo("Laureles");
+        assertThat(PublicTextDerivation.placeName(null, ES)).isEqualTo("Zona marcada en el mapa");
+        assertThat(PublicTextDerivation.placeName(null, EN)).isEqualTo("Area marked on the map");
+        assertThat(PublicTextDerivation.placeName(null, Locale.FRENCH)).isEqualTo("Zona marcada en el mapa");
+    }
+
+    @Test
+    void summaryAsTheMockComposesItAndInEnglish() {
+        assertThat(PublicTextDerivation.summary("dog", "medium", List.of("brown"), ES)).isEqualTo("Perro · Mediano · Café");
+        assertThat(PublicTextDerivation.summary("cat", "small", List.of("black", "tan"), ES)).isEqualTo("Gato · Pequeño · Negro y canela");
+        assertThat(PublicTextDerivation.summary("other", null, List.of("white", "gray", "orange"), ES)).isEqualTo("Animal · Blanco, gris y naranja");
+        assertThat(PublicTextDerivation.summary("dog", null, List.of(), ES)).isEqualTo("Perro");
+        assertThat(PublicTextDerivation.summary("dog", "large", List.of("black", "tan"), EN)).isEqualTo("Dog · Large · Black and tan");
+    }
+
+    @Test
+    void whatsappUrlDropsThePlus() {
+        assertThat(PublicTextDerivation.whatsappUrl("+573007152284")).isEqualTo("https://wa.me/573007152284");
+    }
+
+    @Test
+    void lookTitleAsTheMockComposesIt() {
+        assertThat(PublicTextDerivation.lookTitle("dog", "small", List.of("black", "tan"), ES)).isEqualTo("Perro negro, pequeño");
+        assertThat(PublicTextDerivation.lookTitle("cat", null, List.of(), ES)).isEqualTo("Gato");
+        assertThat(PublicTextDerivation.lookTitle("other", "large", List.of("white"), EN)).isEqualTo("Animal white, large");
+    }
+}

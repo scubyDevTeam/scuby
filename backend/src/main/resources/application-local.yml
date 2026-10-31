@@ -4,3 +4,12 @@ spring:
     url: jdbc:postgresql://localhost:5433/scuby
     username: scuby
     password: scuby
+
+# thin slice: the web client's dev server and its e2e preview build
+scuby:
+  web:
+    allowed-origins: [ "http://localhost:5173", "http://localhost:4173" ]
+  auth:
+    test-bypass:
+      email-domains: [ "e2e.scuby.test" ]
+      sms-prefixes: [ "+5730000000" ]

@@ -1,1 +1,23 @@
 # Test profile
+# thin slice: integration tests behave like the client's e2e origin
+scuby:
+  web:
+    allowed-origins: [ "http://localhost:4173" ]
+  auth:
+    google:
+      client-id: test-google-client-id
+    test-bypass:
+      email-domains: [ "e2e.scuby.test" ]
+      sms-prefixes: [ "+5730000000" ]
+  media:
+    public-base-url: http://localhost/dev-media
+    # One directory per test context: TestDb.reset clears it, so two test runs at once (another
+    # worktree, a second agent) must never share it.
+    local-dir: ${java.io.tmpdir}/scuby-dev-media-test-${random.uuid}
+# thin slice: each cached test context keeps its own pool against one Postgres container
+# (max_connections 100); small pools keep a dozen contexts under the limit.
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1

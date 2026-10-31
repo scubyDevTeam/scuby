@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,6 +43,34 @@ public final class ContractValidator {
         }
     }
 
+    /** One operation of the contract; {@code sessionRequired} when it declares {@code security: [{session: []}]}. */
+    public record Operation(String method, String path, boolean sessionRequired) {}
+
+    private static final List<String> METHODS = List.of("get", "post", "put", "patch", "delete");
+
+    public List<Operation> operations() {
+        List<Operation> found = new ArrayList<>();
+        document.get("paths").properties().forEach(path -> {
+            for (String method : METHODS) {
+                JsonNode op = path.getValue().get(method);
+                if (op == null) continue;
+                boolean session = op.has("security") && op.get("security").toString().contains("\"session\"");
+                found.add(new Operation(method.toUpperCase(Locale.ROOT), path.getKey(), session));
+            }
+        });
+        return found;
+    }
+
+    /** True when a concrete request path (query string allowed) is an instance of a documented path template. */
+    public boolean documents(String concretePath) {
+        String path = concretePath.contains("?") ? concretePath.substring(0, concretePath.indexOf('?')) : concretePath;
+        for (var it = document.get("paths").propertyNames().iterator(); it.hasNext(); ) {
+            String template = it.next();
+            if (path.matches(template.replaceAll("\\{[^/}]+}", "[^/]+"))) return true;
+        }
+        return false;
+    }
+
     public List<String> errors(String method, String pathTemplate, int status, String jsonBody) {
         String pointer = "/paths/" + escape(pathTemplate) + "/" + method.toLowerCase(Locale.ROOT)
                 + "/responses/" + status + "/content/application~1json/schema";
@@ -50,6 +79,15 @@ public final class ContractValidator {
         }
         List<Error> found = registry.getSchema(SchemaLocation.of(BASE + "#" + pointer)).validate(jsonBody, InputFormat.JSON);
         return found.stream().map(Error::getMessage).toList();
+    }
+
+    /** For answers without a body (204): the status must be documented and have no content. */
+    public List<String> errorsForNoContent(String method, String pathTemplate, int status) {
+        String pointer = "/paths/" + escape(pathTemplate) + "/" + method.toLowerCase(Locale.ROOT) + "/responses/" + status;
+        JsonNode response = document.at(pointer);
+        if (response.isMissingNode()) return List.of("contract has no " + method + " " + pathTemplate + " → " + status);
+        if (response.has("content")) return List.of("contract expects a body for " + method + " " + pathTemplate + " → " + status);
+        return List.of();
     }
 
     static String escape(String path) {

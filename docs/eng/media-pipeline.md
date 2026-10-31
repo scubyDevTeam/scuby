@@ -36,7 +36,7 @@ problem; the server repeats the safety steps because not every client is ours.
 | Validate | Real image (magic bytes, not extension), one of **JPEG, PNG, WebP or AVIF** (HEIC is never converted — decision #39); reject > 10 MB pre-resize; reject dimensions > 8000 px |
 | Re-encode | Master stored as JPEG ≤ 1600 px, sRGB — one canonical format regardless of what arrived |
 | Limits | Per pet 6 · per sighting 3 · per claim proof 5 · per help evidence 5 |
-| Auth | **Short-lived signed upload URLs**, scoped to what the photo is for (pet, sighting, claim, evidence, profile) and to who asks — the session or the device. Never a public bucket write. The row does not exist yet when the photo is picked, so it is the publish that attaches: it refuses a photo this caller did not upload for that purpose. Anonymous uploads inherit the rate limits of what they are for. The mechanics: [api.md](api.md) · Uploads |
+| Auth | **Short-lived signed upload URLs**, scoped to what the photo is for (pet, sighting, claim, evidence, profile) and to who asks — the session or the device. Never a public bucket write. The row does not exist yet when the photo is picked, so it is the publish that attaches: it refuses a photo this caller did not upload for that purpose. Slots have no rate limit, signed in or anonymous (decision #55 in [00](../product/00-product-map.md)). The mechanics: [api.md](api.md) · Uploads |
 
 ### Malicious content
 No automated NSFW/abuse scanning in v1 — volume doesn't justify it. The report button and the

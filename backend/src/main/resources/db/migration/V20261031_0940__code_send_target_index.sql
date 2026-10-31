@@ -1,0 +1,22 @@
+-- Performance index for the code log's per-target counts (docs/eng/backend.md · Migrations and indexes). Owner doc for
+-- the rules it serves: docs/eng/auth.md (send caps, cooldown, failed-check cap).
+--
+-- 1. Can the table grow without bound? Yes, in practice. The 30-day purge bounds the age of rows, not their number:
+--    POST /auth/email/start is anonymous, and every new address passes its own per-address cap and inserts a row, so an
+--    attacker's request rate (not a user count) sets the size. At 50 requests/s that is ~4 M rows a day, ~130 M at the
+--    purge horizon. This reverses the earlier removal of code_send_channel_sent_at_idx, which assumed the purge was the bound.
+-- 2. How often does the query run? On every sign-in start (the send count and cooldown, email and SMS) and, with the
+--    failed-check count embedded in the statement that checks a code, on every verification. The hottest anonymous path.
+-- 3. What happens without it? Each of those statements scans the whole table (Seq Scan on code_send, filtered by channel,
+--    target, kind and sent_at): milliseconds at 60 k rows, seconds and the shared Postgres CPU at 100 M, on a path anyone
+--    can call. With it, a read touches only the target's own entries from the last 24 h.
+--
+-- Queries served (CodeSends.countsQuery, CodeSends.failureCountQuery): WHERE channel = ? AND target = ? AND kind = ? AND
+-- sent_at > ?. Plan check: CodeSendPlanTest (60,000 rows, 25,000 targets, ANALYZE). Before: Aggregate > Seq Scan on
+-- code_send (cost 1751.01). After: Aggregate > Bitmap/Index Scan using this index, a few rows.
+--
+-- Also serves the SMS spend alarm count (channel = 'sms' AND sent_at > ?): a Bitmap Index Scan on the channel prefix with
+-- sent_at checked inside the index, so the SMS path reads only SMS rows (paid, so bounded by spend), never the email rows. Write cost: one entry per row written (each send and each failed check), about
+-- 80 bytes; the purge deletes them. Overlaps: none (the table has only its primary key). kind is not in the index: a target
+-- has at most a few dozen rows in a day, so filtering them on the heap is cheaper than a wider index.
+CREATE INDEX code_send_channel_target_sent_at_idx ON code_send (channel, target, sent_at);

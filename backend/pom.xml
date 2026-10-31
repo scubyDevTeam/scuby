@@ -22,7 +22,25 @@
     <testcontainers-codegen.version>1.21.4</testcontainers-codegen.version>
     <!-- Empty default so surefire's @{argLine} resolves when no other plugin (e.g. JaCoCo) sets it. -->
     <argLine></argLine>
+    <!-- thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md): versions Boot does not manage -->
+    <libphonenumber.version>9.0.42</libphonenumber.version>
+    <aws-sdk.version>2.57.6</aws-sdk.version>
+    <pitest.version>1.30.1</pitest.version>
+    <pitest-junit5.version>1.2.3</pitest-junit5.version>
   </properties>
+
+  <!-- thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md): the AWS SDK's own BOM -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws-sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
@@ -97,10 +115,73 @@
       <artifactId>testcontainers-postgresql</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <!-- NimbusJwtDecoder for Google ID tokens; no resource-server auto-configuration on purpose -->
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-oauth2-jose</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.googlecode.libphonenumber</groupId>
+      <artifactId>libphonenumber</artifactId>
+      <version>${libphonenumber.version}</version>
+    </dependency>
+    <dependency>
+      <!-- presigned uploads in staging (plan A2); only the JDK URL client, no Netty or Apache -->
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <exclusions>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache-client</artifactId></exclusion>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache5-client</artifactId></exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>url-connection-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
     <plugins>
+      <!-- thin slice: building with another JDK or an old Maven fails at validate with a clear message -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.6.3</version>
+        <executions>
+          <execution>
+            <id>enforce-java-and-maven</id>
+            <phase>validate</phase>
+            <goals><goal>enforce</goal></goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[25,26)</version>
+                  <message>Scuby's backend builds with Java 25 (backend/.java-version). Export JAVA_HOME=/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home or run `jenv local 25`.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                  <message>Use the wrapper: ./mvnw</message>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <!--
         jOOQ codegen runs the migrations against a throwaway container and writes target/generated-sources/jooq.
         - Plugin 0.0.4 is built for Testcontainers 1.x, so 1.x is pinned here for the plugin only;
@@ -109,6 +190,7 @@
         - The plugin's internal Flyway 9 is left alone on purpose (overriding it breaks the plugin): there is
           a drift risk against the runtime Flyway 12.
         - Every build needs Docker and the local image scuby/postgres:17 (infra/docker/postgres/verify.sh builds it).
+          backend/build.sh runs this build inside a Maven container with the Docker socket mounted.
       -->
       <plugin>
         <groupId>org.testcontainers</groupId>
@@ -190,29 +272,33 @@
           <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
         </configuration>
       </plugin>
+      <!-- thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md): mutation testing on derivations -->
       <plugin>
-        <groupId>com.google.cloud.tools</groupId>
-        <artifactId>jib-maven-plugin</artifactId>
-        <version>3.5.2</version>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <version>${pitest.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-junit5-plugin</artifactId>
+            <version>${pitest-junit5.version}</version>
+          </dependency>
+        </dependencies>
         <configuration>
-          <from>
-            <image>eclipse-temurin:25-jre</image>
-            <platforms>
-              <platform><architecture>arm64</architecture><os>linux</os></platform>
-              <platform><architecture>amd64</architecture><os>linux</os></platform>
-            </platforms>
-          </from>
-          <to>
-            <image>scuby-backend</image>
-          </to>
-          <container>
-            <mainClass>co.scuby.ScubyApplication</mainClass>
-            <ports><port>8080</port></ports>
-            <jvmFlags>
-              <jvmFlag>-XX:MaxRAMPercentage=60</jvmFlag>
-            </jvmFlags>
-          </container>
+          <targetClasses><param>co.scuby.*Derivation*</param></targetClasses>
+          <targetTests><param>co.scuby.*DerivationTest</param></targetTests>
+          <mutationThreshold>80</mutationThreshold>
+          <failWhenNoMutations>false</failWhenNoMutations>
+          <timestampedReports>false</timestampedReports>
+          <outputFormats><param>HTML</param><param>XML</param></outputFormats>
         </configuration>
+        <executions>
+          <execution>
+            <id>mutation-test-derivations</id>
+            <phase>verify</phase>
+            <goals><goal>mutationCoverage</goal></goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

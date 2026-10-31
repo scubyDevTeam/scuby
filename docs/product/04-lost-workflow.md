@@ -103,6 +103,20 @@ The publish form includes the **phone step** — verified once, shown prefilled 
 every later publish, re-verified on change: the UI contract lives in
 [eng/auth.md](../eng/auth.md) and applies to all four verticals.
 
+#### Contact visibility
+
+What the public card shows of the publisher (decisions #47 and #48 in [00](00-product-map.md)):
+
+- **An unverified phone is never public.** Only the owner sees the number. A «WhatsApp» link on the
+  public case needs all of: `expose_whatsapp`, the number marked as having WhatsApp, the number
+  **verified**, `in_app_only` off, and an active case. With `publisher_phone_otp` off
+  ([eng/auth.md](../eng/auth.md) · Behind a flag) a case publishes with the number unverified and has
+  no public phone contact — only «Lo vi» and the in-app thread — until the number is verified.
+- **`in_app_only` wins over `expose_whatsapp`** when both arrive: no link.
+- **The publisher's public name is never derived from the email.** Until the person has chosen a name
+  (typed one, or one supplied by Google), the card shows «Alguien» / "Someone". Once chosen, it is
+  shortened as usual («Carolina M.»).
+
 Two invariants enforced at publish:
 
 | Situation | Behavior |
@@ -120,14 +134,24 @@ searcher who trusts it wastes time on one corner.
 
 | Location | Owner sees | Public / helpers see | Why |
 |---|---|---|---|
-| `last_seen` | the circle they drew | the circle, **radius floored at 200 m** | The circle is usually around a home. A 50 m circle on a shared WhatsApp card is a doorstep — personal data under Ley 1581 and a safety exposure. The floor is applied at render, never stored |
+| `last_seen` | the circle they drew, at the exact point | the circle, **center snapped to a ~200 m grid and radius floored at 200 m** | The circle is usually around a home. A 50 m circle on a shared WhatsApp card is a doorstep — personal data under Ley 1581 and a safety exposure — and so is an exact center under a wider circle, which the anonymous feed hands out for every active case. The server sends the snapped center and the floored radius to everyone but the owner; neither is stored (decisions #41, #63) |
 | Sighting pins | exact | **exact** | Street corners are nobody's personal data, and «¿qué esquina?» is the entire value of a sighting |
 | Reporter contact | visible | **hidden** | Given to the owner, not to the internet |
 
-Computation always uses the stored center: the 30 km sighting bound, the «a 400 m de donde se
-perdió» distance in notifications, and the trajectory line all measure from `last_seen_point`. Only
-the rendered marker is widened. The same circle is rendered every time — nothing random, so there is
-nothing to average out across loads.
+The public center is the snapped one **for display and for every check or ordering a non-owner can
+observe**: the 30 km sighting bound («Lo vi») and the feed's 25 km filter and distance bands measure from
+`last_seen_public_point`, never from the exact point. A check against the exact point is an oracle: an anonymous
+caller bisects the yes/no answer (about 75 requests) and recovers the point the snap hides (decision #69).
+The exact center stays stored (`last_seen_lat`/`last_seen_lng`, no spatial column; the owner's view) and is used only by computations whose result
+never reaches a non-owner: the «a 400 m de donde se perdió» distance in notifications and the trajectory line.
+The snapped center is computed once, at publish, by one function and stored beside the exact one (it is not
+recomputed in SQL, so there is one copy of the grid formula). What a non-owner receives is derived from it: the center is rounded to the nearest node of a fixed grid (latitude
+step 0.0018°, about 200 m; longitude step the same ground distance, 0.0018° / cos latitude, so cells are about
+square everywhere), and the radius is floored. It is deterministic — the same point always gives the same
+center, so there is nothing random to average out across loads and no secret to keep. The snapped center is at
+most ~142 m from the exact point, inside the 200 m floor, so the circle a client draws around it still contains
+the point; a client draws the center and radius it is given and does not correct them. The feed's `point` is
+the snapped center for every caller. Sighting pins stay exact.
 
 `last_seen_radius_m` is the owner's *uncertainty*. It is **not** the broadcast radius (who gets the
 push), which is a reach decision owned by the broadcast rules. Don't derive one from the other.
@@ -151,12 +175,12 @@ everything in this section assumes a sighting attached to a lost case.
 
 `seen_at` is when the reporter saw the animal; `created_at` is when they told us. They differ
 whenever someone reports late («lo vi ayer»), and everything below orders by `seen_at`.
-`reporter_device_key` is a device/IP-derived key for anonymous reporters — the rate-limit handle
-when there is no `person_id`.
+`reporter_device_key` is a device-derived key for anonymous reporters — who the reporter is
+when there is no `person_id` (`mine`, the correction window). No IP is kept.
 
 Default `visible` — publishing a sighting must be instant, or the map dies. The owner can hide any
-pin; moderation removes abuse ([09-reporting.md](09-reporting.md)). Anti-spam is **rate limiting +
-owner-hides-pin**, never pre-approval and never OTP.
+pin; moderation removes abuse ([09-reporting.md](09-reporting.md)). Anti-spam is **owner-hides-pin
++ moderation** (rate limits are deferred until real patterns are seen — decision #54), never pre-approval and never OTP.
 
 **Only the pin is required** (decision #13, [00](00-product-map.md)). `seen_at` defaults to now;
 photo, note, and contact are optional for everyone, anonymous included. A bare pin is worth less to
@@ -195,16 +219,17 @@ saved yet. After submit, the reporter can edit or delete their own sighting unti
 | Check | Bound | Where | Error copy |
 |---|---|---|---|
 | Distance from `last_seen_point` | ≤ 30 km | FE + BE | «Ese punto está muy lejos del último lugar donde se vio a Luna» |
-| `seen_at` in the future | reject | FE + BE | «La hora no puede ser en el futuro» |
+| `seen_at` in the future | the server rejects beyond 5 minutes (device clock drift); the client form rejects any future time | FE + BE | «La hora no puede ser en el futuro» |
 | `seen_at` before the case | ≥ `last_seen_at − 24h` | FE + BE | «Luna se perdió después de esa hora» |
-| Rate, per reporter per case | 1 per 15 min, 5 per day — **the 15-minute rule is waived while the reporter's earlier pin is still inside its correction window**, so «Lo vi otra vez» is never refused as «hace poco» | BE only | «Ya registraste un avistamiento hace poco» |
-| Rate, per reporter global | 20 per day | BE only | same |
+| Rate, per reporter per case | **Deferred until real patterns are seen** ([decision #54](00-product-map.md); [O30](../open-items.md)) | none | — |
+| Rate, per reporter global | same | none | — |
+| Rate, per IP | same | none | — |
 
 **FE validates for feedback, BE enforces.** The distance and time checks are trivial math, so the
 form runs them the moment the pin lands or the time is picked — the user never waits on a round
 trip to learn the pin is wrong. The server runs the same checks anyway: the client is not trusted
 input, and spam is precisely the actor that skips the app and hits the endpoint directly. The
-server-side cost is one distance calculation on a row being written. Rate limits are server-only —
+server-side cost is one distance calculation on a row being written. Rate limits, when they exist, are server-only —
 the client cannot see other devices or its own cleared state. Every rejection is an error returned
 to the caller, never a silent drop.
 
@@ -233,6 +258,9 @@ The map answers «¿dónde voy ahora?»; the list answers «¿qué pasó y cuán
 6. **Late reports are not breaking news.** A new sighting whose `seen_at` is older than the current
    newest still notifies the owner, but the push says when it was seen and the pin renders in its age
    band, not as the latest. The owner is never led to a point the animal left two days ago.
+7. **At most 200 sightings are shown.** A case lists its 200 most recent visible sightings (by `seen_at`),
+   to the owner and to the public alike, oldest first like the rest; older ones stay in the database and
+   leave the response. The feed's `sightings_count` stays the true number of visible sightings (decision #64).
 
 Not in v1, on purpose: weighting by photo, registered-vs-anonymous, or cluster corroboration. These
 are real signals but they are ranking algorithms, and there is no data to tune them yet. Recency plus

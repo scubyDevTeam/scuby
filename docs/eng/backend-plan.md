@@ -72,7 +72,7 @@ response against `openapi.json`. Spike: does openapi-generator produce usable Ja
 3.1 document (the gate to stage 2 of decision #34)? *Done when:* a deliberately wrong response fails a test.
 
 **0.5 Observability and CI.** *Do:* OpenTelemetry export to New Relic, Sentry; GitHub Actions
-backend workflow (path filter, tests, Jib ARM64 image). *Done when:* a PR runs the suite and
+backend workflow (path filter, tests, ARM64 image). *Done when:* a PR runs the suite and
 produces an image.
 
 ## Phase I — Staging infrastructure
@@ -107,18 +107,19 @@ through a presigned URL with a matching checksum appears as a master and serves 
 PUT → URL ([api.md](api.md) · Uploads). *Do:* implement both against `openapi.json`; the emulated
 bucket (`web/src/mocks/api/media.ts`) is the behaviour to match.
 
-**S.1 Auth.** Email code (Resend), Google sign-in, session cookie, `GET /session`, sign-out,
+**S.1 Auth.** Email code (provider open, [O23](../open-items.md); log-only sender until then), Google sign-in, session cookie, `GET /session`, sign-out,
 `GET /config` from `supported_countries`.
 
-**S.2 Phone step.** `POST /me/phone` + verify; SMS OTP over Twilio with the safety checklist of
-[auth.md](auth.md) (Bucket4j limits, spend alarm); the `publisher_phone_otp` flag
+**S.2 Phone step.** `POST /me/phone` + verify; SMS OTP (provider open, [O23](../open-items.md); log-only sender until then) with the safety checklist of
+[auth.md](auth.md) (limits counted over rows in Postgres, spend alarm); the `publisher_phone_otp` flag
 ([feature-flags.md](feature-flags.md)).
 
 **S.3 Publish and view a lost case.** `POST /lost-cases`, `GET /cases/{code}` with the
-publisher-only fields, `GET /feed` (newest first, as the contract says today).
+publisher-only fields, `GET /feed` (nearest first with a national fallback — decision #41 in
+[00](../product/00-product-map.md); the contract's wording still says newest first).
 
 **S.4 «Lo vi».** `POST /cases/{code}/sightings` with server-side validation, the `client_id` replay
-key, rate limits keyed by the anonymous identity from S.0; photos through the upload flow.
+key (no rate limits: decision #54); photos through the upload flow.
 
 **Done when (phase):** the client, built with `VITE_API_MOCK=false` against staging, passes its
 sign-in, publish-lost and lost-case e2e specs.
@@ -137,7 +138,7 @@ Each a step; order within the phase follows what the client needs next.
 - **L.5 Found vertical** and matching v1 ([05](../product/05-found-workflow.md), [O7](../open-items.md)).
 - **L.6 Chat** over Twilio Conversations ([comms.md](comms.md)).
 - **L.7 Reporting and the operator queue** ([09](../product/09-reporting.md); staffing [O11](../open-items.md)).
-- **L.8 Purges and account deletion** ([01](../product/01-actors-and-entities.md) rule 7, decision #28).
+- **L.8 Purges and account deletion** ([01](../product/01-actors-and-entities.md) rule 7, decision #28). Deleting a person must also evict that person's cached sessions: the cache is keyed by token hash, so collect the hashes before the cascade ([backend.md](backend.md) · Sessions).
 - **L.9 Reverse geocoding** for place names.
 
 ## Phase X — Production and launch

@@ -6,21 +6,78 @@ spring:
       enabled: true
   jackson:
     property-naming-strategy: SNAKE_CASE
+    factory:
+      constraints:
+        read:
+          # Bodies are small JSON (photos go to S3, never in JSON). Defaults are unbounded (document, tokens) or
+          # 100 MB (a string), so one anonymous request could exhaust the heap before @Size runs. The largest real
+          # body is a publish (a few KB; the longest field is the 4096-char Google credential). Over a limit the
+          # request is `validation_failed` (the contract has no 413). RequestBodyLimitsTest.
+          max-document-length: 65536
+          max-string-length: 8192
+          max-name-length: 100
+          max-nesting-depth: 16
+          max-number-length: 32
+          max-token-count: 2000
+  datasource:
+    hikari:
+      data-source-properties:
+        # The driver's error message would carry «Detail: Failing row contains (...)», personal data (decision #46).
+        logServerErrorDetail: false
   jooq:
     sql-dialect: postgres
   flyway:
     schemas: scuby
     default-schema: scuby
     create-schemas: true
+    # Migration versions are timestamps; a branch merged later than another may carry an older one, which
+    # must still be applied (so migrations must not depend on each other's order). MigrationNamesTest.
+    out-of-order: true
 
 # Telemetry to New Relic (US) — decision #38. Everything is driven by variables, so a laptop and the tests set
 # nothing and export nothing; servers set them (docs/eng/backend.md · Environments and profiles). The key is
 # newrelic.license-key on servers (Parameter Store, docs/eng/infra.md · Secrets) or NEW_RELIC_LICENSE_KEY on a
 # laptop (from the Keychain); never in a file.
+# thin slice (docs/superpowers/specs/2026-10-29-backend-thin-slice-design.md): the keys below, under scuby:, except telemetry
 scuby:
   environment: ${SCUBY_ENVIRONMENT:local}
   telemetry:
     export: ${SCUBY_TELEMETRY_EXPORT:false}
+  web:
+    allowed-origins: []
+  cookies:
+    secure: true
+  flags:
+    cache-ttl: 30s
+  sms:
+    max-per-number: 5
+    alarm-daily-sends: 50
+  feed:
+    near-radius-m: 25000
+    max-items: 100
+  sessions:
+    cache-size: 10000
+    cache-ttl: 60s
+    lifetime-months: 12
+  auth:
+    code-hash-key: local-only-code-hash-key
+    test-bypass:
+      email-domains: []
+      sms-prefixes: []
+      code: "123456"
+    google:
+      client-id: local-google-client-id
+      jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+  media:
+    store: local
+    public-base-url: http://localhost:8080/dev-media
+    # Relative to the working directory: per checkout/worktree when run from Maven (backend/target is
+    # git-ignored); inside the Docker container SCUBY_MEDIA_LOCAL_DIR points at the container's own path.
+    local-dir: target/dev-media
+    bucket: ""
+    region: ""
+    slot-ttl: 5m
+    attach-window: 24h
 
 management:
   endpoints:

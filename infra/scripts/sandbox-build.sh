@@ -3,9 +3,9 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 docker build --platform linux/arm64 -t scuby/postgres:17 "$REPO/infra/docker/postgres"
-cd "$REPO/backend"
-export JAVA_HOME=/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home PATH=/opt/homebrew/opt/openjdk@25/bin:$PATH
-./mvnw -q -B -DskipTests package jib:dockerBuild -Djib.from.platforms=linux/arm64
+# Maven runs in a container on the host's native architecture; only the runtime image is built for arm64.
+# The tag "latest" makes the local image name plain scuby-backend, which sandbox-deploy.sh tags for ECR.
+SCUBY_IMAGE_TAG=latest bash "$REPO/backend/build.sh" --platform linux/arm64
 docker image inspect scuby/postgres:17 scuby-backend --format '{{.RepoTags}} {{.Architecture}}'
 for img in scuby/postgres:17 scuby-backend; do
   arch=$(docker image inspect "$img" --format '{{.Architecture}}')
