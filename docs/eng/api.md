@@ -216,9 +216,9 @@ lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the 
   point) waits for the first request that uses it.
 - **Publish idempotency** — a double tap on «Publicar» creates two pets and two active cases; add a
   `client_id` to `publishLost`, replayed like a sighting's.
-- **Google with a non-Google address** — the backend answers `401` when the Google address is not
-  one Google vouches for and the browser has no email-code session of that same address (or has one
-  of another address) ([auth.md](auth.md) · Sign-in, the "One account per email" rule). Add a distinct error code the
+- **Google with a non-Google address** — when the Google address is not one Google vouches for and no
+  account has that email, Google creates the account (decision #70). When an account with that email exists, the backend answers `401` if the browser has no email-code session of that same address (or has one
+  of another address) ([auth.md](auth.md) · Sign-in, the "One account per email" rule). Add a distinct error code, for this existing-account case only, that the
   client can turn into «Entra primero con tu código de correo»; with a session of the same address,
   signing in with Google links it.
 - **E2E test identities** — the client's e2e specs sign in with `ana.gomez@correo.co` and the phone

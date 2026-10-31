@@ -38,12 +38,14 @@
   [00](../product/00-product-map.md)). What Google may do depends on whether it vouches for *current* control of
   the address (**authoritative**: the domain is `gmail.com` or `googlemail.com`, or the token's `hd`
   (Workspace domain) equals the email's domain). Outside those, `email_verified` is historical (the address
-  may have changed hands), which would allow account takeover and pre-hijacking; only the email code proves
+  may have changed hands), which would allow account takeover (pre-hijack of a new address is accepted, see Known limitation below); only the email code proves
   the mailbox.
   - A `sub` already linked signs in to its account.
   - **Authoritative address:** creates the account, or links the existing account with that email if it has no
     Google identity yet (never over another `sub`: that is `401`).
-  - **Any other address, no session:** `401`, and nothing is created or linked.
+  - **Any other address, no session, no account with that email:** Google creates the account and links
+    its `sub` (decision #70, amending #58). A later email-code sign-in for that address lands in the same account.
+  - **Any other address, no session, an account with that email exists:** `401`, and nothing is created or linked.
   - **Any other address, with a session of the account whose email is exactly this one** (the person signed in
     with the email code): the Google identity is linked to that account for good; from then on Google alone
     signs in to it.
@@ -52,7 +54,15 @@
   There is no flag on the account and no step that removes a Google link or ends other sessions: an
   email-code sign-in never touches a Google link. The contract has one `401` code, `unauthorized`, for every refusal; a distinct
   code for "sign in with your email code first" is a client-side proposal
-  ([api.md](api.md) · Proposals). Rejected: link on any verified email; allow only Gmail.
+  ([api.md](api.md) · Proposals). Rejected alternatives: decisions #58 and #70 in [00](../product/00-product-map.md).
+  - **Race:** two Google sign-ins creating the same email end in one account (the UNIQUE on `person.email`
+    decides): the loser is `401`, or the same person's win when it is the same `sub`; never a `500`, no locks.
+  - **Known limitation, pre-hijack:** because Google creates the account for a new non-authoritative address, an
+    attacker who once controlled that address can create the account first, and keeps Google access and its
+    sessions permanently after the owner later signs in with the email code: no step removes a Google link or
+    ends other sessions, and the owner cannot see either. The attacker also sees whatever the owner adds
+    later. Accepted as rare (#70). Cheap mitigations, not required now, and the case-recovery question are
+    tracked in [O33](../open-items.md).
 - **No phone uniqueness.** Two accounts may verify the same number (`person.phone` is not unique):
   the number is a contact channel, not an identity, and shared family phones are common.
 - **Until the providers exist** ([O23](../open-items.md)), local, test and staging write email and
@@ -167,6 +177,8 @@ takeover every few days.
 ### Known limitations and risks
 
 Accepted or tracked; each is a deliberate tradeoff, not an oversight.
+
+- **Pre-hijack of a new non-authoritative address.** See the Sign-in bullet "Known limitation, pre-hijack" above ([O33](../open-items.md)).
 
 - **Cookie tossing.** A sibling subdomain can set cookies for the parent domain. The session cookie is
   `__Host-session` (browsers refuse a `__Host-` cookie that names a `Domain`), and both cookie readers treat a

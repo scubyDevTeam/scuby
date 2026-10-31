@@ -56,6 +56,25 @@ class People {
         return byGoogleSub(googleSub).orElseThrow();
     }
 
+    /**
+     * Creates the account only if nothing conflicts. Empty when the email already belongs to another account (the
+     * caller must not link to it); when only the Google identity conflicts, that is the same person's concurrent
+     * sign-in and its account is returned.
+     */
+    Optional<Person> createIfNew(String normalizedEmail, String displayName, boolean displayNameChosen, String googleSub) {
+        int inserted = db.insertInto(PERSON)
+          .set(PERSON.ID, UUID.randomUUID())
+          .set(PERSON.EMAIL, normalizedEmail)
+          .set(PERSON.DISPLAY_NAME, displayName)
+          .set(PERSON.DISPLAY_NAME_CHOSEN, displayNameChosen)
+          .set(PERSON.GOOGLE_SUB, googleSub)
+          .set(PERSON.CREATED_AT, clock.instant().atOffset(ZoneOffset.UTC))
+          .onConflictDoNothing()
+          .execute();
+        if (inserted == 1) return byEmail(normalizedEmail);
+        return byGoogleSub(googleSub).filter(p -> p.email().equals(normalizedEmail));
+    }
+
     /** Sets the Google identity only while the account has none; false when it already has one (never overwritten). */
     boolean linkGoogle(UUID id, String sub) {
         return db.update(PERSON).set(PERSON.GOOGLE_SUB, sub)

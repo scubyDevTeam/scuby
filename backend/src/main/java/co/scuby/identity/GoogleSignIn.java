@@ -37,13 +37,16 @@ class GoogleSignIn {
      *   <li>By `sub` first: an account already linked to this Google identity signs in, whatever address Google now reports.</li>
      *   <li>Otherwise, an <b>authoritative</b> address (gmail.com, googlemail.com, or a Workspace `hd` equal to its
      *       domain) creates the account or links the existing one with that email (never over another `sub`).</li>
-     *   <li>Any other verified address only proves that some provider said so, so it never creates or links by
-     *       itself: with no session it is refused; with a session of the account whose email is exactly this
+     *   <li>Any other verified address only proves that some provider said so, so it never links by itself. With
+     *       no account for the email and no session, Google creates it; with an existing account and no session it
+     *       is refused; with a session of the account whose email is exactly this
      *       one (the person proved the mailbox with the email code) the identity is linked for good; a session
      *       of another account is refused. Nothing is ever linked across emails.</li>
      * </ul>
      * No row locks: the link is a conditional UPDATE (`google_sub IS NULL`), and People.create keeps the row a
      * concurrent sign-in inserted for the same email.
+     * People.createIfNew does the opposite on purpose: on a conflict it never returns a row inserted concurrently
+     * by email, only the row already carrying this sub and email, so Google never links into another account.
      *
      * @param sessionPersonId the account of the session the browser carries, if any
      */
@@ -76,7 +79,14 @@ class GoogleSignIn {
             return linked(account, google.sub());
         }
         if (sessionPersonId == null) {
-            log.warn("Google sign-in refused: the address is not Google-authoritative and there is no email-code session");
+            // No account with this email: Google creates it (accepted pre-hijack risk, docs/eng/auth.md). An account
+            // that exists, or that a concurrent sign-in just created, is never linked without its email-code session.
+            if (people.byEmail(email).isEmpty()) {
+                Optional<Person> created = people.createIfNew(
+                        email, displayName(google, email), googleName(google).isPresent(), google.sub());
+                if (created.isPresent()) return created.get();
+            }
+            log.warn("Google sign-in refused: the address is not Google-authoritative and its account needs the email code");
             throw new ApiException(ErrorCode.UNAUTHORIZED, "sign in with your email code first");
         }
         Person signedIn = people.get(sessionPersonId);

@@ -253,22 +253,97 @@ class GoogleSignInTest {
         assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
     }
 
-    // ---- non-authoritative emails (decision 58): only an email-code session of the same address links them
+    // ---- non-authoritative emails (decisions 58 and 70): no account yet -> Google creates it; an account -> only its email-code session links
     @Test
-    void aNonAuthoritativeEmailWithoutASessionIsRefusedAndCreatesNothing() {
+    void aNonAuthoritativeEmailWithNoAccountCreatesItAndIssuesASession() {
         ApiResponse r = signInWith(GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant()));
-        assertThat(r.status()).isEqualTo(401);
-        assertThat(r.errorCode()).isEqualTo("unauthorized");
-        assertThat(db.fetchCount(PERSON)).as("no account is created").isZero();
-        assertThat(db.fetchCount(co.scuby.db.generated.Tables.SESSION)).isZero();
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(r.str("/email")).isEqualTo("carolina@correo.co");
+        assertThat(db.fetchCount(PERSON)).isEqualTo(1);
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
+        assertThat(db.fetchCount(co.scuby.db.generated.Tables.SESSION)).isEqualTo(1);
     }
 
     @Test
-    void anHdThatDoesNotMatchTheEmailDomainIsNotAuthoritative() {
+    void anEmailCodeSignInAfterAGoogleCreationLandsInTheSameAccount() {
+        String id = signInWith(GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant())).str("/id");
+        ApiResponse byCode = emailSignIn(clients.newBrowser(), "carolina@correo.co");
+        assertThat(byCode.status()).isEqualTo(200);
+        assertThat(byCode.str("/id")).isEqualTo(id);
+        assertThat(db.fetchCount(PERSON)).isEqualTo(1);
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
+    }
+
+    @Test
+    void anHdThatDoesNotMatchTheEmailDomainIsNotAuthoritativeSoAnExistingAccountIsNotLinked() {
+        emailSignIn(api, "carolina@empresa.co");
         var c = GoogleTestKeys.claims("google-sub-1", "carolina@empresa.co", clock.instant());
         c.put("hd", "otra.co");
         assertThat(signInWith(c).errorCode()).isEqualTo("unauthorized");
-        assertThat(db.fetchCount(PERSON)).isZero();
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isNull();
+    }
+
+    @Test
+    void anHdThatDoesNotMatchTheEmailDomainWithNoAccountCreatesItLikeAnyOtherAddress() {
+        var c = GoogleTestKeys.claims("google-sub-1", "carolina@empresa.co", clock.instant());
+        c.put("hd", "otra.co");
+        assertThat(signInWith(c).status()).isEqualTo(200);
+        assertThat(db.fetchCount(PERSON)).isEqualTo(1);
+    }
+
+    @Test
+    void aNonAuthoritativeNewAccountWithNoSessionIsFiveStatements() {
+        caches.orderedStream().filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags)).forEach(co.scuby.platform.cache.ClearableCache::clear);
+        ApiResponse r = signInWith(GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant()));
+        assertThat(r.status()).isEqualTo(200);
+        // sub lookup, email lookup, person insert + select, session insert (no session carried, so no filter lookup or old-session DELETE)
+        assertThat(r.statements()).hasSize(5);
+    }
+
+    @Test
+    void concurrentGoogleCreationsOfOneNonAuthoritativeEmailEndWithOneAccountAndNoServerError() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            testDb.reset();
+            var results = race(List.of("google-sub-1", "google-sub-2"), "carolina@correo.co");
+            assertThat(results).extracting(ApiResponse::status).containsExactlyInAnyOrder(200, 401);
+            assertThat(db.fetchCount(PERSON)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void concurrentGoogleCreationsOfOneNonAuthoritativeEmailAndSubEndWithOneAccount() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            testDb.reset();
+            var results = race(List.of("google-sub-1", "google-sub-1"), "carolina@correo.co");
+            assertThat(results).extracting(ApiResponse::status).containsOnly(200);
+            assertThat(results.get(0).str("/id")).isEqualTo(results.get(1).str("/id"));
+            assertThat(db.fetchCount(PERSON)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void aGoogleCreationRacingAnEmailCodeSignUpNeverLinksWithoutTheCodeAndNeverFails() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            testDb.reset();
+            var pool = Executors.newFixedThreadPool(2);
+            try {
+                String token = keys.token(GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant()));
+                ApiClient g = clients.newBrowser(), e = clients.newBrowser();
+                e.post("/auth/email/start", "{\"email\":\"carolina@correo.co\"}");
+                String code = emails.lastCodeFor("carolina@correo.co");
+                var barrier = new CyclicBarrier(2);
+                Future<ApiResponse> fg = pool.submit(() -> { barrier.await(); return g.post("/auth/google", "{\"credential\":\"" + token + "\"}"); });
+                Future<ApiResponse> fe = pool.submit(() -> { barrier.await();
+                    return e.post("/auth/email/verify", "{\"email\":\"carolina@correo.co\",\"code\":\"" + code + "\"}"); });
+                ApiResponse rg = fg.get(), re = fe.get();
+                assertThat(re.status()).isEqualTo(200);
+                assertThat(rg.status()).isIn(200, 401);
+                assertThat(db.fetchCount(PERSON)).isEqualTo(1);
+                if (rg.status() == 401) assertThat(db.fetchOne(PERSON).getGoogleSub()).as("no link without the code").isNull();
+            } finally {
+                pool.shutdownNow();
+            }
+        }
     }
 
     @Test
