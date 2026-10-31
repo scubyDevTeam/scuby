@@ -28,9 +28,9 @@ class SightingQueries {
         this.db = db;
     }
 
-    /** The case and the point's distance from its center, on geography (meters). */
+    /** The case and the point's distance from its SNAPPED public center (decision 69), on geography (meters). */
     Optional<CaseForSighting> caseFor(String code, GeoPoint point) {
-        var distance = Spatial.distanceMeters(LOST_CASE.LAST_SEEN_POINT, Spatial.geography(point));
+        var distance = Spatial.distanceMeters(LOST_CASE.LAST_SEEN_PUBLIC_POINT, Spatial.geography(point));
         return db.select(LOST_CASE.STATUS, LOST_CASE.LAST_SEEN_AT, distance)
                  .from(LOST_CASE).where(LOST_CASE.CODE.eq(code))
                  .fetchOptional(r -> new CaseForSighting(r.value1(), r.value2().toInstant(), r.value3()));

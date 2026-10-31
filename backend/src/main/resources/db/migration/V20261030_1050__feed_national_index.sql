@@ -9,6 +9,6 @@
 -- stops after 100 rows. Write cost: one entry per active case, removed when it closes; none for sightings.
 -- Overlaps: lost_case_one_active_per_pet (pet_id): different column.
 -- Plan check (the index would be used, not the justification): FeedPlanTest.
--- The local branch's GiST index on last_seen_point is deferred until the web client sends a point.
+-- The local branch's GiST index on last_seen_public_point is deferred until the web client sends a point.
 -- Needs human approval before merge.
 CREATE INDEX lost_case_active_published_idx ON lost_case (published_at DESC) WHERE status = 'active';

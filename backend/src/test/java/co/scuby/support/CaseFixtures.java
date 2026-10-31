@@ -1,5 +1,6 @@
 package co.scuby.support;
 
+import co.scuby.cases.LocationPrecisionDerivation;
 import co.scuby.platform.db.GeoPoint;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
@@ -46,6 +47,7 @@ public final class CaseFixtures {
     /** As above, with the number verified by SMS code at publish or not (publisher_phone_otp off: stored unverified). */
     public String lostCase(UUID owner, String code, String petName, String species, GeoPoint at, double radiusM,
                            String status, Instant publishedAt, boolean phoneHasWhatsapp, boolean phoneVerified) {
+        GeoPoint publicAt = LocationPrecisionDerivation.publicCenter(at);
         UUID pet = UUID.randomUUID();
         db.insertInto(PET).set(PET.ID, pet).set(PET.NAME, petName).set(PET.SPECIES, species)
           .set(PET.SIZE, "small").set(PET.COLORS, new String[]{"black", "tan"})
@@ -61,6 +63,7 @@ public final class CaseFixtures {
           .set(LOST_CASE.CONTACT_PHONE, LUNA_PHONE).set(LOST_CASE.CONTACT_PHONE_VERIFIED, phoneVerified).set(LOST_CASE.PHONE_HAS_WHATSAPP, phoneHasWhatsapp)
           .set(LOST_CASE.EXPOSE_WHATSAPP, true).set(LOST_CASE.EXPOSE_EMAIL, false).set(LOST_CASE.IN_APP_ONLY, false)
           .set(LOST_CASE.LAST_SEEN_LAT, at.lat()).set(LOST_CASE.LAST_SEEN_LNG, at.lng())
+          .set(LOST_CASE.LAST_SEEN_PUBLIC_LAT, publicAt.lat()).set(LOST_CASE.LAST_SEEN_PUBLIC_LNG, publicAt.lng())
           .set(LOST_CASE.LAST_SEEN_RADIUS_M, radiusM).set(LOST_CASE.LAST_SEEN_AT, publishedAt.atOffset(ZoneOffset.UTC))
           .execute();
         return code;

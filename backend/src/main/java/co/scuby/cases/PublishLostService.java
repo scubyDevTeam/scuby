@@ -90,7 +90,8 @@ class PublishLostService {
         // namer is a no-op, and a provider will want a cache keyed by the rounded point.
         GeoPoint point = request.lastSeenPoint().toGeoPoint();
         String placeName = placeNames.forNewCase(point, me);
-        Object result = tx.execute(status -> publishInTransaction(me, caller, request, now, prepared, point, placeName));
+        GeoPoint publicPoint = LocationPrecisionDerivation.publicCenter(point);
+        Object result = tx.execute(status -> publishInTransaction(me, caller, request, now, prepared, point, publicPoint, placeName));
         if (result instanceof PublisherPhone.CodeSent sent) {
             publisherPhone.deliver(sent);                 // after execute: no transaction, no pooled connection
             return PublishView.PhoneStep.OTP;
@@ -105,7 +106,8 @@ class PublishLostService {
     }
 
     private Object publishInTransaction(UUID me, Caller caller, PublishLostRequest request, Instant now,
-                                        PublisherPhone.Prepared prepared, GeoPoint point, @Nullable String placeName) {
+                                        PublisherPhone.Prepared prepared, GeoPoint point, GeoPoint publicPoint,
+                                        @Nullable String placeName) {
         // rate_limited and invalid_code propagate (they leave the transaction rollback-only).
         PublisherPhone.Outcome phone = publisherPhone.resolve(prepared, caller);
 
@@ -131,6 +133,8 @@ class PublishLostService {
                     .set(LOST_CASE.IN_APP_ONLY, request.contactPrefs().inAppOnly())
                     .set(LOST_CASE.LAST_SEEN_LAT, point.lat())
                     .set(LOST_CASE.LAST_SEEN_LNG, point.lng())
+                    .set(LOST_CASE.LAST_SEEN_PUBLIC_LAT, publicPoint.lat())
+                    .set(LOST_CASE.LAST_SEEN_PUBLIC_LNG, publicPoint.lng())
                     .set(LOST_CASE.LAST_SEEN_RADIUS_M, request.lastSeenRadiusM())
                     .set(LOST_CASE.LAST_SEEN_AT, request.lastSeenAt().withOffsetSameInstant(ZoneOffset.UTC))
                     .set(LOST_CASE.PLACE_NAME, placeName)

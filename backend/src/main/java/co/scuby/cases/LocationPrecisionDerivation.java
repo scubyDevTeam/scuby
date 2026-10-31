@@ -7,14 +7,16 @@ import co.scuby.platform.db.GeoPoint;
  * exact point snapped to the nearest node of a fixed grid of about 200 m. The owner's circle is often a home, and the
  * feed hands every active case to anyone, so the public never gets the exact point. Snapping is deterministic (a
  * given point always gives the same center, nothing to average away, no secret to keep); the exact point stays in
- * the database for every computation (the 30 km bound on sightings, distances). Pure: no Spring, jOOQ, clock or randomness.
+ * the database for the owner's view only. It is snapped ONCE, at publish, into last_seen_public_lat/lng, and every
+ * distance a non-owner can observe (feed 25 km and bands, the 30 km «Lo vi» bound) is measured from that stored
+ * center (decision 69): a check against the exact point is an oracle that bisects it back out. Pure: no Spring, jOOQ, clock or randomness.
  *
  * <p>The latitude step is fixed; the longitude step is the same distance on the ground at the snapped latitude
  * (latitude step / cos(latitude)), so cells are about square everywhere. The snapped center is at most half a cell
  * diagonal ({@link #MAX_OFFSET_M}, about 142 m) from the exact point, inside the public radius floor of 200 m, so the
  * circle the client draws around it still contains the point.
  */
-final class LocationPrecisionDerivation {
+public final class LocationPrecisionDerivation {
 
     /** About 200 m of latitude (1 degree is 111.32 km). */
     static final double LAT_STEP_DEG = 0.0018;
@@ -26,7 +28,7 @@ final class LocationPrecisionDerivation {
 
     private LocationPrecisionDerivation() {}
 
-    static GeoPoint publicCenter(GeoPoint exact) {
+    public static GeoPoint publicCenter(GeoPoint exact) {
         double lat = clamp(Math.round(exact.lat() / LAT_STEP_DEG) * LAT_STEP_DEG, 90);
         double lngStep = LAT_STEP_DEG / Math.max(Math.cos(Math.toRadians(lat)), MIN_COS);
         double lng = clamp(Math.round(exact.lng() / lngStep) * lngStep, 180);

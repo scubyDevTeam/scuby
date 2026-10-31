@@ -4,7 +4,13 @@
 -- the purged ones so a printed poster still resolves: GET answers `gone`).
 -- last_seen is an area: the stored radius is the owner's uncertainty; the 200 m public floor is
 -- applied when answering, never stored. place_name NULL = render the generic localized label.
--- Points: lat/lng columns written by the app + a generated geography column for PostGIS.
+-- Points: lat/lng columns written by the app. There are two centers (docs/product/04 · Location precision, #69):
+--   last_seen_lat/lng               the exact point. Owner's view only; no spatial column on purpose.
+--   last_seen_public_lat/lng        the snapped ~200 m center, written by the app at publish with
+--                                   LocationPrecisionDerivation.publicCenter (the one copy of the grid formula).
+--   last_seen_public_point          generated geography of the snapped center. EVERY distance check or ordering a
+--                                   non-owner can observe (feed 25 km / bands, «Lo vi» 30 km) measures from it.
+--                                   Unindexed: the local feed's GiST is deferred until the client sends a point.
 CREATE TABLE lost_case (
   code                text PRIMARY KEY CHECK (code ~ '^[A-Z0-9]{5}$'),
   pet_id              uuid NOT NULL REFERENCES pet (id),
@@ -19,8 +25,10 @@ CREATE TABLE lost_case (
   in_app_only         boolean NOT NULL,
   last_seen_lat       double precision NOT NULL CHECK (last_seen_lat BETWEEN -90 AND 90),
   last_seen_lng       double precision NOT NULL CHECK (last_seen_lng BETWEEN -180 AND 180),
-  last_seen_point     public.geography(Point, 4326) GENERATED ALWAYS AS
-                        (public.ST_SetSRID(public.ST_MakePoint(last_seen_lng, last_seen_lat), 4326)::public.geography) STORED,
+  last_seen_public_lat double precision NOT NULL CHECK (last_seen_public_lat BETWEEN -90 AND 90),
+  last_seen_public_lng double precision NOT NULL CHECK (last_seen_public_lng BETWEEN -180 AND 180),
+  last_seen_public_point public.geography(Point, 4326) GENERATED ALWAYS AS
+                        (public.ST_SetSRID(public.ST_MakePoint(last_seen_public_lng, last_seen_public_lat), 4326)::public.geography) STORED,
   last_seen_radius_m  double precision NOT NULL CHECK (last_seen_radius_m > 0 AND last_seen_radius_m <= 5000),
   last_seen_at        timestamptz NOT NULL,
   place_name          text

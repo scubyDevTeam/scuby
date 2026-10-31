@@ -11,6 +11,8 @@ import co.scuby.support.MutableClock;
 import co.scuby.support.TestDb;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Instant;
@@ -155,22 +157,37 @@ class FeedEndpointTest {
         assertThat(codes(local())).containsExactly("NEWFR", "OLDNR");
     }
 
-    @Test
-    void bandEdgesAreInclusiveJustInsideAndExclusiveJustOutside() {
-        // Each "in" point is 10 m inside a threshold, each "out" point 10 m past it; every band holds recency
-        // opposite to band order, so a wrong threshold changes the order.
-        cases.lostCase(owner, "B2OUT", "a", "dog", northOf(CENTER, 2_010), 300, "active", daysAgo(0));
-        cases.lostCase(owner, "B2IN2", "b", "dog", northOf(CENTER, 1_990), 300, "active", daysAgo(9));
-        cases.lostCase(owner, "B5OUT", "c", "dog", northOf(CENTER, 5_010), 300, "active", daysAgo(1));
-        cases.lostCase(owner, "B5IN2", "d", "dog", northOf(CENTER, 4_990), 300, "active", daysAgo(8));
-        cases.lostCase(owner, "B10OT", "e", "dog", northOf(CENTER, 10_010), 300, "active", daysAgo(2));
-        cases.lostCase(owner, "B10IN", "f", "dog", northOf(CENTER, 9_990), 300, "active", daysAgo(7));
-        cases.lostCase(owner, "C25IN", "g", "dog", northOf(CENTER, 24_990), 300, "active", daysAgo(3));
-        cases.lostCase(owner, "C25OT", "h", "dog", northOf(CENTER, 25_010), 300, "active", daysAgo(0));
-        ApiResponse r = local();
+    /**
+     * Bands and the 25 km filter measure from the SNAPPED center (decision 69). The case sits at Medellín (exact) and
+     * its snapped center is S. The query point is placed 10 m inside / past each threshold measured from S, and a
+     * second, older case Q is placed in the band that the first one leaves or enters. Recency beats distance inside
+     * a band, so the order shows which band the first case is in.
+     */
+    @ParameterizedTest(name = "{0} m, query {1} m from the snapped center")
+    @CsvSource({"2000,-10", "2000,10", "5000,-10", "5000,10", "10000,-10", "10000,10"})
+    void bandEdgesAreMeasuredFromTheSnappedCenter(double threshold, double delta) {
+        GeoPoint snapped = LocationPrecisionDerivation.publicCenter(CaseFixtures.MEDELLIN);
+        GeoPoint near = northOf(snapped, threshold + delta);
+        double previous = threshold == 2_000 ? 0 : threshold == 5_000 ? 2_000 : 5_000;
+        // Q: older, in the band just below the threshold whatever the exact snapping, 10 m from neither edge.
+        GeoPoint q = northOf(near, -((previous + threshold) / 2));
+        cases.lostCase(owner, "EDGEP", "p", "dog", CaseFixtures.MEDELLIN, 300, "active", daysAgo(0));
+        cases.lostCase(owner, "EDGEQ", "q", "dog", q, 300, "active", daysAgo(9));
+        ApiResponse r = api.get("/feed?lat={lat}&lng={lng}", near.lat(), near.lng());
+        // delta < 0: P is inside the threshold, same band as Q, and newer, so first. delta > 0: P is a band further.
+        assertThat(codes(r)).containsExactlyElementsOf(delta < 0 ? List.of("EDGEP", "EDGEQ") : List.of("EDGEQ", "EDGEP"));
+    }
+
+    @ParameterizedTest(name = "query {0} m from the snapped center")
+    @CsvSource({"24990, true", "25010, false"})
+    void theTwentyFiveKmFilterIsMeasuredFromTheSnappedCenter(double meters, boolean listed) {
+        GeoPoint snapped = LocationPrecisionDerivation.publicCenter(CaseFixtures.MEDELLIN);
+        GeoPoint near = northOf(snapped, meters);
+        cases.lostCase(owner, "EDGEP", "p", "dog", CaseFixtures.MEDELLIN, 300, "active", daysAgo(0));
+        cases.lostCase(owner, "NEARQ", "q", "dog", near, 300, "active", daysAgo(9));
+        ApiResponse r = api.get("/feed?lat={lat}&lng={lng}", near.lat(), near.lng());
         assertThat(r.str("/scope")).isEqualTo("local");
-        // band 0: B2IN2; band 1 (2-5 km): B2OUT(newest) then B5IN2; band 2 (5-10 km): B5OUT then B10IN; band 3: B10OT, C25IN.
-        assertThat(codes(r)).containsExactly("B2IN2", "B2OUT", "B5IN2", "B5OUT", "B10IN", "B10OT", "C25IN");
+        assertThat(codes(r).contains("EDGEP")).isEqualTo(listed);
     }
 
     @Test

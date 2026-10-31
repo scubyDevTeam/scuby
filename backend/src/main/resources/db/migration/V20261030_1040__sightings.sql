@@ -5,7 +5,7 @@
 -- (case_code, client_id) is the replay key of an offline retry (docs/eng/api.md · Conventions); it is an
 -- integrity constraint, and it stays a UNIQUE. Reads go through sighting_by_case_recent_idx (below).
 -- No geography column: nothing in the slice reads a sighting's point spatially (the 30 km check
--- measures the request point against lost_case.last_seen_point). Add one with its first consumer
+-- measures the request point against lost_case.last_seen_public_point). Add one with its first consumer
 -- (trajectory, orphan matching).
 CREATE TABLE sighting (
   id                    uuid PRIMARY KEY,

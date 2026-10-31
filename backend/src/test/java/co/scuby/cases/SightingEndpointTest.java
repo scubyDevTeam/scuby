@@ -103,6 +103,46 @@ class SightingEndpointTest {
         assertThat(api.post("/cases/{code}/sightings", bogota, "7K3PQ").errorCode()).isEqualTo("sighting_too_far");
     }
 
+    /**
+     * Oracle test (decision 69). The «Lo vi» 30 km rule is answered before the contact-phone check, so an anonymous
+     * caller who sends a non-mobile number learns "too far or not" for any point. That answer must be a function of
+     * the SNAPPED public center only. Luna's exact point is 90 m west of her snapped center; sweep points due east
+     * across the 30 km boundary in 2 m steps (the boundary of the exact point lies up to 90 m away from the snapped
+     * one) and require every answer to match the distance from the snapped center, never from the exact one.
+     */
+    @Test
+    void theThirtyKmAnswerIsAFunctionOfTheSnappedCenterNotTheExactPoint() {
+        var exact = CaseFixtures.MEDELLIN;
+        var snapped = LocationPrecisionDerivation.publicCenter(exact);
+        assertThat(snapped.lng()).isNotEqualTo(exact.lng());
+        double lo = snapped.lng(), hi = snapped.lng() + 1;      // bisect the 30 km boundary of the snapped center (due east)
+        for (int i = 0; i < 40; i++) {
+            double mid = (lo + hi) / 2;
+            if (metersFrom(snapped.lat(), snapped.lng(), snapped.lat(), mid) > 30_000) hi = mid; else lo = mid;
+        }
+        double boundaryLng = lo;
+        int witnesses = 0;
+        for (int step = -60; step <= 60; step++) {
+            double lng = boundaryLng + step * 0.00002;        // about 2.2 m per step
+            double fromSnapped = metersFrom(snapped.lat(), snapped.lng(), snapped.lat(), lng);
+            double fromExact = metersFrom(exact.lat(), exact.lng(), snapped.lat(), lng);
+            String body = """
+                    {"point":{"lat":%s,"lng":%s},"seen_at":"%s","note":null,"contact_phone":"+571234567"}"""
+                    .formatted(snapped.lat(), lng, clock.instant());
+            String answer = api.post("/cases/{code}/sightings", body, "7K3PQ").errorCode();
+            assertThat(answer).as("lng %s: %s m from the snapped center, %s m from the exact point", lng, fromSnapped, fromExact)
+                    .isEqualTo(fromSnapped > 30_000 ? "sighting_too_far" : "validation_failed");
+            if ((fromSnapped > 30_000) != (fromExact > 30_000)) witnesses++;
+        }
+        assertThat(witnesses).as("the sweep must straddle both boundaries, or it proves nothing").isGreaterThan(10);
+    }
+
+    /** Geodesic meters between two points, from PostGIS (the same function the rule uses). */
+    private double metersFrom(double lat1, double lng1, double lat2, double lng2) {
+        return db.fetchSingle("SELECT ST_Distance(ST_MakePoint(?, ?)::geography, ST_MakePoint(?, ?)::geography)",
+                lng1, lat1, lng2, lat2).get(0, Double.class);
+    }
+
     @Test
     void noteAndContactPhoneAreRequiredButMayBeNull() {
         String noNote = """

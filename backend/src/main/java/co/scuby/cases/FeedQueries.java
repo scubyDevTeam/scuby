@@ -20,7 +20,11 @@ import static co.scuby.db.generated.Tables.LOST_CASE;
 import static co.scuby.db.generated.Tables.PET;
 import static co.scuby.db.generated.Tables.SIGHTING;
 
-/** The feed in one query per branch; per-row sighting counts are correlated subqueries on sighting_by_case_recent_idx. */
+/**
+ * The feed in one query per branch; per-row sighting counts are correlated subqueries on sighting_by_case_recent_idx.
+ * A public view: it reads only the snapped center (last_seen_public_*) and measures every distance from it
+ * (decision 69); the exact point is never selected here.
+ */
 @Component
 class FeedQueries {
 
@@ -36,11 +40,11 @@ class FeedQueries {
             .where(SIGHTING.CASE_CODE.eq(LOST_CASE.CODE)).and(SIGHTING.STATUS.eq(DSL.inline("visible")))).as("last_sighting_at");
 
     Select<? extends Record> localQuery(GeoPoint near, @Nullable String species, double radiusM, int limit) {
-        Field<Double> distance = Spatial.distanceMeters(LOST_CASE.LAST_SEEN_POINT, Spatial.geography(near));
+        Field<Double> distance = Spatial.distanceMeters(LOST_CASE.LAST_SEEN_PUBLIC_POINT, Spatial.geography(near));
         Field<Integer> band = DSL.when(distance.le(2_000.0), 0).when(distance.le(5_000.0), 1)
                                  .when(distance.le(10_000.0), 2).otherwise(3);
         return base(species)
-                .and(Spatial.withinMeters(LOST_CASE.LAST_SEEN_POINT, Spatial.geography(near), radiusM))
+                .and(Spatial.withinMeters(LOST_CASE.LAST_SEEN_PUBLIC_POINT, Spatial.geography(near), radiusM))
                 .orderBy(band, LOST_CASE.PUBLISHED_AT.desc(), LOST_CASE.CODE)
                 .limit(limit);
     }
@@ -54,14 +58,14 @@ class FeedQueries {
                 r.get(LOST_CASE.CODE), r.get(PET.NAME), r.get(PET.SPECIES), r.get(PET.SIZE),
                 Arrays.asList(r.get(PET.COLORS)),
                 r.get(PET.PHOTO_URLS).length == 0 ? null : r.get(PET.PHOTO_URLS)[0],
-                r.get(LOST_CASE.PLACE_NAME), new GeoPoint(r.get(LOST_CASE.LAST_SEEN_LAT), r.get(LOST_CASE.LAST_SEEN_LNG)),
+                r.get(LOST_CASE.PLACE_NAME), new GeoPoint(r.get(LOST_CASE.LAST_SEEN_PUBLIC_LAT), r.get(LOST_CASE.LAST_SEEN_PUBLIC_LNG)),
                 r.get(LOST_CASE.LAST_SEEN_AT).toInstant(), r.get(SIGHTINGS),
                 r.get(LAST_SIGHTING) == null ? null : r.get(LAST_SIGHTING).toInstant()));
     }
 
     private SelectConditionStep<Record> base(@Nullable String species) {
         Condition speciesFilter = species == null ? DSL.noCondition() : PET.SPECIES.eq(species);
-        return db.select(List.of(LOST_CASE.CODE, LOST_CASE.PLACE_NAME, LOST_CASE.LAST_SEEN_LAT, LOST_CASE.LAST_SEEN_LNG,
+        return db.select(List.of(LOST_CASE.CODE, LOST_CASE.PLACE_NAME, LOST_CASE.LAST_SEEN_PUBLIC_LAT, LOST_CASE.LAST_SEEN_PUBLIC_LNG,
                          LOST_CASE.LAST_SEEN_AT, PET.NAME, PET.SPECIES, PET.SIZE, PET.COLORS, PET.PHOTO_URLS,
                          SIGHTINGS, LAST_SIGHTING))
                  .from(LOST_CASE).join(PET).on(PET.ID.eq(LOST_CASE.PET_ID))
