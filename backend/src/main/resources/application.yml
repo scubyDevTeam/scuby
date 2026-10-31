@@ -6,6 +6,11 @@ spring:
       enabled: true
   jackson:
     property-naming-strategy: SNAKE_CASE
+  datasource:
+    hikari:
+      data-source-properties:
+        # The driver's error message would carry «Detail: Failing row contains (...)», personal data (decision #46).
+        logServerErrorDetail: false
   jooq:
     sql-dialect: postgres
   flyway:

@@ -21,6 +21,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +39,8 @@ class ApiErrorHandlerTest {
     @TestConfiguration
     @RestController
     static class Probe {
+        @Autowired org.jooq.DSLContext db;
+
         @GetMapping("/probe/conflict")
         void conflict() {
             throw new ApiException(ErrorCode.ACTIVE_CASE_EXISTS, "pet already has an active case",
@@ -58,11 +62,78 @@ class ApiErrorHandlerTest {
             throw new ApiException(ErrorCode.NOT_FOUND, "");
         }
 
+        /** A violation as the Postgres driver reports it, detail included (what a naive handler would log). */
+        @GetMapping("/probe/db-detail")
+        void dbDetail() {
+            throw new org.springframework.dao.DataIntegrityViolationException("could not execute statement",
+                    new java.sql.SQLException("ERROR: new row violates check constraint \"sighting_client_id_check\"\n"
+                            + "  Detail: Failing row contains (+573156677889, note)", "23514"));
+        }
+
+        /** A real CHECK violation through the real driver: its own message must carry no row values. */
+        @GetMapping("/probe/db-real")
+        void dbReal() {
+            try {
+                insertBadSighting();
+            } catch (org.springframework.dao.DataAccessException e) {
+                // Rethrown as plain text so the handler logs the driver's own message verbatim.
+                throw new IllegalStateException(e.getMessage() + " | " + (e.getCause() == null ? "" : e.getCause().getMessage()));
+            }
+        }
+
+        private void insertBadSighting() {
+            db.execute("insert into scuby.sighting (id, case_code, lat, lng, seen_at, created_at, reporter_device_hash, reporter_ip_hash, contact_phone, client_id) "
+                    + "values (gen_random_uuid(), 'ZZZZZ', 1, 1, now(), now(), repeat('a', 64), repeat('b', 64), ?, ?)", "+573156677889", "short");
+        }
+
         @PostMapping("/probe/validate")
         void validate(@Valid @RequestBody Body body) {}
     }
 
     @Autowired MockMvc mvc;
+
+    private ch.qos.logback.classic.Logger logger;
+    private final ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+            new ch.qos.logback.core.read.ListAppender<>();
+
+    @org.junit.jupiter.api.BeforeEach
+    void capture() {
+        appender.list.clear();
+        appender.start();
+        logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ApiErrorHandler.class);
+        logger.addAppender(appender);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void release() {
+        logger.detachAppender(appender);
+        appender.stop();
+    }
+
+    /** Message, formatted line and every throwable message/stack line of everything the handler logged. */
+    private String everythingLogged() {
+        StringBuilder all = new StringBuilder();
+        for (var event : appender.list) {
+            all.append(event.getFormattedMessage()).append('\n');
+            for (var t = event.getThrowableProxy(); t != null; t = t.getCause()) all.append(t.getMessage()).append('\n');
+        }
+        return all.toString();
+    }
+
+    @Test
+    void aDatabaseViolationAnswersServerErrorAndNeverLogsTheRowDetail() throws Exception {
+        mvc.perform(get("/probe/db-detail")).andExpect(status().isInternalServerError())
+           .andExpect(jsonPath("$.error.code").value("server_error"));
+        assertThat(appender.list).isNotEmpty();
+        assertThat(everythingLogged()).doesNotContain("573156677889").doesNotContain("Failing row").contains("23514");
+    }
+
+    @Test
+    void theDriverItselfDoesNotPutRowValuesInItsMessage() throws Exception {
+        mvc.perform(get("/probe/db-real")).andExpect(status().isInternalServerError());
+        assertThat(everythingLogged()).doesNotContain("573156677889").doesNotContain("Failing row")
+                .contains("sighting_client_id_check");
+    }
 
     @Test
     void apiExceptionKeepsCodeStatusAndDetails() throws Exception {

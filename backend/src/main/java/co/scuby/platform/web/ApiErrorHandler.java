@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -33,8 +34,27 @@ public class ApiErrorHandler extends ResponseEntityExceptionHandler {
     /** Anything Spring does not know: a 500. */
     @ExceptionHandler(Exception.class)
     ResponseEntity<Object> unexpected(Exception e) {
-        log.error("unhandled exception", e);
+        logUnexpected(e);
         return contract(ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+    }
+
+    /**
+     * A database error is logged by SQLSTATE and constraint name only: the driver's message can carry
+     * «Detail: Failing row contains (...)», that is, the personal data of the request (decision #46). The driver is
+     * also configured not to include it (spring.datasource.hikari.data-source-properties.logServerErrorDetail).
+     */
+    private static final java.util.regex.Pattern CONSTRAINT = java.util.regex.Pattern.compile("constraint \"([A-Za-z0-9_]+)\"");
+
+    private static void logUnexpected(Exception e) {
+        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof SQLException sql) {
+                var named = CONSTRAINT.matcher(String.valueOf(sql.getMessage()));   // only the name is taken; the message itself is never logged
+                String constraint = named.find() ? named.group(1) : null;
+                log.error("unhandled database error: {} sqlstate={} constraint={}", e.getClass().getSimpleName(), sql.getSQLState(), constraint);
+                return;
+            }
+        }
+        log.error("unhandled exception", e);
     }
 
     /** Spring's ProblemDetail for bean validation has no per-field map; the contract wants one. */
@@ -60,7 +80,7 @@ public class ApiErrorHandler extends ResponseEntityExceptionHandler {
     @Override
     protected @Nullable ResponseEntity<Object> handleExceptionInternal(Exception ex, @Nullable Object body,
             HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
-        if (statusCode.is5xxServerError()) log.error("server-side failure", ex);
+        if (statusCode.is5xxServerError()) logUnexpected(ex);
         // Spring passes a null body for ErrorResponse exceptions; their ProblemDetail is on the exception.
         ProblemDetail pd = body instanceof ProblemDetail p ? p
                 : ex instanceof ErrorResponse er ? er.getBody()
