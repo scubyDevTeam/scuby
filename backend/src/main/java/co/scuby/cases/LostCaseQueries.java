@@ -28,9 +28,13 @@ class LostCaseQueries {
         this.db = db;
     }
 
-    /** The publisher's number only when it is public: active, exposed, and on WhatsApp. Otherwise NULL — never loaded. */
+    /**
+     * The publisher's number only when it is public: active, exposed, on WhatsApp, and verified by SMS code (with the
+     * publisher_phone_otp flag off a case is published with the number unverified, and that is never public).
+     * Otherwise NULL — never loaded.
+     */
     static final Field<String> WHATSAPP_PHONE = DSL.when(
-                    DSL.condition(LOST_CASE.EXPOSE_WHATSAPP).and(LOST_CASE.PHONE_HAS_WHATSAPP).and(LOST_CASE.STATUS.eq(DSL.inline("active"))),
+                    DSL.condition(LOST_CASE.EXPOSE_WHATSAPP).and(LOST_CASE.PHONE_HAS_WHATSAPP).and(LOST_CASE.CONTACT_PHONE_VERIFIED).and(LOST_CASE.STATUS.eq(DSL.inline("active"))),
                     LOST_CASE.CONTACT_PHONE)
             .as("whatsapp_phone");
 

@@ -26,6 +26,7 @@ class UploadsTest {
     @Autowired TestDb testDb;
     @Autowired Accounts accounts;
     @Autowired MutableClock clock;
+    @Autowired org.springframework.beans.factory.ObjectProvider<co.scuby.platform.cache.ClearableCache> caches;
 
     ApiClient api;
 
@@ -126,6 +127,14 @@ class UploadsTest {
         assertThat(api.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).errorCode()).isEqualTo("rate_limited");
         clock.advance(Duration.ofMinutes(10).plusSeconds(1));
         assertThat(api.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
+    }
+
+    /** Session lookup, the two slot counts in one statement, the upsert: exactly the ceiling, so the ceiling is not padded. */
+    @Test
+    void aSlotOnASessionCacheMissIsExactlyThreeStatements() {
+        accounts.signIn(api, "ana@correo.co");
+        caches.orderedStream().filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags)).forEach(co.scuby.platform.cache.ClearableCache::clear);
+        assertThat(api.post("/uploads", slotBody("pet", Hashing.sha256Hex(photo()), 3)).statements()).hasSize(3);
     }
 
     /** A script without cookies is a new device (a new owner key) on every request: only the IP bounds it. */

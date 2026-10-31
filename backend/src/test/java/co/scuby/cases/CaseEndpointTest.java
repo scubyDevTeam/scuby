@@ -159,6 +159,23 @@ class CaseEndpointTest {
         assertThat(queries.loadCase("WA0K2").orElseThrow().whatsappPhone()).isEqualTo(CaseFixtures.LUNA_PHONE);
     }
 
+    /** Leak test: a number stored unverified (publisher_phone_otp off) is never public, to anyone, though exposed and on WhatsApp. */
+    @Test
+    void anUnverifiedNumberIsNeverPublic() {
+        cases.lostCase(carolina, "UNV3R", "Kira", "dog", CaseFixtures.MEDELLIN, 300, "active", MutableClock.START.minusSeconds(3600), true, false);
+        assertThat(queries.loadCase("UNV3R").orElseThrow().whatsappPhone()).isNull();
+        ApiClient stranger = clients.newBrowser();
+        accounts.signIn(stranger, "stranger@correo.co");
+        for (ApiClient viewer : List.of(clients.newBrowser(), stranger, owner)) {
+            ApiResponse r = viewer.get("/cases/{code}", "UNV3R");
+            assertThat(r.isNull("/contact/whatsapp_url")).isTrue();
+            assertThat(r.body()).doesNotContain(CaseFixtures.LUNA_PHONE.substring(1));
+        }
+        // the feed and the owner's list never carried a number; check anyway
+        assertThat(clients.newBrowser().get("/feed").body()).doesNotContain(CaseFixtures.LUNA_PHONE.substring(1));
+        assertThat(owner.get("/me/cases").body()).doesNotContain(CaseFixtures.LUNA_PHONE.substring(1));
+    }
+
     /** A case that is not active: the number is not loaded and the response has no contact, even with WhatsApp exposed. */
     @Test
     void aNonActiveCaseNeverLoadsOrExposesTheNumber() {

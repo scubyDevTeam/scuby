@@ -22,14 +22,14 @@ INSERT INTO scuby.responsibility_link (id, person_id, pet_id, role, active_from)
   (gen_random_uuid(), '00000000-0000-0000-0000-00000000ca01', '00000000-0000-0000-0000-00000000be01', 'owner', now() - interval '3 days'),
   (gen_random_uuid(), '00000000-0000-0000-0000-00000000ca02', '00000000-0000-0000-0000-00000000be02', 'owner', now() - interval '20 days');
 
-INSERT INTO scuby.lost_case (code, pet_id, created_by, status, published_at, resolved_at, contact_phone, phone_has_whatsapp,
+INSERT INTO scuby.lost_case (code, pet_id, created_by, status, published_at, resolved_at, contact_phone, contact_phone_verified, phone_has_whatsapp,
   expose_whatsapp, expose_email, in_app_only, last_seen_lat, last_seen_lng, last_seen_radius_m, last_seen_at, place_name) VALUES
   -- fixtures.ts:229-243 (7K3PQ: Laureles, 100 m, published 2 days ago, +573000000000 with WhatsApp exposed)
   ('7K3PQ', '00000000-0000-0000-0000-00000000be01', '00000000-0000-0000-0000-00000000ca01', 'active', now() - interval '2 days', NULL,
-   '+573000000000', true, true, false, false, 6.2447, -75.5916, 100, now() - interval '2 days', 'Laureles'),
+   '+573000000000', true, true, true, false, false, 6.2447, -75.5916, 100, now() - interval '2 days', 'Laureles'),
   -- fixtures.ts:197-223 + :260 (closedLost H4PPY: reunited 3 days ago, published 10 days ago, offset(400, -300), 300 m)
   ('H4PPY', '00000000-0000-0000-0000-00000000be02', '00000000-0000-0000-0000-00000000ca02', 'reunited', now() - interval '10 days', now() - interval '3 days',
-   '+573000000003', true, true, false, false, 6.24829, -75.59431, 300, now() - interval '10 days', 'Laureles');
+   '+573000000003', true, true, true, false, false, 6.24829, -75.59431, 300, now() - interval '10 days', 'Laureles');
 
 INSERT INTO scuby.sighting (id, case_code, lat, lng, seen_at, created_at, note, reporter_person_id, reporter_device_hash,
   reporter_ip_hash, contact_phone, status) VALUES

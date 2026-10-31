@@ -127,6 +127,7 @@ class PublishLostService {
                     .set(LOST_CASE.STATUS, "active")
                     .set(LOST_CASE.PUBLISHED_AT, at)
                     .set(LOST_CASE.CONTACT_PHONE, ready.phone())
+                    .set(LOST_CASE.CONTACT_PHONE_VERIFIED, ready.verified())
                     .set(LOST_CASE.PHONE_HAS_WHATSAPP, request.phoneHasWhatsapp())
                     .set(LOST_CASE.EXPOSE_WHATSAPP, request.contactPrefs().exposeWhatsapp())
                     .set(LOST_CASE.EXPOSE_EMAIL, request.contactPrefs().exposeEmail())

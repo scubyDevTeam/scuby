@@ -85,6 +85,28 @@ class PublishLostTest {
         assertThat(db.selectFrom(PERSON).where(PERSON.ID.eq(ana)).fetchOne().getPhoneVerifiedAt()).isNotNull();
     }
 
+    /** O24 + review I4: publisher_phone_otp off publishes with the number unverified, and an unverified number is never public. */
+    @Test
+    void withTheOtpFlagOffTheCaseIsPublishedButItsUnverifiedNumberHasNoPublicContact() {
+        db.execute("INSERT INTO scuby.feature_flag_overrides (flag_key, person_id, enabled, reason) VALUES ('publisher_phone_otp', ?, false, 'test')", ana);
+        String code = publish(PublishBodies.kira(PHONE, null)).str("/code");
+        var row = db.selectFrom(LOST_CASE).where(LOST_CASE.CODE.eq(code)).fetchOne();
+        assertThat(row.getContactPhone()).isEqualTo(PHONE);                // stored for the owner
+        assertThat(row.getContactPhoneVerified()).isFalse();
+        for (ApiClient viewer : java.util.List.of(clients.newBrowser(), api)) {
+            ApiResponse r = viewer.get("/cases/{code}", code);
+            assertThat(r.isNull("/contact/whatsapp_url")).isTrue();
+            assertThat(r.body()).doesNotContain(PHONE.substring(1));
+        }
+    }
+
+    @Test
+    void aVerifiedPublishIsMarkedVerifiedAndGetsItsPublicWhatsappLink() {
+        String code = publishVerified();
+        assertThat(db.selectFrom(LOST_CASE).where(LOST_CASE.CODE.eq(code)).fetchOne().getContactPhoneVerified()).isTrue();
+        assertThat(clients.newBrowser().get("/cases/{code}", code).str("/contact/whatsapp_url")).isEqualTo("https://wa.me/573007152284");
+    }
+
     @Test
     void theNextPublishWithTheVerifiedNumberGoesStraightThrough() {
         publishVerified();
