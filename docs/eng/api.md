@@ -18,7 +18,7 @@
 **Staging (decision #34).** Stage 1 — now: the source stays `api.ts`, and every wire shape is named
 (`names.ts`), so `openapi.json` carries `components/schemas` and `$ref`s instead of inlined
 objects. Stage 2 — after the Java spike ([backend-plan.md](backend-plan.md) · 0.4) shows the
-generator yields usable records: [`openapi.yaml`](openapi.yaml) becomes the hand-edited source,
+generator yields usable records: `docs/eng/openapi.yaml` (not created yet) becomes the hand-edited source,
 either side proposes changes in a PR the other reviews, the backend generates its types and the
 client its Zod from it, and the table above flips (`api.ts` and `contracts/*.ts` become generated;
 `openapi.json` goes away).
