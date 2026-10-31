@@ -138,9 +138,14 @@ searcher who trusts it wastes time on one corner.
 | Sighting pins | exact | **exact** | Street corners are nobody's personal data, and «¿qué esquina?» is the entire value of a sighting |
 | Reporter contact | visible | **hidden** | Given to the owner, not to the internet |
 
-Computation always uses the stored exact center: the 30 km sighting bound, the «a 400 m de donde se
-perdió» distance in notifications, and the trajectory line all measure from `last_seen_point`. What a
-non-owner receives is derived from it: the center is rounded to the nearest node of a fixed grid (latitude
+The public center is the snapped one **for display and for every check or ordering a non-owner can
+observe**: the 30 km sighting bound («Lo vi») and the feed's 25 km filter and distance bands measure from
+`last_seen_public_point`, never from the exact point. A check against the exact point is an oracle: an anonymous
+caller bisects the yes/no answer (about 75 requests) and recovers the point the snap hides (decision #69).
+The exact center stays stored (`last_seen_lat`/`last_seen_lng`, no spatial column; the owner's view) and is used only by computations whose result
+never reaches a non-owner: the «a 400 m de donde se perdió» distance in notifications and the trajectory line.
+The snapped center is computed once, at publish, by one function and stored beside the exact one (it is not
+recomputed in SQL, so there is one copy of the grid formula). What a non-owner receives is derived from it: the center is rounded to the nearest node of a fixed grid (latitude
 step 0.0018°, about 200 m; longitude step the same ground distance, 0.0018° / cos latitude, so cells are about
 square everywhere), and the radius is floored. It is deterministic — the same point always gives the same
 center, so there is nothing random to average out across loads and no secret to keep. The snapped center is at
