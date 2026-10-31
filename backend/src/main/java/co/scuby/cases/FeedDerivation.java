@@ -1,0 +1,20 @@
+package co.scuby.cases;
+
+import java.util.List;
+import java.util.Locale;
+
+/** Feed rows (already ordered and capped by the query) → the contract's Feed. Pure. */
+final class FeedDerivation {
+
+    enum Scope { local, national }
+
+    private FeedDerivation() {}
+
+    static FeedView derive(List<FeedRow> rows, Scope scope, Locale locale) {
+        return new FeedView(scope.name(), rows.stream().map(r -> new FeedView.FeedItem(
+                r.code(), "lost", r.petName() == null ? "" : r.petName(), r.species(),
+                PublicTextDerivation.summary(r.species(), r.size(), r.colors(), locale),
+                PublicTextDerivation.placeName(r.placeName(), locale), r.center(), r.firstPhotoUrl(),
+                r.lastSeenAt(), false, r.sightingsCount(), r.lastSightingAt(), null)).toList());
+    }
+}

@@ -39,6 +39,9 @@ scuby:
     max-per-ip: 20
     max-per-account: 10
     alarm-daily-sends: 50
+  feed:
+    near-radius-m: 25000
+    max-items: 100
   sessions:
     cache-size: 10000
     cache-ttl: 60s

@@ -1,0 +1,11 @@
+-- GET /feed, national branch (design · Behaviour decisions, Feed; FeedQueries.nationalQuery):
+--   status = 'active' ORDER BY published_at DESC LIMIT 100 → a partial b-tree read in order, stopping
+--   after 100 rows; closed cases leave the index, so it stays the size of the open set, not of history.
+-- Plan before (20,000 cases, 10 % active; A2 report): a full read of lost_case_one_active_per_pet + a
+-- Hash Join against a Seq Scan on pet + sort. Plan after: Index Scan using this index, Nested Loop on pet_pkey.
+-- Write cost: one entry per active case, removed when it closes; no cost for sightings.
+-- Overlaps: lost_case_one_active_per_pet (pet_id) — different column, no overlap.
+-- The local branch's GiST index on last_seen_point is deferred until the web client sends a point
+-- (today it never does, so no request would use it).
+-- Needs human approval before merge.
+CREATE INDEX lost_case_active_published_idx ON lost_case (published_at DESC) WHERE status = 'active';
