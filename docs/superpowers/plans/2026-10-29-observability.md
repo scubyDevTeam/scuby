@@ -6,8 +6,10 @@
 > - The HTTP and no-data conditions `FACET` by `deployment.environment`, so each environment is evaluated separately.
 > - Log attributes in New Relic are `severity.text` and `otel.library.name`, not `level` and `logger.name`.
 > - `ServerTelemetryTest` also clears Boot's console logging system properties afterwards, so the JSON console does not leak into later test classes.
-> - Startup fails when the `newrelic` profile is active and no license key is set (`NewRelicLicenseKeyCheck`), instead of exporting with an unresolved header.
+> - Startup fails when `SCUBY_TELEMETRY_EXPORT=true` and no license key is set (`NewRelicLicenseKeyCheck`), instead of exporting with an unresolved header.
 > - Telemetry and the server console are configured by variables in `application.yml` (`SCUBY_TELEMETRY_EXPORT`, `SCUBY_ENVIRONMENT`, `LOGGING_STRUCTURED_FORMAT_CONSOLE`, `LOGGING_THRESHOLD_CONSOLE`) instead of the `newrelic` / `server` profiles described below; the startup check applies when `SCUBY_TELEMETRY_EXPORT=true`.
+> - The `staging` and `prod` profiles default `SCUBY_ENVIRONMENT` to their own name, so a server that forgets the variable never reports as `local`.
+> - Verified live on 2026-10-30 with a local run (export on, its own Postgres stopped, `/actuator/health` answering 503): the WARN log records carry the same `trace.id` as their `http get /actuator/health` span, the 5xx count of `http.server.requests` arrives with `status` and `uri`, and `NrMTDConsumption` reports ingest under `productLine = 'DataPlatform'`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
