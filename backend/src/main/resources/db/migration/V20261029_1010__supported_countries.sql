@@ -1,9 +1,11 @@
 -- Country is configuration, never code (docs/eng/auth.md · Country is configuration). One row per
 -- country; adding one is a row plus a legal review. mobile_pattern matches the national significant
 -- number (the digits after phone_prefix). default_center is where maps open (GET /config).
+-- phone_prefix is not UNIQUE: several countries share a calling code (+1, +7), and the table is a handful of
+-- rows read whole. SupportedCountries.forE164 picks the longest matching prefix, then sort_order, then code.
 CREATE TABLE supported_countries (
   code                char(2) PRIMARY KEY CHECK (code ~ '^[A-Z]{2}$'),
-  phone_prefix        text NOT NULL UNIQUE CHECK (phone_prefix ~ '^\+[1-9][0-9]{0,3}$'),
+  phone_prefix        text NOT NULL CHECK (phone_prefix ~ '^\+[1-9][0-9]{0,3}$'),
   mobile_pattern      text NOT NULL,
   currency            char(3) NOT NULL,
   locale              text NOT NULL,

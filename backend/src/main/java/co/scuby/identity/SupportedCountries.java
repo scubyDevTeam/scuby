@@ -32,10 +32,15 @@ public class SupportedCountries {
                          new GeoPoint(r.getDefaultCenterLat(), r.getDefaultCenterLng())));
     }
 
-    /** The country whose prefix starts this E.164 number (the longest prefix wins). */
+    /**
+     * The country whose prefix starts this E.164 number. phone_prefix is not unique (+1, +7 are shared), so the
+     * choice is explicit: the longest matching prefix, then the lowest sort_order, then the code. The list is
+     * already ordered by sort_order and code, and the sort below is stable.
+     */
     public Optional<Country> forE164(String e164) {
         return all().stream()
                     .filter(c -> e164.startsWith(c.phonePrefix()))
-                    .max(Comparator.comparingInt(c -> c.phonePrefix().length()));
+                    .sorted(Comparator.comparingInt((Country c) -> c.phonePrefix().length()).reversed())
+                    .findFirst();
     }
 }
