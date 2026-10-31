@@ -29,13 +29,19 @@ class ProfileStartupTest {
                     "scuby.web.allowed-origins", "https://staging.scuby.test",
                     "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
                     "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef",
-                    "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com"),
+                    "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com",
+                    "scuby.media.bucket", "dummy-media-bucket",
+                    "scuby.media.region", "sa-east-1",
+                    "scuby.media.public-base-url", "https://img.staging.scuby.test"),
             "prod", Map.of(
                     "scuby.web.allowed-origins", "https://scuby.test",
                     "scuby.web.origin-secret", "dummy-origin-secret",
                     "scuby.web.ip-hash-key", "dummy-ip-hash-key-0123456789abcdef",
                     "scuby.auth.code-hash-key", "dummy-code-hash-key-0123456789abcdef",
-                    "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com"));
+                    "scuby.auth.google.client-id", "dummy-client.apps.googleusercontent.com",
+                    "scuby.media.bucket", "dummy-media-bucket",
+                    "scuby.media.region", "sa-east-1",
+                    "scuby.media.public-base-url", "https://img.scuby.test"));
 
     @ParameterizedTest
     @ValueSource(strings = {"staging", "prod"})
@@ -168,6 +174,17 @@ class ProfileStartupTest {
         Throwable failure = catchThrowable(() -> start("prod", props).close());
         assertThat(failure).as("prod started with %s", bypass).isNotNull();
         assertThat(chainOf(failure)).contains("test bypass");
+    }
+
+    /** Prod must never run on the local directory store: uploads cannot work and /dev-media is off. */
+    @org.junit.jupiter.api.Test
+    void prodRefusesTheLocalMediaStore() {
+        Map<String, String> props = new LinkedHashMap<>(REQUIRED.get("prod"));
+        props.put("scuby.media.store", "local");
+        props.put("scuby.media.local-dir", "target/prod-must-not-use-this");
+        Throwable failure = catchThrowable(() -> start("prod", props).close());
+        assertThat(failure).as("prod started with the local media store").isNotNull();
+        assertThat(chainOf(failure)).contains("scuby.media.store=local");
     }
 
     private static void assertRefusedWith(String profile, String key, String value) {

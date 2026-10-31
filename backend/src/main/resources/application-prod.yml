@@ -1,1 +1,10 @@
 # Production environment
+
+# thin slice: photos through S3 + the ingest Lambda (values from infra: docs/eng/infra.md · Media)
+scuby:
+  media:
+    # empty default (${VAR:}): an unset variable must fail validation, not bind the literal placeholder
+    store: s3
+    bucket: ${SCUBY_MEDIA_BUCKET:}
+    region: ${SCUBY_MEDIA_REGION:}
+    public-base-url: ${SCUBY_MEDIA_PUBLIC_BASE_URL:}
