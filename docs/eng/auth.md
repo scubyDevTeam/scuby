@@ -134,10 +134,9 @@ cost ≈ one send per publisher, once. The checklist, none of it skippable:
 - **The SMS is sent like the email:** the code is stored in a transaction and the provider is called after it
   returned, with no transaction open and no pooled connection held (decision #60). A send that fails leaves an
   unused code and answers `server_error`.
-- **The caps are not locked.** The count of `code_send` and the insert that follows are separate statements, so
-  simultaneous requests for one number (or address) can each read a count under the cap and overshoot it, by up
-  to the number of simultaneous requests; later requests see the real count. Accepted (decision #59,
-  [backend.md](backend.md) · Concurrency): one extra SMS costs cents, and the daily alarm and the flag cover pumping.
+- **The caps are not locked.** The email cap and cooldown are exact; the SMS cap and cooldown can be overshot
+  only by simultaneous requests from different accounts to one number. Rule and reasoning:
+  [backend.md](backend.md) · Concurrency (decision #59).
 - Numbers validated **before any send**: libphonenumber format check client-side, server re-check,
   country + mobile-pattern rules from `supported_countries` (v1: +57, ten digits starting with 3)
 - **Daily SMS spend alarm** — sends × $0.06 above a few dollars/day means pumping; page us. The backend logs

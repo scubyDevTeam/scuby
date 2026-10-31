@@ -5,6 +5,7 @@ import co.scuby.platform.web.ErrorCode;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -50,7 +51,14 @@ class GoogleSignIn {
         // Verified BEFORE the transaction opens: on a key-cache miss this fetches Google's JWKS over HTTP, and a
         // slow Google must not hold a pooled connection per waiting sign-in.
         GoogleIdentity google = tokens.verify(credential);
-        return tx.execute(status -> signIn(google, carriedTokenHash, sessionPersonId));
+        try {
+            return tx.execute(status -> signIn(google, carriedTokenHash, sessionPersonId));
+        } catch (DataIntegrityViolationException e) {
+            // A concurrent sign-in put this `sub` on another account first (UNIQUE google_sub): refused like any
+            // other Google sign-in that cannot link. Caught outside the transaction, which Postgres has aborted.
+            log.warn("Google sign-in refused: this Google identity is already linked to another account");
+            throw new ApiException(ErrorCode.UNAUTHORIZED, "this Google account is already linked to another account");
+        }
     }
 
     private SignedIn signIn(GoogleIdentity google, Optional<String> carriedTokenHash, @Nullable UUID sessionPersonId) {
