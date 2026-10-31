@@ -10,6 +10,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -176,15 +177,23 @@ class ProfileStartupTest {
         assertThat(chainOf(failure)).contains("test bypass");
     }
 
-    /** Prod must never run on the local directory store: uploads cannot work and /dev-media is off. */
+    /** No deployed profile runs on the local directory store: uploads cannot work and /dev-media is off. */
     @org.junit.jupiter.api.Test
-    void prodRefusesTheLocalMediaStore() {
-        Map<String, String> props = new LinkedHashMap<>(REQUIRED.get("prod"));
-        props.put("scuby.media.store", "local");
-        props.put("scuby.media.local-dir", "target/prod-must-not-use-this");
-        Throwable failure = catchThrowable(() -> start("prod", props).close());
-        assertThat(failure).as("prod started with the local media store").isNotNull();
-        assertThat(chainOf(failure)).contains("scuby.media.store=local");
+    void deployedProfilesRefuseTheLocalMediaStore() {
+        for (String profile : List.of("staging", "prod")) {
+            Map<String, String> props = new LinkedHashMap<>(REQUIRED.get(profile));
+            props.put("scuby.media.store", "local");
+            props.put("scuby.media.local-dir", "target/deployed-must-not-use-this");
+            Throwable failure = catchThrowable(() -> start(profile, props).close());
+            assertThat(failure).as("%s started with the local media store", profile).isNotNull();
+            assertThat(chainOf(failure)).contains("scuby.media.store=");
+        }
+    }
+
+    /** A blank store must fail naming the key, not die on a missing MediaStore bean. */
+    @org.junit.jupiter.api.Test
+    void aBlankMediaStoreIsRefusedByName() {
+        assertRefusedWith("staging", "scuby.media.store", "");
     }
 
     private static void assertRefusedWith(String profile, String key, String value) {

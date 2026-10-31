@@ -65,6 +65,33 @@ class S3MediaStoreTest {
         assertThatThrownBy(() -> store.withClient(forbidden).isStored(SHA)).isInstanceOf(S3Exception.class);
     }
 
+    /** A 5xx is an outage, never "not stored": it must propagate (500) so a photo is not refused as missing. */
+    @Test
+    void aServerErrorOnHeadPropagates() {
+        for (int status : new int[]{500, 503}) {
+            S3Client down = stubHead(s3Error(status, "Service Unavailable"));
+            assertThatThrownBy(() -> store.withClient(down).isStored(SHA))
+                    .isInstanceOfSatisfying(S3Exception.class, e -> assertThat(e.statusCode()).isEqualTo(status));
+        }
+    }
+
+    @Test
+    void theStoreRejectsAnythingButLowercaseSha256() {
+        for (String bad : new String[]{"B".repeat(64), "b".repeat(63), "../" + "b".repeat(61), "", null}) {
+            assertThatThrownBy(() -> store.isStored(bad)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> store.presign(bad, 10, Instant.now())).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
+    void closeClosesTheClients() {
+        java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
+        S3Client client = (S3Client) java.lang.reflect.Proxy.newProxyInstance(S3Client.class.getClassLoader(), new Class<?>[]{S3Client.class},
+                (proxy, method, args) -> { if (method.getName().equals("close")) closed.set(true); return null; });
+        store.withClient(client).close();
+        assertThat(closed).isTrue();
+    }
+
     private static S3Exception s3Error(int status, String message) {
         return (S3Exception) S3Exception.builder().statusCode(status).message(message).build();
     }

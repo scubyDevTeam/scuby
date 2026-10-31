@@ -27,7 +27,7 @@ record MediaProperties(String store,
     boolean isS3() { return "s3".equals(store); }
 
     @AssertTrue(message = "scuby.media.store must be local or s3")
-    boolean isStoreKnown() { return store == null || store.isBlank() || "local".equals(store) || "s3".equals(store); }
+    boolean isStoreKnown() { return store == null || "local".equals(store) || "s3".equals(store); }
 
     @AssertTrue(message = "scuby.media.local-dir must be set when scuby.media.store=local")
     boolean isLocalDirSetWhenLocal() { return isS3() || !(localDir == null || localDir.isBlank()); }

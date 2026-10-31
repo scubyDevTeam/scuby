@@ -29,9 +29,12 @@ import java.util.regex.Pattern;
  * photo's SHA-256 so S3 refuses other bytes; the ingest Lambda writes media/{sha}.jpg, which is
  * what "stored" means. No image work in the JVM.
  */
-final class S3MediaStore implements MediaStore {
+final class S3MediaStore implements MediaStore, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(S3MediaStore.class);
+
+    private static final Duration HEAD_TIMEOUT = Duration.ofSeconds(3);
+    private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 
     private final MediaProperties properties;
     private final S3Presigner presigner;
@@ -42,7 +45,9 @@ final class S3MediaStore implements MediaStore {
     S3MediaStore(MediaProperties properties, AwsCredentialsProvider credentials) {
         this(properties, S3Presigner.builder().region(Region.of(properties.region())).credentialsProvider(credentials).build(),
              S3Client.builder().region(Region.of(properties.region())).credentialsProvider(credentials)
-                     .httpClient(UrlConnectionHttpClient.create()).build());
+                     .httpClient(UrlConnectionHttpClient.create())
+                     // HeadObject runs on the request thread: bound a degraded S3 so it cannot stall a publish.
+                     .overrideConfiguration(c -> c.apiCallTimeout(HEAD_TIMEOUT)).build());
     }
 
     private S3MediaStore(MediaProperties properties, S3Presigner presigner, S3Client s3) {
@@ -71,6 +76,7 @@ final class S3MediaStore implements MediaStore {
 
     @Override
     public boolean isStored(String sha256) {
+        requireSha256(sha256);
         String key = "media/" + sha256 + ".jpg";
         try {
             s3.headObject(b -> b.bucket(properties.bucket()).key(key));
@@ -90,6 +96,7 @@ final class S3MediaStore implements MediaStore {
 
     @Override
     public UploadTarget presign(String sha256, long bytes, Instant expiresAt) {
+        requireSha256(sha256);
         String checksum = Base64.getEncoder().encodeToString(HexFormat.of().parseHex(sha256));
         PutObjectRequest put = PutObjectRequest.builder()
                 .bucket(properties.bucket())
@@ -107,5 +114,17 @@ final class S3MediaStore implements MediaStore {
             if (!key.equals("host")) headers.put(key, String.join(",", values));
         });
         return new UploadTarget("PUT", signed.url().toString(), headers, expiresAt);
+    }
+
+    private static void requireSha256(String sha256) {
+        if (sha256 == null || !SHA256.matcher(sha256).matches()) {
+            throw new IllegalArgumentException("sha256 must be 64 lowercase hex characters");
+        }
+    }
+
+    @Override
+    public void close() {
+        presigner.close();
+        s3.close();
     }
 }
