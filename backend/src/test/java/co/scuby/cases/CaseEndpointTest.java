@@ -257,4 +257,21 @@ class CaseEndpointTest {
         assertThat(r.str("/sightings/2/note")).isEqualTo("junto al parque");
         assertThat(r.json().at("/sightings/0/highlighted_by_owner").asBoolean()).isFalse();
     }
+
+    /** Leak test (decision 63): the public never gets the exact last-seen point, only the same snapped center every time. */
+    @Test
+    void aNonOwnerGetsASnappedCenterThatIsStableAndTheOwnerGetsTheExactPoint() {
+        ApiResponse first = clients.newBrowser().get("/cases/{code}", "7K3PQ");
+        ApiResponse second = clients.newBrowser().get("/cases/{code}", "7K3PQ");
+        double lat = first.json().at("/last_seen/center/lat").asDouble();
+        double lng = first.json().at("/last_seen/center/lng").asDouble();
+        assertThat(lat == CaseFixtures.MEDELLIN.lat() && lng == CaseFixtures.MEDELLIN.lng()).as("the exact center reached the public").isFalse();
+        assertThat(lat).isEqualTo(6.2442);
+        assertThat(lng).isEqualTo(-75.580392);
+        assertThat(second.json().at("/last_seen/center")).isEqualTo(first.json().at("/last_seen/center"));
+        assertThat(first.json().get("last_seen").toString()).doesNotContain("-75.5812");
+        ApiResponse mine = owner.get("/cases/{code}", "7K3PQ");
+        assertThat(mine.json().at("/last_seen/center/lat").asDouble()).isEqualTo(CaseFixtures.MEDELLIN.lat());
+        assertThat(mine.json().at("/last_seen/center/lng").asDouble()).isEqualTo(CaseFixtures.MEDELLIN.lng());
+    }
 }

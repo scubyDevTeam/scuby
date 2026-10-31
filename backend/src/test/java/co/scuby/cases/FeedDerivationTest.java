@@ -31,7 +31,7 @@ class FeedDerivationTest {
         assertThat(a.species()).isEqualTo("cat");
         assertThat(a.summary()).isEqualTo("Gato · Pequeño · Negro y canela");
         assertThat(a.placeName()).isEqualTo("Zona marcada en el mapa");
-        assertThat(a.point()).isEqualTo(new GeoPoint(6.2442, -75.5812));
+        assertThat(a.point()).isEqualTo(new GeoPoint(6.2442, -75.580392));   // snapped (decision 63): the row's center is 6.2442, -75.5812
         assertThat(a.photoUrl()).isEqualTo("http://x/a.jpg");
         assertThat(a.happenedAt()).isEqualTo(T);
         assertThat(a.possibleFind()).isFalse();

@@ -211,4 +211,20 @@ class FeedEndpointTest {
         }
         return new GeoPoint(lat, from.lng());
     }
+
+    /** Leak test (decision 63): a feed item's point is the snapped center, the same on every request, never the exact one. */
+    @Test
+    void feedPointsAreSnappedAndStable() {
+        cases.lostCase(owner, "AAAA2", "Uno", "dog", CaseFixtures.MEDELLIN, 300, "active", daysAgo(1));
+        ApiResponse first = api.get("/feed");
+        ApiResponse second = clients.newBrowser().get("/feed");
+        assertThat(first.json().at("/items/0/point/lat").asDouble()).isEqualTo(6.2442);
+        assertThat(first.json().at("/items/0/point/lng").asDouble()).isEqualTo(-75.580392);
+        assertThat(second.json().at("/items/0/point")).isEqualTo(first.json().at("/items/0/point"));
+        assertThat(first.body()).doesNotContain("-75.5812");
+        // a signed-in caller gets the same feed point: the feed is a public view
+        ApiClient signedIn = clients.newBrowser();
+        accounts.signIn(signedIn, "other@correo.co");
+        assertThat(signedIn.get("/feed").json().at("/items/0/point")).isEqualTo(first.json().at("/items/0/point"));
+    }
 }

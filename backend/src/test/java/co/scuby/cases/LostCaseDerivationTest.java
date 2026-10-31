@@ -60,11 +60,11 @@ class LostCaseDerivationTest {
             "5000, PUBLIC, 5000",
             "50,   OWNER,  50",
     })
-    void thePublicRadiusIsFlooredAt200AndTheCenterNeverMoves(double stored, Access access, double expected) {
+    void thePublicRadiusIsFlooredAt200AndTheOwnerKeepsTheExactCenter(double stored, Access access, double expected) {
         Viewer v = access == Access.OWNER ? OWNER_VIEW : STRANGER;
         LostCaseView view = LostCaseDerivation.derive(facts("active", stored, null, "Luna", WA, List.of()), v, NOW, ES);
         assertThat(view.lastSeen().radiusM()).isEqualTo(expected);
-        assertThat(view.lastSeen().center()).isEqualTo(new GeoPoint(6.2442, -75.5812));
+        assertThat(view.lastSeen().center()).isEqualTo(access == Access.OWNER ? new GeoPoint(6.2442, -75.5812) : new GeoPoint(6.2442, -75.580392));
         assertThat(view.viewer()).isEqualTo(access == Access.OWNER ? "owner" : "public");
     }
 

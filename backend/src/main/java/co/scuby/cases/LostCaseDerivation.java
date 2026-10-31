@@ -31,7 +31,7 @@ final class LostCaseDerivation {
                 facts.code(), "lost", facts.status(), facts.resolvedAt(), owner ? "owner" : "public",
                 new LostCaseView.PetView(pet.name() == null ? "" : pet.name(), pet.species(), pet.size(),
                         pet.colors(), pet.marks(), pet.photoUrls()),
-                new LostCaseView.LastSeenView(facts.center(),
+                new LostCaseView.LastSeenView(owner ? facts.center() : LocationPrecisionDerivation.publicCenter(facts.center()),
                         owner ? facts.radiusM() : Math.max(facts.radiusM(), PUBLIC_RADIUS_FLOOR_M),
                         facts.lastSeenAt(), PublicTextDerivation.placeName(facts.placeName(), locale)),
                 0, sightings, List.of(), null, contact(facts, locale));
