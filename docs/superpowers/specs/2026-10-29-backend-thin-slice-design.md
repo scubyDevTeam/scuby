@@ -132,7 +132,7 @@ in `platform.web`.
   Tested: while the controller of an authenticated request runs, the pool has 0 active connections
   (sampled during the request — after it, every connection is back anyway), the lookup ran in
   autocommit, and a session read issues no `INSERT`/`UPDATE`.
-- **Device cookie** (decision #35): opaque, only its hash stored; there is no device table; the device hash lives only on the rows that need it (`upload.owner_key`, `sighting.reporter_device_hash`); renewing
+- **Device cookie** (decision #35): opaque, only its hash stored; there is no device table; the device hash lives only on the rows that need it (`upload.owner_key`, `sighting.reporter_device_hash`, and `code_send.device_hash` for the send throttles); renewing
   the cookie's lifetime is a `Set-Cookie` header, not a database write.
 - **Google:** the client sends Google's **ID token** (`POST /auth/google {credential}`); the backend
   verifies it (signature against Google's keys, `aud` = our client ID, `iss`, expiry) with Spring

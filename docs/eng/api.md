@@ -127,7 +127,7 @@ logs:
 | `server_error` | 500 | — |
 
 Any endpoint may answer `validation_failed`, `rate_limited` and `server_error`; every other code
-must be in that endpoint's `errors`. The emulated backend enforces this, so the list stays true.
+must be in that endpoint's `errors`. The emulated backend enforces this, so the list stays true. One known exception: the real backend also answers `forbidden` to an unsafe request from a disallowed origin, on every endpoint, before it is routed ([backend.md](backend.md) · Security); the contract does not list it yet ([O27](../open-items.md)).
 
 ## Plugging in the real backend
 

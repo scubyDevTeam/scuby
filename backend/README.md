@@ -44,7 +44,7 @@ El código de jOOQ se regenera en cada build en `target/generated-sources/jooq`;
 
 ```
 src/main/java/co/scuby/
-├── platform/    técnico, sin dominio: roles, web (sobre de errores), db (PostGIS), security, flags, time
+├── platform/    técnico, sin dominio: roles, web (sobre de errores), db (PostGIS), security, flags, time, cache, config, crypto, modules
 ├── identity/    cuentas, sesiones, cookie de dispositivo, código por correo, Google, OTP por SMS, GET /config, GET /me/profile
 src/test/java/co/scuby/support/     arnés de pruebas: ApiClient (contrato + techo de sentencias), TestDb, MutableClock
 src/test/java/co/scuby/architecture/ reglas de ArchUnit que fallan el build

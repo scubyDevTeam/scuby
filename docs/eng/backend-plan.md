@@ -109,7 +109,7 @@ bucket (`web/src/mocks/api/media.ts`) is the behaviour to match.
 `GET /config` from `supported_countries`.
 
 **S.2 Phone step.** `POST /me/phone` + verify; SMS OTP over Twilio with the safety checklist of
-[auth.md](auth.md) (Bucket4j limits, spend alarm); the `publisher_phone_otp` flag
+[auth.md](auth.md) (limits counted over rows in Postgres, spend alarm); the `publisher_phone_otp` flag
 ([feature-flags.md](feature-flags.md)).
 
 **S.3 Publish and view a lost case.** `POST /lost-cases`, `GET /cases/{code}` with the
@@ -135,7 +135,7 @@ Each a step; order within the phase follows what the client needs next.
 - **L.5 Found vertical** and matching v1 ([05](../product/05-found-workflow.md), [O7](../open-items.md)).
 - **L.6 Chat** over Twilio Conversations ([comms.md](comms.md)).
 - **L.7 Reporting and the operator queue** ([09](../product/09-reporting.md); staffing [O11](../open-items.md)).
-- **L.8 Purges and account deletion** ([01](../product/01-actors-and-entities.md) rule 7, decision #28).
+- **L.8 Purges and account deletion** ([01](../product/01-actors-and-entities.md) rule 7, decision #28). Deleting a person must also evict that person's cached sessions: the cache is keyed by token hash, so collect the hashes before the cascade ([backend.md](backend.md) · Sessions).
 - **L.9 Reverse geocoding** for place names.
 
 ## Phase X — Production and launch

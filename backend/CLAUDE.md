@@ -23,17 +23,16 @@ One version, three places that must agree — change them in one commit:
 
 The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older than 3.9.
 
-## Package rules (ArchUnit fails the build)
+## Package rules
 
-- Package by feature, **flat**: `platform` (domain-free), foundations `identity`, `uploads`, `pets`,
+- Enforced by ArchUnit (the build fails): package by feature, **flat**: `platform` (domain-free), foundations `identity`, `uploads`, `pets`,
   verticals `cases` (later `adoption`, `help`…). No layer subpackages.
 - Package-private by default. A class another feature uses is `public` **and** `@ModuleApi`.
 - Dependencies: `platform` → nothing of ours; foundations → `platform` only; verticals →
   foundations + `platform`, never another vertical. A new feature package is added to
   `ArchitectureRules.FOUNDATIONS` or `VERTICALS` in the same commit.
-- Each table has **one writing feature**; reads may join any table (`db.generated` is shared).
-- Cross-feature side effects go through the outbox, never a direct call to another vertical.
-- Roles: `@ApiComponent` and `@WorkerComponent` never depend on each other.
+- Roles (ArchUnit): `@ApiComponent` and `@WorkerComponent` never depend on each other; every `@RestController` is an `@ApiComponent`; every `@Scheduled`/`@SqsListener` method is in a `@WorkerComponent`.
+- **Enforced by review only** (nothing fails the build): each table has **one writing feature** (reads may join any table; `db.generated` is shared), and cross-feature side effects go through the outbox, never a direct call to another vertical.
 
 ## Writing an endpoint
 
@@ -58,26 +57,30 @@ The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older 
   every response is validated against `openapi.json` and the request's SQL statements are counted
   against `StatementCeilings` (add your endpoint's line; a ceiling never grows with row counts —
   seed several rows to prove it).
+- A contract route is called through the checked methods; `raw()` refuses a documented path, and `unchecked(…, reason)` is the escape (for a status the contract does not list, such as the Origin `403`). A controller route missing from `openapi.json` fails `ContractCoverageTest`.
 - Viewer-dependent endpoints get a **leak test**: as a non-owner, every owner-only field is `null`.
 - Time travel: `MutableClock` (`advance`, `set`). Codes sent by email/SMS: `RecordingEmailSender`,
-  `RecordingSmsSender`. Signed-in shortcut: `Accounts.signIn(api, email)` (sets the `__Host-session`
+  `RecordingSmsSender`. Signed-in shortcut: an injected `Accounts` bean's `signIn(api, email)` (sets the `__Host-session`
   cookie).
 - Connection hygiene: `ConnectionSampler` samples the pool while the controller starts, and
   `StatementRecorder.autoCommits()` says which statements ran outside a transaction.
 - A deployed profile's required setting goes into `ProfileStartupTest.REQUIRED` (dummy value): the
-  test proves `staging` and `prod` start with them and refuse to start without each.
-- A new writable table goes into `TestDb.MUTABLE_TABLES`.
+  test proves `staging` and `prod` start with them and refuse to start without each. A deployed
+  profile combined with `local` or `test` is still deployed; keys must be non-blank, at least 32
+  characters and not the shipped default.
+- A new writable table goes into `TestDb.MUTABLE_TABLES` (or `TestDb.REFERENCE_TABLES` for seeded reference data); `HarnessSelfTest` fails for a table in neither.
 
 ## Migrations and indexes
 
 - Flyway file names are timestamps: `V20261029_1430__what.sql` (never sequence numbers) — **on
-  every branch**: a `V3__…` merged after timestamped migrations fails validation on every database
-  that already ran them. Each starts with a comment: what it is for, which doc owns it. Qualify
+  every branch**, enforced by `MigrationNamesTest`. `spring.flyway.out-of-order` is on, so a migration
+  from a branch that merges later still runs; therefore a migration must not depend on another
+  branch's migrations (decision #44). Each starts with a comment: what it is for, which doc owns it. Qualify
   tables with `scuby.` inside PL/pgSQL.
 - **An index is earned:** only growth-sensitive queries get a plan check (`PlanAssert`, seeded
   thousands of rows). Write the failing plan check first, then the index; its migration comment
   carries the query, the plan before/after, the write cost and overlaps. Every new index is listed
-  for human approval in the task report.
+  for human approval in the task report (review-enforced).
 
 ## What reviewers check (humans)
 

@@ -19,14 +19,17 @@
 - Apple gotcha for later: it returns the user's name **only on first authorization** — capture it
   then or lose it. (Apple login itself is deferred — see Deferred.)
 - Sessions are long-lived: an opaque token in an httpOnly cookie, stored only as its SHA-256,
-  expiring 12 months after sign-in whatever the use (no sliding refresh); sign-out ends it at once.
-  Mechanics: [backend.md](backend.md) · Sessions.
+  expiring 12 months after sign-in whatever the use (no sliding refresh; decision #43 in
+  [00](../product/00-product-map.md)); sign-out ends it at once. Mechanics: [backend.md](backend.md) · Sessions.
 - **Email code:** 6 digits, stored as a keyed hash, 5-minute expiry, 3 attempts, a 60 s resend
   cooldown while the current code is live and unused (a used or burned code never blocks a new
   one), at most 10 sends per address per day, and at most 10 per device and 20 per IP over a rolling
   24 h (those two answer "too many requests"); the address is trimmed and lower-cased; otherwise
   starting a sign-in always answers the same (it never reveals whether an account exists). The
-  account is named from the address («juan.perez@…» → «Juan Perez») until the person edits it.
+  account is named from the address («juan.perez@…» → «Juan Perez») until the person edits it. The
+  code is sent after the transaction that stores it commits; a send that fails leaves an unused code
+  and the person asks for another (decision #45). The device and IP caps are approximate under
+  parallel bursts across different addresses ([O23](../open-items.md)).
 - **Google:** the client sends Google's ID token; the server verifies the signature against
   Google's keys, the audience (our client ID), the issuer, the expiry and issue time, requires a
   verified email, keys the account on Google's `sub`, and links a first Google sign-in to the
@@ -38,15 +41,19 @@
   sign in; that account is flagged `person.google_email_authoritative = false`. An account created
   by email code is never linked to a non-authoritative Google identity (the answer is `401`). When
   someone signs in with an email code to an account holding a non-authoritative Google link, the
-  server unlinks that Google identity, ends the person's other sessions, clears a phone verified
-  meanwhile and deletes pending phone codes: whoever held the account through that link may have
-  attached a number of their own. Why: outside Gmail and Workspace, `email_verified` is historical
+  server unlinks that Google identity, ends the person's other sessions, clears the account's phone
+  (verified or not), resets the display name to the one derived from the address and deletes pending
+  phone codes: whoever held the account through that link may have attached a number or a name of
+  their own. Why: outside Gmail and Workspace, `email_verified` is historical
   (the address may have changed hands), which allows account takeover and pre-hijacking. Rejected:
-  link on any verified email (decision 42 in [00](../product/00-product-map.md)).
+  link on any verified email (decision #42 in [00](../product/00-product-map.md)).
 - **No phone uniqueness.** Two accounts may verify the same number (`person.phone` is not unique):
   the number is a contact channel, not an identity, and shared family phones are common.
 - **Until the providers exist** ([O23](../open-items.md)), local, test and staging write email and
-  SMS codes to the log; production starts but refuses every send. For e2e runs, addresses on a test
+  SMS codes to the log; production starts but refuses every send. The log shows the recipient
+  masked and the code in clear: an email as its first character, `***@` and the domain, a phone as
+  `***` and its last 4 digits (decision #46) — so a reader of staging logs holds live codes but not
+  full addresses or numbers. For e2e runs, addresses on a test
   domain and numbers in a reserved range accept a fixed code and skip the cooldowns and every send
   limit; configuring either under the production profile stops the server at start-up.
 
@@ -110,8 +117,8 @@ One international long code (~$2/mo); SMS to Colombia ≈ **$0.0592/send** (veri
 cost ≈ one send per publisher, once. The checklist, none of it skippable:
 
 - 6-digit code, stored as a **keyed hash** (HMAC), 5-minute expiry, max 3 attempts, invalidated on success
-- Resend cooldown 60 s; max 4 sends per number per day; per-device (10 per day) and per-IP (20 per
-  day) throttles over rolling 24 h; a repeat inside the cooldown answers as if sent, without sending
+- Resend cooldown 60 s; max 4 sends per number per day; per-account (10), per-device (10) and
+  per-IP (20) throttles over a rolling 24 h; a repeat inside the cooldown answers as if sent, without sending
 - A right code is consumed only when the action it unlocks commits (a failed publish leaves it
   usable); a wrong one counts even when the action fails
 - Numbers validated **before any send**: libphonenumber format check client-side, server re-check,
@@ -124,13 +131,26 @@ cost ≈ one send per publisher, once. The checklist, none of it skippable:
 
 Accepted or tracked; each is a deliberate tradeoff, not an oversight.
 
-- **Cookie tossing on `device`.** A sibling subdomain can set a duplicate `device` cookie; the server then treats every request as a new device, so anonymous ownership is lost and upload slots stop matching. An availability problem; only renaming it `__Host-device` fixes it, which is a contract change on the client.
-- **Victim lockout.** The per-number SMS cap can lock a number's real owner out of verifying. Accepted.
+- **Cookie tossing.** A sibling subdomain can set cookies for the parent domain. The session cookie is
+  `__Host-session` (browsers refuse a `__Host-` cookie that names a `Domain`), and both cookie readers treat a
+  name sent twice as absent, so it cannot be pinned. The device cookie is still `device`: a duplicate pinned
+  by a sibling subdomain makes the server treat every request as a new device, so anonymous ownership is lost
+  and upload slots stop matching. An availability problem; only renaming it `__Host-device` fixes it, which is
+  a contract change on the client side ([O27](../open-items.md)).
+- **Origin check on the contract.** An unsafe request from a disallowed origin answers `forbidden` (`403`) before
+  it reaches the endpoint ([backend.md](backend.md) · Security), but the contract lists no `403` on the auth and
+  phone endpoints ([O27](../open-items.md)).
+- **Victim lockout.** The per-number SMS cap can lock a number's real owner out of verifying. Accepted. The email
+  channel has the same shape: from one IP, three wrong verifies burn the live code, so the next start sends a
+  new one at once; ten such rounds use the address's 10 sends for the UTC day (30 verifies, under the 20-per-IP
+  start cap), and the owner gets no code until midnight UTC. Accepted for now.
+- **Send log.** `code_send` keeps the email address or phone number in clear for 30 days (the throttles count
+  rows by target); `phone_otp` rows are purged 30 days after they expire. Accepted until a reason to hash the target.
 - **Test number range.** The test bypass range +57 300 000 00xx overlaps an assigned number block. Acceptable: production refuses to start with bypasses configured.
 - **IPv6.** IP limits key on the full IPv6 address, so one host can rotate within its /64 ([O26](../open-items.md)).
-- **JWKS refetch.** An unknown `kid` in a Google token triggers a refetch of Google's keys, and `/auth/google` has no `429` ([O26](../open-items.md)).
+- **JWKS refetch.** An unknown `kid` in a Google token forces a refetch of Google's keys, at most once every 30 s; past that, the token is refused (`401`). A token signed with a freshly rotated key can therefore be refused for up to 30 s, and `/auth/google` has no `429` ([O26](../open-items.md)).
 - **Logging.** Never log the Google `credential` (the ID token).
-- **Sign-out everywhere.** "Sign out everywhere" and unlink delete sessions by `person_id` without an index; the path is rare, so the index waits until it becomes frequent.
+- **Sessions by person.** The reclaim unlink (and, later, account deletion) deletes sessions by `person_id`, which has no index; the path is rare, so the index waits until it becomes frequent. Account deletion must also evict the person's cached sessions.
 
 ## Country is configuration, never code
 

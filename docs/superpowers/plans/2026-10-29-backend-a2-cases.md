@@ -36,7 +36,7 @@
 
 | Topic | Rule |
 |---|---|
-| Phone step at publish | `PublisherPhone.resolve` (A1): OTP when `publisher_phone_otp` is on and the number is new or unverified; first call sends and answers `{phone_step: "otp"}`; repeat inside 60 s answers `otp` without resending; flag off publishes with the number stored unverified (O24). It runs inside the publish transaction (`MANDATORY`) **after every other validation**, so a refused or rolled-back publish leaves a correct code usable |
+| Phone step at publish | `PublisherPhone` (A1, `backend/src/main/java/co/scuby/identity/PublisherPhone.java`) in two calls: `prepare` with no transaction open, then `resolve` inside the publish transaction. OTP when `publisher_phone_otp` is on and the number is new or unverified; first call sends and answers `{phone_step: "otp"}`; repeat inside 60 s answers `otp` without resending; flag off publishes with the number stored unverified (O24). `resolve` runs **after every other validation**, so a refused or rolled-back publish leaves a correct code usable (its attempt stays spent). The SMS itself goes out after the publish transaction commits |
 | Feed | With `lat`+`lng`: open lost cases within 25 km, ordered by distance band (≤ 2, ≤ 5, ≤ 10, ≤ 25 km) then newest `published_at` first; scope `local`. None near, or no `lat`/`lng`: scope `national`, newest first. At most 100 items either way (no paging in the contract). `vertical`/`species` filter **before** the scope is decided (deviation from the mock, which filtered after — so `local` means "something near matches"). The web client sends no point today, so real traffic is national; the local branch is built and tested, its spatial index deferred until the client sends a point (no request would use it before then) |
 | Public location floor | Non-owners get `last_seen.radius_m = max(radius, 200)`; the owner gets the stored radius; the center is never moved |
 | Sightings | Order of checks: case exists (lost only; purged/other verticals → `not_found`) → `client_id` replay (before everything else, any reporter) → case `active` else `invalid_transition` → `seen_at` > now + 5 min `seen_at_in_future` → `seen_at` < `last_seen_at` − 24 h `seen_at_before_case` → distance > 30 km `sighting_too_far` → contact phone format → photos → rate limits → insert |
@@ -1509,7 +1509,13 @@ git commit -m "feat: pets foundation — pet and owner responsibility link, owne
 ---
 ### Task 4: `POST /lost-cases` — publish a lost case
 
-One transaction (`docs/product/04-lost-workflow.md` · Publishing): the pet (new, or an existing one the caller owns), its owner link, and the case. Order of checks (so a blocked publish never sends an SMS and never consumes a code): `last_seen_at` more than 5 minutes in the future → `validation_failed` on `last_seen_at` (same tolerance as sightings); new pet → its photos must be the caller's processed `pet` uploads (`validation_failed` on `pet.photo_urls`) — checked **before** the transaction opens, because `PhotoAttachments` may call S3 and runs only outside transactions; then, in the transaction: `pet_id` given → must be the caller's (`not_found`) and must have no active case (`active_case_exists`, `details.case_code`); **last**, the phone step (`PublisherPhone.resolve`, A1, `Propagation.MANDATORY`: it consumes a correct code inside this transaction, so a later rollback leaves the code usable) — `CodeSent` answers `{"phone_step":"otp"}` and writes nothing else; `Ready` continues: pet + link (new pet only; with `pet_id` the body's `pet` is ignored, as in the mock), a fresh code, the place name (computed once, stored), the case with `contact_phone` = the resolved number. Answer `{"code": "…"}` with status **200** (the contract's `publishLost`). A double tap creates two pets and two cases (no idempotency key in the contract): proposed to the client side as `client_id` on `publishLost` (Task 12).
+One transaction (`docs/product/04-lost-workflow.md` · Publishing): the pet (new, or an existing one the caller owns), its owner link, and the case. Order (so a blocked publish never sends an SMS and never consumes a code):
+
+1. Cheap validations, with no I/O: `last_seen_at` more than 5 minutes in the future → `validation_failed` on `last_seen_at` (same tolerance as sightings). Then the checks that read but do not write, all **outside any transaction**: a new pet's photos must be the caller's processed `pet` uploads (`validation_failed` on `pet.photo_urls`; `PhotoAttachments` may call S3), and with `pet_id` given, the pet must be the caller's (`not_found`) and have no active case (`active_case_exists`, `details.case_code`) — a read-only `active_case_exists` pre-check.
+2. `PublisherPhone.prepare(personId, body phone, otp_code)`, **with no transaction open**: validates the number (`phone_required`, `validation_failed` on `phone`) and, when a code was given for a number that needs one, counts the attempt in its own autocommit statement (a wrong code is `invalid_code` right here and spends an attempt).
+3. The publish transaction (`TransactionTemplate`): re-check ownership and `active_case_exists` (a concurrent publish may have won), then `PublisherPhone.resolve(prepared, caller)` (`Propagation.MANDATORY`; it locks the person row, then sends the code, consumes the reserved one, or stores the number). `CodeSent` → **commit** (the `phone_otp` row must persist) and answer `{"phone_step":"otp"}` without inserting a case. `Ready` → insert pet + link (new pet only; with `pet_id` the body's `pet` is ignored, as in the mock), a fresh code, the place name (computed once, stored), and the case with `contact_phone` = the resolved number. `resolve` can throw `rate_limited` (the SMS cap) and `invalid_code` (a stale reservation or a lost race): let them propagate out of the transaction — either leaves it rollback-only, so catching one and carrying on ends in an `UnexpectedRollbackException`.
+
+A rolled-back publish leaves a correct code usable. Answer `{"code": "…"}` with status **200** (the contract's `publishLost`). A double tap creates two pets and two cases (no idempotency key in the contract): proposed to the client side as `client_id` on `publishLost` (Task 12).
 
 **Files:**
 - Create: `B/src/main/resources/db/migration/V20261030_1020__lost_cases.sql`
@@ -1520,14 +1526,14 @@ One transaction (`docs/product/04-lost-workflow.md` · Publishing): the pet (new
 - Create: `B/src/test/java/co/scuby/support/PublishBodies.java`
 
 **Interfaces:**
-- Consumes: `PublisherPhone.resolve(UUID, String, String, Caller) → Outcome (Ready(phone, verified) | CodeSent)` — `@Transactional(propagation = MANDATORY)`; a wrong code is counted in its own REQUIRES_NEW transaction, a correct one is consumed in the caller's; `PhotoAttachments.requireAttachable(List<String>, UploadPurpose, Caller, String)`; `Pets.createOwned(UUID, NewPet)`, `Pets.requireOwnedBy(String, UUID)`; `FeatureFlags.isEnabled(Flag.REVERSE_GEOCODING, UUID)`; `Account`, `Caller`; `GeoPoint`.
+- Consumes: `PublisherPhone.prepare(UUID personId, @Nullable String bodyPhone, @Nullable String otpCode) → PublisherPhone.Prepared` — `Propagation.NEVER`, throws `phone_required`, `validation_failed` on `phone`, or `invalid_code`; and `PublisherPhone.resolve(Prepared, Caller) → Outcome (Ready(String phone, boolean verified) | CodeSent())` — `Propagation.MANDATORY`, throws `rate_limited` and `invalid_code`, and `IllegalArgumentException` when the caller is not the account `prepare` was called for (`Prepared` is opaque: pass it unchanged); `PhotoAttachments.requireAttachable(List<String>, UploadPurpose, Caller, String)`; `Pets.createOwned(UUID, NewPet)`, `Pets.requireOwnedBy(String, UUID)`; `FeatureFlags.isEnabled(Flag.REVERSE_GEOCODING, UUID)`; `Account`, `Caller`; `GeoPoint`.
 - Produces:
   - Tables `lost_case` (code PK, pet_id, created_by, status, published_at, resolved_at, contact_phone, phone_has_whatsapp, expose_whatsapp, expose_email, in_app_only, last_seen_lat, last_seen_lng, generated `last_seen_point geography`, last_seen_radius_m, last_seen_at, place_name nullable) and `purged_case_code (code, purged_at)`.
   - `CaseCodes`: `static final String ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"`, `String newCode()`, `static Optional<String> normalize(String raw)` (upper-cases; empty unless 5 alphabet characters).
   - `interface PlaceNamer { Optional<String> nameFor(GeoPoint point); }`, `NoPlaceNamer` (always empty — no provider in this slice), `PlaceNames.forNewCase(GeoPoint, UUID publisher) → @Nullable String` (null = render the generic label).
   - `record PointInput(Double lat, Double lng)` with `GeoPoint toGeoPoint()` — reused by sightings and the feed (package-private in `cases`).
-  - `POST /lost-cases`; statement ceiling measured in Step 5 (pre-authorised ≤ 16).
-  - `PublishLostService.publish` is **not** `@Transactional`: photo check first (outside), then a `TransactionTemplate` transaction ending with `PublisherPhone.resolve` before any write.
+  - `POST /lost-cases`; statement ceiling measured in Step 5 (pre-authorised ≤ 18).
+  - `PublishLostService.publish` is **not** `@Transactional`: photo check first (outside), then `PublisherPhone.prepare` (no transaction), then a `TransactionTemplate` transaction that re-checks the pet and `active_case_exists` and calls `PublisherPhone.resolve` before any write.
   - Test support `PublishBodies.kira(String phone, String otpCode)` (the mock's `kira` body as JSON), `PublishBodies.withPetId(String petId, String phone)`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1709,7 +1715,7 @@ class PublishLostTest {
         assertThat(bob.post("/lost-cases", body).json().at("/error/fields").has("pet.photo_urls")).isTrue();
     }
 
-    /** The phone step runs after every other check, so a refused publish never burns the SMS code (A1 · PublisherPhone). */
+    /** The phone step runs after every other check, so a refused publish never burns the SMS code (A1 · PublisherPhone: prepare, then resolve). */
     @Test
     void aPublishRefusedForAnotherReasonLeavesTheSmsCodeUsable() {
         publish(PublishBodies.kira(PHONE, null));
@@ -2153,11 +2159,13 @@ import static co.scuby.db.generated.Tables.LOST_CASE;
 /**
  * docs/product/04-lost-workflow.md · Publishing: pet (or reuse), owner link, case — one transaction.
  *
- * <p>Order: checks without I/O, then the photo check <b>outside</b> the transaction (it may call S3:
- * {@code PhotoAttachments} is {@code Propagation.NEVER}), then one transaction that re-checks
- * ownership and the active case, and only <b>then</b> resolves the phone step: {@code PublisherPhone.resolve}
- * is {@code Propagation.MANDATORY} and consumes a correct SMS code inside this transaction, so it
- * must come after every other validation — a publish refused or rolled back later leaves the code usable.
+ * <p>Order: (1) checks without I/O, then the read-only checks <b>outside</b> any transaction: the photo check
+ * (it may call S3: {@code PhotoAttachments} is {@code Propagation.NEVER}) and, with {@code pet_id}, ownership and the
+ * {@code active_case_exists} pre-check; (2) {@code PublisherPhone.prepare}, with no transaction open (it counts a code
+ * attempt in its own statement); (3) one transaction that re-checks ownership and the active case and only <b>then</b>
+ * calls {@code PublisherPhone.resolve} ({@code Propagation.MANDATORY}: sends the SMS after commit, or consumes the
+ * reserved code). It must come after every other validation — a publish refused or rolled back later leaves the code
+ * usable. On {@code CodeSent} the transaction commits and no case is written.
  */
 @Service
 class PublishLostService {
@@ -2198,19 +2206,30 @@ class PublishLostService {
             // Outside any transaction (S3 HeadObject in staging). A new pet has no active case, so the
             // mock's order (pet checks → photos → phone) is unchanged.
             photos.requireAttachable(request.pet().photoUrls(), UploadPurpose.pet, caller, "pet.photo_urls");
+        } else {
+            // Read-only pre-check, outside the transaction: a blocked publish must not spend a code attempt.
+            requireOwnedAndFree(request.petId(), me);
         }
-        return tx.execute(status -> publishInTransaction(me, caller, request, now));
+        // No transaction is open here (PublishLostService is not @Transactional): prepare counts a code attempt in
+        // its own statement, and a wrong code is invalid_code right now.
+        PublisherPhone.Prepared prepared = publisherPhone.prepare(me, request.phone(), request.otpCode());
+        return tx.execute(status -> publishInTransaction(me, caller, request, now, prepared));
     }
 
-    private Object publishInTransaction(UUID me, Caller caller, PublishLostRequest request, Instant now) {
-        if (request.petId() != null) {
-            pets.requireOwnedBy(request.petId(), me);
-            String open = activeCaseQuery(UUID.fromString(request.petId())).fetchOptional(Record1::value1).orElse(null);
-            if (open != null) throw activeCaseExists(open);
-        }
+    private void requireOwnedAndFree(String petId, UUID me) {
+        pets.requireOwnedBy(petId, me);
+        String open = activeCaseQuery(UUID.fromString(petId)).fetchOptional(Record1::value1).orElse(null);
+        if (open != null) throw activeCaseExists(open);
+    }
 
-        // Last validation step: consumes a correct code in this transaction (A1 · PublisherPhone).
-        PublisherPhone.Outcome phone = publisherPhone.resolve(me, request.phone(), request.otpCode(), caller);
+    private Object publishInTransaction(UUID me, Caller caller, PublishLostRequest request, Instant now,
+                                        PublisherPhone.Prepared prepared) {
+        // Re-check: a concurrent publish may have won since the pre-check.
+        if (request.petId() != null) requireOwnedAndFree(request.petId(), me);
+
+        // Last validation step. CodeSent: this transaction commits (the phone_otp row must persist) and no case is
+        // inserted. rate_limited and invalid_code propagate (they leave the transaction rollback-only).
+        PublisherPhone.Outcome phone = publisherPhone.resolve(prepared, caller);
         if (phone instanceof PublisherPhone.CodeSent) return PublishView.PhoneStep.OTP;
         PublisherPhone.Ready ready = (PublisherPhone.Ready) phone;
 
@@ -2296,27 +2315,29 @@ class PublishLostController {
 }
 ```
 
-`TestDb.MUTABLE_TABLES`: add `"lost_case"`, `"purged_case_code"`. `StatementCeilings`: add `Map.entry("POST /lost-cases", 16)` — a pre-authorised upper bound, to be lowered after measuring (Step 5). Expected breakdown of the heaviest path (a correct SMS code, new pet with photos):
+`TestDb.MUTABLE_TABLES`: add `"lost_case"`, `"purged_case_code"`. `StatementCeilings`: add `Map.entry("POST /lost-cases", 18)` — a pre-authorised upper bound, to be lowered after measuring (Step 5). Expected breakdown of the heaviest path (a correct SMS code, new pet with photos):
 
 | Step | Statements |
 |---|---|
 | session lookup | 1 |
 | photo slots (`PhotoAttachments`, one SELECT for all photos) | 1 |
-| `people.get` | 1 |
+| `people.get` (in `prepare`) | 1 |
 | supported countries | 1 |
-| flag `publisher_phone_otp` | 1–2 |
-| `PhoneOtp.check` success path (select + delete, in this transaction; the REQUIRES_NEW attempt write happens only on a **wrong** code) | 2 |
+| flag `publisher_phone_otp` (read in `prepare` and again in `resolve`) | 1–2 |
+| `PhoneOtp.reserveAndCheck` (in `prepare`, outside the transaction: one conditional UPDATE; a wrong code stops here) | 1 |
+| `people.lock` (in `resolve`: the person row, `FOR UPDATE`) | 1 |
+| `PhoneOtp.consume` (one conditional DELETE, in the publish transaction) | 1 |
 | `people.setPhone` | 1 |
 | pet + owner link | 2 |
 | `newCode` | 1 |
 | flag `reverse_geocoding` | 1–2 |
 | case insert | 1 |
-| **Total** | **13–15** (one more code draw + insert on a code collision: ≤ 16 only with ≤ 1 collision) |
+| **Total** | **14–16** (one more code draw + insert on a code collision). A publish with a code reads the person and the flag twice (`prepare`, then `resolve`), so size the ceiling from the measured count, not from this estimate. With `pet_id`, the ownership and `active_case_exists` pre-check runs twice (outside and inside the transaction) |
 
 - [ ] **Step 5: Run the endpoint tests, then measure and set the ceiling**
 
 Run: `[mvn] -q test -Dtest='PublishLostTest,CaseCodesTest,PlaceNamesTest,ArchitectureTest'`
-Expected: PASS. Record the measured statement count of each publish path (otp, correct code, wrong code, verified, flag-off, with photos) in the report, then set the ceiling to the highest measured value. A measurement above 16 is a defect to explain in the report (which statement repeats), not a reason to raise the ceiling.
+Expected: PASS. Record the measured statement count of each publish path (otp, correct code, wrong code, verified, flag-off, with photos) in the report, then set the ceiling to the highest measured value. A measurement above 18 is a defect to explain in the report (which statement repeats), not a reason to raise the ceiling.
 
 - [ ] **Step 6: Measure the active-case check — expect a seq scan**
 

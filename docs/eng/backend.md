@@ -176,7 +176,7 @@ backend still never generates a competing one.
 [`backend/CLAUDE.md`](../../backend/CLAUDE.md).
 
 **Package by feature, flat, package-private by default.** `co.scuby.platform` is technical and
-domain-free (roles, web envelope, PostGIS helpers, security wiring, flags, time); foundations
+domain-free (roles, web envelope, PostGIS helpers, security wiring, flags, time, cache, config, crypto, module annotations); foundations
 `identity`, `uploads`, `pets` depend only on `platform`; verticals (`cases` today) depend on
 foundations and `platform`, never on each other. A class used from another feature carries
 `@ModuleApi`; everything else stays package-private. Reads may join any table; each table has one
@@ -191,11 +191,30 @@ record is serialised. Request/response records are written by hand next to their
 (generation was rejected: openapi-generator turns the contract's unions into unusable classes).
 
 **Guardrails that fail the build:** ArchUnit (derivation purity — no Spring, jOOQ, I/O, clock or
-randomness; roles by annotation; the DAG; the declared surface), PIT mutation testing on
-derivations (≥ 80 %), contract conformance of every response an integration test produces, leak
-tests on viewer-dependent endpoints, statement-count ceilings per request (an N+1 fails the test),
-plan checks on growth-sensitive queries only, and indexes added only with a measured plan and human
-approval. Flyway versions are timestamps on every branch so parallel branches never collide.
+randomness; roles by annotation, including that every `@RestController` is an `@ApiComponent` and every
+`@Scheduled`/`@SqsListener` method sits in a `@WorkerComponent`; the DAG; the declared surface), PIT
+mutation testing on derivations (≥ 80 %), contract conformance of every response an integration test
+produces, contract coverage (every controller route is in `openapi.json`; every implemented session
+route refuses an anonymous caller with `401`), a test client whose `raw()` refuses a documented
+contract path (`unchecked(…, reason)` is the explicit escape), leak tests on viewer-dependent
+endpoints, statement-count ceilings per request (an N+1 fails the test), plan checks on
+growth-sensitive queries only, a check that every table is either reset between tests or declared
+reference data, and a test on the migration file names. **Enforced by review, not the build:**
+indexes only with a measured plan and human approval, one writing feature per table, cross-feature
+side effects through the outbox, and viewer logic staying inside `*Derivation` classes.
+
+**Migrations** (decision #44). Flyway versions are timestamps (`V20261029_1430__what.sql`; the
+original `V1` and `V2` predate the rule). `spring.flyway.out-of-order` is on, so a migration written
+earlier than one already applied still runs when its branch merges later; the cost is that
+migrations from parallel branches must not depend on each other's order. `MigrationNamesTest`
+enforces the file-name pattern and the property.
+
+**No network call inside a transaction** (decision #45). The Google token is verified before the
+sign-in transaction opens (a slow JWKS fetch would otherwise hold a pooled connection and the locks
+for its whole length). Email and SMS codes are sent after the transaction that stores them commits
+(email: stored in one transaction, then delivered; SMS: registered to run after commit, so a publish's
+outer transaction is waited for too). A send that fails after the commit leaves an unused code and a
+`server_error`; the person asks for another.
 
 ## Security
 
@@ -214,20 +233,21 @@ cookies are the second layer. Rejected: Spring's token CSRF (needs a contract ch
 here); `SameSite` alone (a sibling subdomain is same-site). **CORS** allows only the client's
 origins (`scuby.web.allowed-origins`), with credentials.
 
-**Cookie tossing:** a sibling subdomain can set cookies for the parent domain. The session cookie is
-`__Host-session` (browsers refuse a `__Host-` cookie that names a `Domain`), and both cookie readers
-treat a name sent twice as absent. The device cookie keeps the name `device` until the client side
-agrees to `__Host-device` (proposed).
+**Cookie tossing** (a sibling subdomain setting cookies for the parent domain): how the session cookie resists it, and why the `device` cookie cannot yet, is in [auth.md](auth.md) · Known limitations and risks.
 
 **Caching:** every response carries `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`
 (Spring Security's default, kept on purpose): answers are per viewer, and a CDN must never store
 one. An endpoint that wants caching sets it explicitly and says why.
 
 **Deployed profiles are configured, never defaulted:** outside `local` and `test`, start-up is
-refused without the allowed origins, the IP-hash key, the code-hash key and the Google client ID;
+refused without the allowed origins, the IP-hash key, the code-hash key and the Google client ID (each
+key non-blank, at least 32 characters and not the shipped default); a deployed profile combined with
+`local` or `test` (`staging,local`) is still deployed;
 under `prod` also without the origin secret (under `staging` a missing one is a start-up warning:
 every per-IP limit would key on CloudFront's address). A start-up test keeps every deployed profile
-startable with exactly those settings.
+startable with exactly those settings. Infra must also put `logServerErrorDetail=false` on the JDBC URL of
+deployed profiles: otherwise pgjdbc copies the failing row (which can hold an email, a phone or a code
+hash) into exception messages, and the API logs those. The URL comes from infra; nothing in this repo sets it.
 
 **Client IP** (a rate-limit key): `CloudFront-Viewer-Address` only when the request carries the
 origin secret header, else the socket address. IPs are stored only as an HMAC.
@@ -243,7 +263,7 @@ its SHA-256, with `expires_at` = sign-in + 12 months (absolute); the cookie's `M
 from that `expires_at`, so both end together. **Reading a session never writes** — no
 `last_seen_at`, no sliding expiry; writes happen on sign-in, sign-out, account deletion and a daily
 purge. A bounded in-process cache (10,000 entries, 60 s) sits in front of the lookup behind
-`SessionLookup`; sign-out evicts locally; size `0` disables it. **Connection hygiene:** the lookup
+`SessionLookup`; sign-out evicts locally; size `0` disables it. The lifetime is decision #43. **Connection hygiene:** the lookup
 runs outside any transaction and returns its connection at once; transactions live in service
 methods, never across a request — a test asserts the lookup ran in autocommit, the pool had 0 active
 connections when the controller started (sampled during the request, not after it), no servlet
