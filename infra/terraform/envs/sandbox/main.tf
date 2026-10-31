@@ -40,6 +40,7 @@ module "params" {
     "vapid/private-key",
     "google/client-secret",
     "sentry/dsn",
+    "auth/code-hash-key", # placeholder replaced by sandbox-deploy.sh (it regenerates any value under 32 chars)
   ]
 }
 

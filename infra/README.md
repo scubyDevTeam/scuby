@@ -72,11 +72,9 @@ Orden:
    y `$SCRATCH/watchdog.log` debe mostrar las rutas de `terraform` y `aws` (no `MISSING`).
 4. `nohup terraform -chdir=infra/terraform/envs/sandbox apply -auto-approve -input=false > "$SCRATCH/apply.log" 2>&1; echo $? > "$SCRATCH/apply.exit"`
 5. `bash infra/scripts/sandbox-deploy.sh`, en segundo plano como el ejemplo de arriba. Además de la
-   contraseña de la base, el script crea (si falta) el parámetro SSM `/scuby/sandbox/auth/code-hash-key`
+   contraseña de la base, el script reemplaza el placeholder del parámetro SSM `/scuby/sandbox/auth/code-hash-key` (lo crea Terraform)
    y pasa al backend los ajustes que exige el perfil `staging` (origen, ID de Google de relleno,
-   bucket y URL de imágenes; lista en [`staging-rollout.md`](../docs/eng/staging-rollout.md)). Mientras
-   `auth/code-hash-key` no esté en `secret_names` de `envs/sandbox/main.tf`, el parámetro sobrevive a
-   `sandbox-destroy.sh` y el sweep lo reporta: bórralo con `aws ssm delete-parameter`.
+   bucket y URL de imágenes; lista en [`staging-rollout.md`](../docs/eng/staging-rollout.md)).
 6. Mínimo **90 min** de SSO restantes (`sso-remaining.sh`); si no, saltar al destroy.
    Luego `bash infra/scripts/sandbox-smoke.sh`, en segundo plano.
 7. **Siempre, al final:** `bash infra/scripts/sandbox-destroy.sh`, en segundo plano, aunque el
