@@ -35,7 +35,7 @@ problem.
 
 **Anonymous and one tap.** Requiring an account to report abuse means abuse goes unreported — the
 person best placed to flag a scam is usually a stranger who just saw it in the feed. A reason is
-required; nothing else is. Rate-limited by device/IP, exactly like sightings.
+required; nothing else is. No rate limit for now, like sightings: those limits are deferred ([decision #54](00-product-map.md)); per-IP limits are an edge matter ([O30](../open-items.md)).
 
 ---
 

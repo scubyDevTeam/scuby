@@ -217,12 +217,14 @@ earlier than one already applied still runs when its branch merges later; the co
 migrations from parallel branches must not depend on each other's order. `MigrationNamesTest`
 enforces the file-name pattern and the property.
 
-**No network call inside a transaction** (decision #45). The Google token is verified before the
-sign-in transaction opens (a slow JWKS fetch would otherwise hold a pooled connection and the locks
-for its whole length). Email and SMS codes are sent after the transaction that stores them commits
-(email: stored in one transaction, then delivered; SMS: registered to run after commit, so a publish's
-outer transaction is waited for too). A send that fails after the commit leaves an unused code and a
-`server_error`; the person asks for another.
+**No network call while a pooled connection is held** (decisions #45, #60). The Google token is verified
+before the sign-in transaction opens (a slow JWKS fetch would otherwise hold a pooled connection for its
+whole length). Email and SMS codes are stored in one transaction and sent after `TransactionTemplate.execute`
+returned: no transaction is open and no connection is held during the provider call (`afterCommit` is not
+enough: the connection is still checked out there). A publish that needs an SMS stores the code inside its
+transaction and sends it after that transaction returned. A send that fails leaves an unused code and a
+`server_error`; the person asks for another. `NoConnectionDuringSendTest` pins it: no transaction active and
+no active connection in the pool during the send.
 
 ## Security
 
@@ -250,17 +252,15 @@ one. An endpoint that wants caching sets it explicitly and says why.
 **Deployed profiles are configured, never defaulted:** outside `local` and `test`, start-up is
 refused without the allowed origins, the code-hash key and the Google client ID (the key
 non-blank, at least 32 characters and not the shipped default); a deployed profile combined with
-`local` or `test` (`staging,local`) is still deployed;
-under `prod` also without the origin secret. (There is no IP-hash key: the backend stores no IP —
-decision #54.) A start-up test keeps every deployed profile
+`local` or `test` (`staging,local`) is still deployed. (There is no IP-hash key: the backend stores no
+IP — decision #54.) A start-up test keeps every deployed profile
 startable with exactly those settings. Infra must also put `logServerErrorDetail=false` on the JDBC URL of
 deployed profiles: otherwise pgjdbc copies the failing row (which can hold an email, a phone or a code
 hash) into exception messages, and the API logs those. The URL comes from infra; nothing in this repo sets it.
 
 **Client IP.** The backend neither reads nor stores any client IP: no limit keys on it (decisions #54, #55).
-Per-IP limits, if they are wanted, are an edge rule ([O30](../open-items.md)). `scuby.web.origin-secret` is
-still required under `prod` so that infra's contract does not change, but nothing in the backend reads it now
-(it used to prove that `CloudFront-Viewer-Address` could be trusted); revisit it with O30.
+Per-IP limits, if they are wanted, are an edge rule ([O30](../open-items.md)); if an edge rule needs a shared
+secret between the edge and the API, it comes back with the code that reads it.
 
 **Device cookie** (decision #35): only its SHA-256 is used; it is set when missing and renewed on
 unsafe requests by a `Set-Cookie` header. There is no `device` table: the hash is stored on the rows
@@ -341,9 +341,9 @@ is wired yet; the comparison is in `docs/superpowers/specs/2026-10-30-place-name
 
 Only code sends are limited in the backend (decisions #56, #57): SMS at most 5 per number and email at most
 10 per address, each in a rolling 24 h, plus a 60 s cooldown, all counted over `code_send` (a log purged at
-30 days, so bounded and without a performance index). The count and the insert run under a transaction-scoped
-advisory lock on the number or address, so parallel requests cannot all read the same count. The rules live in
-[auth.md](auth.md); «Lo vi» and uploads have no limits ([04](../product/04-lost-workflow.md) · Validation,
+30 days, so bounded and without a performance index). The count and the insert are separate statements with
+no lock, so simultaneous requests for one number or address can overshoot a cap (see *Concurrency*). The
+rules live in [auth.md](auth.md); «Lo vi» and uploads have no limits ([04](../product/04-lost-workflow.md) · Validation,
 *Uploads and media* above), and per-IP abuse limits are an edge matter
 ([O30](../open-items.md)).
 
@@ -373,24 +373,40 @@ ORDER BY sightings DESC
 LIMIT 20;
 ```
 
-## Lock order
+## Concurrency
 
-*Decided 2026-10-31 — decision #50 ([00](../product/00-product-map.md)).* Row and advisory locks are
-taken in one order everywhere, so two transactions never wait on each other:
+*Decided 2026-10-31 — decision #59 ([00](../product/00-product-map.md)); it replaced a lock-order rule.*
+Transactions run at `READ COMMITTED` and correctness comes from **one atomic conditional statement per
+invariant**, not from row or advisory locks:
 
-1. **`person` first.** A transaction that locks the person (`People.lock`: sign-in with Google,
-   phone change, publish, phone-code send; the email-code reclaim updates the person row first) does
-   it before any other lock.
-2. Then the advisory locks of the flow (`phone_otp`, `email_code`), then the `phone_otp` row.
-3. **The person row lock is `FOR NO KEY UPDATE`, never `FOR UPDATE`.** Inserting a row that references
-   `person` (a sighting by a signed-in reporter) takes `FOR KEY SHARE` on it; `FOR UPDATE` conflicts
-   with that and would make the sighting queue behind the person's publish, or deadlock against any
-   path that holds `lost_case` and then waits for `person`.
-4. **A future path that locks a person and then a case** (close, edit) follows the same order:
-   `person`, then `lost_case`. «Lo vi» takes `lost_case … FOR SHARE` (so a sighting never lands on a
-   case that closes meanwhile) and then the foreign-key share lock on `person`; because `person` is
-   only ever locked `FOR NO KEY UPDATE`, the two do not conflict. Such a path gets a race test
-   against a signed-in sighting.
+- **A code is consumed once.** Email: `UPDATE email_code SET attempts = CASE WHEN code_hash = ? THEN max ELSE
+  attempts + 1 END WHERE email = ? AND attempts < max AND expires_at > ? RETURNING code_hash`; two requests with
+  the right code cannot both pass the `attempts < max` guard. SMS: `UPDATE phone_otp SET attempts = attempts + 1
+  … RETURNING code_hash` counts the attempt before the caller's transaction, and a conditional `DELETE … WHERE
+  code_hash = ?` inside it consumes the code once; a publish that rolls back after it leaves the code in place.
+- **One live code per address or number.** One upsert, `INSERT … ON CONFLICT DO UPDATE … WHERE <cooldown passed>`;
+  a second simultaneous start finds the guard false and sends nothing.
+- **One active case per pet, one sighting per replay key.** Unique indexes with `ON CONFLICT DO NOTHING`; the
+  loser reads the winner's row (`active_case_exists` with its code; the same sighting id).
+- **A sighting only on an active case.** One `INSERT … SELECT … FROM lost_case WHERE code = ? AND status =
+  'active'`. A close that commits a moment later is ordered after the sighting, and a close does not
+  delay it (it takes `FOR NO KEY UPDATE`, which does not conflict with the key share a foreign key takes).
+- **The send caps may be overshot.** The 5-SMS and 10-email caps and the SMS cooldown are a count of `code_send`
+  followed by an insert. Simultaneous requests for one number can all read a count under the cap, so a burst can
+  exceed it by up to the number of simultaneous requests; every request that comes after the burst sees the real
+  count. Accepted: the cost of one extra SMS is cents, and the alarm and the flag cover pumping
+  ([auth.md](auth.md) · OTP mechanics).
+
+**Where a lock remains.** Application code takes none. The only locks are Postgres' own: the unique-index waits
+above (a second insert waits for the first transaction and then conflicts), the row lock of an `UPDATE`, and
+`FOR UPDATE SKIP LOCKED` in the outbox relay ([outbox-relay.md](outbox-relay.md)). A future path that closes or
+edits a case holds its row only for its own `UPDATE`; it needs a race test against a signed-in sighting, and
+a lock beyond that needs a decision-log row saying why an atomic statement does not do.
+
+**Race tests** (`CodeRaceTest`, `PublishLostTest`, `SightingRaceTest`) start requests together with a barrier or hold
+an uncommitted row from another connection, and assert the invariants: a code is never consumed twice, two
+publishes for one pet give one case and one `409` and never a `500`, a correct code is still usable after a
+refused publish.
 
 ## Migrations and indexes: partial indexes need literals
 

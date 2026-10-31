@@ -29,25 +29,30 @@
   address is trimmed and lower-cased. A new account's own screens show a placeholder name built from the
   address («juan.perez@…» → «Juan Perez») until the person names themselves; it is never public: a case's
   contact shows «Alguien» until a name is chosen (decision #48). The
-  code is sent after the transaction that stores it commits; a send that fails leaves an unused code
-  and the person asks for another (decision #45).
+  code is sent after the transaction that stores it has returned its connection; a send that fails
+  leaves an unused code and the person asks for another (decisions #45, #60).
 - **Google:** the client sends Google's ID token; the server verifies the signature against
   Google's keys, the audience (our client ID), the issuer, the expiry and issue time, requires a
-  verified email, keys the account on Google's `sub`, and links a first Google sign-in to the
-  account with the same email only if that account has no Google identity yet and the email is
-  authoritative (next bullet). No redirect flow, no client secret.
-- **When Google may link to an existing account.** Only when Google vouches for *current* control
-  of the address: the domain is `gmail.com` or `googlemail.com`, or the token's `hd` (Workspace
-  domain) equals the email's domain. A non-authoritative email may still create an account and
-  sign in; that account is flagged `person.google_email_authoritative = false`. An account created
-  by email code is never linked to a non-authoritative Google identity (the answer is `401`). When
-  someone signs in with an email code to an account holding a non-authoritative Google link, the
-  server unlinks that Google identity, ends the person's other sessions, clears the account's phone
-  (verified or not), resets the display name to the one derived from the address and deletes pending
-  phone codes: whoever held the account through that link may have attached a number or a name of
-  their own. Why: outside Gmail and Workspace, `email_verified` is historical
-  (the address may have changed hands), which allows account takeover and pre-hijacking. Rejected:
-  link on any verified email (decision #42 in [00](../product/00-product-map.md)).
+  verified email, and keys the account on Google's `sub`. No redirect flow, no client secret.
+- **One account per email: Google and the email code point at the same row** (decision #58 in
+  [00](../product/00-product-map.md)). What Google may do depends on whether it vouches for *current* control of
+  the address (**authoritative**: the domain is `gmail.com` or `googlemail.com`, or the token's `hd`
+  (Workspace domain) equals the email's domain). Outside those, `email_verified` is historical (the address
+  may have changed hands), which would allow account takeover and pre-hijacking; only the email code proves
+  the mailbox.
+  - A `sub` already linked signs in to its account.
+  - **Authoritative address:** creates the account, or links the existing account with that email if it has no
+    Google identity yet (never over another `sub`: that is `401`).
+  - **Any other address, no session:** `401`, and nothing is created or linked.
+  - **Any other address, with a session of the account whose email is exactly this one** (the person signed in
+    with the email code): the Google identity is linked to that account for good; from then on Google alone
+    signs in to it.
+  - **Any other address, with a session of a different email:** `401`. A link never crosses emails.
+
+  There is no flag on the account and no step that removes a Google link or ends other sessions: an
+  email-code sign-in never touches a Google link. The contract has one `401` code, `unauthorized`, for every refusal; a distinct
+  code for "sign in with your email code first" is a client-side proposal
+  ([api.md](api.md) · Proposals). Rejected: link on any verified email; allow only Gmail.
 - **No phone uniqueness.** Two accounts may verify the same number (`person.phone` is not unique):
   the number is a contact channel, not an identity, and shared family phones are common.
 - **Until the providers exist** ([O23](../open-items.md)), local, test and staging write email and
@@ -126,6 +131,13 @@ cost ≈ one send per publisher, once. The checklist, none of it skippable:
   pumping to other destinations.
 - A right code is consumed only when the action it unlocks commits (a failed publish leaves it
   usable); a wrong one counts even when the action fails
+- **The SMS is sent like the email:** the code is stored in a transaction and the provider is called after it
+  returned, with no transaction open and no pooled connection held (decision #60). A send that fails leaves an
+  unused code and answers `server_error`.
+- **The caps are not locked.** The count of `code_send` and the insert that follows are separate statements, so
+  simultaneous requests for one number (or address) can each read a count under the cap and overshoot it, by up
+  to the number of simultaneous requests; later requests see the real count. Accepted (decision #59,
+  [backend.md](backend.md) · Concurrency): one extra SMS costs cents, and the daily alarm and the flag cover pumping.
 - Numbers validated **before any send**: libphonenumber format check client-side, server re-check,
   country + mobile-pattern rules from `supported_countries` (v1: +57, ten digits starting with 3)
 - **Daily SMS spend alarm** — sends × $0.06 above a few dollars/day means pumping; page us. The backend logs
@@ -159,7 +171,7 @@ Accepted or tracked; each is a deliberate tradeoff, not an oversight.
   they are needed, belong at the edge, where an IPv6 host can rotate within its /64 ([O26](../open-items.md), [O30](../open-items.md)).
 - **JWKS refetch.** An unknown `kid` in a Google token forces a refetch of Google's keys, at most once every 30 s; past that, the token is refused (`401`). A token signed with a freshly rotated key can therefore be refused for up to 30 s, and `/auth/google` has no `429` ([O26](../open-items.md)).
 - **Logging.** Never log the Google `credential` (the ID token).
-- **Sessions by person.** The reclaim unlink (and, later, account deletion) deletes sessions by `person_id`, which has no index; the path is rare, so the index waits until it becomes frequent. Account deletion must also evict the person's cached sessions.
+- **Sessions by person.** Account deletion (later) deletes sessions by `person_id`, which has no index; the path is rare, so the index waits until it becomes frequent. Account deletion must also evict the person's cached sessions.
 
 ## Country is configuration, never code
 

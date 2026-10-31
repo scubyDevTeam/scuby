@@ -116,7 +116,7 @@ bucket (`web/src/mocks/api/media.ts`) is the behaviour to match.
 publisher-only fields, `GET /feed` (newest first, as the contract says today).
 
 **S.4 «Lo vi».** `POST /cases/{code}/sightings` with server-side validation, the `client_id` replay
-key, rate limits keyed by the anonymous identity from S.0; photos through the upload flow.
+key (no rate limits: decision #54); photos through the upload flow.
 
 **Done when (phase):** the client, built with `VITE_API_MOCK=false` against staging, passes its
 sign-in, publish-lost and lost-case e2e specs.

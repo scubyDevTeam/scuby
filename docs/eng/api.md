@@ -49,7 +49,7 @@ it, so neither can use an endpoint the contract does not list.
   the outcome — `phone_step: otp` — never the flag.
 - **Replays are idempotent where the client queues.** «Lo vi» (`POST /cases/:code/sightings`) carries
   a `client_id` the client makes once and sends again on every retry: the same key on the same case
-  answers the sighting it already created — before any other check — so a send whose answer was lost
+  answers the sighting it already created — before every validation — so a send whose answer was lost
   on the way never becomes two pins ([frontend.md](frontend.md) · Risks §6).
 - **The email's one-tap links are public** (`/checkin-links/:token`): the token is the auth — single
   use, expiring, bound to one check-in and one answer. A GET applies only a safe answer; a
@@ -122,7 +122,7 @@ logs:
 | `active_case_exists` | 409 | The pet already has an active lost case; `details.case_code` |
 | `invalid_code` · `phone_required` | 422 | The emailed/SMS code is wrong · publishing with no verified number |
 | `sighting_too_far` · `seen_at_in_future` · `seen_at_before_case` | 422 | [04 · Validation](../product/04-lost-workflow.md) |
-| `rate_limited` | 429 | Too many email or SMS codes requested for one number or address ([auth.md](auth.md)) |
+| `rate_limited` | 429 | Too many SMS codes requested for one number ([auth.md](auth.md)); an email start never answers it (it answers `204` and sends nothing) |
 | `server_error` | 500 | — |
 
 Any endpoint may answer `validation_failed`, `rate_limited` and `server_error`; every other code
@@ -216,10 +216,11 @@ lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the 
   point) waits for the first request that uses it.
 - **Publish idempotency** — a double tap on «Publicar» creates two pets and two active cases; add a
   `client_id` to `publishLost`, replayed like a sighting's.
-- **Connecting Google to an email-code account** — the backend answers `401` when an account created
-  by email code meets a non-authoritative Google identity ([auth.md](auth.md) · When Google may
-  link). Add a distinct error code the client can turn into «Inicia sesión con tu código por correo
-  y luego conecta Google».
+- **Google with a non-Google address** — the backend answers `401` when the Google address is not
+  one Google vouches for and the browser has no email-code session of that same address (or has one
+  of another address) ([auth.md](auth.md) · When Google may link). Add a distinct error code the
+  client can turn into «Entra primero con tu código de correo»; with a session of the same address,
+  signing in with Google links it.
 - **E2E test identities** — the client's e2e specs sign in with `ana.gomez@correo.co` and the phone
   `+573007152284`, which the backend's test bypass accepts only through an extra compose override.
   Use `*@e2e.scuby.test` and `+57 300 000 00xx` (the bypass defaults) and the override is not needed.
