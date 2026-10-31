@@ -43,7 +43,9 @@
   - A `sub` already linked signs in to its account.
   - **Authoritative address:** creates the account, or links the existing account with that email if it has no
     Google identity yet (never over another `sub`: that is `401`).
-  - **Any other address, no session:** `401`, and nothing is created or linked.
+  - **Any other address, no session, no account with that email:** Google creates the account and links
+    its `sub` (decision #70, amending #58). A later email-code sign-in for that address lands in the same account.
+  - **Any other address, no session, an account with that email exists:** `401`, and nothing is created or linked.
   - **Any other address, with a session of the account whose email is exactly this one** (the person signed in
     with the email code): the Google identity is linked to that account for good; from then on Google alone
     signs in to it.
@@ -52,7 +54,14 @@
   There is no flag on the account and no step that removes a Google link or ends other sessions: an
   email-code sign-in never touches a Google link. The contract has one `401` code, `unauthorized`, for every refusal; a distinct
   code for "sign in with your email code first" is a client-side proposal
-  ([api.md](api.md) · Proposals). Rejected: link on any verified email; allow only Gmail.
+  ([api.md](api.md) · Proposals). Rejected: link on any verified email; allow only Gmail; keep the `401` for
+  new accounts (friction on a rare case); trust Google for existing accounts too (takeover through a Google
+  account bound to a mailbox the person no longer controls).
+  - **Race:** two Google sign-ins creating the same email end in one account (the UNIQUE on `person.email`
+    decides): the loser is `401`, or the same person's win when it is the same `sub`; never a `500`, no locks.
+  - **Known limitation, pre-hijack:** because Google creates the account for a new non-authoritative address, an
+    attacker who once controlled that address can create the account first, and keeps Google access after the
+    owner later signs in with the email code. Accepted as rare (#70).
 - **No phone uniqueness.** Two accounts may verify the same number (`person.phone` is not unique):
   the number is a contact channel, not an identity, and shared family phones are common.
 - **Until the providers exist** ([O23](../open-items.md)), local, test and staging write email and
