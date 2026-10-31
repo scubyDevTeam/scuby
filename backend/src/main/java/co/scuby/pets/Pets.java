@@ -51,7 +51,7 @@ public class Pets {
           .set(PET.NAME, pet.name())
           .set(PET.SPECIES, pet.species().name())
           .set(PET.SIZE, pet.size() == null ? null : pet.size().name())
-          .set(PET.COLORS, pet.colors().stream().map(Enum::name).toArray(String[]::new))
+          .set(PET.COLORS, pet.colors().stream().distinct().map(Enum::name).toArray(String[]::new))
           .set(PET.MARKS, pet.marks())
           .set(PET.CHIP_NUMBER, pet.chipNumber())
           .set(PET.PHOTO_URLS, pet.photoUrls().toArray(String[]::new))

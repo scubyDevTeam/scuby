@@ -7,7 +7,8 @@ CREATE TABLE pet (
   species        text NOT NULL CHECK (species IN ('dog', 'cat', 'other')),
   size           text CHECK (size IN ('small', 'medium', 'large')),
   colors         text[] NOT NULL DEFAULT '{}'
-                   CHECK (colors <@ ARRAY['black', 'white', 'brown', 'tan', 'gray', 'yellow', 'orange']),
+                   CHECK (colors <@ ARRAY['black', 'white', 'brown', 'tan', 'gray', 'yellow', 'orange']
+                          AND cardinality(colors) <= 7),   -- the 7 known colours, each at most once (Pets.createOwned de-duplicates)
   marks          text CHECK (length(marks) <= 500),
   chip_number    text CHECK (length(chip_number) <= 40),
   photo_urls     text[] NOT NULL DEFAULT '{}' CHECK (cardinality(photo_urls) <= 6),

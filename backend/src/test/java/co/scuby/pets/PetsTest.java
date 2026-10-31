@@ -101,4 +101,30 @@ class PetsTest {
                 "INSERT INTO scuby.responsibility_link (id, person_id, pet_id, role, active_from) VALUES (gen_random_uuid(), ?, ?, 'owner', now())",
                 bob, pet)).hasMessageContaining("responsibility_link_one_active_owner");
     }
+
+    @Test
+    void repeatedColoursAreStoredOnce() {
+        UUID ana = accounts.person("ana@correo.co");
+        var repeated = new Pets.NewPet("Kira", Pets.Species.dog, Pets.Size.medium,
+                List.of(Pets.Color.black, Pets.Color.tan, Pets.Color.black, Pets.Color.tan, Pets.Color.black), null, null, List.of());
+        UUID pet = tx.execute(s -> pets.createOwned(ana, repeated));
+        assertThat(db.selectFrom(PET).where(PET.ID.eq(pet)).fetchOne().getColors()).containsExactly("black", "tan");
+    }
+
+    @Test
+    void theDatabaseRefusesMoreThanSevenColours() {
+        UUID ana = accounts.person("ana@correo.co");
+        String[] eight = {"black", "white", "brown", "tan", "gray", "yellow", "orange", "black"};
+        assertThatThrownBy(() -> db.insertInto(PET)
+                .set(PET.ID, UUID.randomUUID()).set(PET.NAME, "Kira").set(PET.SPECIES, "dog")
+                .set(PET.COLORS, eight).set(PET.CUSTODY_STATE, "claimed")
+                .set(PET.CREATED_AT, clock.instant().atOffset(java.time.ZoneOffset.UTC)).execute())
+                .hasMessageContaining("pet_colors_check");
+        String[] seven = {"black", "white", "brown", "tan", "gray", "yellow", "orange"};
+        assertThatCode(() -> db.insertInto(PET)
+                .set(PET.ID, UUID.randomUUID()).set(PET.NAME, "Kira").set(PET.SPECIES, "dog")
+                .set(PET.COLORS, seven).set(PET.CUSTODY_STATE, "claimed")
+                .set(PET.CREATED_AT, clock.instant().atOffset(java.time.ZoneOffset.UTC)).execute())
+                .doesNotThrowAnyException();
+    }
 }

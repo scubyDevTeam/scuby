@@ -35,7 +35,7 @@ record PublishLostRequest(
     record PetInput(@NotBlank @CodePoints(max = 60) String name,
                     @NotNull Pets.Species species,
                     @NotNull Pets.Size size,
-                    @NotNull List<Pets.@NotNull Color> colors,
+                    @NotNull @Size(max = 7) List<Pets.@NotNull Color> colors,
                     @JsonProperty(required = true) @Nullable @CodePoints(max = 500) String marks,
                     @JsonProperty(required = true) @Nullable @CodePoints(max = 40) String chipNumber,
                     @NotNull @Size(max = 6) List<@NotBlank String> photoUrls) {

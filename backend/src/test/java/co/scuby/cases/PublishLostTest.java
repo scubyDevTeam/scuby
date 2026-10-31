@@ -421,4 +421,24 @@ class PublishLostTest {
     void nobodySignedInIsUnauthorized() {
         assertThat(clients.newBrowser().post("/lost-cases", PublishBodies.kira(PHONE, null)).status()).isEqualTo(401);
     }
+
+    @Test
+    void moreThanSevenColoursIsValidationFailed() {
+        String eight = "[\"black\",\"white\",\"brown\",\"tan\",\"gray\",\"yellow\",\"orange\",\"black\"]";
+        ApiResponse r = publish(PublishBodies.kira(PHONE, null).replace("[\"brown\"]", eight));
+        assertThat(r.status()).isEqualTo(422);
+        assertThat(r.errorCode()).isEqualTo("validation_failed");
+        assertThat(r.json().at("/error/fields").has("pet.colors")).isTrue();
+        assertThat(db.fetchCount(PET)).isZero();
+    }
+
+    @Test
+    void repeatedColoursPublishAndAreStoredOnce() {
+        String repeated = "[\"brown\",\"brown\",\"tan\",\"brown\"]";
+        publish(PublishBodies.kira(PHONE, null).replace("[\"brown\"]", repeated));
+        ApiResponse done = publish(PublishBodies.kira(PHONE, sms.lastCodeFor(PHONE)).replace("[\"brown\"]", repeated));
+        assertThat(done.status()).isEqualTo(200);
+        assertThat(db.selectFrom(PET).fetchOne().getColors()).containsExactly("brown", "tan");
+        assertThat(api.get("/cases/{code}", done.str("/code")).json().at("/pet/colors").toString()).isEqualTo("[\"brown\",\"tan\"]");
+    }
 }
