@@ -65,11 +65,17 @@ class LostCaseQueries {
         return db.fetchExists(PURGED_CASE_CODE, PURGED_CASE_CODE.CODE.eq(code));
     }
 
+    /** A case shows at most this many sightings: the most recent ones (docs/product/04 · display rules, decision 64). */
+    static final int MAX_SIGHTINGS_SHOWN = 200;
+
     List<LostCaseFacts.SightingFacts> sightings(String code, Access access) {
         return sightingsQuery(code, access).fetch(LostCaseQueries::toSighting);
     }
 
-    /** PUBLIC: hidden and removed pins are not queried, and reporters' numbers are selected as NULL. */
+    /**
+     * The {@link #MAX_SIGHTINGS_SHOWN} most recent sightings the viewer may see (newest first; the derivation puts them
+     * back oldest first). PUBLIC: hidden and removed pins are not queried, and reporters' numbers are selected as NULL.
+     */
     Select<? extends Record> sightingsQuery(String code, Access access) {
         var phone = access == Access.OWNER ? SIGHTING.CONTACT_PHONE : DSL.castNull(SIGHTING.CONTACT_PHONE).as(SIGHTING.CONTACT_PHONE.getName());
         var visibility = access == Access.OWNER
@@ -80,7 +86,8 @@ class LostCaseQueries {
                          SIGHTING.STATUS, SIGHTING.HIGHLIGHTED_BY_OWNER)
                  .from(SIGHTING)
                  .where(SIGHTING.CASE_CODE.eq(code)).and(visibility)
-                 .orderBy(SIGHTING.SEEN_AT, SIGHTING.ID);
+                 .orderBy(SIGHTING.SEEN_AT.desc(), SIGHTING.ID.desc())
+                 .limit(MAX_SIGHTINGS_SHOWN);
     }
 
     private static LostCaseFacts.SightingFacts toSighting(Record r) {
