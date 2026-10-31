@@ -11,7 +11,6 @@ import co.scuby.support.IntegrationTest;
 import co.scuby.support.MutableClock;
 import co.scuby.support.PublishBodies;
 import co.scuby.support.RecordingSmsSender;
-import co.scuby.support.TestDb;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,16 +60,36 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Behaviour that changed after the plan was written, and is asserted as built: the client_id replay comes
  * before the rate limits, and an absent note or contact_phone is validation_failed (null is fine).
  * <p>
- * Not in this slice (scenarios of the mock with no endpoint here): (156) found custodian detail and ownership claims;
- * (331) owner closes the case; (343) close once; (356) starring a pin notifies its reporter; (368) reopening an expired case;
- * (385, 425, 443) claims and check-ins; (457, 492) found claims and matching; (572–794) adoption; help; (1252, 1729–1793)
- * evidence photos and case corrections; (1925) profile photo; notifications and nearby alerts.
+ * Not in this slice (every other scenario of the mock; the backend has no endpoint for it):
+ * <ul>
+ * <li>(107) contract coverage of every endpoint in api.ts</li>
+ * <li>(156) found custodian detail and ownership claims</li>
+ * <li>(331, 343, 356, 368) owner closes the case, close once, starring a pin notifies its reporter, reopening an expired case</li>
+ * <li>(385, 425, 443) claims and check-ins</li>
+ * <li>(457, 492) found claims and matching</li>
+ * <li>(572-848) adoption: who sees what, «Me interesa», the lister's moves, endings, follow-up loop, publishing, day-15 conversion</li>
+ * <li>(865-1281) help: who sees what, «Yo ayudo», confirmation, follow-up loop, endings, publishing, evidence photos (1252)</li>
+ * <li>(1301, 1311) profile edit and inbox</li>
+ * <li>(1320) one request, one transaction</li>
+ * <li>(1363-1458) the email's one-tap links</li>
+ * <li>(1470-1564) the in-app chat</li>
+ * <li>(1631, 1646, 1657, 1663) correcting and deleting your own sighting (same describe as the mapped 1616/1625, but not ported)</li>
+ * <li>(1686-1712) «Mascotas perdidas cerca de mí» nearby alerts</li>
+ * <li>(1729-1816) editing published lost, found, adoption and help cases</li>
+ * <li>(1830-1856) deleting the account</li>
+ * <li>(1862, 1879) the thread a claim or an interest opens</li>
+ * <li>(1925) profile photo (set and remove)</li>
+ * <li>(1945-1985) the custodian's follow-up loop</li>
+ * <li>(2022, 2029) «La tengo» on an archived case</li>
+ * <li>(2037, 2050) share.opened</li>
+ * <li>(2062, 2072) the date a case archives on</li>
+ * <li>(2086) the demo account comes back</li>
+ * </ul>
  */
 @IntegrationTest
 class LostParityTest {
 
     @Autowired ApiClients clients;
-    @Autowired TestDb testDb;
     @Autowired Accounts accounts;
     @Autowired CaseFixtures cases;
     @Autowired RecordingSmsSender sms;
@@ -82,7 +101,6 @@ class LostParityTest {
 
     @BeforeEach
     void setUp() {
-        testDb.reset();
         api = clients.newBrowser();
         carolina = accounts.person("carolina@correo.co");
         cases.luna(carolina);
