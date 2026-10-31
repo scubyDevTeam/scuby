@@ -128,4 +128,87 @@ class FeedEndpointTest {
         assertThat(api.get("/feed?lat={lat}&lng={lng}", 200, 0).errorCode()).isEqualTo("validation_failed");
         assertThat(api.get("/feed?species=dragon").errorCode()).isEqualTo("validation_failed");
     }
+
+    @Test
+    void malformedAndOutOfRangeCoordinatesAreValidationFailedNeverA500() {
+        for (String q : List.of("lat=abc&lng=0", "lat=0&lng=abc", "lat=-90.1&lng=0", "lat=0&lng=180.1", "lat=0&lng=-180.1",
+                "lat=NaN&lng=0", "lat=Infinity&lng=0", "vertical=bogus")) {
+            assertThat(api.get("/feed?" + q).errorCode()).as(q).isEqualTo("validation_failed");
+        }
+    }
+
+    @Test
+    void onlyOneOfLatLngIsTheNationalFeed() {
+        cases.lostCase(owner, "NEAR2", "Cerca", "dog", ONE_KM, 300, "active", daysAgo(1));
+        for (String q : List.of("lat=6.2442", "lng=-75.5812")) {
+            ApiResponse r = api.get("/feed?" + q);
+            assertThat(r.str("/scope")).as(q).isEqualTo("national");
+            assertThat(codes(r)).as(q).containsExactly("NEAR2");
+        }
+    }
+
+    // Inside one band recency beats distance: plain nearest-first ordering would put NEWER_FARTHER last.
+    @Test
+    void insideABandTheNewerCaseComesFirstEvenWhenFarther() {
+        cases.lostCase(owner, "OLDNR", "Viejo", "dog", northOf(CENTER, 500), 300, "active", daysAgo(5));
+        cases.lostCase(owner, "NEWFR", "Nuevo", "dog", northOf(CENTER, 1_800), 300, "active", daysAgo(1));
+        assertThat(codes(local())).containsExactly("NEWFR", "OLDNR");
+    }
+
+    @Test
+    void bandEdgesAreInclusiveJustInsideAndExclusiveJustOutside() {
+        // Each "in" point is 10 m inside a threshold, each "out" point 10 m past it; every band holds recency
+        // opposite to band order, so a wrong threshold changes the order.
+        cases.lostCase(owner, "B2OUT", "a", "dog", northOf(CENTER, 2_010), 300, "active", daysAgo(0));
+        cases.lostCase(owner, "B2IN2", "b", "dog", northOf(CENTER, 1_990), 300, "active", daysAgo(9));
+        cases.lostCase(owner, "B5OUT", "c", "dog", northOf(CENTER, 5_010), 300, "active", daysAgo(1));
+        cases.lostCase(owner, "B5IN2", "d", "dog", northOf(CENTER, 4_990), 300, "active", daysAgo(8));
+        cases.lostCase(owner, "B10OT", "e", "dog", northOf(CENTER, 10_010), 300, "active", daysAgo(2));
+        cases.lostCase(owner, "B10IN", "f", "dog", northOf(CENTER, 9_990), 300, "active", daysAgo(7));
+        cases.lostCase(owner, "C25IN", "g", "dog", northOf(CENTER, 24_990), 300, "active", daysAgo(3));
+        cases.lostCase(owner, "C25OT", "h", "dog", northOf(CENTER, 25_010), 300, "active", daysAgo(0));
+        ApiResponse r = local();
+        assertThat(r.str("/scope")).isEqualTo("local");
+        // band 0: B2IN2; band 1 (2-5 km): B2OUT(newest) then B5IN2; band 2 (5-10 km): B5OUT then B10IN; band 3: B10OT, C25IN.
+        assertThat(codes(r)).containsExactly("B2IN2", "B2OUT", "B5IN2", "B5OUT", "B10IN", "B10OT", "C25IN");
+    }
+
+    @Test
+    void equalPublishedAtIsOrderedByCodeSoTheOrderIsDeterministic() {
+        Instant same = daysAgo(2);
+        for (String code : List.of("CCCC2", "AAAA2", "BBBB2")) {
+            cases.lostCase(owner, code, "Pet" + code, "dog", ONE_KM, 300, "active", same);
+        }
+        assertThat(codes(api.get("/feed"))).containsExactly("AAAA2", "BBBB2", "CCCC2");
+        assertThat(codes(local())).containsExactly("AAAA2", "BBBB2", "CCCC2");
+    }
+
+    @Test
+    void atMostOneHundredItemsOnALocalHitToo() {
+        for (int i = 0; i < 105; i++) {
+            cases.lostCase(owner, "L%04d".formatted(i), "P" + i, "dog", ONE_KM, 300, "active", daysAgo(1).plusSeconds(i));
+        }
+        ApiResponse r = local();
+        assertThat(r.str("/scope")).isEqualTo("local");
+        assertThat(r.json().get("items")).hasSize(100);
+        assertThat(codes(r).getFirst()).isEqualTo("L0104");
+    }
+
+    static final GeoPoint CENTER = new GeoPoint(6.2442, -75.5812);
+
+    private ApiResponse local() {
+        return api.get("/feed?lat={lat}&lng={lng}", CENTER.lat(), CENTER.lng());
+    }
+
+    /** A point {@code meters} due north of {@code from} on the same meridian (WGS84 meridian radius at the midpoint). */
+    static GeoPoint northOf(GeoPoint from, double meters) {
+        double a = 6_378_137.0, e2 = 0.00669437999014;
+        double lat = from.lat();
+        for (int i = 0; i < 3; i++) {   // refine with the radius at the midpoint latitude
+            double mid = Math.toRadians((from.lat() + lat) / 2);
+            double m = a * (1 - e2) / Math.pow(1 - e2 * Math.sin(mid) * Math.sin(mid), 1.5);
+            lat = from.lat() + Math.toDegrees(meters / m);
+        }
+        return new GeoPoint(lat, from.lng());
+    }
 }

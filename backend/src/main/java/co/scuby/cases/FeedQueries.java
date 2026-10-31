@@ -41,12 +41,12 @@ class FeedQueries {
                                  .when(distance.le(10_000.0), 2).otherwise(3);
         return base(species)
                 .and(Spatial.withinMeters(LOST_CASE.LAST_SEEN_POINT, Spatial.geography(near), radiusM))
-                .orderBy(band, LOST_CASE.PUBLISHED_AT.desc())
+                .orderBy(band, LOST_CASE.PUBLISHED_AT.desc(), LOST_CASE.CODE)
                 .limit(limit);
     }
 
     Select<? extends Record> nationalQuery(@Nullable String species, int limit) {
-        return base(species).orderBy(LOST_CASE.PUBLISHED_AT.desc()).limit(limit);
+        return base(species).orderBy(LOST_CASE.PUBLISHED_AT.desc(), LOST_CASE.CODE).limit(limit);
     }
 
     List<FeedRow> fetch(Select<? extends Record> query) {
