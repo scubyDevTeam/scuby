@@ -32,9 +32,13 @@ class People {
                  .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED, "the account no longer exists"));
     }
 
-    /** Reads the row with `FOR UPDATE`: serialises with the unlink (an UPDATE of the same row) and re-reads the committed state. */
+    /**
+     * Reads the row with `FOR NO KEY UPDATE`: serialises with the unlink (an UPDATE of the same row) and with other
+     * lockers, and re-reads the committed state. Unlike FOR UPDATE it does not conflict with the FOR KEY SHARE a
+     * foreign key takes on the row, so a signed-in «Lo vi» (its sighting references the person) never queues behind it.
+     */
     Person lock(UUID id) {
-        return db.selectFrom(PERSON).where(PERSON.ID.eq(id)).forUpdate().fetchOptional().map(People::toPerson)
+        return db.selectFrom(PERSON).where(PERSON.ID.eq(id)).forNoKeyUpdate().fetchOptional().map(People::toPerson)
                  .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED, "the account no longer exists"));
     }
 
