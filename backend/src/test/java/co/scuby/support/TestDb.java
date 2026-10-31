@@ -26,6 +26,7 @@ public final class TestDb {
             "pet",
             "lost_case",
             "purged_case_code",
+            "sighting",
             "responsibility_link"
     );
 

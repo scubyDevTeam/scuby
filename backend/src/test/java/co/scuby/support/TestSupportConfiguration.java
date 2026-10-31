@@ -59,6 +59,11 @@ public class TestSupportConfiguration {
     }
 
     @Bean
+    CaseFixtures caseFixtures(DSLContext db) {
+        return new CaseFixtures(db);
+    }
+
+    @Bean
     TestDb testDb(DSLContext db, ObjectProvider<ClearableCache> caches, MutableClock clock, StatementRecorder recorder,
                   ConnectionSampler sampler,
                   ObjectProvider<RecordingEmailSender> emails, ObjectProvider<RecordingSmsSender> sms) {

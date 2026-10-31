@@ -22,6 +22,7 @@ final class StatementCeilings {
             Map.entry("GET /me/profile", 2),       // session lookup + person
             Map.entry("POST /uploads", 3),   // session lookup, slot count, upsert (the stored-bytes check is a file or S3 call, not SQL)
             Map.entry("POST /lost-cases", 16),   // worst path: pet_id with a new number, code sent, on a session-cache miss (16, measured by PublishStatementsTest, which pins every path): session lookup, ownership + active-case pre-check, PublisherPhone.prepare, person row lock + SMS send, ownership + active-case re-check. Excludes the process-wide flag snapshot load (+2, once per 30 s)
+            Map.entry("GET /cases/{code}", 3),   // exactly 3 on a session-cache miss (owner or signed-in stranger; CaseStatementsTest pins it, anonymous is 2): session lookup, case (+ pet, publisher), sightings. Excludes the flag snapshot load
             Map.entry("POST /auth/google", 8)   // sub lookup, email lookup, person insert + select, person SELECT ... FOR UPDATE, session insert (+ filter lookup and old DELETE)
     );
 
