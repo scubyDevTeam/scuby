@@ -13,6 +13,7 @@ import org.jooq.DSLContext;
 import org.jooq.Record1;
 import org.jooq.Select;
 import org.jooq.impl.DSL;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -32,10 +33,10 @@ import static co.scuby.db.generated.Tables.LOST_CASE;
  * <p>Order: (1) checks without I/O, then the read-only checks <b>outside</b> any transaction: the photo check
  * (it may call S3: {@code PhotoAttachments} is {@code Propagation.NEVER}) and, with {@code pet_id}, ownership and the
  * {@code active_case_exists} pre-check; (2) {@code PublisherPhone.prepare}, with no transaction open (it counts a code
- * attempt in its own statement); (3) one transaction that re-checks ownership and the active case and only <b>then</b>
- * calls {@code PublisherPhone.resolve} ({@code Propagation.MANDATORY}: sends the SMS after commit, or consumes the
- * reserved code). It must come after every other validation — a publish refused or rolled back later leaves the code
- * usable. On {@code CodeSent} the transaction commits and no case is written.
+ * attempt in its own statement); (3) the place name (possibly a network call), then one transaction that calls
+ * {@code PublisherPhone.resolve} ({@code Propagation.MANDATORY}: takes the person lock, sends the SMS after commit, or
+ * consumes the reserved code) and <b>then</b> re-checks ownership and the active case, so the re-check sees what
+ * committed while it waited for the lock. A publish refused or rolled back later leaves the code usable. On {@code CodeSent} the transaction commits and no case is written.
  */
 @Service
 class PublishLostService {
@@ -83,7 +84,12 @@ class PublishLostService {
         // No transaction is open here (PublishLostService is not @Transactional): prepare counts a code attempt in
         // its own statement, and a wrong code is invalid_code right now.
         PublisherPhone.Prepared prepared = publisherPhone.prepare(me, request.phone(), request.otpCode());
-        return tx.execute(status -> publishInTransaction(me, caller, request, now, prepared));
+        // The place name may be a network call (a reverse geocoder): never inside the transaction (decision #45).
+        // It is also computed when this call ends up only sending the SMS code; that is harmless while the
+        // namer is a no-op, and a provider will want a cache keyed by the rounded point.
+        GeoPoint point = request.lastSeenPoint().toGeoPoint();
+        String placeName = placeNames.forNewCase(point, me);
+        return tx.execute(status -> publishInTransaction(me, caller, request, now, prepared, point, placeName));
     }
 
     private void requireOwnedAndFree(String petId, UUID me) {
@@ -93,19 +99,24 @@ class PublishLostService {
     }
 
     private Object publishInTransaction(UUID me, Caller caller, PublishLostRequest request, Instant now,
-                                        PublisherPhone.Prepared prepared) {
-        // Re-check: a concurrent publish may have won since the pre-check.
+                                        PublisherPhone.Prepared prepared, GeoPoint point, @Nullable String placeName) {
+        // resolve takes the person row lock (Propagation.MANDATORY, this transaction). rate_limited and
+        // invalid_code propagate (they leave the transaction rollback-only).
+        PublisherPhone.Outcome phone = publisherPhone.resolve(prepared, caller);
+
+        // Re-check AFTER resolve, on purpose. Two taps on one account queue on the person lock inside resolve;
+        // a check made before it would have been taken before the wait and could not see the case the first tap
+        // committed meanwhile. Under READ COMMITTED every statement takes a fresh snapshot, so this one sees
+        // anything committed up to the moment the lock was granted. Throwing here rolls back the consumed code
+        // and cancels the after-commit SMS, so a doomed publish never sends one. (The unique index plus
+        // ON CONFLICT below still arbitrates publishes from different accounts that share the pet.)
         if (request.petId() != null) requireOwnedAndFree(request.petId(), me);
 
-        // Last validation step. CodeSent: this transaction commits (the phone_otp row must persist) and no case is
-        // inserted. rate_limited and invalid_code propagate (they leave the transaction rollback-only).
-        PublisherPhone.Outcome phone = publisherPhone.resolve(prepared, caller);
+        // CodeSent: this transaction commits (the phone_otp row must persist) and no case is inserted.
         if (phone instanceof PublisherPhone.CodeSent) return PublishView.PhoneStep.OTP;
         PublisherPhone.Ready ready = (PublisherPhone.Ready) phone;
 
         UUID petId = request.petId() != null ? UUID.fromString(request.petId()) : pets.createOwned(me, request.pet().toNewPet());
-        GeoPoint point = request.lastSeenPoint().toGeoPoint();
-        String placeName = placeNames.forNewCase(point, me);
         OffsetDateTime at = now.atOffset(ZoneOffset.UTC);
         for (int attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
             String code = codes.newCode();
