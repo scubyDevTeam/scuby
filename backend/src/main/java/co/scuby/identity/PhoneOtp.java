@@ -5,6 +5,7 @@ import co.scuby.platform.crypto.Hashing;
 import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.ErrorCode;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,7 @@ class PhoneOtp {
             upsert(personId, phone, bypass.code(), now, false);
             return null;
         }
-        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.sms, phone);
+        CodeSends.Counts counts = sends.last24h(CodeSends.Channel.sms, phone, true);
         if (counts.lastToTarget() != null && counts.lastToTarget().plus(COOLDOWN).isAfter(now)) return null;
         if (counts.target() >= limits.maxPerNumber()) {
             throw new ApiException(ErrorCode.RATE_LIMITED, "too many codes sent");
@@ -124,17 +125,33 @@ class PhoneOtp {
      * UPDATE is atomic, so concurrent attempts can never exceed {@link #MAX_ATTEMPTS}.
      * Returns empty for a wrong, expired, exhausted or absent code; a reservation for a right one.
      * A rolled-back caller still spent the attempt.
+     *
+     * <p>The number's failed checks are capped (10 in a rolling 24 h, from any account, however many codes were
+     * issued): the cap is a condition of the UPDATE, so past it the right code is not reserved either and the
+     * answer is {@code rate_limited}. A wrong code that hit a live one is logged as a failure. A test number is never
+     * capped or counted.
      */
     @Transactional(propagation = Propagation.NEVER)
     public Optional<Reservation> reserveAndCheck(UUID personId, String phone, String code) {
+        boolean bypassed = bypass.smsBypassed(phone);
         OffsetDateTime now = clock.instant().atOffset(ZoneOffset.UTC);
         String hash = db.update(PHONE_OTP)
                         .set(PHONE_OTP.ATTEMPTS, PHONE_OTP.ATTEMPTS.plus(1))
                         .where(PHONE_OTP.PERSON_ID.eq(personId), PHONE_OTP.PHONE.eq(phone),
-                               PHONE_OTP.EXPIRES_AT.gt(now), PHONE_OTP.ATTEMPTS.lt(MAX_ATTEMPTS))
+                               PHONE_OTP.EXPIRES_AT.gt(now), PHONE_OTP.ATTEMPTS.lt(MAX_ATTEMPTS),
+                               bypassed ? DSL.noCondition() : sends.failureCapOpen(CodeSends.Channel.sms, phone))
                         .returning(PHONE_OTP.CODE_HASH)
                         .fetchOptional().map(PhoneOtpRecord::getCodeHash).orElse(null);
-        if (hash == null || !hasher.matches(hash, phone, code)) return Optional.empty();
+        if (hash == null) {
+            if (!bypassed && sends.failureCapReached(CodeSends.Channel.sms, phone)) {
+                throw new ApiException(ErrorCode.RATE_LIMITED, "too many wrong codes");
+            }
+            return Optional.empty();
+        }
+        if (!hasher.matches(hash, phone, code)) {
+            if (!bypassed) sends.recordFailure(CodeSends.Channel.sms, phone);
+            return Optional.empty();
+        }
         return Optional.of(new Reservation(personId, phone, hash));
     }
 

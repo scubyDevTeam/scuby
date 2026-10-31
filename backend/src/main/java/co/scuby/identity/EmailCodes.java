@@ -3,6 +3,8 @@ package co.scuby.identity;
 import co.scuby.db.generated.tables.records.EmailCodeRecord;
 import co.scuby.platform.crypto.Hashing;
 import co.scuby.platform.security.Caller;
+import co.scuby.platform.web.ApiException;
+import co.scuby.platform.web.ErrorCode;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
@@ -64,7 +66,7 @@ class EmailCodes {
             upsert(email, bypass.code(), now, false);
             return new Outgoing(email, bypass.code());
         }
-        if (sends.last24h(CodeSends.Channel.email, email).target() >= MAX_SENDS_PER_DAY) return null;
+        if (sends.last24h(CodeSends.Channel.email, email, false).target() >= MAX_SENDS_PER_DAY) return null;
 
         String code = Hashing.randomDigits(6);
         if (!upsert(email, code, now, true)) return null;      // the live code is inside its cooldown
@@ -81,17 +83,32 @@ class EmailCodes {
      * True once per code, in one atomic statement: a live code (unexpired, attempts left) is either
      * exhausted by the right code (consumed: no second request can pass the `attempts &lt; max` guard) or
      * charged one attempt by a wrong one. The caller's transaction must commit the wrong-code attempt.
+     *
+     * <p>The address's failed checks are capped (10 in a rolling 24 h, however many codes were issued): the cap is a
+     * condition of that same statement, so past it nothing is consumed or charged, even by the right code, and the
+     * answer is {@code rate_limited}. A wrong code that hit a live one is logged as a failure; a check with no live
+     * code is not (it cannot grow the log). A test address is never capped or counted.
      */
     boolean consume(String email, String code) {
+        boolean bypassed = bypass.emailBypassed(email);
         String submitted = hasher.hash(email, code);
         String stored = db.update(EMAIL_CODE)
                           .set(EMAIL_CODE.ATTEMPTS, DSL.when(EMAIL_CODE.CODE_HASH.eq(submitted), DSL.inline(MAX_ATTEMPTS))
                                                        .otherwise(EMAIL_CODE.ATTEMPTS.plus(1)))
                           .where(EMAIL_CODE.EMAIL.eq(email), EMAIL_CODE.ATTEMPTS.lt(MAX_ATTEMPTS),
-                                 EMAIL_CODE.EXPIRES_AT.gt(clock.instant().atOffset(ZoneOffset.UTC)))
+                                 EMAIL_CODE.EXPIRES_AT.gt(clock.instant().atOffset(ZoneOffset.UTC)),
+                                 bypassed ? DSL.noCondition() : sends.failureCapOpen(CodeSends.Channel.email, email))
                           .returning(EMAIL_CODE.CODE_HASH)
                           .fetchOptional().map(EmailCodeRecord::getCodeHash).orElse(null);
-        return stored != null && hasher.matches(stored, email, code);
+        if (stored == null) {
+            if (!bypassed && sends.failureCapReached(CodeSends.Channel.email, email)) {
+                throw new ApiException(ErrorCode.RATE_LIMITED, "too many wrong codes");
+            }
+            return false;
+        }
+        boolean right = hasher.matches(stored, email, code);
+        if (!right && !bypassed) sends.recordFailure(CodeSends.Channel.email, email);
+        return right;
     }
 
     /** Data minimisation: drops rows whose code has expired (the daily cap counts the send log, not this table). */
