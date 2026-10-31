@@ -134,14 +134,19 @@ searcher who trusts it wastes time on one corner.
 
 | Location | Owner sees | Public / helpers see | Why |
 |---|---|---|---|
-| `last_seen` | the circle they drew | the circle, **radius floored at 200 m** | The circle is usually around a home. A 50 m circle on a shared WhatsApp card is a doorstep — personal data under Ley 1581 and a safety exposure. The server sends the floored radius to everyone but the owner; never stored |
+| `last_seen` | the circle they drew, at the exact point | the circle, **center snapped to a ~200 m grid and radius floored at 200 m** | The circle is usually around a home. A 50 m circle on a shared WhatsApp card is a doorstep — personal data under Ley 1581 and a safety exposure — and so is an exact center under a wider circle, which the anonymous feed hands out for every active case. The server sends the snapped center and the floored radius to everyone but the owner; neither is stored (decisions #41, #63) |
 | Sighting pins | exact | **exact** | Street corners are nobody's personal data, and «¿qué esquina?» is the entire value of a sighting |
 | Reporter contact | visible | **hidden** | Given to the owner, not to the internet |
 
-Computation always uses the stored center: the 30 km sighting bound, the «a 400 m de donde se
-perdió» distance in notifications, and the trajectory line all measure from `last_seen_point`. Only
-the rendered marker is widened. The same circle is rendered every time — nothing random, so there is
-nothing to average out across loads.
+Computation always uses the stored exact center: the 30 km sighting bound, the «a 400 m de donde se
+perdió» distance in notifications, and the trajectory line all measure from `last_seen_point`. What a
+non-owner receives is derived from it: the center is rounded to the nearest node of a fixed grid (latitude
+step 0.0018°, about 200 m; longitude step the same ground distance, 0.0018° / cos latitude, so cells are about
+square everywhere), and the radius is floored. It is deterministic — the same point always gives the same
+center, so there is nothing random to average out across loads and no secret to keep. The snapped center is at
+most ~142 m from the exact point, inside the 200 m floor, so the circle a client draws around it still contains
+the point; a client draws the center and radius it is given and does not correct them. The feed's `point` is
+the snapped center for every caller. Sighting pins stay exact.
 
 `last_seen_radius_m` is the owner's *uncertainty*. It is **not** the broadcast radius (who gets the
 push), which is a reach decision owned by the broadcast rules. Don't derive one from the other.
@@ -248,6 +253,9 @@ The map answers «¿dónde voy ahora?»; the list answers «¿qué pasó y cuán
 6. **Late reports are not breaking news.** A new sighting whose `seen_at` is older than the current
    newest still notifies the owner, but the push says when it was seen and the pin renders in its age
    band, not as the latest. The owner is never led to a point the animal left two days ago.
+7. **At most 200 sightings are shown.** A case lists its 200 most recent visible sightings (by `seen_at`),
+   to the owner and to the public alike, oldest first like the rest; older ones stay in the database and
+   leave the response. The feed's `sightings_count` stays the true number of visible sightings (decision #64).
 
 Not in v1, on purpose: weighting by photo, registered-vs-anonymous, or cluster corroboration. These
 are real signals but they are ranking algorithms, and there is no data to tune them yet. Recency plus

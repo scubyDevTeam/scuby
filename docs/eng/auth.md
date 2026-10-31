@@ -24,7 +24,7 @@
 - **Email code:** 6 digits, stored as a keyed hash, 5-minute expiry, 3 attempts, a 60 s resend
   cooldown while the current code is live and unused (a used or burned code never blocks a new
   one), and **at most 10 sends per address in a rolling 24 h**; there is no cap per device or per IP
-  (decision #57 in [00](../product/00-product-map.md)). Past the cooldown or the cap, starting a
+  (decision #57 in [00](../product/00-product-map.md)); failed checks are capped too (*Guessing budget*). Past the cooldown or the cap, starting a
   sign-in still answers the same and sends nothing (it never reveals whether an account exists). The
   address is trimmed and lower-cased. A new account's own screens show a placeholder name built from the
   address («juan.perez@…» → «Juan Perez») until the person names themselves; it is never public: a case's
@@ -146,6 +146,24 @@ cost ≈ one send per publisher, once. The checklist, none of it skippable:
 - Twilio Verify (+$0.05/verification, managed fraud guard) is the **named escape hatch** if the
   alarm ever fires for real — not installed by default
 
+### Guessing budget
+
+Both code channels share one rule (decision #65): **at most 10 failed code checks per email address and 10 per phone
+number in a rolling 24 h, however many codes were issued.** A new code does not reset the count. Without it, 3
+attempts per code and 10 codes a day gave 30 guesses per address per day, and spraying a list of addresses gave a
+takeover every few days.
+
+- A *failed check* is a wrong code checked against a live one (unexpired, attempts left). It is logged as a row of
+  `code_send` with `kind = 'fail'` (the same table and 30-day purge as the sends). A wrong check with no live code
+  writes nothing, so nobody can grow the log without first starting a code.
+- Past the cap, verification answers `rate_limited` (`429`) **even for the right code**, which is not consumed,
+  until the oldest failures are 24 h old. The cap is a condition of the same atomic statement that checks the code
+  (no lock, no extra statement on the success path); a few simultaneous requests can overshoot it by their number
+  (decision #59). Starting a code is unaffected: its own caps are above.
+- The count is per target, across accounts: for a number, failures from any account add up (the publish flow's code
+  check and the profile's share it). A successful check does not clear the count.
+- A test address or number (the bypass lists) is never counted or capped; production refuses to start with a bypass.
+
 ### Known limitations and risks
 
 Accepted or tracked; each is a deliberate tradeoff, not an oversight.
@@ -163,9 +181,11 @@ Accepted or tracked; each is a deliberate tradeoff, not an oversight.
   owner out of verifying until the oldest of the five is 24 h old. Accepted. The email channel has the same
   shape: three wrong verifies burn the live code, so the next start sends a new one at once; ten such rounds use
   the address's 10 sends in a rolling 24 h (30 verifies), and the owner gets no code until the oldest of the ten
-  is 24 h old. Accepted for now.
-- **Send log.** `code_send` keeps the email address or phone number in clear for 30 days (the throttles count
-  rows by target); `phone_otp` rows are purged 30 days after they expire. Accepted until a reason to hash the target.
+  is 24 h old. Accepted for now. The failed-check cap (*Guessing budget*) adds a second way to lock a target out: ten
+  wrong checks on an address or number stop its real owner's verification for up to 24 h. Accepted: it is the price
+  of bounding guesses.
+- **Send log.** `code_send` keeps the email address or phone number in clear for 30 days (the throttles and the
+  failed-check cap count rows by target; its failure rows hold no more than that); `phone_otp` rows are purged 30 days after they expire. Accepted until a reason to hash the target.
 - **Test number range.** The test bypass range +57 300 000 00xx overlaps an assigned number block. Acceptable: production refuses to start with bypasses configured.
 - **No IP limits in the backend.** Code sends are limited per number and per address only; per-IP abuse limits, if
   they are needed, belong at the edge, where an IPv6 host can rotate within its /64 ([O26](../open-items.md), [O30](../open-items.md)).

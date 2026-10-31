@@ -281,6 +281,13 @@ cookies are the second layer. Rejected: Spring's token CSRF (needs a contract ch
 here); `SameSite` alone (a sibling subdomain is same-site). **CORS** allows only the client's
 origins (`scuby.web.allowed-origins`), with credentials.
 
+**Request bodies are bounded** (decision #67): Jackson's read constraints in `application.yml`
+(`spring.jackson.factory.constraints.read`) cap a document at 64 KiB, a string at 8192 characters, a field name at 100,
+nesting at 16, a number at 32 digits and a body at 2000 tokens, before anything is bound and before `@Size` runs. The
+largest real body (a publish) is a few KB; photos go to S3, never in JSON. Over a limit the answer is
+`validation_failed` (`422`; the contract has no `413`). `PUT /dev-media` (local and test only) keeps its own size cap.
+`pet.colors` takes at most 7 values, stored once each, with a database `CHECK` on the array size.
+
 **Cookie tossing** (a sibling subdomain setting cookies for the parent domain): how the session cookie resists it, and why the `device` cookie cannot yet, is in [auth.md](auth.md) · Known limitations and risks.
 
 **Caching:** every response carries `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`
@@ -378,8 +385,11 @@ is wired yet; the comparison is in `docs/superpowers/specs/2026-10-30-place-name
 ## Rate limits on rows
 
 Only code sends are limited in the backend (decisions #56, #57): the numbers (caps, cooldown) live in
-[auth.md](auth.md). The daily caps are counted over `code_send` (a log purged at 30 days, so bounded and
-without a performance index); the email cooldown is a guard on `email_code.sent_at`, the SMS cooldown reads
+[auth.md](auth.md), with the failed-check cap (decision #65). The daily caps and the failed checks are counted over
+`code_send` (rows of kind `send` and `fail`), a log purged at 30 days. **It carries a performance index,
+`(channel, target, sent_at)`** (decision #66): the purge bounds the age of rows, not their number, because anonymous
+email starts with distinct addresses add a row each, and the counts run on every sign-in start and verification; the
+migration `V20261031_0940` holds the growth answers and `CodeSendPlanTest` the plan check. The email cooldown is a guard on `email_code.sent_at`, the SMS cooldown reads
 `code_send`. The SMS overshoot across accounts is explained once, in *Concurrency*. «Lo vi» and uploads have no limits ([04](../product/04-lost-workflow.md) · Validation,
 *Uploads and media* above), and per-IP abuse limits are an edge matter
 ([O30](../open-items.md)).

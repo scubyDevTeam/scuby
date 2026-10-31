@@ -233,8 +233,9 @@ lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the 
   failing `expect` inside a `test.step` still ends the test, so the steps after it (the sightings
   trajectory among them) never run. Move that assertion to the end of the spec, make it
   `expect.soft`, or split it into its own `test` (or tag).
-- **`point` comment in `feed.ts`** — it says "public precision, never a doorstep", but the center is
-  not moved ([04](../product/04-lost-workflow.md) · Location precision); only the radius is floored.
+- **`point` comment in `feed.ts`** — it says "public precision, never a doorstep", which is now true: the
+  server snaps the center to a ~200 m grid for every feed caller ([04](../product/04-lost-workflow.md) ·
+  Location precision, decision #63). The mock's feed still returns exact points.
 - **Paging for `GET /me/cases`** — it returns every case of the caller, with no way to page.
 - **Endpoints the e2e specs need beyond the first backend release** — `/me/pets` (the lost-pet
   re-publish flow of @PLOST-002 and @PLOST-004), case edit (@PLOST-004), Google sign-in
