@@ -21,11 +21,19 @@ class TelemetrySwitchTest {
     };
 
     private StandardEnvironment environment(Map<String, Object> variables) throws IOException {
+        return environment(variables, null);
+    }
+
+    private StandardEnvironment environment(Map<String, Object> variables, String profile) throws IOException {
         var env = new StandardEnvironment();
         env.getPropertySources().remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
         env.getPropertySources().remove(StandardEnvironment.SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME);
         new YamlPropertySourceLoader().load("application", new ClassPathResource("application.yml"))
                 .forEach(env.getPropertySources()::addLast);
+        if (profile != null) {
+            new YamlPropertySourceLoader().load(profile, new ClassPathResource("application-" + profile + ".yml"))
+                    .forEach(env.getPropertySources()::addFirst);
+        }
         env.getPropertySources().addFirst(new MapPropertySource("variables", variables));
         return env;
     }
@@ -50,5 +58,13 @@ class TelemetrySwitchTest {
     void environmentDefaultsToLocalAndFollowsTheVariable() throws IOException {
         assertThat(environment(Map.of()).getProperty("management.opentelemetry.resource-attributes.deployment.environment")).isEqualTo("local");
         assertThat(environment(Map.of("SCUBY_ENVIRONMENT", "prod")).getProperty("management.opentelemetry.resource-attributes.deployment.environment")).isEqualTo("prod");
+    }
+
+    @Test
+    void serverProfilesNameTheirEnvironmentWhenTheVariableIsMissing() throws IOException {
+        for (String profile : new String[] {"staging", "prod"}) {
+            assertThat(environment(Map.of(), profile).getProperty("management.opentelemetry.resource-attributes.deployment.environment")).as(profile).isEqualTo(profile);
+        }
+        assertThat(environment(Map.of("SCUBY_ENVIRONMENT", "sandbox"), "staging").getProperty("management.opentelemetry.resource-attributes.deployment.environment")).isEqualTo("sandbox");
     }
 }
