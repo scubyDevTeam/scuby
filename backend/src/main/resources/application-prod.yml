@@ -1,1 +1,3 @@
 # Production environment
+scuby:
+  environment: ${SCUBY_ENVIRONMENT:prod}   # a server that forgets the variable still reports as prod

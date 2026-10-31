@@ -77,6 +77,35 @@ only changes its connection settings.
 - Docker Compose runs the backend image (and Postgres, in staging). The JVM is tuned for the
   instance's RAM.
 
+## Logs
+
+- **Backend:** the container's stdout carries only WARN and above, as JSON ([backend.md](backend.md)
+  · Observability). Docker's **`awslogs` driver** ships it to the CloudWatch log group
+  `/scuby/<env>/backend` — mode `non-blocking`, so a CloudWatch hiccup never stalls the container;
+  **retention 7 days** (it is the crash record; day-to-day logs are in New Relic). The log group is
+  Terraform-managed and the instance role may only `logs:CreateLogStream` / `logs:PutLogEvents` on
+  it. The backend container receives the telemetry and console variables of
+  [backend.md](backend.md) · Environments and profiles (the license key from SSM).
+- **Lambdas:** their logs go to CloudWatch, as Lambda does; retention set per group.
+- **Cost:** CloudWatch Logs ingests 5 GB/month free; with WARN-and-up only, launch volume is
+  megabytes. An alarm on the groups' `IncomingBytes` catches a runaway logger.
+
+## Observability as code
+
+Dashboards and alert conditions live in Terraform with the `newrelic` provider
+(`infra/terraform/observability/`, its own state), applied to the real New Relic account (US). The
+provider authenticates with a User API key (`NRAK-…`) from the operator's environment — never in
+the repo, never in Parameter Store.
+
+Applied to account 8675334: the dashboard «Scuby — Backend» and the policy `scuby-backend`, which
+emails scubydev@gmail.com. The HTTP and no-data conditions watch `deployment.environment` staging
+and prod only (laptop runs are `local` and never page); the ingest conditions (50 and 80 GB) are
+account-wide. The no-data condition stays off until staging runs continuously. Apply with
+`infra/terraform/observability/apply.sh`. State is local to the operator's machine and git-ignored
+until staging's S3 state bucket exists; then it moves to that backend. What each resource is and
+how to rebuild lost state:
+[`infra/terraform/observability/README.md`](../../infra/terraform/observability/README.md).
+
 ## Database
 
 - **PostgreSQL 17 + PostGIS.** `pgvector` joins when photo matching needs it ([O7](../open-items.md)), not before.
@@ -120,6 +149,12 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
 - **Terraform creates each parameter with a placeholder and ignores later value changes**
   (`lifecycle { ignore_changes = [value] }`); a person sets the real value through the CLI or
   console. Terraform state stores values in plain text, so real secrets never pass through it.
+- **New Relic license key:** `/scuby/<env>/newrelic/license-key`, imported as the property
+  `newrelic.license-key`. On a laptop the same value comes from the environment variable
+  `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. (The parameter and the start-up import
+  arrive with staging. Until then a deploy reads the parameter on the instance into its mode-600
+  environment file and passes it to the backend container as `NEW_RELIC_LICENSE_KEY`, next to the
+  other telemetry variables listed in [backend.md](backend.md) · Environments and profiles.)
 
 ## Infrastructure as code
 
