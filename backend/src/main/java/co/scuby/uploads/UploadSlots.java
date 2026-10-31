@@ -4,7 +4,7 @@ import co.scuby.platform.security.Caller;
 import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.ErrorCode;
 import org.jooq.DSLContext;
-import org.jooq.Record1;
+import org.jooq.Record2;
 import org.jooq.Select;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Service;
@@ -45,18 +45,22 @@ class UploadSlots {
                     Map.of("purpose", "needs a signed-in session"), Map.of());
         }
         Instant now = clock.instant();
-        int recent = recentSlotsQuery(caller.ownerKey(), now.minus(Duration.ofMinutes(10))).fetchOne().value1();
-        if (recent >= properties.maxSlotsPer10Min()) throw new ApiException(ErrorCode.RATE_LIMITED, "too many upload slots");
+        var recent = recentSlotsQuery(caller.ownerKey(), caller.ipHash(), now.minus(Duration.ofMinutes(10))).fetchOne();
+        if (recent.value1() >= properties.maxSlotsPer10Min() || recent.value2() >= properties.maxSlotsPerIp10Min()) {
+            throw new ApiException(ErrorCode.RATE_LIMITED, "too many upload slots");
+        }
 
         db.insertInto(UPLOAD)
           .set(UPLOAD.OWNER_KEY, caller.ownerKey())
           .set(UPLOAD.SHA256, request.sha256())
           .set(UPLOAD.PURPOSE, request.purpose().name())
           .set(UPLOAD.BYTES, request.bytes().intValue())
+          .set(UPLOAD.IP_HASH, caller.ipHash())
           .set(UPLOAD.CREATED_AT, now.atOffset(ZoneOffset.UTC))
           .onConflict(UPLOAD.OWNER_KEY, UPLOAD.SHA256, UPLOAD.PURPOSE).doUpdate()
           .set(UPLOAD.CREATED_AT, now.atOffset(ZoneOffset.UTC))
           .set(UPLOAD.BYTES, request.bytes().intValue())
+          .set(UPLOAD.IP_HASH, caller.ipHash())
           .execute();
 
         String url = store.publicUrl(request.sha256());
@@ -66,9 +70,15 @@ class UploadSlots {
         return new UploadView(url, target);
     }
 
-    Select<Record1<Integer>> recentSlotsQuery(String ownerKey, Instant since) {
-        return db.select(DSL.count()).from(UPLOAD)
-                 .where(UPLOAD.OWNER_KEY.eq(ownerKey))
+    /**
+     * One statement, two counts over the last window: this caller's slots (the primary key's owner_key prefix) and this
+     * IP's slots across all callers (upload_by_ip_recent_idx). The OR is served by a bitmap union of the two indexes.
+     */
+    Select<Record2<Integer, Integer>> recentSlotsQuery(String ownerKey, String ipHash, Instant since) {
+        return db.select(DSL.count().filterWhere(UPLOAD.OWNER_KEY.eq(ownerKey)),
+                         DSL.count().filterWhere(UPLOAD.IP_HASH.eq(ipHash)))
+                 .from(UPLOAD)
+                 .where(UPLOAD.OWNER_KEY.eq(ownerKey).or(UPLOAD.IP_HASH.eq(ipHash)))
                  .and(UPLOAD.CREATED_AT.gt(since.atOffset(ZoneOffset.UTC)));
     }
 }

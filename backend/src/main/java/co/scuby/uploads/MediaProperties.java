@@ -22,6 +22,7 @@ record MediaProperties(String store,
                        String localDir, String bucket, String region,
                        @NotNull(message = "scuby.media.slot-ttl must be set") Duration slotTtl,
                        @Min(value = 1, message = "scuby.media.max-slots-per10-min must be set and at least 1") int maxSlotsPer10Min,
+                       @Min(value = 1, message = "scuby.media.max-slots-per-ip10-min must be set and at least 1") int maxSlotsPerIp10Min,
                        @NotNull(message = "scuby.media.attach-window must be set") Duration attachWindow) {
 
     boolean isS3() { return "s3".equals(store); }

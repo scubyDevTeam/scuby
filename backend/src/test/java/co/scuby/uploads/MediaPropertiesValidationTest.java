@@ -19,12 +19,12 @@ class MediaPropertiesValidationTest {
 
     private static final String[] LOCAL = {
             "scuby.media.store=local", "scuby.media.public-base-url=http://localhost/dev-media",
-            "scuby.media.local-dir=target/x", "scuby.media.slot-ttl=5m", "scuby.media.max-slots-per10-min=20",
+            "scuby.media.local-dir=target/x", "scuby.media.slot-ttl=5m", "scuby.media.max-slots-per10-min=20", "scuby.media.max-slots-per-ip10-min=60",
             "scuby.media.attach-window=24h"};
     private static final String[] S3 = {
             "scuby.media.store=s3", "scuby.media.public-base-url=https://img.scuby.test",
             "scuby.media.bucket=b", "scuby.media.region=sa-east-1", "scuby.media.slot-ttl=5m",
-            "scuby.media.max-slots-per10-min=20", "scuby.media.attach-window=24h"};
+            "scuby.media.max-slots-per10-min=20", "scuby.media.max-slots-per-ip10-min=60", "scuby.media.attach-window=24h"};
 
     private static String[] without(String[] all, String key) {
         return java.util.Arrays.stream(all).filter(p -> !p.startsWith("scuby.media." + key + "=")).toArray(String[]::new);
@@ -51,6 +51,7 @@ class MediaPropertiesValidationTest {
     void aMissingSlotLimitFailsInsteadOfBindingToZero() {
         assertThat(failureOf(without(LOCAL, "max-slots-per10-min"))).contains("max-slots-per10-min");
         assertThat(failureOf(without(S3, "max-slots-per10-min"))).contains("max-slots-per10-min");
+        assertThat(failureOf(without(LOCAL, "max-slots-per-ip10-min"))).contains("max-slots-per-ip10-min");
     }
 
     @Test

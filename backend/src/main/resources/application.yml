@@ -77,4 +77,6 @@ scuby:
     region: ""
     slot-ttl: 5m
     max-slots-per10-min: 20
+    # Per client IP across all callers (a script without cookies is a new device on every request).
+    max-slots-per-ip10-min: 60
     attach-window: 24h

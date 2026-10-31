@@ -24,7 +24,7 @@ class S3MediaStoreTest {
 
     private final S3MediaStore store = new S3MediaStore(
             new MediaProperties("s3", "https://img.scuby.example", "", "scuby-media-staging", "us-east-1",
-                    Duration.ofMinutes(5), 20, Duration.ofHours(24)),
+                    Duration.ofMinutes(5), 20, 60, Duration.ofHours(24)),
             StaticCredentialsProvider.create(AwsBasicCredentials.create("AKIDEXAMPLE", "secret")));
 
     @Test

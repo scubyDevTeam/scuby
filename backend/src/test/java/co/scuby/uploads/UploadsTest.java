@@ -128,6 +128,22 @@ class UploadsTest {
         assertThat(api.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
     }
 
+    /** A script without cookies is a new device (a new owner key) on every request: only the IP bounds it. */
+    @Test
+    void sixtySlotsPerIpPerTenMinutesAcrossCallersWithNoCookies() {
+        for (int i = 0; i < 60; i++) {
+            ApiClient fresh = clients.newBrowser().from("198.51.100.7");
+            assertThat(fresh.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
+        }
+        ApiClient another = clients.newBrowser().from("198.51.100.7");
+        assertThat(another.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).errorCode()).isEqualTo("rate_limited");
+        // another address is unaffected; so is the same address once the window has passed
+        assertThat(clients.newBrowser().from("198.51.100.8").post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status())
+                .isEqualTo(201);
+        clock.advance(Duration.ofMinutes(10).plusSeconds(1));
+        assertThat(another.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
+    }
+
     @Test
     void tooBigOrNotJpegIsValidationFailed() {
         String sha = Hashing.sha256Hex(photo());
