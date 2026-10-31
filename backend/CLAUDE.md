@@ -83,10 +83,24 @@ The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older 
   from a branch that merges later still runs; therefore a migration must not depend on another
   branch's migrations (decision #44). Each starts with a comment: what it is for, which doc owns it. Qualify
   tables with `scuby.` inside PL/pgSQL.
-- **An index is earned:** only growth-sensitive queries get a plan check (`PlanAssert`, seeded
-  thousands of rows). Write the failing plan check first, then the index; its migration comment
-  carries the query, the plan before/after, the write cost and overlaps. Every new index is listed
-  for human approval in the task report (review-enforced).
+- **Two kinds of index, justified differently.**
+  - *Integrity* (a PK, a UNIQUE, a partial unique that enforces a rule or settles a race): justified
+    by the rule it protects. Table size is irrelevant.
+  - *Performance:* justified only by growth. Before adding one, answer in the migration comment:
+    1. **Can the table grow without bound?** Rows never deleted (cases, sightings) — yes. Rows a
+       purge keeps to a window (code sends at 30 days) — bounded. Reference data — no.
+    2. **How often does the query run?** Per page view, per write, or rarely.
+    3. **What happens without the index** once the table has grown? A full scan on the hot path,
+       or a few milliseconds on a rare one.
+
+    A seeded plan check shows only that the index *would be used*. Seeding thousands of rows always
+    makes a sequential scan lose, so a passing check is not the justification. Prefer bounding the
+    table (a purge) over indexing it. A small, bounded or rarely-read table gets no performance
+    index.
+  - When an index is justified: write the failing plan check first (`PlanAssert`), then the index.
+    Its migration comment carries the growth answer, the query, the plan before/after, the write
+    cost and overlaps. Every new index, of either kind, is listed for human approval in the task
+    report (review-enforced).
 - A predicate a partial index depends on (`status = 'active'`) is a literal in jOOQ — `DSL.inline("active")` — never a bind value ([backend.md](../docs/eng/backend.md) · Migrations and indexes).
 
 ## What reviewers check (humans)

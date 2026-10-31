@@ -208,7 +208,7 @@ contract path (`unchecked(…, reason)` is the explicit escape), leak tests on v
 endpoints, statement-count ceilings per request (an N+1 fails the test), plan checks on
 growth-sensitive queries only, a check that every table is either reset between tests or declared
 reference data, and a test on the migration file names. **Enforced by review, not the build:**
-indexes only with a measured plan and human approval, one writing feature per table, cross-feature
+performance indexes only for queries over tables that can grow (rule in `backend/CLAUDE.md` · Migrations and indexes) and with human approval, one writing feature per table, cross-feature
 side effects through the outbox, and viewer logic staying inside `*Derivation` classes.
 
 **Migrations** (decision #44). Flyway versions are timestamps (`V20261029_1430__what.sql`; the
