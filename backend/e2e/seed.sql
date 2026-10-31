@@ -5,10 +5,10 @@
 TRUNCATE scuby.sighting, scuby.lost_case, scuby.purged_case_code, scuby.responsibility_link, scuby.pet,
          scuby.upload, scuby.session, scuby.phone_otp, scuby.code_send, scuby.email_code, scuby.person CASCADE;
 
-INSERT INTO scuby.person (id, display_name, email, created_at) VALUES
-  ('00000000-0000-0000-0000-00000000ca01', 'Carolina Mejía', 'carolina@correo.co', now() - interval '240 days'),   -- fixtures.ts:498
-  ('00000000-0000-0000-0000-00000000ca02', 'Julián Restrepo', 'julian@correo.co', now() - interval '400 days'),   -- fixtures.ts:500 (closedLost's created_by, :208)
-  ('00000000-0000-0000-0000-00000000ca03', 'Andrés Rojas', 'andres@correo.co', now() - interval '95 days');       -- fixtures.ts:502
+INSERT INTO scuby.person (id, display_name, display_name_chosen, email, created_at) VALUES
+  ('00000000-0000-0000-0000-00000000ca01', 'Carolina Mejía', true, 'carolina@correo.co', now() - interval '240 days'),   -- fixtures.ts:498
+  ('00000000-0000-0000-0000-00000000ca02', 'Julián Restrepo', true, 'julian@correo.co', now() - interval '400 days'),   -- fixtures.ts:500 (closedLost's created_by, :208)
+  ('00000000-0000-0000-0000-00000000ca03', 'Andrés Rojas', true, 'andres@correo.co', now() - interval '95 days');       -- fixtures.ts:502
 
 INSERT INTO scuby.pet (id, name, species, size, colors, marks, photo_urls, custody_state, created_at) VALUES
   -- fixtures.ts:514-523 (pet-luna)

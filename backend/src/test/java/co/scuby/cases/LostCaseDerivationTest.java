@@ -138,6 +138,15 @@ class LostCaseDerivationTest {
     }
 
     @Test
+    void anUnnamedPublisherShowsTheGenericNameNotAnythingFromTheirEmail() {
+        var unnamed = new LostCaseFacts("7K3PQ", "active", null, OWNER,
+                new LostCaseFacts.PetFacts("Luna", "dog", "small", List.of("black"), null, List.of()),
+                new GeoPoint(6.2442, -75.5812), 100, NOW, null, null, WA, List.of());
+        assertThat(LostCaseDerivation.derive(unnamed, STRANGER, NOW, ES).contact().displayName()).isEqualTo("Alguien");
+        assertThat(LostCaseDerivation.derive(unnamed, STRANGER, NOW, java.util.Locale.ENGLISH).contact().displayName()).isEqualTo("Someone");
+    }
+
+    @Test
     void noContactOnceTheCaseIsClosedAndTheResolutionTimeShows() {
         var view = LostCaseDerivation.derive(facts("reunited", 100, null, "Toby", null, List.of()), STRANGER, NOW, ES);
         assertThat(view.contact()).isNull();

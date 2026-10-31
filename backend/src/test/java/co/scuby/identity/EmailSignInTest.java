@@ -55,6 +55,7 @@ class EmailSignInTest {
         ApiResponse r = verify("juan.perez@correo.co", code);
         assertThat(r.status()).isEqualTo(200);
         assertThat(r.str("/display_name")).isEqualTo("Juan Perez");
+        assertThat(db.fetchOne(PERSON).getDisplayNameChosen()).as("the placeholder is not a chosen name").isFalse();
         assertThat(r.str("/email")).isEqualTo("juan.perez@correo.co");
         assertThat(r.setCookies()).anyMatch(c -> c.startsWith("__Host-session=") && c.contains("HttpOnly")
                 && c.contains("Secure") && c.contains("SameSite=Lax"));

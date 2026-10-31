@@ -23,7 +23,17 @@ class PublicTextDerivationTest {
             "'  Juan   Perez ', Juan P.",
     })
     void publicName(String displayName, String expected) {
-        assertThat(PublicTextDerivation.publicName(displayName)).isEqualTo(expected);
+        assertThat(PublicTextDerivation.publicName(displayName, ES)).isEqualTo(expected);
+    }
+
+    /** Review I3: no name chosen → the mock's «Alguien», never something made from the email. */
+    @Test
+    void anUnnamedPublisherIsAGenericWordInTheRequestLanguage() {
+        assertThat(PublicTextDerivation.publicName(null, ES)).isEqualTo("Alguien");
+        assertThat(PublicTextDerivation.publicName(null, EN)).isEqualTo("Someone");
+        assertThat(PublicTextDerivation.publicName(null, Locale.FRENCH)).isEqualTo("Alguien");
+        assertThat(PublicTextDerivation.publicName("   ", EN)).isEqualTo("Someone");
+        assertThat(PublicTextDerivation.publicName("Carolina Mejía", EN)).isEqualTo("Carolina M.");
     }
 
     @Test

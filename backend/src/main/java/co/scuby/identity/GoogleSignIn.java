@@ -64,7 +64,7 @@ class GoogleSignIn {
             String email = EmailSignIn.normalize(google.email());
             boolean authoritative = google.emailAuthoritative();
             Person account = people.byEmail(email)
-                    .orElseGet(() -> people.create(email, displayName(google, email), google.sub(), authoritative));
+                    .orElseGet(() -> people.create(email, displayName(google, email), googleName(google).isPresent(), google.sub(), authoritative));
             if (google.sub().equals(account.googleSub())) return account;
             if (account.googleSub() != null) {
                 log.warn("Google sign-in refused: account {} is linked to another Google identity", account.id());
@@ -82,11 +82,17 @@ class GoogleSignIn {
         });
     }
 
-    private static String displayName(GoogleIdentity google, String email) {
+    /** Google's own name for the person, cleaned and cut to the column's length; empty when Google sent none. */
+    private static java.util.Optional<String> googleName(GoogleIdentity google) {
         String name = google.name() == null ? "" : stripInvisible(google.name()).strip();
-        if (name.isEmpty()) return DisplayNames.fromEmail(email);
-        if (name.codePointCount(0, name.length()) <= MAX_NAME) return name;
-        return name.substring(0, name.offsetByCodePoints(0, MAX_NAME));
+        if (name.isEmpty()) return java.util.Optional.empty();
+        if (name.codePointCount(0, name.length()) <= MAX_NAME) return java.util.Optional.of(name);
+        return java.util.Optional.of(name.substring(0, name.offsetByCodePoints(0, MAX_NAME)));
+    }
+
+    /** Google's name, else the email-derived placeholder (not public: display_name_chosen is false then). */
+    private static String displayName(GoogleIdentity google, String email) {
+        return googleName(google).orElseGet(() -> DisplayNames.fromEmail(email));
     }
 
     /** Drops control (Cc) and format (Cf: zero-width, RTL override...) characters. */

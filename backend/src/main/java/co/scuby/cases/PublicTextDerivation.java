@@ -25,8 +25,13 @@ final class PublicTextDerivation {
         return "en".equals(locale.getLanguage());
     }
 
-    /** «Carolina Mejía» → «Carolina M.»: the public face of a publisher (as the client mock). */
-    static String publicName(String displayName) {
+    /**
+     * «Carolina Mejía» → «Carolina M.»: the public face of a publisher (as the client mock). A person who has not
+     * named themselves (null) is «Alguien» / «Someone» (the mock's word for an unknown person): never a name derived
+     * from their email address.
+     */
+    static String publicName(@Nullable String displayName, Locale locale) {
+        if (displayName == null || displayName.isBlank()) return english(locale) ? "Someone" : "Alguien";
         String[] parts = displayName.strip().split("\\s+");
         if (parts.length < 2) return parts[0];
         return parts[0] + " " + Character.toUpperCase(parts[1].charAt(0)) + ".";

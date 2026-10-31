@@ -80,7 +80,23 @@ class CaseEndpointTest {
         assertThat(r.str("/sightings/0/contact_phone")).isEqualTo("+573001112233");
         assertThat(r.json().at("/sightings/1/hidden").asBoolean()).isTrue();
         assertThat(r.str("/contact/whatsapp_url")).isEqualTo("https://wa.me/573114829017");
-        assertThat(r.str("/contact/display_name")).isEqualTo("carolina");
+        // carolina@correo.co signed in by email code and never named herself: «carolina» is a placeholder, not public
+        assertThat(r.str("/contact/display_name")).isEqualTo("Alguien");
+    }
+
+    /** Review I3 leak test: a name made from the email's local part reaches no viewer; a chosen name does, shortened. */
+    @Test
+    void thePublicNameIsNeverDerivedFromTheEmailButIsTheChosenOneWhenThereIsOne() {
+        ApiClient stranger = clients.newBrowser();
+        for (ApiClient viewer : List.of(stranger, owner)) {
+            ApiResponse r = viewer.get("/cases/{code}", "7K3PQ");
+            assertThat(r.str("/contact/display_name")).isEqualTo("Alguien");
+            assertThat(r.body()).doesNotContainIgnoringCase("carolina");
+        }
+        assertThat(clients.newBrowser().header("Accept-Language", "en").get("/cases/{code}", "7K3PQ").str("/contact/display_name"))
+                .isEqualTo("Someone");
+        db.execute("UPDATE scuby.person SET display_name = 'Carolina Mejía', display_name_chosen = true WHERE id = ?", carolina);
+        assertThat(clients.newBrowser().get("/cases/{code}", "7K3PQ").str("/contact/display_name")).isEqualTo("Carolina M.");
     }
 
     @Test

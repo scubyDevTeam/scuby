@@ -34,7 +34,7 @@ final class LostCaseDerivation {
                 new LostCaseView.LastSeenView(facts.center(),
                         owner ? facts.radiusM() : Math.max(facts.radiusM(), PUBLIC_RADIUS_FLOOR_M),
                         facts.lastSeenAt(), PublicTextDerivation.placeName(facts.placeName(), locale)),
-                0, sightings, List.of(), null, contact(facts));
+                0, sightings, List.of(), null, contact(facts, locale));
     }
 
     private static LostCaseView.SightingView sighting(LostCaseFacts.SightingFacts s, Viewer viewer, boolean owner, Instant now) {
@@ -47,9 +47,9 @@ final class LostCaseDerivation {
                 owner ? s.contactPhone() : null, owner && s.hidden(), mine, editableUntil);
     }
 
-    private static LostCaseView.@Nullable ContactView contact(LostCaseFacts facts) {
+    private static LostCaseView.@Nullable ContactView contact(LostCaseFacts facts, Locale locale) {
         if (!"active".equals(facts.status())) return null;
         String whatsapp = facts.whatsappPhone() == null ? null : PublicTextDerivation.whatsappUrl(facts.whatsappPhone());
-        return new LostCaseView.ContactView(PublicTextDerivation.publicName(facts.publisherName()), whatsapp);
+        return new LostCaseView.ContactView(PublicTextDerivation.publicName(facts.publisherName(), locale), whatsapp);
     }
 }

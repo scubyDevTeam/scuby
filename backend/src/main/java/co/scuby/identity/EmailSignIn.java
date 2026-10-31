@@ -55,7 +55,7 @@ class EmailSignIn {
     public SignedIn verify(String email, String code, Optional<String> carriedTokenHash) {
         String normalized = normalize(email);
         if (!codes.consume(normalized, code)) throw new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code");
-        Person person = people.byEmail(normalized).orElseGet(() -> people.create(normalized, DisplayNames.fromEmail(normalized), null, false));
+        Person person = people.byEmail(normalized).orElseGet(() -> people.create(normalized, DisplayNames.fromEmail(normalized), false, null, false));
         // Proving the mailbox beats a Google link that only vouched for it non-authoritatively (someone may
         // have created a Google account with this address): drop the link and every session it opened.
         if (person.googleSub() != null && Boolean.FALSE.equals(person.googleEmailAuthoritative())

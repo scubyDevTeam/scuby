@@ -13,7 +13,7 @@ import java.util.UUID;
  */
 record LostCaseFacts(String code, String status, @Nullable Instant resolvedAt, UUID createdBy, PetFacts pet,
                      GeoPoint center, double radiusM, Instant lastSeenAt, @Nullable String placeName,
-                     String publisherName, @Nullable String whatsappPhone, List<SightingFacts> sightings) {
+                     @Nullable String publisherName, @Nullable String whatsappPhone, List<SightingFacts> sightings) {
 
     record PetFacts(@Nullable String name, String species, @Nullable String size, List<String> colors,
                     @Nullable String marks, List<String> photoUrls) {}

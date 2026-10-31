@@ -38,11 +38,14 @@ class LostCaseQueries {
                     LOST_CASE.CONTACT_PHONE)
             .as("whatsapp_phone");
 
+    /** The publisher's name only when they chose it; a name derived from the email is never loaded for display (review I3). */
+    static final Field<String> PUBLISHER_NAME = DSL.when(DSL.condition(PERSON.DISPLAY_NAME_CHOSEN), PERSON.DISPLAY_NAME).as("publisher_name");
+
     Optional<LostCaseFacts> loadCase(String code) {
         return db.select(LOST_CASE.CODE, LOST_CASE.STATUS, LOST_CASE.RESOLVED_AT, LOST_CASE.CREATED_BY,
                          LOST_CASE.LAST_SEEN_LAT, LOST_CASE.LAST_SEEN_LNG, LOST_CASE.LAST_SEEN_RADIUS_M, LOST_CASE.LAST_SEEN_AT,
                          LOST_CASE.PLACE_NAME, WHATSAPP_PHONE,
-                         PET.NAME, PET.SPECIES, PET.SIZE, PET.COLORS, PET.MARKS, PET.PHOTO_URLS, PERSON.DISPLAY_NAME)
+                         PET.NAME, PET.SPECIES, PET.SIZE, PET.COLORS, PET.MARKS, PET.PHOTO_URLS, PUBLISHER_NAME)
                  .from(LOST_CASE)
                  .join(PET).on(PET.ID.eq(LOST_CASE.PET_ID))
                  .join(PERSON).on(PERSON.ID.eq(LOST_CASE.CREATED_BY))
@@ -55,7 +58,7 @@ class LostCaseQueries {
                                  Arrays.asList(r.get(PET.COLORS)), r.get(PET.MARKS), Arrays.asList(r.get(PET.PHOTO_URLS))),
                          new GeoPoint(r.get(LOST_CASE.LAST_SEEN_LAT), r.get(LOST_CASE.LAST_SEEN_LNG)),
                          r.get(LOST_CASE.LAST_SEEN_RADIUS_M), r.get(LOST_CASE.LAST_SEEN_AT).toInstant(),
-                         r.get(LOST_CASE.PLACE_NAME), r.get(PERSON.DISPLAY_NAME), r.get(WHATSAPP_PHONE), List.of()));
+                         r.get(LOST_CASE.PLACE_NAME), r.get(PUBLISHER_NAME), r.get(WHATSAPP_PHONE), List.of()));
     }
 
     boolean isPurged(String code) {

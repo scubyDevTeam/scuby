@@ -66,6 +66,7 @@ class GoogleSignInTest {
         assertThat(r.str("/email")).isEqualTo("carolina@gmail.com");
         assertThat(api.get("/session").status()).isEqualTo(200);
         assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
+        assertThat(db.fetchOne(PERSON).getDisplayNameChosen()).as("Google's own name may be public").isTrue();
     }
 
     @Test
@@ -161,6 +162,7 @@ class GoogleSignInTest {
         var c = claims();
         c.remove("name");
         assertThat(google(keys.token(c)).str("/display_name")).isEqualTo("Carolina");
+        assertThat(db.fetchOne(PERSON).getDisplayNameChosen()).as("an email-derived placeholder is never public").isFalse();
     }
 
     @Test
@@ -296,6 +298,7 @@ class GoogleSignInTest {
                 + keys.token(GoogleTestKeys.claims("attacker-sub", "victim@correo.co", clock.instant())) + "\"}");
         assertThat(db.fetchOne(PERSON).getDisplayName()).isEqualTo("Carolina Mejía");
         assertThat(emailSignIn(clients.newBrowser(), "victim@correo.co").str("/display_name")).isEqualTo("Victim");
+        assertThat(db.fetchOne(PERSON).getDisplayNameChosen()).isFalse();
     }
 
     @Test
@@ -438,6 +441,7 @@ class GoogleSignInTest {
         var c = claims();
         c.put("name", "\u200B\u202E");
         assertThat(google(keys.token(c)).str("/display_name")).isEqualTo("Carolina");
+        assertThat(db.fetchOne(PERSON).getDisplayNameChosen()).as("an email-derived placeholder is never public").isFalse();
     }
 
     private List<ApiResponse> race(List<String> subs) throws Exception {
