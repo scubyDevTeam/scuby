@@ -22,7 +22,12 @@ import java.util.UUID;
 
 import static co.scuby.db.generated.Tables.PHONE_OTP;
 
-/** SMS one-time codes with the full checklist of docs/eng/auth.md · OTP mechanics. */
+/**
+ * SMS one-time codes with the full checklist of docs/eng/auth.md · OTP mechanics.
+ *
+ * <p>Known and accepted until a real SMS provider exists (R1): the after-commit send still runs on the request
+ * thread, so the request's connection is held while the provider is called.
+ */
 @Component
 class PhoneOtp {
 
@@ -41,9 +46,11 @@ class PhoneOtp {
     private final SmsProperties limits;
     private final CodeHasher hasher;
     private final CodeSends sends;
+    private final People people;
 
     PhoneOtp(DSLContext db, Clock clock, SmsSender sender, TestBypass bypass, SmsProperties limits,
-             CodeHasher hasher, CodeSends sends) {
+             CodeHasher hasher, CodeSends sends, People people) {
+        this.people = people;
         this.db = db;
         this.clock = clock;
         this.sender = sender;
@@ -61,6 +68,19 @@ class PhoneOtp {
      */
     @Transactional
     public Sent send(UUID personId, String phone, Caller caller) {
+        // Lock order everywhere: person row, then (advisory locks and) the phone_otp row. The send-log and
+        // phone_otp inserts need the person row for their foreign keys, so taking it last deadlocked with a
+        // publish (PublisherPhone.resolve) and with an email-code reclaim, which both take it first.
+        people.lock(personId);
+        return sendHoldingPersonLock(personId, phone, caller);
+    }
+
+    /**
+     * {@link #send} for a caller that already holds the person row's lock in this transaction
+     * (PublisherPhone.resolve): same behaviour, without locking the row a second time.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    Sent sendHoldingPersonLock(UUID personId, String phone, Caller caller) {
         Instant now = clock.instant();
         if (bypass.smsBypassed(phone)) {
             write(personId, phone, bypass.code(), now);

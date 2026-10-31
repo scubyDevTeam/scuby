@@ -25,6 +25,9 @@ import java.util.UUID;
  *       A rolled-back publish leaves a right code usable; its attempt stays spent.</li>
  * </ol>
  * Identity stays the only writer of `person` and `phone_otp`.
+ *
+ * <p>Known and accepted until a real SMS provider exists (R1): the SMS goes out after commit on the request
+ * thread, so the request's connection is held during the provider call.
  */
 @ModuleApi
 @Component
@@ -99,7 +102,7 @@ public class PublisherPhone {
         return switch (decide(person, target, prepared.codeGiven)) {
             case USE_VERIFIED -> new Ready(target, true);
             case SEND_CODE -> {
-                otp.send(personId, target, caller);
+                otp.sendHoldingPersonLock(personId, target, caller);
                 yield new CodeSent();
             }
             case CHECK_CODE -> {
