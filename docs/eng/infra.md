@@ -54,6 +54,11 @@ then; unused credits keep applying. AWS Budgets alarms from day one ([costs.md](
 Moving staging data to RDS, if any is worth keeping, is `pg_dump` / `pg_restore`; the application
 only changes its connection settings.
 
+**Sandbox.** A throwaway environment in a separate test AWS account
+(`infra/terraform/envs/sandbox`, local state): applied, smoke-tested end to end and destroyed in the
+same run, to prove the Terraform before staging exists. It uses the CloudFront default domains, so
+it needs no domain. How to run it: `infra/README.md`.
+
 ## Edge: CloudFront, ACM, Route 53
 
 - **TLS lives at CloudFront.** ACM certificates are free but attach only to CloudFront, load
@@ -62,7 +67,8 @@ only changes its connection settings.
   query strings. The session cookie is set on this same-site subdomain (decision #37).
 - **The origin is closed to everything but CloudFront**: the EC2 security group admits only AWS's
   managed prefix list for CloudFront origin-facing addresses, and the backend rejects requests
-  without a secret origin header.
+  without a secret origin header (not built yet: CloudFront sends the header, the backend does not
+  check it — [staging-rollout.md](staging-rollout.md)).
 - **Trade-off accepted for launch:** CloudFront → EC2 is plain HTTP. Encrypting that hop later means
   CloudFront VPC origins with the instance in a private subnet — which then needs a NAT for outbound
   calls (a managed NAT gateway is ~$32/month). Revisit when the cost is worth it.
@@ -76,6 +82,9 @@ only changes its connection settings.
   carries the permissions it needs.
 - Docker Compose runs the backend image (and Postgres, in staging). The JVM is tuned for the
   instance's RAM.
+- **Memory budget on the 2 GB instance:** the backend container is capped at 1 GB (`mem_limit`, so
+  the JVM's `MaxRAMPercentage=60` sizes the heap from that) and Postgres at 512 MB; the rest is the
+  OS and Docker.
 
 ## Logs
 
@@ -138,6 +147,10 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
 | CORS for the poster canvas | Response headers on the image distribution |
 | `og` variant | Plain cover crop in v1. Status text composited on the image («YA ESTÁ EN CASA», [10](../product/10-sharing.md)) is later |
 
+Not built yet: restricted images (claim proofs, orphan sightings) still need a visibility in the
+upload key and CloudFront signed URLs; until then every master is reachable through `/img/…`. It
+arrives with the backend's upload slots, which know each photo's purpose.
+
 ## Secrets
 
 - **SSM Parameter Store, `SecureString`, one parameter per value**, under `/scuby/{env}/…`. The
@@ -146,9 +159,18 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
 - One parameter per value — not one JSON blob — so a value changes alone, permissions and history
   are per value, and no size limit is hit. Standard parameters are free.
 - **Never in the image, never at build time.** The same image runs in every environment.
-- **Terraform creates each parameter with a placeholder and ignores later value changes**
-  (`lifecycle { ignore_changes = [value] }`); a person sets the real value through the CLI or
-  console. Terraform state stores values in plain text, so real secrets never pass through it.
+- **Terraform creates each parameter with a write-only placeholder** (`value_wo`); a person sets the
+  real value through the CLI or console. Terraform state stores values in plain text, so no SSM
+  value lives there: a write-only argument is sent to AWS but never stored, and a refresh leaves the
+  state's `value` empty even after the real value is set (verified 2026-10-29). Not
+  `ignore_changes = [value]`: that only hides the diff, and every refresh would read the decrypted
+  value back into the state. **Bumping `value_wo_version` makes the next apply write the
+  placeholder over the real value; renaming a parameter or removing it from the list deletes it,
+  value included.**
+- **One secret is still in the state:** the CloudFront origin secret ([staging-rollout.md](staging-rollout.md)).
+- **Sandbox exceptions:** the deploy script generates the database password and the instance passes
+  it to the containers through a `.env` file; nothing is imported from the prefix at start-up yet
+  ([staging-rollout.md](staging-rollout.md)).
 - **New Relic license key:** `/scuby/<env>/newrelic/license-key`, imported as the property
   `newrelic.license-key`. On a laptop the same value comes from the environment variable
   `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. (The parameter and the start-up import
@@ -161,7 +183,12 @@ retention — are in [media-pipeline.md](media-pipeline.md). This is how AWS imp
 - **Terraform** for every resource; nothing created by hand except the account itself and the
   secret values above.
 - State in an S3 bucket with S3-native locking (no DynamoDB table).
-- `terraform plan` runs on every pull request touching `infra/`; `apply` is run manually.
+- `terraform plan` runs on every pull request touching `infra/`; `apply` is run manually. (Not
+  built yet: no workflow runs on `infra/` — [staging-rollout.md](staging-rollout.md).)
+
+## Before staging
+
+What the sandbox proved but staging must not inherit as it is: [staging-rollout.md](staging-rollout.md).
 
 ## CI/CD
 

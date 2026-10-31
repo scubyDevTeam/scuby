@@ -1,0 +1,40 @@
+# What runs on the sandbox EC2. Memory is capped so the JVM and Postgres share 2 GB safely:
+# the JVM's MaxRAMPercentage=60 applies to the backend's 1 GB limit, not to the host.
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE}
+    environment:
+      POSTGRES_DB: scuby
+      POSTGRES_USER: scuby
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - /srv/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U scuby -d scuby"]
+      interval: 2s
+      retries: 60
+    mem_limit: 512m
+    restart: unless-stopped
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: staging
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/scuby
+      SPRING_DATASOURCE_USERNAME: scuby
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "8080:8080"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: us-east-1
+        awslogs-group: ${BACKEND_LOG_GROUP}
+        mode: non-blocking
+        max-buffer-size: 4m
+    mem_limit: 1g
+    restart: unless-stopped
