@@ -66,10 +66,11 @@ class PhoneSendLockOrderTest {
     private void awaitBlockedQuery() throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
         while (System.nanoTime() < deadline) {
-            Integer waiting = db.fetchOne("select count(*) from pg_stat_activity where wait_event_type = 'Lock'").get(0, Integer.class);
+            Integer waiting = db.fetchOne("select count(*) from pg_stat_activity where wait_event_type = 'Lock' and datname = current_database() and (query ilike '%person%' or query ilike '%phone_otp%' or query ilike '%code_send%')").get(0, Integer.class);
             if (waiting != null && waiting > 0) return;
             Thread.sleep(20);
         }
+        throw new AssertionError("the second side never blocked: the interleaving was not exercised");
     }
 
     private static void await(CountDownLatch latch) {

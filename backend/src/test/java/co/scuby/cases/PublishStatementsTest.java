@@ -1,6 +1,7 @@
 package co.scuby.cases;
 
 import co.scuby.platform.crypto.Hashing;
+import co.scuby.platform.flags.FeatureFlags;
 import co.scuby.support.Accounts;
 import co.scuby.support.ApiClient;
 import co.scuby.support.ApiClients;
@@ -12,6 +13,8 @@ import co.scuby.support.TestDb;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import co.scuby.platform.cache.ClearableCache;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 
@@ -33,6 +36,18 @@ class PublishStatementsTest {
     @Autowired Accounts accounts;
     @Autowired RecordingSmsSender sms;
     @Autowired DSLContext db;
+    @Autowired ObjectProvider<ClearableCache> caches;
+
+    /** Every call starts from empty caches (session lookup, flag snapshot): the honest worst case, as StatementCeilings counts it. */
+    private ApiResponse publishCold(ApiClient client, String body) {
+        // The session-lookup cache only. Not the dev media store (it holds the uploaded bytes the photo check looks
+        // for) and not the flag snapshot (process-wide, reloaded once per 30 s: +2 statements on one request in 30 s,
+        // not a per-request cost, so it is left out of the ceilings as everywhere else).
+        caches.orderedStream()
+              .filter(c -> !c.getClass().getSimpleName().contains("MediaStore") && !(c instanceof FeatureFlags))
+              .forEach(ClearableCache::clear);
+        return client.post("/lost-cases", body);
+    }
 
     @BeforeEach
     void setUp() { testDb.reset(); }
@@ -50,39 +65,43 @@ class PublishStatementsTest {
         api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", bytes, "image/jpeg", sha);
         String withPhoto = "[\"" + url + "\"]";
 
-        ApiResponse r = api.post("/lost-cases", PublishBodies.kira(PHONE, null, withPhoto, AT, 300));
+        ApiResponse r = publishCold(api, PublishBodies.kira(PHONE, null, withPhoto, AT, 300));
         counts.put("otp (code sent, photos)", r.statements().size());
         String wrong = sms.lastCodeFor(PHONE).equals("000000") ? "111111" : "000000";
-        r = api.post("/lost-cases", PublishBodies.kira(PHONE, wrong, withPhoto, AT, 300));
+        r = publishCold(api, PublishBodies.kira(PHONE, wrong, withPhoto, AT, 300));
         counts.put("wrong code", r.statements().size());
-        r = api.post("/lost-cases", PublishBodies.kira(PHONE, null, withPhoto, AT, 300));
+        r = publishCold(api, PublishBodies.kira(PHONE, null, withPhoto, AT, 300));
         counts.put("otp repeat (cooldown)", r.statements().size());
-        r = api.post("/lost-cases", PublishBodies.kira(PHONE, sms.lastCodeFor(PHONE), withPhoto, AT, 300));
+        r = publishCold(api, PublishBodies.kira(PHONE, sms.lastCodeFor(PHONE), withPhoto, AT, 300));
         counts.put("correct code (new pet, photos)", r.statements().size());
-        r = api.post("/lost-cases", PublishBodies.kira(null, null));
+        r = publishCold(api, PublishBodies.kira(null, null));
         counts.put("verified number", r.statements().size());
         String petId = db.select(LOST_CASE.PET_ID).from(LOST_CASE).limit(1).fetchOne().value1().toString();
-        r = api.post("/lost-cases", PublishBodies.withPetId(petId, null));
+        r = publishCold(api, PublishBodies.withPetId(petId, null));
         counts.put("pet_id, active case exists (409)", r.statements().size());
 
         db.update(LOST_CASE).set(LOST_CASE.STATUS, "expired").execute();
-        r = api.post("/lost-cases", PublishBodies.withPetId(petId, null));
+        r = publishCold(api, PublishBodies.withPetId(petId, null));
         counts.put("pet_id, republish after the case closed", r.statements().size());
 
         db.update(LOST_CASE).set(LOST_CASE.STATUS, "expired").execute();
-        r = api.post("/lost-cases", PublishBodies.withPetId(petId, "+573001234567"));
+        r = publishCold(api, PublishBodies.withPetId(petId, "+573001234567"));
         counts.put("pet_id, a new number (code sent)", r.statements().size());
+        ApiResponse worst = r;
         String code = sms.lastCodeFor("+573001234567");
-        r = api.post("/lost-cases", PublishBodies.withPetId(petId, "+573001234567").replace("\"otp_code\":null", "\"otp_code\":\"" + code + "\""));
+        r = publishCold(api, PublishBodies.withPetId(petId, "+573001234567").replace("\"otp_code\":null", "\"otp_code\":\"" + code + "\""));
         counts.put("pet_id, a new number, correct code", r.statements().size());
 
         ApiClient flagOff = clients.newBrowser();
         var bea = accounts.signIn(flagOff, "bea@correo.co");
         db.execute("INSERT INTO scuby.feature_flag_overrides (flag_key, person_id, enabled, reason) VALUES ('publisher_phone_otp', ?, false, 'test')", bea);
-        r = flagOff.post("/lost-cases", PublishBodies.kira(PHONE, null));
+        r = publishCold(flagOff, PublishBodies.kira(PHONE, null));
         counts.put("flag off", r.statements().size());
 
         System.out.println("STMTS " + counts);
-        assertThat(counts.values()).allSatisfy(n -> assertThat(n).isPositive());
+        System.out.println("STMTS-SQL " + worst.statements());
+        // Pinned (not just recorded): the highest path is the ceiling in StatementCeilings, with a session-cache miss.
+        assertThat(counts).containsEntry("pet_id, a new number (code sent)", 16);
+        assertThat(counts.values()).allSatisfy(n -> assertThat(n).isBetween(1, 16));
     }
 }
