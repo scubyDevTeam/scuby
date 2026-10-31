@@ -38,6 +38,8 @@ class ActiveCasePlanTest {
                 FROM generate_series(1, 20000) g
                 ON CONFLICT DO NOTHING""");
         db.execute("ANALYZE scuby.lost_case");
-        PlanAssert.assertNoSeqScan(db, service.activeCaseQuery(UUID.fromString("00000000-0000-0000-0001-000000000010")), "lost_case");
+        var query = service.activeCaseQuery(UUID.fromString("00000000-0000-0000-0001-000000000010"));
+        PlanAssert.assertNoSeqScan(db, query, "lost_case");
+        PlanAssert.assertUsesIndex(db, query, "lost_case_one_active_per_pet");
     }
 }

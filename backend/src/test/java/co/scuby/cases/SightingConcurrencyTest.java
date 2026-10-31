@@ -58,10 +58,13 @@ class SightingConcurrencyTest {
                 }
             }));
         }
-        start.countDown();
         int created = 0;
-        for (Future<Boolean> r : results) if (r.get(60, TimeUnit.SECONDS)) created++;
-        pool.shutdown();
+        try {
+            start.countDown();
+            for (Future<Boolean> r : results) if (r.get(60, TimeUnit.SECONDS)) created++;
+        } finally {
+            pool.shutdownNow();
+        }
         assertThat(created).isEqualTo(5);
     }
 
@@ -86,10 +89,13 @@ class SightingConcurrencyTest {
                 }
             }));
         }
-        start.countDown();
         int created = 0;
-        for (Future<Boolean> r : results) if (r.get(60, TimeUnit.SECONDS)) created++;
-        pool.shutdown();
+        try {
+            start.countDown();
+            for (Future<Boolean> r : results) if (r.get(60, TimeUnit.SECONDS)) created++;
+        } finally {
+            pool.shutdownNow();
+        }
         assertThat(created).isEqualTo(20);
     }
 }

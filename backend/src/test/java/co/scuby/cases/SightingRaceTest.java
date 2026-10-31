@@ -87,11 +87,11 @@ class SightingRaceTest {
 
     private void waitUntilWaiting(int requests) throws Exception {
         for (int i = 0; i < 500; i++) {
-            Integer waiting = db.fetchOne("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted").get(0, Integer.class);
+            Integer waiting = db.fetchOne("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())").get(0, Integer.class);
             if (waiting == requests) return;
             Thread.sleep(20);
         }
-        throw new AssertionError("the requests never queued behind the lock (waiting: " + db.fetchOne("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted") + ")");
+        throw new AssertionError("the requests never queued behind the lock (waiting: " + db.fetchOne("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())") + ")");
     }
 
     private void release() throws Exception {
@@ -101,10 +101,7 @@ class SightingRaceTest {
 
     private List<ApiResponse> concurrently(List<Callable<ApiResponse>> calls) throws Exception {
         List<Future<ApiResponse>> futures = calls.stream().map(pool::submit).toList();
-        try { waitUntilWaiting(calls.size()); } catch (AssertionError e) {
-            for (var f : futures) if (f.isDone()) { try { System.out.println("EARLY: " + f.get().status() + " " + f.get().body()); } catch (Exception x) { x.printStackTrace(); } }
-            throw e;
-        }
+        waitUntilWaiting(calls.size());
         release();
         return futures.stream().map(f -> {
             try { return f.get(30, TimeUnit.SECONDS); } catch (Exception e) { throw new AssertionError(e); }

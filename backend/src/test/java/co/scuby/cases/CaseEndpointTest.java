@@ -192,6 +192,19 @@ class CaseEndpointTest {
         assertThat(owner.get("/me/cases").body()).doesNotContain(CaseFixtures.LUNA_PHONE.substring(1));
     }
 
+    /** The client makes «solo en la app» exclusive; a direct API client that sends both gets no public number. */
+    @Test
+    void inAppOnlyWinsOverExposeWhatsapp() {
+        cases.lostCase(carolina, "1NAPP", "Kira", "dog", CaseFixtures.MEDELLIN, 300, "active", MutableClock.START.minusSeconds(3600));
+        db.execute("UPDATE scuby.lost_case SET in_app_only = true WHERE code = '1NAPP'");
+        assertThat(queries.loadCase("1NAPP").orElseThrow().whatsappPhone()).isNull();
+        for (ApiClient viewer : List.of(clients.newBrowser(), owner)) {
+            ApiResponse r = viewer.get("/cases/{code}", "1NAPP");
+            assertThat(r.isNull("/contact/whatsapp_url")).isTrue();
+            assertThat(r.body()).doesNotContain(CaseFixtures.LUNA_PHONE.substring(1));
+        }
+    }
+
     /** A case that is not active: the number is not loaded and the response has no contact, even with WhatsApp exposed. */
     @Test
     void aNonActiveCaseNeverLoadsOrExposesTheNumber() {
