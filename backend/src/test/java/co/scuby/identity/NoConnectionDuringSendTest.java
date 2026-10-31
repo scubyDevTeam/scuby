@@ -15,6 +15,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.sql.DataSource;
@@ -37,6 +38,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the stored code unused.
  */
 @IntegrationTest
+// Its own context: Google's key set is cached for 5 minutes per context, so in a shared one an earlier class has
+// already warmed it and no fetch happens. A fresh context starts cold, whatever the class order.
+@TestPropertySource(properties = "scuby.test.context=no-connection-during-send")
 class NoConnectionDuringSendTest {
 
     static final String PHONE = "+573007152284";
