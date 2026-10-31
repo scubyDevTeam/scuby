@@ -2,6 +2,7 @@ package co.scuby.cases;
 
 import co.scuby.pets.Pets;
 import co.scuby.platform.db.GeoPoint;
+import co.scuby.platform.web.CodePoints;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -27,12 +28,12 @@ record PublishLostRequest(
         @NotNull @Valid ContactPrefs contactPrefs,
         @Nullable @Pattern(regexp = "^\\d{6}$") String otpCode) {
 
-    record PetInput(@NotBlank @Size(max = 60) String name,
+    record PetInput(@NotBlank @CodePoints(max = 60) String name,
                     @NotNull Pets.Species species,
                     @NotNull Pets.Size size,
                     @NotNull List<Pets.@NotNull Color> colors,
-                    @Nullable @Size(max = 500) String marks,
-                    @Nullable @Size(max = 40) String chipNumber,
+                    @Nullable @CodePoints(max = 500) String marks,
+                    @Nullable @CodePoints(max = 40) String chipNumber,
                     @NotNull @Size(max = 6) List<@NotBlank String> photoUrls) {
 
         Pets.NewPet toNewPet() {
