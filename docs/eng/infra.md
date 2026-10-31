@@ -194,7 +194,7 @@ What the sandbox proved but staging must not inherit as it is: [staging-rollout.
 
 - **GitHub Actions**, a backend workflow beside the client's `web.yml`, triggered by path filters.
 - **OIDC from GitHub to AWS** — no stored AWS keys.
-- Build and test; Jib builds the ARM64 image and pushes it to **ECR**.
+- Build and test; the image is built from `backend/Dockerfile` for ARM64 ([decision #62](../product/00-product-map.md)) and pushed it to **ECR**.
 - Deploy: SSM Run Command on the instance pulls the new image and restarts the Compose service.
   Flyway migrates at application start-up.
 

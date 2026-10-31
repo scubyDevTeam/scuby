@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 # Builds the backend with only Docker on the host (no JDK): Maven runs inside a container, then the
 # runtime image scuby-backend:${SCUBY_IMAGE_TAG:-local} is built from the jar.
-# Usage (from anywhere): bash backend/build.sh [--verify]
+# Usage (from anywhere): bash backend/build.sh [--verify] [--platform linux/arm64]
 #   default   ./mvnw -B package -DskipTests   (jOOQ codegen runs, tests do not)
 #   --verify  ./mvnw -B verify                (codegen + the full test suite + PIT)
+#   --platform P  the runtime image is built for P (default: the Docker daemon's own architecture).
+#             Only the final image is cross-built; the Maven container always runs natively.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 goal=(package -DskipTests)
-[[ "${1:-}" == "--verify" ]] && goal=(verify)
+platform=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --verify) goal=(verify) ;;
+    --platform) platform="${2:?--platform needs a value, e.g. linux/arm64}"; shift ;;
+    *) echo "build.sh: unknown argument '$1'" >&2; exit 1 ;;
+  esac
+  shift
+done
 tag="${SCUBY_IMAGE_TAG:-local}"
 maven_image="${SCUBY_MAVEN_IMAGE:-maven:3.9-eclipse-temurin-25}" # keep the JDK major equal to <java.version> in pom.xml
 
@@ -45,11 +55,14 @@ docker run "${args[@]}" "$maven_image" bash -c '
   chown -R "$HOST_UID:$HOST_GID" target 2>/dev/null || true
   exit $status' _ "${goal[@]}"
 
-arch="$(docker info --format '{{.Architecture}}')"
-case "$arch" in
-  aarch64|arm64) platform=linux/arm64 ;;
-  x86_64|amd64)  platform=linux/amd64 ;;
-  *) echo "build.sh: unsupported Docker architecture '$arch'" >&2; exit 1 ;;
-esac
-docker build --platform "$platform" -t "scuby-backend:$tag" .
+if [[ -z "$platform" ]]; then
+  arch="$(docker info --format '{{.Architecture}}')"
+  case "$arch" in
+    aarch64|arm64) platform=linux/arm64 ;;
+    x86_64|amd64)  platform=linux/amd64 ;;
+    *) echo "build.sh: unsupported Docker architecture '$arch'" >&2; exit 1 ;;
+  esac
+fi
+# --load puts the image in the local daemon (never pushes); --platform applies to this image only.
+docker buildx build --platform "$platform" --load -t "scuby-backend:$tag" .
 echo "Built scuby-backend:$tag ($platform)"
