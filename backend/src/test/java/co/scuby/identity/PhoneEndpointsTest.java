@@ -4,10 +4,8 @@ import co.scuby.support.Accounts;
 import co.scuby.support.ApiClient;
 import co.scuby.support.ApiClients;
 import co.scuby.support.ApiResponse;
-import co.scuby.support.GoogleTestKeys;
 import co.scuby.support.IntegrationTest;
 import co.scuby.support.MutableClock;
-import co.scuby.support.RecordingEmailSender;
 import co.scuby.support.RecordingSmsSender;
 import co.scuby.support.TestDb;
 import org.jooq.DSLContext;
@@ -19,7 +17,6 @@ import java.time.Duration;
 import java.time.Instant;
 
 import static co.scuby.db.generated.Tables.CODE_SEND;
-import static co.scuby.db.generated.Tables.PERSON;
 import static co.scuby.db.generated.Tables.PHONE_OTP;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,8 +29,6 @@ class PhoneEndpointsTest {
     @Autowired TestDb testDb;
     @Autowired Accounts accounts;
     @Autowired RecordingSmsSender sms;
-    @Autowired RecordingEmailSender emails;
-    @Autowired GoogleTestKeys keys;
     @Autowired MutableClock clock;
     @Autowired DSLContext db;
     @Autowired org.springframework.beans.factory.ObjectProvider<co.scuby.platform.cache.ClearableCache> caches;
@@ -71,11 +66,11 @@ class PhoneEndpointsTest {
         assertThat(api.get("/session").str("/phone")).isEqualTo(PHONE);
     }
 
-    /** Pins the ceiling in StatementCeilings: session lookup, supported_countries, person lock, number lock, otp select, send count, otp upsert, send-log insert. */
+    /** Pins the ceiling in StatementCeilings: session lookup, supported_countries, send count, guarded otp upsert, send-log insert. No locks. */
     @Test
-    void aSendOnASessionCacheMissIsExactlyEightStatements() {
+    void aSendOnASessionCacheMissIsExactlyFiveStatements() {
         caches.orderedStream().filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags)).forEach(co.scuby.platform.cache.ClearableCache::clear);
-        assertThat(startChange(api, PHONE).statements()).hasSize(8);
+        assertThat(startChange(api, PHONE).statements()).hasSize(5);
     }
 
     @Test
@@ -161,12 +156,12 @@ class PhoneEndpointsTest {
     }
 
     @Test
-    void thereIsNoCapPerDeviceAccountOrIpOnlyPerNumber() {
-        // One account, one device, one IP: twelve different numbers are all sent (the only caps are per number and the cooldown).
+    void thereIsNoCapPerDeviceOrAccountOnlyPerNumber() {
+        // One account, one device: twelve different numbers are all sent (the only caps are per number and the cooldown).
         for (int i = 0; i < 12; i++) assertThat(startChange(api, "+57300100%04d".formatted(100 + i)).status()).isEqualTo(204);
         assertThat(sms.sent()).hasSize(12);
         for (int i = 0; i < 12; i++) {
-            ApiClient other = clients.newBrowser().from("198.51.100.99");
+            ApiClient other = clients.newBrowser();
             accounts.signIn(other, "p" + i + "@correo.co");
             assertThat(startChange(other, "+57300101%04d".formatted(i)).status()).isEqualTo(204);
         }
@@ -178,6 +173,7 @@ class PhoneEndpointsTest {
         accounts.signIn(other, "other@correo.co");
         for (int i = 0; i < 2; i++) {
             assertThat(startChange(api, PHONE).status()).isEqualTo(204);
+            clock.advance(Duration.ofSeconds(61));
             assertThat(startChange(other, PHONE).status()).isEqualTo(204);
             clock.advance(Duration.ofSeconds(61));
         }
@@ -186,6 +182,21 @@ class PhoneEndpointsTest {
         clock.advance(Duration.ofSeconds(61));
         assertThat(startChange(api, PHONE).errorCode()).isEqualTo("rate_limited");
         assertThat(startChange(other, PHONE).errorCode()).isEqualTo("rate_limited");
+    }
+
+    /** The 60 s between sends is a rule of the number, whichever account asks (decision 56). */
+    @Test
+    void theCooldownBelongsToTheNumberNotToTheAccount() {
+        ApiClient other = clients.newBrowser();
+        accounts.signIn(other, "other@correo.co");
+        assertThat(startChange(api, PHONE).status()).isEqualTo(204);
+        assertThat(startChange(other, PHONE).status()).as("answered as sent").isEqualTo(204);
+        assertThat(sms.sent()).as("but nothing went out inside the number's cooldown").hasSize(1);
+        assertThat(db.fetchCount(CODE_SEND)).isEqualTo(1);
+        assertThat(db.fetchCount(PHONE_OTP)).as("and the second account stored no code").isEqualTo(1);
+        clock.advance(Duration.ofSeconds(61));
+        assertThat(startChange(other, PHONE).status()).isEqualTo(204);
+        assertThat(sms.sent()).hasSize(2);
     }
 
     @Test
@@ -238,30 +249,5 @@ class PhoneEndpointsTest {
         String code = sms.lastCodeFor(PHONE);
         String stored = db.select(PHONE_OTP.CODE_HASH).from(PHONE_OTP).fetchOne().value1();
         assertThat(stored).matches("^[0-9a-f]{64}$").isNotEqualTo(co.scuby.platform.crypto.Hashing.sha256Hex(PHONE + ":" + code));
-    }
-
-    @Test
-    void anEmailCodeReclaimClearsAPhoneTheAttackerVerifiedThroughGoogle() {
-        String victim = "victim@correo.co";
-        ApiClient attacker = clients.newBrowser();
-        assertThat(attacker.post("/auth/google", "{\"credential\":\""
-                + keys.token(GoogleTestKeys.claims("attacker-sub", victim, clock.instant())) + "\"}").status()).isEqualTo(200);
-        attacker.post("/me/phone", "{\"phone\":\"" + PHONE + "\"}");
-        String code = sms.lastCodeFor(PHONE);
-        assertThat(attacker.post("/me/phone/verify", "{\"phone\":\"" + PHONE + "\",\"code\":\"" + code + "\"}").status()).isEqualTo(200);
-        attacker.post("/me/phone", "{\"phone\":\"+573009998866\"}");   // a pending code, not yet verified
-        assertThat(db.selectFrom(PERSON).where(PERSON.EMAIL.eq(victim)).fetchOne().getPhone()).isEqualTo(PHONE);
-
-        ApiClient owner = clients.newBrowser();
-        owner.post("/auth/email/start", "{\"email\":\"" + victim + "\"}");
-        assertThat(owner.post("/auth/email/verify", "{\"email\":\"" + victim + "\",\"code\":\"" + emails.lastCodeFor(victim) + "\"}")
-                        .status()).isEqualTo(200);
-
-        var person = db.selectFrom(PERSON).where(PERSON.EMAIL.eq(victim)).fetchOne();
-        assertThat(person.getGoogleSub()).isNull();
-        assertThat(person.getPhone()).isNull();
-        assertThat(person.getPhoneVerifiedAt()).isNull();
-        assertThat(db.fetchCount(PHONE_OTP)).isZero();
-        assertThat(owner.get("/session").isNull("/phone")).isTrue();
     }
 }

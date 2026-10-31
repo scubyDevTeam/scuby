@@ -131,7 +131,7 @@ class SightingPrecedenceTest {
         accounts.signIn(api, "helper@correo.co");
         caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
         ApiResponse full = post(api, "7K3PQ", json(6.2455, -75.5905, ok(), "+573001112233", ",\"client_id\":\"statements-1\""));
-        assertThat(full.statements()).hasSize(6);   // session, case, replay, supported_countries, status FOR SHARE, insert
+        assertThat(full.statements()).hasSize(5);   // session, case, replay, supported_countries, conditional insert
         caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
         ApiResponse replay = post(api, "7K3PQ", json(6.2455, -75.5905, ok(), "+573001112233", ",\"client_id\":\"statements-1\""));
         assertThat(replay.statements()).hasSize(3);   // session, case, replay

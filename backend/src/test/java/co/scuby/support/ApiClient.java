@@ -30,7 +30,6 @@ public final class ApiClient {
     private final ConnectionSampler sampler;
     private final Map<String, Cookie> jar = new LinkedHashMap<>();
     private final Map<String, String> headers = new LinkedHashMap<>();
-    private String remoteAddr = "203.0.113.10";
 
     ApiClient(MockMvc mvc, ContractValidator contract, StatementRecorder recorder, ConnectionSampler sampler) {
         this.mvc = mvc;
@@ -42,8 +41,6 @@ public final class ApiClient {
     public ApiClient newBrowser() { return new ApiClient(mvc, contract, recorder, sampler); }
 
     public ApiClient header(String name, String value) { headers.put(name, value); return this; }
-
-    public ApiClient from(String ip) { this.remoteAddr = ip; return this; }
 
     public void setCookie(String name, String value) { jar.put(name, new Cookie(name, value)); }
 
@@ -119,8 +116,6 @@ public final class ApiClient {
         req.accept(MediaType.APPLICATION_JSON);
         headers.forEach(req::header);
         if (!jar.isEmpty()) req.cookie(jar.values().toArray(Cookie[]::new));
-        String addr = remoteAddr;
-        req.with(r -> { r.setRemoteAddr(addr); return r; });
         recorder.resetCurrentThread();
         sampler.reset();
         try {

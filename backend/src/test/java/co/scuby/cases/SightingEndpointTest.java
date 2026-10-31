@@ -2,7 +2,6 @@ package co.scuby.cases;
 
 import co.scuby.platform.cache.ClearableCache;
 import co.scuby.platform.crypto.Hashing;
-import co.scuby.platform.db.GeoPoint;
 import co.scuby.support.Accounts;
 import co.scuby.support.ApiClient;
 import co.scuby.support.ApiClients;
@@ -141,12 +140,12 @@ class SightingEndpointTest {
         assertThat(report(api, withPhoto).status()).isEqualTo(201);
     }
 
-    /** Rate limits are deferred (decision log): one reporter, one device, one IP can report as often as they like. */
+    /** Rate limits are deferred (decision log): one reporter or device can report as often as they like. */
     @Test
     void thereAreNoRateLimits() {
         for (int i = 0; i < 30; i++) assertThat(report(api, "").status()).isEqualTo(201);
         for (int i = 0; i < 30; i++) {
-            assertThat(report(clients.newBrowser().from("198.51.100.20"), "").status()).isEqualTo(201);
+            assertThat(report(clients.newBrowser(), "").status()).isEqualTo(201);
         }
         accounts.signIn(api, "helper@correo.co");
         for (int i = 0; i < 30; i++) assertThat(report(api, "").status()).isEqualTo(201);
@@ -166,7 +165,7 @@ class SightingEndpointTest {
         caches.orderedStream().filter(c -> c.getClass().getSimpleName().equals("CachingSessionLookup")).forEach(ClearableCache::clear);
         ApiResponse r = api.post("/cases/{code}/sightings", full, "7K3PQ");
         assertThat(r.status()).isEqualTo(201);
-        // session, case, replay, supported_countries, upload lookup, status FOR SHARE, insert
-        assertThat(r.statements()).hasSize(7);
+        // session, case, replay, supported_countries, upload lookup, conditional insert
+        assertThat(r.statements()).hasSize(6);
     }
 }

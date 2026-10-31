@@ -32,9 +32,7 @@ class GoogleSignInTest {
     @Autowired MutableClock clock;
     @Autowired DSLContext db;
     @Autowired RecordingEmailSender emails;
-    @Autowired People people;
-    @Autowired SessionStore sessionStore;
-    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
+    @Autowired org.springframework.beans.factory.ObjectProvider<co.scuby.platform.cache.ClearableCache> caches;
 
     ApiClient api;
 
@@ -197,8 +195,16 @@ class GoogleSignInTest {
         }
     }
 
-    private static final org.jooq.Field<Boolean> AUTHORITATIVE =
-            org.jooq.impl.DSL.field("google_email_authoritative", Boolean.class);
+    /** Pins the ceiling: a new account from a browser that carries a session, on a session-cache miss. */
+    @Test
+    void aNewAccountFromASignedInBrowserIsExactlySevenStatements() {
+        emailSignIn(api, "ana@correo.co");
+        caches.orderedStream().filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags)).forEach(co.scuby.platform.cache.ClearableCache::clear);
+        ApiResponse r = google(keys.token(claims()));
+        assertThat(r.status()).isEqualTo(200);
+        // filter lookup, sub lookup, email lookup, person insert + select, old session DELETE, session insert
+        assertThat(r.statements()).hasSize(7);
+    }
 
     private ApiResponse signInWith(Map<String, Object> claims) {
         return clients.newBrowser().post("/auth/google", "{\"credential\":\"" + keys.token(claims) + "\"}");
@@ -218,14 +224,14 @@ class GoogleSignInTest {
         }
     }
 
-    // ---- authoritative email rule
+    // ---- one account per email: authoritative emails link or create directly
     @Test
     void aGmailAddressLinksAnExistingEmailCodeAccount() {
         String id = emailSignIn(api, "carolina@gmail.com").str("/id");
         ApiResponse r = signInWith(claims());
         assertThat(r.status()).isEqualTo(200);
         assertThat(r.str("/id")).isEqualTo(id);
-        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isTrue();
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
     }
 
     @Test
@@ -236,78 +242,85 @@ class GoogleSignInTest {
         ApiResponse r = signInWith(c);
         assertThat(r.status()).isEqualTo(200);
         assertThat(r.str("/id")).isEqualTo(id);
-        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isTrue();
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
+    }
+
+    @Test
+    void aWorkspaceAddressWithAMatchingHdCreatesTheAccountDirectly() {
+        var c = GoogleTestKeys.claims("google-sub-1", "carolina@empresa.co", clock.instant());
+        c.put("hd", "empresa.co");
+        assertThat(signInWith(c).status()).isEqualTo(200);
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
+    }
+
+    // ---- non-authoritative emails (decision 58): only an email-code session of the same address links them
+    @Test
+    void aNonAuthoritativeEmailWithoutASessionIsRefusedAndCreatesNothing() {
+        ApiResponse r = signInWith(GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant()));
+        assertThat(r.status()).isEqualTo(401);
+        assertThat(r.errorCode()).isEqualTo("unauthorized");
+        assertThat(db.fetchCount(PERSON)).as("no account is created").isZero();
+        assertThat(db.fetchCount(co.scuby.db.generated.Tables.SESSION)).isZero();
     }
 
     @Test
     void anHdThatDoesNotMatchTheEmailDomainIsNotAuthoritative() {
-        emailSignIn(api, "carolina@empresa.co");
         var c = GoogleTestKeys.claims("google-sub-1", "carolina@empresa.co", clock.instant());
         c.put("hd", "otra.co");
         assertThat(signInWith(c).errorCode()).isEqualTo("unauthorized");
+        assertThat(db.fetchCount(PERSON)).isZero();
     }
 
     @Test
-    void aNonAuthoritativeEmailDoesNotLinkAnExistingAccount() {
+    void aNonAuthoritativeEmailWithoutASessionDoesNotLinkAnExistingAccount() {
         emailSignIn(api, "carolina@correo.co");
+        ApiResponse r = signInWith(GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant()));
+        assertThat(r.status()).isEqualTo(401);
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isNull();
+    }
+
+    @Test
+    void aNonAuthoritativeEmailWithASessionOfThatEmailLinksForeverAndThenGoogleAloneSignsIn() {
+        String id = emailSignIn(api, "carolina@correo.co").str("/id");              // the browser now holds the session
         var c = GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant());
-        ApiResponse r = signInWith(c);
+        ApiResponse linked = api.post("/auth/google", "{\"credential\":\"" + keys.token(c) + "\"}");
+        assertThat(linked.status()).isEqualTo(200);
+        assertThat(linked.str("/id")).isEqualTo(id);
+        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
+
+        ApiResponse alone = signInWith(c);                                          // a fresh browser: no session
+        assertThat(alone.status()).isEqualTo(200);
+        assertThat(alone.str("/id")).isEqualTo(id);
+        assertThat(db.fetchCount(PERSON)).isEqualTo(1);
+    }
+
+    @Test
+    void aNonAuthoritativeEmailWithASessionOfAnotherEmailIsRefusedAndLinksNothing() {
+        emailSignIn(api, "ana@correo.co");
+        ApiResponse r = api.post("/auth/google", "{\"credential\":\"" + keys.token(
+                GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant())) + "\"}");
         assertThat(r.status()).isEqualTo(401);
         assertThat(r.errorCode()).isEqualTo("unauthorized");
+        assertThat(db.fetchCount(PERSON)).isEqualTo(1);
         assertThat(db.fetchOne(PERSON).getGoogleSub()).isNull();
+        assertThat(api.get("/session").status()).as("the refused call leaves the session alone").isEqualTo(200);
     }
 
     @Test
-    void aNonAuthoritativeEmailCanStillCreateAnAccountButItIsMarked() {
-        ApiResponse r = signInWith(GoogleTestKeys.claims("google-sub-1", "carolina@correo.co", clock.instant()));
+    void aSessionOfAnotherEmailNeverLinksAnAuthoritativeAddressToIt() {
+        emailSignIn(api, "ana@correo.co");
+        ApiResponse r = api.post("/auth/google", "{\"credential\":\"" + keys.token(claims()) + "\"}");
         assertThat(r.status()).isEqualTo(200);
-        assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
-        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isFalse();
+        assertThat(db.fetchCount(PERSON)).as("carolina@gmail.com is its own account").isEqualTo(2);
+        assertThat(db.selectFrom(PERSON).where(PERSON.EMAIL.eq("ana@correo.co")).fetchOne().getGoogleSub()).isNull();
     }
 
     @Test
-    void anEmailCodeSignInUnlinksANonAuthoritativeGoogleAndEndsTheAttackersSession() {
-        ApiClient attacker = clients.newBrowser();
-        assertThat(attacker.post("/auth/google", "{\"credential\":\""
-                + keys.token(GoogleTestKeys.claims("attacker-sub", "victim@correo.co", clock.instant())) + "\"}").status()).isEqualTo(200);
-        assertThat(attacker.get("/session").status()).isEqualTo(200);
-
-        ApiClient owner = clients.newBrowser();
-        assertThat(emailSignIn(owner, "victim@correo.co").status()).isEqualTo(200);
-
-        assertThat(db.fetchOne(PERSON).getGoogleSub()).isNull();
-        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isNull();
-        assertThat(attacker.get("/session").status()).isEqualTo(401);
-        assertThat(owner.get("/session").status()).isEqualTo(200);
-        assertThat(db.fetchCount(co.scuby.db.generated.Tables.SESSION)).isEqualTo(1);
-    }
-
-    @Test
-    void aReclaimFromABrowserThatCarriesASessionStaysInsideItsStatementCeiling() {
-        assertThat(clients.newBrowser().post("/auth/google", "{\"credential\":\""
-                + keys.token(GoogleTestKeys.claims("attacker-sub", "victim@correo.co", clock.instant())) + "\"}").status()).isEqualTo(200);
-        ApiClient owner = clients.newBrowser();
-        assertThat(emailSignIn(owner, "someone.else@correo.co").status()).isEqualTo(200);   // the browser now carries a session
-        assertThat(emailSignIn(owner, "victim@correo.co").status()).isEqualTo(200);         // reclaim: ceiling checked by ApiClient
-        assertThat(db.selectFrom(PERSON).where(PERSON.EMAIL.eq("victim@correo.co")).fetchOne().getGoogleSub()).isNull();
-    }
-
-    @Test
-    void aReclaimDropsTheDisplayNameTheAttackerSetThroughGoogle() {
-        clients.newBrowser().post("/auth/google", "{\"credential\":\""
-                + keys.token(GoogleTestKeys.claims("attacker-sub", "victim@correo.co", clock.instant())) + "\"}");
-        assertThat(db.fetchOne(PERSON).getDisplayName()).isEqualTo("Carolina Mejía");
-        assertThat(emailSignIn(clients.newBrowser(), "victim@correo.co").str("/display_name")).isEqualTo("Victim");
-        assertThat(db.fetchOne(PERSON).getDisplayNameChosen()).isFalse();
-    }
-
-    @Test
-    void anEmailCodeSignInKeepsAnAuthoritativeGoogleLinkAndItsSessions() {
+    void anEmailCodeSignInKeepsAnExistingGoogleLinkAndItsSessions() {
         ApiClient google = clients.newBrowser();
         google.post("/auth/google", "{\"credential\":\"" + keys.token(claims()) + "\"}");
         assertThat(emailSignIn(clients.newBrowser(), "carolina@gmail.com").status()).isEqualTo(200);
         assertThat(db.fetchOne(PERSON).getGoogleSub()).isEqualTo("google-sub-1");
-        assertThat(db.fetchOne(PERSON).get(AUTHORITATIVE)).isTrue();
         assertThat(google.get("/session").status()).isEqualTo(200);
     }
 
@@ -319,61 +332,6 @@ class GoogleSignInTest {
             var results = race(List.of("google-sub-1", "google-sub-1"));
             assertThat(results).extracting(ApiResponse::status).containsOnly(200);
             assertThat(results).extracting(r -> r.str("/id")).containsOnly(id);
-        }
-    }
-
-
-    /**
-     * The owner's email-code reclaim unlinks the attacker's non-authoritative Google identity and deletes its
-     * sessions; a replayed Google token landing between that work and its commit must not keep a session.
-     * The reclaim's transaction is held open by the test (after unlink + deleteAllOf, before commit) while
-     * the attacker signs in; the attacker is either blocked on the person row (new code) or already done (old).
-     */
-    @Test
-    void aReplayedGoogleTokenRacingTheOwnersReclaimKeepsNoSession() throws Exception {
-        String victim = "victim@correo.co";
-        String replay = keys.token(GoogleTestKeys.claims("attacker-sub", victim, clock.instant()));
-        ApiClient attacker = clients.newBrowser();
-        assertThat(attacker.post("/auth/google", "{\"credential\":\"" + replay + "\"}").status()).isEqualTo(200);
-        java.util.UUID personId = db.fetchOne(PERSON).getId();
-
-        var pool = Executors.newFixedThreadPool(2);
-        var reclaimWorkDone = new java.util.concurrent.CountDownLatch(1);
-        var release = new java.util.concurrent.CountDownLatch(1);
-        try {
-            Future<?> reclaim = pool.submit(() -> new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx -> {
-                assertThat(people.unlinkNonAuthoritativeGoogle(personId, "Victim")).isTrue();
-                sessionStore.deleteAllOf(personId);
-                reclaimWorkDone.countDown();
-                try {
-                    assertThat(release.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-                } catch (InterruptedException e) {
-                    throw new IllegalStateException(e);
-                }
-            }));
-            assertThat(reclaimWorkDone.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-
-            ApiClient replayer = clients.newBrowser();
-            Future<ApiResponse> attack = pool.submit(() -> replayer.post("/auth/google", "{\"credential\":\"" + replay + "\"}"));
-            // Wait until the attacker is blocked on a row lock (new code) or has finished (old code).
-            long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
-            while (!attack.isDone() && System.nanoTime() < deadline) {
-                Integer waiting = db.fetchOne("select count(*) from pg_stat_activity where wait_event_type = 'Lock'").get(0, Integer.class);
-                if (waiting != null && waiting > 0) break;
-                Thread.sleep(20);
-            }
-            release.countDown();
-            reclaim.get(30, java.util.concurrent.TimeUnit.SECONDS);
-            ApiResponse r = attack.get(30, java.util.concurrent.TimeUnit.SECONDS);
-
-            assertThat(r.status()).as("the replayed token after the reclaim").isEqualTo(401);
-            assertThat(db.fetchCount(co.scuby.db.generated.Tables.SESSION)).as("sessions left for the reclaimed account").isZero();
-            assertThat(replayer.get("/session").status()).isEqualTo(401);
-            assertThat(attacker.get("/session").status()).isEqualTo(401);
-            assertThat(db.fetchOne(PERSON).getGoogleSub()).isNull();
-        } finally {
-            release.countDown();
-            pool.shutdownNow();
         }
     }
 

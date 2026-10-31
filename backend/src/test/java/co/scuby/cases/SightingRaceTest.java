@@ -24,6 +24,7 @@ import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -33,9 +34,9 @@ import static co.scuby.db.generated.Tables.SIGHTING;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Requests that overlap in time, made deterministic: the test holds the case row's lock, lets the requests pile
- * up behind it (each has passed every check outside the transaction and waits at the FOR SHARE status read),
- * then releases it.
+ * «Lo vi» has no row locks: one conditional INSERT ... SELECT (the case must be active) with ON CONFLICT on the
+ * replay key. The races it must survive are made deterministic by holding an uncommitted row from another
+ * connection, or by a barrier.
  */
 @IntegrationTest
 class SightingRaceTest {
@@ -48,6 +49,7 @@ class SightingRaceTest {
     @Autowired DSLContext db;
     @Autowired DataSource dataSource;
     @Autowired ObjectProvider<ClearableCache> caches;
+    @Autowired SightingQueries queries;
 
     ApiClient api;
     UUID me;
@@ -77,17 +79,12 @@ class SightingRaceTest {
         return api.post("/cases/{code}/sightings", body(extra), "7K3PQ");
     }
 
-    /** Locks the case row, as a close or a purge would: the sightings queue at their FOR SHARE read. */
-    private void holdTheCaseLock(String update) throws Exception {
+    private void hold(String sql) throws Exception {
         holder = dataSource.getConnection();
         holder.setAutoCommit(false);
-        try (PreparedStatement ps = holder.prepareStatement(update)) {
+        try (PreparedStatement ps = holder.prepareStatement(sql)) {
             ps.execute();
         }
-    }
-
-    private void holdTheCaseLock() throws Exception {
-        holdTheCaseLock("SELECT 1 FROM scuby.lost_case WHERE code = '7K3PQ' FOR UPDATE");
     }
 
     private static final String WAITING = "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()";
@@ -98,44 +95,52 @@ class SightingRaceTest {
             if (waiting == requests) return;
             Thread.sleep(20);
         }
-        throw new AssertionError("the requests never queued behind the lock (waiting: " + db.fetchOne(WAITING) + ")");
-    }
-
-    private void release() throws Exception {
-        holder.commit();
-        holder.close();
-    }
-
-    private List<ApiResponse> concurrently(List<Callable<ApiResponse>> calls) throws Exception {
-        List<Future<ApiResponse>> futures = calls.stream().map(pool::submit).toList();
-        waitUntilWaiting(calls.size());
-        release();
-        return futures.stream().map(f -> {
-            try { return f.get(30, TimeUnit.SECONDS); } catch (Exception e) { throw new AssertionError(e); }
-        }).toList();
+        throw new AssertionError("the requests never queued (waiting: " + db.fetchOne(WAITING) + ")");
     }
 
     @Test
     void twoConcurrentSendsOfOneClientIdAreTheSameSightingAndOneRow() throws Exception {
-        holdTheCaseLock();
-        Callable<ApiResponse> send = () -> post(",\"client_id\":\"queued-retry-1\"");
-        List<ApiResponse> both = concurrently(List.of(send, send));
-        assertThat(both).extracting(ApiResponse::status).containsExactly(201, 201);
-        assertThat(both.get(0).str("/id")).isEqualTo(both.get(1).str("/id"));
+        for (int round = 0; round < 8; round++) {
+            testDb.reset();
+            cases.luna(accounts.person("carolina" + round + "@correo.co"));
+            String clientId = "queued-retry-" + round;
+            var barrier = new CyclicBarrier(2);
+            Callable<ApiResponse> send = () -> { barrier.await(); return clients.newBrowser().post("/cases/{code}/sightings",
+                    body(",\"client_id\":\"" + clientId + "\""), "7K3PQ"); };
+            Future<ApiResponse> a = pool.submit(send);
+            Future<ApiResponse> b = pool.submit(send);
+            ApiResponse ra = a.get(30, TimeUnit.SECONDS);
+            ApiResponse rb = b.get(30, TimeUnit.SECONDS);
+            assertThat(List.of(ra.status(), rb.status())).as("round %d", round).containsOnly(201);
+            assertThat(ra.str("/id")).isEqualTo(rb.str("/id"));
+            assertThat(db.fetchCount(SIGHTING)).isEqualTo(1);
+        }
+    }
+
+    /** A close that has not committed yet takes no lock the sighting needs: the sighting ordered before it, and is not delayed. */
+    @Test
+    void aCaseBeingClosedDoesNotDelayASighting() throws Exception {
+        hold("UPDATE scuby.lost_case SET status = 'reunited' WHERE code = '7K3PQ'");
+        Future<ApiResponse> f = pool.submit(() -> post(""));
+        assertThat(f.get(10, TimeUnit.SECONDS).status()).isEqualTo(201);
         assertThat(db.fetchCount(SIGHTING)).isEqualTo(1);
     }
 
+    /** The insert re-checks the status in its own statement: a case closed after the service read it takes no sighting. */
     @Test
-    void aCaseClosedWhileTheRequestWaitedIsRefused() throws Exception {
-        holdTheCaseLock("UPDATE scuby.lost_case SET status = 'reunited' WHERE code = '7K3PQ'");
-        Future<ApiResponse> f = pool.submit(() -> post(""));
-        waitUntilWaiting(1);
-        release();
-        assertThat(f.get(30, TimeUnit.SECONDS).errorCode()).isEqualTo("invalid_transition");
+    void theInsertItselfRefusesACaseThatIsNoLongerActive() {
+        var caller = new co.scuby.platform.security.Caller(me, "d".repeat(64));
+        var point = new co.scuby.platform.db.GeoPoint(6.2455, -75.5905);
+        db.update(co.scuby.db.generated.Tables.LOST_CASE).set(co.scuby.db.generated.Tables.LOST_CASE.STATUS, "reunited").execute();
+        assertThat(queries.insertIfActive("7K3PQ", point, clock.instant(), clock.instant(), null, List.of(), caller, null, "closed-1")).isEmpty();
+        assertThat(queries.insertIfActive("NOPE0", point, clock.instant(), clock.instant(), null, List.of(), caller, null, null)).isEmpty();
         assertThat(db.fetchCount(SIGHTING)).isZero();
     }
 
-    /** Both passed the replay check; the second hits ON CONFLICT and re-selects: the longest path. */
+    /**
+     * Both passed the replay check; the second waits on the first's uncommitted row, hits ON CONFLICT and re-selects:
+     * the longest path. The first is a raw uncommitted insert held by the test.
+     */
     @Test
     void theLongestPathIsMeasuredExactlyOnTheConflictRaceWithPhotosAndAPhone() throws Exception {
         byte[] bytes = "race-photo".getBytes();
@@ -144,18 +149,22 @@ class SightingRaceTest {
                 {"purpose":"sighting","sha256":"%s","content_type":"image/jpeg","bytes":%d}""".formatted(sha, bytes.length)).str("/url");
         api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", bytes, "image/jpeg", sha);
         String extra = ",\"photo_urls\":[\"" + url + "\"],\"client_id\":\"long-path-1\"";
-        Callable<ApiResponse> send = () -> api.post("/cases/{code}/sightings",
-                body(extra).replace("\"contact_phone\":null", "\"contact_phone\":\"+573001112233\""), "7K3PQ");
-        holdTheCaseLock();
+        hold("INSERT INTO scuby.sighting (id, case_code, lat, lng, seen_at, created_at, reporter_device_hash, client_id) "
+                + "VALUES ('00000000-0000-0000-0000-000000000001', '7K3PQ', 6.2455, -75.5905, now(), now(), repeat('a', 64), 'long-path-1')");
         caches.orderedStream().filter(c -> c.getClass().getSimpleName().equals("CachingSessionLookup")).forEach(ClearableCache::clear);   // the session lookup counts; the stored photo stays
-        List<ApiResponse> both = concurrently(List.of(send, send));
-        assertThat(both).extracting(ApiResponse::status).containsExactly(201, 201);
+        Future<ApiResponse> f = pool.submit(() -> api.post("/cases/{code}/sightings",
+                body(extra).replace("\"contact_phone\":null", "\"contact_phone\":\"+573001112233\""), "7K3PQ"));
+        waitUntilWaiting(1);
+        holder.commit();
+        holder.close();
+        ApiResponse loser = f.get(30, TimeUnit.SECONDS);
+        assertThat(loser.status()).isEqualTo(201);
+        assertThat(loser.str("/id")).as("the winner's row").isEqualTo("00000000-0000-0000-0000-000000000001");
         assertThat(db.fetchCount(SIGHTING)).isEqualTo(1);
-        // The loser re-selects the winner's row. Whether its session lookup hit the cache depends on timing, so the
-        // session SELECT is counted apart: the ceiling is this count plus that one.
-        int loser = both.stream().mapToInt(r -> (int) r.statements().stream().filter(q -> !q.contains("\"session\"")).count()).max().orElseThrow();
-        assertThat(loser).isEqualTo(RACE_PATH_WITHOUT_SESSION);   // case, replay, supported_countries, upload lookup, status, insert, re-select
+        // The session SELECT is counted apart (a cache hit depends on timing): the ceiling is this count plus that one.
+        int withoutSession = (int) loser.statements().stream().filter(q -> !q.contains("\"session\"")).count();
+        assertThat(withoutSession).isEqualTo(RACE_PATH_WITHOUT_SESSION);   // case, replay, supported_countries, upload lookup, insert (waits, conflicts), re-select
     }
 
-    static final int RACE_PATH_WITHOUT_SESSION = 7;   // +1 for the session lookup on a cache miss = the ceiling, 8
+    static final int RACE_PATH_WITHOUT_SESSION = 6;   // +1 for the session lookup on a cache miss = the ceiling, 7
 }

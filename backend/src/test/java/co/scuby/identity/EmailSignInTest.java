@@ -141,20 +141,32 @@ class EmailSignInTest {
         assertThat(emails.sent()).hasSize(10);
     }
 
-    /** Pins the ceiling in StatementCeilings: advisory lock, row select, send count, upsert, send-log insert (+ the session lookup when signed in). */
+    /** Pins the verify ceiling: a new account from a browser that already carries a session, on a session-cache miss. */
     @Test
-    void aStartIsExactlyFiveStatementsOrSixOnASessionCacheMiss() {
-        assertThat(start("ana@correo.co").statements()).hasSize(5);
+    void aVerifyOfANewAccountFromASignedInBrowserIsExactlySevenStatements() {
+        accounts.signIn(api, "bea@correo.co");
+        start("ana@correo.co");
+        caches.orderedStream().filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags)).forEach(co.scuby.platform.cache.ClearableCache::clear);
+        ApiResponse r = verify("ana@correo.co", emails.lastCodeFor("ana@correo.co"));
+        assertThat(r.status()).isEqualTo(200);
+        // filter lookup, atomic consume, email lookup, person insert + select, old session DELETE, session insert
+        assertThat(r.statements()).hasSize(7);
+    }
+
+    /** Pins the ceiling in StatementCeilings: send count, guarded upsert, send-log insert (+ the session lookup when signed in). No locks. */
+    @Test
+    void aStartIsExactlyThreeStatementsOrFourOnASessionCacheMiss() {
+        assertThat(start("ana@correo.co").statements()).hasSize(3);
         clock.advance(Duration.ofMinutes(2));
         accounts.signIn(api, "bea@correo.co");
         caches.orderedStream().filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags)).forEach(co.scuby.platform.cache.ClearableCache::clear);
-        assertThat(start("ana@correo.co").statements()).hasSize(6);
+        assertThat(start("ana@correo.co").statements()).hasSize(4);
     }
 
     @Test
-    void thereIsNoCapPerDeviceOrIp() {
+    void thereIsNoCapPerDevice() {
         for (int i = 0; i < 25; i++) {
-            ApiResponse r = clients.newBrowser().from("198.51.100.77")
+            ApiResponse r = clients.newBrowser()
                     .post("/auth/email/start", "{\"email\":\"q" + i + "@correo.co\"}");
             assertThat(r.status()).isEqualTo(204);
         }

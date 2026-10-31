@@ -15,18 +15,18 @@ final class StatementCeilings {
             Map.entry("GET /config", 1),
             Map.entry("GET /session", 2),          // lookup + person
             Map.entry("POST /auth/sign-out", 2),   // lookup + DELETE
-            Map.entry("POST /auth/email/start", 6),   // advisory lock, row select, send count, upsert, send-log insert (+ the filter's session lookup when the browser is signed in)
-            Map.entry("POST /auth/email/verify", 10),   // worst case, a reclaim from a signed-in browser (measured 9 with a warm session cache): consume select + update, person lookup, unlink, deleteAllOf, discardAllOf, person re-read, old session DELETE, session insert (+ the filter lookup on a cache miss)
-            Map.entry("POST /me/phone", 8),   // exactly: session lookup, supported_countries, person row FOR NO KEY UPDATE (lock order: person first), the number's advisory lock, otp select, send count, otp upsert, send-log insert
+            Map.entry("POST /auth/email/start", 4),   // send count, guarded upsert, send-log insert (+ the filter's session lookup when the browser is signed in): 3, or 4 on a session-cache miss. No locks
+            Map.entry("POST /auth/email/verify", 7),   // worst case, a new account from a signed-in browser on a session-cache miss: filter lookup, atomic consume (UPDATE ... RETURNING), email lookup, person insert + select, old session DELETE, session insert
+            Map.entry("POST /me/phone", 5),   // exactly: session lookup, supported_countries, send count, guarded otp upsert, send-log insert. No locks
             Map.entry("POST /me/phone/verify", 6),   // exactly: session lookup, supported_countries, attempt reservation (UPDATE ... RETURNING), conditional delete, person update, person select
             Map.entry("GET /me/profile", 2),       // session lookup + person
             Map.entry("POST /uploads", 2),   // session lookup, upsert (the stored-bytes check is a file or S3 call, not SQL)
-            Map.entry("POST /lost-cases", 14),   // worst path: pet_id with a new number, code sent, on a session-cache miss (14, measured by PublishStatementsTest, which pins every path): session lookup, ownership + active-case pre-check, PublisherPhone.prepare, person row lock + SMS send, ownership + active-case re-check. Excludes the process-wide flag snapshot load (+2, once per 30 s)
+            Map.entry("POST /lost-cases", 13),   // worst path: a correct code with a new pet and photos, on a session-cache miss (13, measured by PublishStatementsTest, which pins every path; 10 for a new number on an existing pet). Excludes the process-wide flag snapshot load (+2, once per 30 s)
             Map.entry("GET /cases/{code}", 3),   // exactly 3 on a session-cache miss (owner or signed-in stranger; CaseStatementsTest pins it, anonymous is 2): session lookup, case (+ pet, publisher), sightings. Excludes the flag snapshot load
             Map.entry("GET /me/cases", 2),   // exactly 2 on a session-cache miss, 1 or 20 cases (MyCasesEndpointTest): session lookup, the cases query. Excludes the flag snapshot load
             Map.entry("GET /feed", 3),   // session lookup when signed in, local query, national fallback. Excludes the flag snapshot load
-            Map.entry("POST /cases/{code}/sightings", 8),   // the longest path, measured by SightingRaceTest: a concurrent retry that loses the ON CONFLICT race, with a phone and a photo, on a session-cache miss (7 + the session lookup): session, case + distance, replay, supported_countries, upload lookup, case status FOR SHARE, insert, re-select. Without phone or photos 6; SightingPrecedenceTest pins the single-request paths (6 plain, 7 with phone and photo). Excludes the flag snapshot load
-            Map.entry("POST /auth/google", 8)   // sub lookup, email lookup, person insert + select, person SELECT ... FOR UPDATE, session insert (+ filter lookup and old DELETE)
+            Map.entry("POST /cases/{code}/sightings", 7),   // the longest path, measured by SightingRaceTest: a retry that loses the ON CONFLICT race, with a phone and a photo, on a session-cache miss: session, case + distance, replay, supported_countries, upload lookup, conditional insert (waits, conflicts), re-select. SightingPrecedenceTest pins the single-request paths (5 plain, 6 with phone and photo). Excludes the flag snapshot load
+            Map.entry("POST /auth/google", 7)   // worst case on a session-cache miss with a carried session: filter lookup, sub lookup, email lookup, person insert + select (or conditional link + re-read), old session DELETE, session insert
     );
 
     private StatementCeilings() {}

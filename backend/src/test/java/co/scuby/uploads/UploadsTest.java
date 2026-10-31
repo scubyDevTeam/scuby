@@ -128,12 +128,12 @@ class UploadsTest {
     /** A script without cookies is a new device (a new owner key) on every request: only the IP bounds it. */
     @Test
     void thereIsNoCapOnSlots() {
-        // 70 slots from one caller and 70 from one IP of cookie-less scripts: none is refused (abuse by IP is the edge's job).
+        // 70 slots from one caller and 70 from cookie-less scripts: none is refused (abuse by IP is the edge's job).
         for (int i = 0; i < 70; i++) {
             assertThat(api.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
         }
         for (int i = 0; i < 70; i++) {
-            ApiClient fresh = clients.newBrowser().from("198.51.100.7");
+            ApiClient fresh = clients.newBrowser();
             assertThat(fresh.post("/uploads", slotBody("sighting", Hashing.sha256Hex(photo()), 3)).status()).isEqualTo(201);
         }
     }

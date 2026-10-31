@@ -47,7 +47,9 @@ class PublisherPhoneTest {
     /** What the publish does: reserve any code attempt first (no transaction), then resolve inside its transaction. */
     private PublisherPhone.Outcome resolve(String phone, String code) {
         PublisherPhone.Prepared prepared = publisherPhone.prepare(ana, phone, code);
-        return tx.execute(s -> publisherPhone.resolve(prepared, caller));
+        PublisherPhone.Outcome outcome = tx.execute(s -> publisherPhone.resolve(prepared, caller));
+        if (outcome instanceof PublisherPhone.CodeSent sent) publisherPhone.deliver(sent);   // after the transaction, like the publish
+        return outcome;
     }
 
     private String codeOf(ApiException e) {

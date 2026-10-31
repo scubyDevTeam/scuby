@@ -299,40 +299,78 @@ class PublishLostTest {
         }
     }
 
+    /** Two publishes of one pet started together by a barrier: one case, one 409 carrying its code, never a 500. */
+    @Test
+    void twoConcurrentPublishesForOnePetGiveOneCaseAndOne409() throws Exception {
+        String first = publishVerified();
+        UUID petId = db.select(LOST_CASE.PET_ID).from(LOST_CASE).fetchOne().value1();
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < 8; round++) {
+                db.update(LOST_CASE).set(LOST_CASE.STATUS, "expired").execute();   // the pet is free again
+                int casesBefore = db.fetchCount(LOST_CASE);
+                var barrier = new java.util.concurrent.CyclicBarrier(2);
+                var calls = java.util.List.of(
+                        pool.submit(() -> { barrier.await(); return publish(PublishBodies.withPetId(petId.toString(), null)); }),
+                        pool.submit(() -> { barrier.await(); return publish(PublishBodies.withPetId(petId.toString(), null)); }));
+                java.util.List<ApiResponse> answers = new java.util.ArrayList<>();
+                for (var f : calls) answers.add(f.get(30, TimeUnit.SECONDS));
+                assertThat(answers).extracting(ApiResponse::status).as("round %d: %s", round, answers.stream().map(ApiResponse::body).toList())
+                                   .containsExactlyInAnyOrder(200, 409);
+                ApiResponse loser = answers.stream().filter(r -> r.status() == 409).findFirst().orElseThrow();
+                ApiResponse winner = answers.stream().filter(r -> r.status() == 200).findFirst().orElseThrow();
+                assertThat(loser.errorCode()).isEqualTo("active_case_exists");
+                assertThat(loser.str("/error/details/case_code")).isEqualTo(winner.str("/code"));
+                assertThat(db.fetchCount(LOST_CASE)).isEqualTo(casesBefore + 1);
+                assertThat(db.fetchCount(LOST_CASE, LOST_CASE.STATUS.eq("active"))).isEqualTo(1);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(first).isNotBlank();
+    }
+
     /**
-     * Two taps on one account: the second waits on the person lock inside the phone step. Once it gets the lock the
-     * first tap's case is committed, so the second must answer 409 and send no SMS (its re-check ran after the wait).
+     * The correct code is consumed inside the publish's transaction; the publish then loses the one-active-case race
+     * and rolls back. The code must still be usable (its attempt stays spent) once the pet is free again.
      */
     @Test
-    void aPublishThatWaitedOnThePersonLockSeesTheCaseCommittedMeanwhile() throws Exception {
-        String code = publishVerified();
+    void aCorrectCodeIsStillUsableAfterAPublishRefusedOnTheRace() throws Exception {
+        publishVerified();
         UUID petId = db.select(LOST_CASE.PET_ID).from(LOST_CASE).fetchOne().value1();
         db.update(LOST_CASE).set(LOST_CASE.STATUS, "expired").execute();
-        int before = sms.sent().size();
+        String other = "+573001234567";
+        assertThat(api.post("/me/phone", "{\"phone\":\"" + other + "\"}").status()).isEqualTo(204);
+        String code = sms.lastCodeFor(other);
+        String body = PublishBodies.withPetId(petId.toString(), other).replace("\"otp_code\":null", "\"otp_code\":\"" + code + "\"");
 
         var pool = Executors.newFixedThreadPool(2);
-        var holds = new CountDownLatch(1);
+        var rivalHolds = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         try {
-            Future<?> firstTap = pool.submit(() -> tx.executeWithoutResult(s -> {
-                db.selectFrom(PERSON).where(PERSON.ID.eq(ana)).forUpdate().fetch();
-                holds.countDown();
-                try { release.await(30, TimeUnit.SECONDS); } catch (InterruptedException e) { throw new IllegalStateException(e); }
+            Future<?> rival = pool.submit(() -> tx.executeWithoutResult(s -> {
                 db.update(LOST_CASE).set(LOST_CASE.STATUS, "active").where(LOST_CASE.PET_ID.eq(petId)).execute();
+                rivalHolds.countDown();
+                try { release.await(30, TimeUnit.SECONDS); } catch (InterruptedException e) { throw new IllegalStateException(e); }
             }));
-            assertThat(holds.await(30, TimeUnit.SECONDS)).isTrue();
-            Future<ApiResponse> secondTap = pool.submit(() -> publish(PublishBodies.withPetId(petId.toString(), "+573001234567")));
-            awaitBlockedOn("person");
+            assertThat(rivalHolds.await(30, TimeUnit.SECONDS)).isTrue();
+            Future<ApiResponse> mine = pool.submit(() -> publish(body));
+            awaitBlockedOn("lost_case");           // the code is consumed; our INSERT waits on the rival's index entry
             release.countDown();
-            firstTap.get(30, TimeUnit.SECONDS);
-            ApiResponse r = secondTap.get(30, TimeUnit.SECONDS);
-            assertThat(r.errorCode()).isEqualTo("active_case_exists");
-            assertThat(r.str("/error/details/case_code")).isEqualTo(code);
-            assertThat(sms.sent()).hasSize(before);
+            rival.get(30, TimeUnit.SECONDS);
+            ApiResponse refused = mine.get(30, TimeUnit.SECONDS);
+            assertThat(refused.status()).isEqualTo(409);
+            assertThat(refused.errorCode()).isEqualTo("active_case_exists");
         } finally {
             release.countDown();
             pool.shutdownNow();
         }
+        assertThat(db.fetchCount(co.scuby.db.generated.Tables.PHONE_OTP)).as("the refused publish left the code in place").isEqualTo(1);
+
+        db.update(LOST_CASE).set(LOST_CASE.STATUS, "expired").execute();
+        ApiResponse again = publish(body);
+        assertThat(again.status()).as("same code, second try: %s", again.body()).isEqualTo(200);
+        assertThat(again.str("/code")).isNotBlank();
     }
 
     @Test

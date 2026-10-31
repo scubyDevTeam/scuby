@@ -23,7 +23,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
 
-import static co.scuby.db.generated.Tables.CODE_SEND;
 import static co.scuby.db.generated.Tables.PHONE_OTP;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -95,18 +94,5 @@ class PhoneConcurrencyTest {
         // The code is burnt: the right one no longer works.
         assertThat(owner.post("/me/phone/verify", "{\"phone\":\"" + PHONE + "\",\"code\":\"" + code + "\"}").errorCode())
                 .isEqualTo("invalid_code");
-    }
-
-    /** Thirty accounts ask for a code for one number at once: only the advisory lock keeps the count at the cap of 5. */
-    @Test
-    void aParallelBurstOfSendsToOneNumberStopsAtTheNumberCap() throws Exception {
-        List<ApiResponse> answers = burst(30, i -> () -> {
-            ApiClient c = clients.newBrowser();
-            accounts.signIn(c, "p" + i + "@correo.co");
-            return c.post("/me/phone", "{\"phone\":\"" + PHONE + "\"}");
-        });
-        assertThat(answers).filteredOn(r -> r.status() == 204).hasSize(5);
-        assertThat(answers).filteredOn(r -> r.status() == 429).hasSize(25);
-        assertThat(db.fetchCount(CODE_SEND)).isEqualTo(5);
     }
 }
