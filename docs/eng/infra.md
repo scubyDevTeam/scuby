@@ -68,7 +68,7 @@ it needs no domain. How to run it: `infra/README.md`.
 - **The origin is closed to everything but CloudFront**: the EC2 security group admits only AWS's
   managed prefix list for CloudFront origin-facing addresses, and the backend rejects requests
   without a secret origin header (not built yet: CloudFront sends the header, the backend does not
-  check it — *Before staging*).
+  check it — [staging-rollout.md](staging-rollout.md)).
 - **Trade-off accepted for launch:** CloudFront → EC2 is plain HTTP. Encrypting that hop later means
   CloudFront VPC origins with the instance in a private subnet — which then needs a NAT for outbound
   calls (a managed NAT gateway is ~$32/month). Revisit when the cost is worth it.
@@ -138,10 +138,10 @@ arrives with the backend's upload slots, which know each photo's purpose.
   value back into the state. **Bumping `value_wo_version` makes the next apply write the
   placeholder over the real value; renaming a parameter or removing it from the list deletes it,
   value included.**
-- **One secret is still in the state:** the CloudFront origin secret (*Before staging*).
+- **One secret is still in the state:** the CloudFront origin secret ([staging-rollout.md](staging-rollout.md)).
 - **Sandbox exceptions:** the deploy script generates the database password and the instance passes
   it to the containers through a `.env` file; nothing is imported from the prefix at start-up yet
-  (*Before staging*).
+  ([staging-rollout.md](staging-rollout.md)).
 
 ## Infrastructure as code
 
@@ -149,39 +149,11 @@ arrives with the backend's upload slots, which know each photo's purpose.
   secret values above.
 - State in an S3 bucket with S3-native locking (no DynamoDB table).
 - `terraform plan` runs on every pull request touching `infra/`; `apply` is run manually. (Not
-  built yet: no workflow runs on `infra/` — *Before staging*.)
+  built yet: no workflow runs on `infra/` — [staging-rollout.md](staging-rollout.md).)
 
 ## Before staging
 
-What the sandbox proved but staging must not inherit as it is. Where a module has a safe default
-(keep data, 14-day logs), the sandbox opts into the throwaway setting; staging must not copy it.
-
-- **Data that deletes itself:** the media and registry modules default to keeping data
-  (`force_destroy` / `force_delete` = `false`); only the sandbox opts into deleting it. The bucket
-  holds the only copy of every master photo, so staging adds `prevent_destroy` on the bucket and
-  the data volume.
-- **The origin secret** reaches CloudFront but has no path to the backend, and it sits in the
-  state: Terraform generates it (`random_password`) and every header Terraform sets on a
-  distribution is read back on refresh. Staging decides between accepting that (the state bucket is
-  encrypted and only deployers read it; the header only proves a request came through CloudFront,
-  next to the security group's prefix list) and dropping the header for CloudFront VPC origins
-  (*Edge*). If the header stays, the backend gets the value from SSM and checks it.
-- **Secrets at start-up:** the backend imports its SSM prefix with the instance role (*Secrets*),
-  replacing the sandbox's `.env`.
-- **Instance permissions:** `AmazonSSMManagedInstanceCore` grants `ssm:GetParameter(s)` on every
-  parameter in the account; replace it with a custom core policy.
-- **The origin is the instance's public DNS name**, which changes on stop/start; use an Elastic IP.
-- **The GitHub OIDC provider is one per account:** make it optional or read it as data if staging
-  and production share an account. The deploy role's `sub` changes if the job uses an `environment`.
-- **Lambdas:** reserved concurrency and async retry settings; `Accept` normalized in a CloudFront
-  Function so it stops fragmenting the image cache.
-- **CORS** restricted to the app's origin, on the S3 upload rule and on the image distribution
-  (today `Managed-SimpleCORS`, `*`).
-- **Price class** is `PriceClass_100` on both distributions, which leaves out South American edges;
-  decide it consciously for a Colombia-first product.
-- **ACM validation** has no timeout; DLM snapshots survive `destroy` (they carry `Project=scuby`).
-- **CI:** a workflow that runs the media Lambda tests and `terraform fmt`/`validate`/`plan` on
-  `infra/`; provider lock files need `terraform providers lock -platform=linux_amd64`.
+What the sandbox proved but staging must not inherit as it is: [staging-rollout.md](staging-rollout.md).
 
 ## CI/CD
 
