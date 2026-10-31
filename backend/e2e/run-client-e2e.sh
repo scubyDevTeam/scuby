@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Runs web/e2e's sign-in, publish-lost and lost-case specs against the backend in Docker, in a compose
+# Runs web/e2e's sign-in, publish-lost, lost-case, feed, map and offline specs against the backend in Docker, in a compose
 # project of its own (scuby-e2e-<checkout>: own containers, volume, image tag, database port).
 # Usage: bash backend/e2e/run-client-e2e.sh [playwright config]   (default: backend/e2e/playwright.real.config.ts)
+#        SCUBY_E2E_GREP="@feed|@FEED-001" bash backend/e2e/run-client-e2e.sh   (narrow the run to a Playwright --grep)
 #        bash backend/e2e/run-client-e2e.sh --down                 (removes this project and its volume only)
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -46,4 +47,4 @@ cd "$web"
 # pnpm may not be installed: run the version web/package.json pins through npx.
 if command -v pnpm >/dev/null 2>&1; then pnpm_cmd=(pnpm); else pnpm_cmd=(npx --yes pnpm@10.27.0); fi
 "${pnpm_cmd[@]}" install --frozen-lockfile
-"${pnpm_cmd[@]}" exec playwright test --config "$config" --workers=1 --grep "@auth|@publish-lost|@case-link"
+"${pnpm_cmd[@]}" exec playwright test --config "$config" --workers=1 --grep "${SCUBY_E2E_GREP:-@auth|@publish-lost|@case-link|@feed|@map|@offline}"
