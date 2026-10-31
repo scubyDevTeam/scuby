@@ -30,7 +30,7 @@ door open without paying for it now.
 | Scheduled jobs | **db-scheduler** (state in Postgres, cluster-safe) — cron-style work only |
 | Rate limiting | Only SMS and email code sends are limited in the backend, as counts over the send log (rolling windows with SQL) — *Rate limits on rows* below. Per-IP limits belong at the edge ([O30](../open-items.md)). **Bucket4j** with its Postgres store if a limit ever needs tokens without rows |
 | Phone numbers | libphonenumber ([auth.md](auth.md)) |
-| Observability | **OpenTelemetry → New Relic** (traces, metrics, logs over OTLP); **Sentry** for errors |
+| Observability | **OpenTelemetry → New Relic** (traces, metrics, logs from INFO over OTLP); **stdout (WARN and up) → CloudWatch Logs** as the crash record; **Sentry** for errors |
 | Tests | JUnit 5, **Testcontainers** (one static container per JVM, started lazily and wired with a `DynamicPropertyRegistrar`, not a Spring bean, so closing a test context cannot stop it), **WireMock** for Twilio/Resend/Google, **ElasticMQ** for SQS |
 | Container image | A runtime-only `backend/Dockerfile` (pinned `eclipse-temurin` JRE, layered jar, non-root) — *Build and image* below |
 | Build | **Maven** with the wrapper committed (`backend/mvnw`); Java version pinned for jenv in `backend/.java-version`; `backend/build.sh` runs it in a container so the host needs only Docker |
@@ -96,6 +96,25 @@ different rates. The split is a second instance of the same image with `scuby.ro
 | Production | `prod` | The AWS EC2 + RDS ([infra.md](infra.md)) |
 
 Each is combined with the role profiles (`api`, `worker`) once they are split.
+
+Telemetry and the server console are not profiles: `application.yml` reads these environment
+variables, and with none set (a laptop, the tests) nothing is exported and the console is plain
+text at INFO.
+
+| Variable | Default | On servers | Drives |
+|---|---|---|---|
+| `SCUBY_ENVIRONMENT` | `local`; `staging` / `prod` under those profiles, so a server that forgets it never reports as `local` | `staging` / `prod` | the `deployment.environment` resource attribute |
+| `SCUBY_TELEMETRY_EXPORT` | `false` | `true` | the three OTLP exports (traces, metrics, logs) to New Relic |
+| `LOGGING_STRUCTURED_FORMAT_CONSOLE` | empty (plain text) | `ecs` | structured JSON console (an unknown format fails startup), the crash record that [infra.md](infra.md) · Logs ships to CloudWatch |
+| `LOGGING_THRESHOLD_CONSOLE` | `INFO` | `WARN` | the console's minimum level; filters stdout only, New Relic still receives INFO |
+| `NEW_RELIC_LICENSE_KEY` | none | from SSM ([infra.md](infra.md) · Secrets) | the OTLP `api-key` header; the property `newrelic.license-key` wins if set |
+
+With `SCUBY_TELEMETRY_EXPORT=true` and no license key the application does not start (the
+`NewRelicLicenseKeyCheck` startup check, which covers this switch only: setting Boot's individual
+export flags directly bypasses it and is not supported); with export off the key is never read.
+
+Trace sampling is `management.tracing.sampling.probability` (1.0 to start). The why is in ·
+Observability below.
 
 ## Build and image
 
@@ -361,7 +380,7 @@ is wired yet; the comparison is in `docs/superpowers/specs/2026-10-30-place-name
 Only code sends are limited in the backend (decisions #56, #57): the numbers (caps, cooldown) live in
 [auth.md](auth.md). The daily caps are counted over `code_send` (a log purged at 30 days, so bounded and
 without a performance index); the email cooldown is a guard on `email_code.sent_at`, the SMS cooldown reads
-`code_send`. Overshoot is described once, in *Concurrency*. «Lo vi» and uploads have no limits ([04](../product/04-lost-workflow.md) · Validation,
+`code_send`. The SMS overshoot across accounts is explained once, in *Concurrency*. «Lo vi» and uploads have no limits ([04](../product/04-lost-workflow.md) · Validation,
 *Uploads and media* above), and per-IP abuse limits are an edge matter
 ([O30](../open-items.md)).
 
@@ -409,11 +428,14 @@ invariant**, not from row or advisory locks:
 - **A sighting only on an active case.** One `INSERT … SELECT … FROM lost_case WHERE code = ? AND status =
   'active'`. A close that commits a moment later is ordered after the sighting, and a close does not
   delay it (it takes `FOR NO KEY UPDATE`, which does not conflict with the key share a foreign key takes).
-- **The send caps may be overshot.** The 5-SMS and 10-email caps and the SMS cooldown are a count of `code_send`
-  followed by an insert. Simultaneous requests for one number can all read a count under the cap, so a burst can
-  exceed it by up to the number of simultaneous requests; every request that comes after the burst sees the real
-  count. Accepted: the cost of one extra SMS is cents, and the alarm and the flag cover pumping
-  ([auth.md](auth.md) · OTP mechanics).
+- **The send caps: email exact, SMS overshootable across accounts.** An email is sent only after the guarded upsert
+  on the address's single `email_code` row succeeds, and simultaneous starts serialize on that row, so the email
+  cooldown and the 10-per-24-h cap hold exactly. The same holds for SMS from one account (one `phone_otp` row).
+  Only requests from different accounts to one number (one `phone_otp` row each) can all read a `code_send` count
+  under the 5-per-24-h cap, or a passed cooldown, before any insert, so a burst can exceed them by up to the number of
+  simultaneous requests; every request after the burst sees the real count. Accepted: one extra SMS costs cents,
+  and the alarm and the flag cover pumping. The numbers are in [auth.md](auth.md) · OTP mechanics. This is the
+  only place the overshoot is explained; other docs link here.
 
 **Where a lock remains.** Application code takes none. The only locks are Postgres' own: the unique-index waits
 above (a second insert waits for the first transaction and then conflicts), the row lock of an `UPDATE`, and
@@ -448,9 +470,24 @@ so they would not catch it.
 
 ## Observability
 
-- **OpenTelemetry** (Spring Boot's built-in support) exports traces, metrics and logs over OTLP to
-  **New Relic** (free tier). No proprietary agent and no log-shipping sidecar: both cost RAM the
-  instance does not have.
+Decision [00 · #38](../product/00-product-map.md). Two sinks, split by log level so nothing is paid
+for twice:
+
+| Signal | Emitted as | Goes to | Why |
+|---|---|---|---|
+| Traces, metrics | OTLP (OpenTelemetry, Spring Boot's built-in support) | **New Relic** (US, `otlp.nr-data.net`), license key from SSM | 100 GB/month free; traces are the bulk of the volume |
+| Logs, INFO and up | OTLP log records, with `trace_id`/`span_id` | **New Relic** | The day-to-day view: a log opens from its trace |
+| Logs, WARN and up | **Structured JSON on stdout** (`logging.structured.format.console`) | **CloudWatch Logs** through Docker's `awslogs` driver ([infra.md](infra.md) · Logs) | The crash record: what is written before OpenTelemetry starts (a failed migration, a bad config) only reaches stdout; it sits beside the Lambdas' logs |
+
+- **No agent, no sidecar.** OTLP is sent by the application; stdout is shipped by Docker itself.
+  Both cost no RAM the instance does not have.
+- **Vendor-neutral on purpose.** OTLP and JSON-on-stdout are standards: moving to another backend
+  (Grafana Cloud, Loki, Honeycomb…) is an endpoint and a log-driver change, not code.
+- **Budget guards.** Logs at INFO with no per-request access log (traces cover requests); trace
+  sampling is a property (start at 100%, lower to 10–25% when volume demands); a New Relic usage
+  alert at 50 and 80 GB/month and a CloudWatch alarm on incoming log bytes (dashboards and alerts
+  are code — [infra.md](infra.md) · Observability as code).
+- **Local and test** export nothing; stdout shows everything at INFO.
 - **Sentry** for errors — the client already uses it, so one tool covers both and a trace crosses
   from the browser into the API.
 - Health: Spring Boot Actuator.

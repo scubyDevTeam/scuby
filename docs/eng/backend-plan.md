@@ -77,6 +77,8 @@ produces an image.
 
 ## Phase I — Staging infrastructure
 
+The sandbox (`infra/terraform/envs/sandbox`) already proved the modules these steps compose. What it left undone, step by step: [staging-rollout.md](staging-rollout.md).
+
 **I.1 Terraform bootstrap.** State bucket, GitHub OIDC role, ECR repository. *Done when:*
 `terraform plan` runs from a PR.
 

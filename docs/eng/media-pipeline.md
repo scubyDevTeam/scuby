@@ -25,7 +25,7 @@ problem; the server repeats the safety steps because not every client is ours.
 |---|---|
 | Downscale | Canvas re-encode to **≤ 1600 px long edge**, JPEG quality ~0.82. A 12 MP photo (4–6 MB) becomes ~300 KB. On a prepaid plan this is the difference between a sighting being sent and abandoned |
 | EXIF | Dropped as a side effect of canvas re-encoding — no GPS, no device model, no timestamp leaves the phone |
-| HEIC | iPhone default; decoded on the device before re-encode. If the browser can't, the server converts |
+| HEIC | iPhone default; decoded on the device before re-encode. The server cannot convert HEIC (the image library's prebuilt binaries decode AVIF, not HEVC-based HEIC), so a photo the browser cannot decode is refused on the device with an explanation (decision #39). |
 | Orientation | Applied from EXIF *before* stripping it, so portraits don't arrive sideways |
 | Feedback | Progress per photo; a failed upload keeps the local preview and retries — the form never loses a photo the user already picked |
 
@@ -33,7 +33,7 @@ problem; the server repeats the safety steps because not every client is ours.
 | Step | Rule |
 |---|---|
 | EXIF | Stripped again, unconditionally |
-| Validate | Real image (magic bytes, not extension); reject > 10 MB pre-resize; reject dimensions > 8000 px |
+| Validate | Real image (magic bytes, not extension), one of **JPEG, PNG, WebP or AVIF** (HEIC is never converted — decision #39); reject > 10 MB pre-resize; reject dimensions > 8000 px |
 | Re-encode | Master stored as JPEG ≤ 1600 px, sRGB — one canonical format regardless of what arrived |
 | Limits | Per pet 6 · per sighting 3 · per claim proof 5 · per help evidence 5 |
 | Auth | **Short-lived signed upload URLs**, scoped to what the photo is for (pet, sighting, claim, evidence, profile) and to who asks — the session or the device. Never a public bucket write. The row does not exist yet when the photo is picked, so it is the publish that attaches: it refuses a photo this caller did not upload for that purpose. Anonymous uploads inherit the rate limits of what they are for. The mechanics: [api.md](api.md) · Uploads |
@@ -114,7 +114,7 @@ photos with its row:
 
 Deletion is reference removal; a blob with zero references is garbage-collected within 24 h. Edge
 caches expire with the immutable TTL — which is why restricted images are never served through
-the public CDN path.
+the public CDN path. Removing a deleted photo from the edge sooner: [O21](../open-items.md).
 
 ---
 
