@@ -22,7 +22,9 @@ public final class TestDb {
             "code_send",
             "phone_otp",
             "person",
-            "upload"
+            "upload",
+            "pet",
+            "responsibility_link"
     );
 
     /**
