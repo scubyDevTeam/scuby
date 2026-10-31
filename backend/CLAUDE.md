@@ -40,7 +40,7 @@ The Maven enforcer fails `validate` on any JDK outside `[25,26)` or Maven older 
 1. Request/response records by hand, matching the contract (snake_case comes from Jackson).
    Responses are complete: every field present, `null` not absent.
 2. Controller (`@ApiComponent @RestController`, package-private) takes `Caller` (who asks: person?,
-   device, IP hash) and/or `Account` (sign-in required) parameters. A `session` endpoint is also
+   device) and/or `Account` (sign-in required) parameters. A `session` endpoint is also
    declared in the feature's `SecurityRules` bean.
 3. Service methods own transactions. Never a transaction across a request; never `@Transactional`
    on a controller or filter.

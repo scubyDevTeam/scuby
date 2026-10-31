@@ -49,7 +49,7 @@ it, so neither can use an endpoint the contract does not list.
   the outcome — `phone_step: otp` — never the flag.
 - **Replays are idempotent where the client queues.** «Lo vi» (`POST /cases/:code/sightings`) carries
   a `client_id` the client makes once and sends again on every retry: the same key on the same case
-  answers the sighting it already created — before any rate limit — so a send whose answer was lost
+  answers the sighting it already created — before any other check — so a send whose answer was lost
   on the way never becomes two pins ([frontend.md](frontend.md) · Risks §6).
 - **The email's one-tap links are public** (`/checkin-links/:token`): the token is the auth — single
   use, expiring, bound to one check-in and one answer. A GET applies only a safe answer; a
@@ -67,9 +67,8 @@ Someone without an account is a **device**: an opaque `device` cookie that the A
   year, renewed when used. The client reads nothing and sends nothing extra: it already sends every
   request with credentials (`api-client/http.ts`). The server keeps only a hash of the value.
 - **What it identifies.** The anonymous reporter or claimant of a sighting or a «lo tengo»: it
-  authorizes correcting or deleting their own sighting inside its window, marks it `mine` on the
-  case, and is the key of the per-reporter rate limits (with the IP as a second key —
-  [04](../product/04-lost-workflow.md)). It also scopes an anonymous upload slot (*Uploads*).
+  authorizes correcting or deleting their own sighting inside its window, and marks it `mine` on the
+  case (there are no per-reporter rate limits for now — [04](../product/04-lost-workflow.md) · Validation). It also scopes an anonymous upload slot (*Uploads*).
 - **Not an account, never a login.** A signed-in session wins when both are present; the cookie
   proves nothing about who someone is, only that this is the same browser. Clearing cookies forgets
   it — the person loses the right to correct what they sent, nothing else. Moving an anonymous
@@ -96,9 +95,8 @@ A photo reaches storage in three steps (decision #36; the pipeline's rules are
 
 Rules the server enforces, and the client may not predict:
 
-- **Limits per purpose** ([media-pipeline.md](media-pipeline.md) §1). Rate limits on slots are the
-  same for every purpose, per caller and per IP ([backend.md](backend.md) · Uploads and media). A
-  refused slot is `rate_limited` or `validation_failed`.
+- **Limits per purpose** ([media-pipeline.md](media-pipeline.md) §1). Slots have no rate limit
+  ([backend.md](backend.md) · Uploads and media). A refused slot is `validation_failed`.
 - **A photo in a publish body must be one this caller uploaded for that purpose** (or one already on
   the row being edited); anything else is `validation_failed` on that field. So is a photo whose
   bytes have not been processed yet — it takes seconds, normally done before the form is.
@@ -124,7 +122,7 @@ logs:
 | `active_case_exists` | 409 | The pet already has an active lost case; `details.case_code` |
 | `invalid_code` · `phone_required` | 422 | The emailed/SMS code is wrong · publishing with no verified number |
 | `sighting_too_far` · `seen_at_in_future` · `seen_at_before_case` | 422 | [04 · Validation](../product/04-lost-workflow.md) |
-| `rate_limited` | 429 | Per reporter, per case and global ([04](../product/04-lost-workflow.md)) |
+| `rate_limited` | 429 | Too many email or SMS codes requested for one number or address ([auth.md](auth.md)) |
 | `server_error` | 500 | — |
 
 Any endpoint may answer `validation_failed`, `rate_limited` and `server_error`; every other code

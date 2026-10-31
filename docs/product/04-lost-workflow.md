@@ -165,12 +165,12 @@ everything in this section assumes a sighting attached to a lost case.
 
 `seen_at` is when the reporter saw the animal; `created_at` is when they told us. They differ
 whenever someone reports late («lo vi ayer»), and everything below orders by `seen_at`.
-`reporter_device_key` is a device/IP-derived key for anonymous reporters — the rate-limit handle
-when there is no `person_id`.
+`reporter_device_key` is a device-derived key for anonymous reporters — who the reporter is
+when there is no `person_id` (`mine`, the correction window). No IP is kept.
 
 Default `visible` — publishing a sighting must be instant, or the map dies. The owner can hide any
-pin; moderation removes abuse ([09-reporting.md](09-reporting.md)). Anti-spam is **rate limiting +
-owner-hides-pin**, never pre-approval and never OTP.
+pin; moderation removes abuse ([09-reporting.md](09-reporting.md)). Anti-spam is **owner-hides-pin
++ moderation** (rate limits are deferred until real patterns are seen — decision #54), never pre-approval and never OTP.
 
 **Only the pin is required** (decision #13, [00](00-product-map.md)). `seen_at` defaults to now;
 photo, note, and contact are optional for everyone, anonymous included. A bare pin is worth less to
@@ -211,15 +211,15 @@ saved yet. After submit, the reporter can edit or delete their own sighting unti
 | Distance from `last_seen_point` | ≤ 30 km | FE + BE | «Ese punto está muy lejos del último lugar donde se vio a Luna» |
 | `seen_at` in the future | the server rejects beyond 5 minutes (device clock drift); the client form rejects any future time | FE + BE | «La hora no puede ser en el futuro» |
 | `seen_at` before the case | ≥ `last_seen_at − 24h` | FE + BE | «Luna se perdió después de esa hora» |
-| Rate, per reporter per case | 1 per 15 min, 5 per day — **the 15-minute rule is waived while the reporter's earlier pin is still inside its correction window**, so «Lo vi otra vez» is never refused as «hace poco» (as written the waiver covers the whole 15 minutes, so the rule never fires — [O25](../open-items.md)) | BE only | «Ya registraste un avistamiento hace poco» |
-| Rate, per reporter global | 20 per day | BE only | same |
-| Rate, per IP (second key) | 20 per case, 80 per day (the backend's choice: 4× the per-reporter limits so shared networks — NAT, public wifi — are not punished; configurable; confirming the numbers is in [O26](../open-items.md)) | BE only | same |
+| Rate, per reporter per case | **Deferred until real patterns are seen** ([decision #54](00-product-map.md); [O30](../open-items.md)) | none | — |
+| Rate, per reporter global | same | none | — |
+| Rate, per IP | same | none | — |
 
 **FE validates for feedback, BE enforces.** The distance and time checks are trivial math, so the
 form runs them the moment the pin lands or the time is picked — the user never waits on a round
 trip to learn the pin is wrong. The server runs the same checks anyway: the client is not trusted
 input, and spam is precisely the actor that skips the app and hits the endpoint directly. The
-server-side cost is one distance calculation on a row being written. Rate limits are server-only —
+server-side cost is one distance calculation on a row being written. Rate limits, when they exist, are server-only —
 the client cannot see other devices or its own cleared state. Every rejection is an error returned
 to the caller, never a silent drop.
 

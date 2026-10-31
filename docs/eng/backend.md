@@ -28,7 +28,7 @@ door open without paying for it now.
 | Data access | **jOOQ** (open-source edition), reads and writes — *Data access* below |
 | Queue | **Amazon SQS** behind a transactional outbox — *Async work* below |
 | Scheduled jobs | **db-scheduler** (state in Postgres, cluster-safe) — cron-style work only |
-| Rate limiting | Counts over the rows themselves (rolling windows with SQL, indexed where measured) — the limits in this slice key on rows that exist anyway (sends, sightings, uploads). **Bucket4j** with its Postgres store if a limit ever needs tokens without rows |
+| Rate limiting | Only SMS and email code sends are limited in the backend, as counts over the send log (rolling windows with SQL) — *Rate limits on rows* below. Per-IP limits belong at the edge ([O30](../open-items.md)). **Bucket4j** with its Postgres store if a limit ever needs tokens without rows |
 | Phone numbers | libphonenumber ([auth.md](auth.md)) |
 | Observability | **OpenTelemetry → New Relic** (traces, metrics, logs over OTLP); **Sentry** for errors |
 | Tests | JUnit 5, **Testcontainers** (one static container per JVM, started lazily and wired with a `DynamicPropertyRegistrar`, not a Spring bean, so closing a test context cannot stop it), **WireMock** for Twilio/Resend/Google, **ElasticMQ** for SQS |
@@ -248,17 +248,19 @@ origins (`scuby.web.allowed-origins`), with credentials.
 one. An endpoint that wants caching sets it explicitly and says why.
 
 **Deployed profiles are configured, never defaulted:** outside `local` and `test`, start-up is
-refused without the allowed origins, the IP-hash key, the code-hash key and the Google client ID (each
-key non-blank, at least 32 characters and not the shipped default); a deployed profile combined with
+refused without the allowed origins, the code-hash key and the Google client ID (the key
+non-blank, at least 32 characters and not the shipped default); a deployed profile combined with
 `local` or `test` (`staging,local`) is still deployed;
-under `prod` also without the origin secret (under `staging` a missing one is a start-up warning:
-every per-IP limit would key on CloudFront's address). A start-up test keeps every deployed profile
+under `prod` also without the origin secret. (There is no IP-hash key: the backend stores no IP —
+decision #54.) A start-up test keeps every deployed profile
 startable with exactly those settings. Infra must also put `logServerErrorDetail=false` on the JDBC URL of
 deployed profiles: otherwise pgjdbc copies the failing row (which can hold an email, a phone or a code
 hash) into exception messages, and the API logs those. The URL comes from infra; nothing in this repo sets it.
 
-**Client IP** (a rate-limit key): `CloudFront-Viewer-Address` only when the request carries the
-origin secret header, else the socket address. IPs are stored only as an HMAC.
+**Client IP.** The backend neither reads nor stores any client IP: no limit keys on it (decisions #54, #55).
+Per-IP limits, if they are wanted, are an edge rule ([O30](../open-items.md)). `scuby.web.origin-secret` is
+still required under `prod` so that infra's contract does not change, but nothing in the backend reads it now
+(it used to prove that `CloudFront-Viewer-Address` could be trusted); revisit it with O30.
 
 **Device cookie** (decision #35): only its SHA-256 is used; it is set when missing and renewed on
 unsafe requests by a `Set-Cookie` header. There is no `device` table: the hash is stored on the rows
@@ -288,13 +290,11 @@ took a slot for, for that purpose, within 24 h, and whose bytes are processed. B
 photo's SHA-256; "processed" = the ingest Lambda wrote `media/{sha}.jpg` — [infra.md](infra.md) ·
 Media), a **development directory** in `local` and `test` (a dev-only `PUT/GET /dev-media/{sha}.jpg`
 that checks the hash and counts as processed at once; never in a deployed profile, staging or
-production). A slot is limited twice over a rolling 10 minutes, whatever the photo is for: at most
-20 per caller (account when signed in, else device) and at most 60 per IP (both configurable:
-`scuby.media.max-slots-per10-min`, `scuby.media.max-slots-per-ip10-min`). The IP cap exists because
-a client that sends no cookie is a new device on every call, so the per-caller cap alone bounds
-nothing (decision in [00](../product/00-product-map.md) · #49). Both counts are one query over the
-`upload` rows (`owner_key`, `ip_hash`), then an insert without a lock: concurrent requests can exceed
-a cap by the number in flight — accepted, a slot is only a row.
+production). **A slot has no cap**, neither per caller nor per IP (decision #55): a client that sends no
+cookie is a new device on every call, so a per-caller cap bounded nothing, and abuse by IP, if it
+appears, is an edge rule ([O30](../open-items.md)). The table stays small by a **daily purge**
+(`UploadPurge`, worker role) that deletes `upload` rows older than `scuby.media.attach-window` (24 h),
+the age after which a slot can no longer be attached; the table has no performance index.
 
 S3 calls never run inside a database transaction: the attach check (`PhotoAttachments`, a HeadObject
 per photo in S3 mode) runs before the publish or sighting opens its transaction, and refuses to run
@@ -339,12 +339,39 @@ is wired yet; the comparison is in `docs/superpowers/specs/2026-10-30-place-name
 
 ## Rate limits on rows
 
-A rate limit is a count over the rows the action writes anyway — one indexed query per key, over a
-rolling window — never a separate counter table. Where a limit must hold under parallel requests
-(«Lo vi»), the count and the insert run in one transaction behind transaction-scoped advisory locks
-on each key, always taken in the same order (reporter, then IP) so two requests cannot wait on
-each other. The numbers live with their flows: «Lo vi» in [04](../product/04-lost-workflow.md) ·
-Validation, SMS in [auth.md](auth.md) · OTP mechanics, upload slots above.
+Only code sends are limited in the backend (decisions #56, #57): SMS at most 5 per number and email at most
+10 per address, each in a rolling 24 h, plus a 60 s cooldown, all counted over `code_send` (a log purged at
+30 days, so bounded and without a performance index). The count and the insert run under a transaction-scoped
+advisory lock on the number or address, so parallel requests cannot all read the same count. The rules live in
+[auth.md](auth.md); «Lo vi» and uploads have no limits ([04](../product/04-lost-workflow.md) · Validation,
+*Uploads and media* above), and per-IP abuse limits are an edge matter
+([O30](../open-items.md)).
+
+## Operational queries
+
+Two ad-hoc SQL queries to look at «Lo vi» activity until the New Relic event of
+[O30](../open-items.md) exists. They are run by hand against the database: **no index serves them and they are
+not analytics** (the `sighting` table is small enough to scan for a human-initiated query; if one becomes a
+routine, that is the moment to ask the three questions of `backend/CLAUDE.md` · Migrations and indexes).
+
+```sql
+-- Sightings per reporter (account or device) in the last 24 h, heaviest first.
+SELECT COALESCE('p:' || reporter_person_id::text, 'd:' || reporter_device_hash) AS reporter,
+       count(*) AS sightings, count(DISTINCT case_code) AS cases
+FROM scuby.sighting
+WHERE created_at > now() - interval '24 hours'
+GROUP BY 1
+ORDER BY sightings DESC
+LIMIT 20;
+
+-- Cases with the most new sightings in the last 24 h.
+SELECT case_code, count(*) AS sightings, count(DISTINCT COALESCE(reporter_person_id::text, reporter_device_hash)) AS reporters
+FROM scuby.sighting
+WHERE created_at > now() - interval '24 hours'
+GROUP BY case_code
+ORDER BY sightings DESC
+LIMIT 20;
+```
 
 ## Lock order
 
@@ -354,8 +381,7 @@ taken in one order everywhere, so two transactions never wait on each other:
 1. **`person` first.** A transaction that locks the person (`People.lock`: sign-in with Google,
    phone change, publish, phone-code send; the email-code reclaim updates the person row first) does
    it before any other lock.
-2. Then the advisory locks of the flow (`sms_ip`, `sms_dev`, `phone_otp`; «Lo vi»: reporter key, then
-   IP key), then the `phone_otp` row.
+2. Then the advisory locks of the flow (`phone_otp`, `email_code`), then the `phone_otp` row.
 3. **The person row lock is `FOR NO KEY UPDATE`, never `FOR UPDATE`.** Inserting a row that references
    `person` (a sighting by a signed-in reporter) takes `FOR KEY SHARE` on it; `FOR UPDATE` conflicts
    with that and would make the sighting queue behind the person's publish, or deadlock against any
