@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "NEW_RELIC_LICENSE_KEY=test-not-a-key",
         "SCUBY_TELEMETRY_EXPORT=false" // nothing may leave the machine
 })
+@ActiveProfiles("test") // the thin slice refuses the local media store under no profile
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Import(TestcontainersConfiguration.class)
 @ExtendWith(OutputCaptureExtension.class)

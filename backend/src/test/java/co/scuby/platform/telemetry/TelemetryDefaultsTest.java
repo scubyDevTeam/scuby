@@ -13,11 +13,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Without SCUBY_TELEMETRY_EXPORT=true nothing is exported, and logs still reach OpenTelemetry (docs/eng/backend.md · Observability). */
 @SpringBootTest(properties = "scuby.test.context=telemetry-defaults") // own cache key: never reuses a context whose logging another class reset
+@ActiveProfiles("test") // the thin slice refuses the local media store under no profile
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Import(TestcontainersConfiguration.class)
 class TelemetryDefaultsTest {
