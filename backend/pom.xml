@@ -180,6 +180,7 @@
         - The plugin's internal Flyway 9 is left alone on purpose (overriding it breaks the plugin): there is
           a drift risk against the runtime Flyway 12.
         - Every build needs Docker and the local image scuby/postgres:17 (infra/docker/postgres/verify.sh builds it).
+          backend/build.sh runs this build inside a Maven container with the Docker socket mounted.
       -->
       <plugin>
         <groupId>org.testcontainers</groupId>
@@ -288,37 +289,6 @@
             <goals><goal>mutationCoverage</goal></goals>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>com.google.cloud.tools</groupId>
-        <artifactId>jib-maven-plugin</artifactId>
-        <version>3.5.2</version>
-        <configuration>
-          <from>
-            <!--
-              thin slice: the base image derives from ${java.version} and is pinned to the multi-arch
-              index digest of eclipse-temurin:${java.version}-jre (linux/amd64 + linux/arm64), looked up
-              on 2026-10-29.
-              To bump: docker buildx imagetools inspect eclipse-temurin:${java.version}-jre → the top "Digest:".
-              Changing java.version means changing .java-version and this digest in the same commit.
-            -->
-            <image>eclipse-temurin:${java.version}-jre@sha256:78f1f183913482ef390c2722f46c3f0ce76ada341d69590e7c482ec943ee72d5</image>
-            <platforms>
-              <platform><architecture>arm64</architecture><os>linux</os></platform>
-              <platform><architecture>amd64</architecture><os>linux</os></platform>
-            </platforms>
-          </from>
-          <to>
-            <image>scuby-backend</image>
-          </to>
-          <container>
-            <mainClass>co.scuby.ScubyApplication</mainClass>
-            <ports><port>8080</port></ports>
-            <jvmFlags>
-              <jvmFlag>-XX:MaxRAMPercentage=60</jvmFlag>
-            </jvmFlags>
-          </container>
-        </configuration>
       </plugin>
     </plugins>
   </build>
