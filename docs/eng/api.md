@@ -96,8 +96,9 @@ A photo reaches storage in three steps (decision #36; the pipeline's rules are
 
 Rules the server enforces, and the client may not predict:
 
-- **Limits per purpose** ([media-pipeline.md](media-pipeline.md) §1) and rate limits on slots,
-  inherited from what the photo is for. A refused slot is `rate_limited` or `validation_failed`.
+- **Limits per purpose** ([media-pipeline.md](media-pipeline.md) §1). Rate limits on slots are the
+  same for every purpose, per caller and per IP ([backend.md](backend.md) · Uploads and media). A
+  refused slot is `rate_limited` or `validation_failed`.
 - **A photo in a publish body must be one this caller uploaded for that purpose** (or one already on
   the row being edited); anything else is `validation_failed` on that field. So is a photo whose
   bytes have not been processed yet — it takes seconds, normally done before the form is.
@@ -115,7 +116,7 @@ logs:
 
 | Code | Status | When |
 |---|---|---|
-| `validation_failed` | 422 | Body or query breaks the schema; `fields` maps each wire path to what is wrong |
+| `validation_failed` | 422 | Body or query breaks the schema; `fields` maps each wire path to what is wrong. A required field that is absent is an error naming it (nested ones by path, e.g. `pet.marks`); an explicit `null` is accepted where the contract allows it (decision #51 in [00](../product/00-product-map.md)) |
 | `unauthorized` | 401 | No session on a `session` endpoint |
 | `forbidden` | 403 | Signed in, but it is someone else's case, claim or notification |
 | `not_found` · `gone` | 404 · 410 | Unknown · purged (a printed poster's code still resolves) |
@@ -188,24 +189,22 @@ contract change with the feature that needs it. The two that blocked the backend
   on intent (cost rule 1).
 - **Phone on «Me interesa».** [auth.md](auth.md) says interest askers are never asked for a phone;
   the contract requires a verified one.
-- **Feed order** — settled by the backend's thin slice (2026-10-29): nearest first by distance band
-  (≤ 2, 5, 10, 25 km), newest first within a band, then `code` as a final tiebreak; national, newest
-  first (then `code`), when nothing is near or no point is sent; at most 100 items. The contract's
-  wording is to follow (below). Decision #41 in [00](../product/00-product-map.md).
+- **Feed order** — settled by decision #41 in [00](../product/00-product-map.md), which owns the
+  rule. The contract's wording is to follow (Proposals, below).
 - **Smaller:** `contact.opened {whatsapp_click}` ([04](../product/04-lost-workflow.md) · Events) has
   no endpoint; a found-case claimant cannot withdraw «es mío»; match rejections leave no record
   ([05](../product/05-found-workflow.md) · Events); unmerge has no surface.
 
 
-### Proposals from the backend thin slice (2026-10-29)
+### Proposals from the first backend release (2026-10-29)
 
 Contract or client changes the backend needs; each is made on the client side, which owns the pen
-until the contract moves to `openapi.yaml` (decision #34). The device cookie rename to
+until the contract moves to `openapi.yaml` (decision #34). The backend's first release is the
+lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the caller's own cases. The device cookie rename to
 `__Host-device` is already [O27](../open-items.md).
 
 - **Feed paging** — the feed is capped at 100 items with no way to ask for more.
-- **`phone_step: unverified`** on publish responses ([O24](../open-items.md)) — with
-  `publisher_phone_otp` off the backend publishes and the client cannot tell the number is unverified.
+- **`phone_step: unverified`** on publish responses — proposed in [O24](../open-items.md).
 - **`GET /feed` query parameters** (`vertical`, `species`, `lat`, `lng`) are missing from
   `openapi.json` (`parameters: []`) although `web/src/contracts/feed.ts` defines them.
 - **`seen_at` tolerance** — the server accepts up to 5 minutes in the future (device clock drift);
@@ -230,12 +229,18 @@ until the contract moves to `openapi.yaml` (decision #34). The device cookie ren
   Google client id (`web/.env` has a `mock-` one), so the three Google specs (@AUTH-002, @PLOST-002,
   @PLOST-004) cannot run against the backend; they need a documented e2e environment or a backend
   bypass, planned with the phase that adds Google.
-- **@LINK-001** asserts «Posible hallazgo» (which needs an open claim, outside the first backend
-  slice) in the same step as the sightings trajectory, so everything after it is hidden behind the
-  claims dependency. Move that assertion to its own `test.step` (or tag).
-- **Endpoints the e2e specs need beyond the first backend slice** — `/me/pets` (the lost-pet
+- **@LINK-001** ends its first step ("who is missing, and what a stranger can do") with the
+  «Posible hallazgo» assertion, which needs an open claim, outside the first backend release. A
+  failing `expect` inside a `test.step` still ends the test, so the steps after it (the sightings
+  trajectory among them) never run. Move that assertion to the end of the spec, make it
+  `expect.soft`, or split it into its own `test` (or tag).
+- **`point` comment in `feed.ts`** — it says "public precision, never a doorstep", but the center is
+  not moved ([04](../product/04-lost-workflow.md) · Location precision); only the radius is floored.
+- **Paging for `GET /me/cases`** — it returns every case of the caller, with no way to page.
+- **Endpoints the e2e specs need beyond the first backend release** — `/me/pets` (the lost-pet
   re-publish flow of @PLOST-002 and @PLOST-004), case edit (@PLOST-004), Google sign-in
   (@AUTH-002, @PLOST-002, @PLOST-004) and claims (the «Posible hallazgo» state of @LINK-001).
-- **English look title** — the title composed for a case in English reads «Dog black, small»
-  (species, colour, size in Spanish word order); it needs a human copy review («Black dog, small»).
-  The backend owns the text; the review is a copy decision, not a contract change.
+- **Not a proposal: the English look title.** `GET /me/cases` titles a case whose pet has no name
+  from species, first colour and size; in English it reads «Dog black, small» (Spanish word order).
+  It needs a human copy review («Black dog, small»). The backend owns the text, so this is a copy
+  decision, not a contract change.

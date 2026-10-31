@@ -190,6 +190,14 @@ for the public; a pure `*Derivation` (time and viewer as parameters) builds the 
 record is serialised. Request/response records are written by hand next to their feature
 (generation was rejected: openapi-generator turns the contract's unions into unusable classes).
 
+**Request validation** (decision #51). A required field that is absent is `validation_failed` naming
+its wire path: required-nullable fields carry `@JsonProperty(required = true)`, the others `@NotNull`,
+and `RequiredFieldsTest` compares every request record with `openapi.json`. A length check that
+mirrors a database `CHECK` counts code points like Postgres (`@CodePoints`, not `@Size`), so an input
+the bean check accepts can never fail the constraint. A database error is logged by SQLSTATE and
+constraint name only, and the driver's `logServerErrorDetail` is off, so a failing row (a phone
+number) never reaches the logs.
+
 **Guardrails that fail the build:** ArchUnit (derivation purity — no Spring, jOOQ, I/O, clock or
 randomness; roles by annotation, including that every `@RestController` is an `@ApiComponent` and every
 `@Scheduled`/`@SqsListener` method sits in a `@WorkerComponent`; the DAG; the declared surface), PIT
@@ -279,9 +287,14 @@ took a slot for, for that purpose, within 24 h, and whose bytes are processed. B
 `MediaStore`: **S3** in staging and production (a presigned PUT into `incoming/` signed with the
 photo's SHA-256; "processed" = the ingest Lambda wrote `media/{sha}.jpg` — [infra.md](infra.md) ·
 Media), a **development directory** in `local` and `test` (a dev-only `PUT/GET /dev-media/{sha}.jpg`
-that checks the hash and counts as processed at once; refused under `prod`). At most 20 slots per
-caller per 10 minutes (count then insert without a lock: concurrent requests can exceed it by the
-number in flight — accepted, a slot is only a row).
+that checks the hash and counts as processed at once; never in a deployed profile, staging or
+production). A slot is limited twice over a rolling 10 minutes, whatever the photo is for: at most
+20 per caller (account when signed in, else device) and at most 60 per IP (both configurable:
+`scuby.media.max-slots-per10-min`, `scuby.media.max-slots-per-ip10-min`). The IP cap exists because
+a client that sends no cookie is a new device on every call, so the per-caller cap alone bounds
+nothing (decision in [00](../product/00-product-map.md) · #49). Both counts are one query over the
+`upload` rows (`owner_key`, `ip_hash`), then an insert without a lock: concurrent requests can exceed
+a cap by the number in flight — accepted, a slot is only a row.
 
 S3 calls never run inside a database transaction: the attach check (`PhotoAttachments`, a HeadObject
 per photo in S3 mode) runs before the publish or sighting opens its transaction, and refuses to run
@@ -292,15 +305,30 @@ The bucket's CORS allows `PUT` from the web origins with the headers `content-ty
 `content-length` and `x-amz-checksum-sha256`.
 
 **Handoff to the infrastructure doc.** [infra.md](infra.md) must pick up, for staging and for
-production (production refuses to start without them): the environment variables
-`SCUBY_MEDIA_BUCKET`, `SCUBY_MEDIA_REGION` and `SCUBY_MEDIA_PUBLIC_BASE_URL`; the instance-role
-permissions above; and the bucket's CORS rule above. The presign path has not been run against a
-real bucket yet.
+production (both refuse to start without the variables):
+
+- The environment variables `SCUBY_MEDIA_BUCKET`, `SCUBY_MEDIA_REGION` and
+  `SCUBY_MEDIA_PUBLIC_BASE_URL`.
+- **What the public base URL means.** It is the prefix, usually the CDN's, under which
+  `{base}/{sha256}.jpg` serves the object stored at `media/{sha256}.jpg`. A photo's public URL is
+  that address, and an attach request is accepted only for URLs of exactly this shape
+  (`S3MediaStore.sha256Of`): with the bucket's own URL, or a base that already contains `media/`,
+  every photo is refused as `validation_failed`.
+- **Key shape.** The presigned PUT writes `incoming/{sha256}.jpg`; the ingest Lambda's trigger is that
+  prefix and suffix, and it writes `media/{sha256}.jpg`. The PUT is valid for `scuby.media.slot-ttl`
+  (5 minutes). `incoming/` objects the Lambda never processes need a lifecycle expiry.
+- The instance-role permissions above, and the bucket's CORS rule above, with the allowed origins
+  set per environment.
+- The `s3:ListBucket` prefix condition is unverified: a HeadObject request may carry no
+  `s3:prefix`, in which case a prefix-conditioned grant would not turn a missing key into 404.
+  Verify on the real bucket, or grant ListBucket on the bucket without the condition.
+
+The presign path has not been run against a real bucket yet.
 
 **Known limitation.** "Uploaded by this caller" means "took a slot for this hash". Every public
 photo URL contains its hash, so anyone can take a slot for a photo they have seen (the answer is
 `upload: null`) and attach it to their own case or sighting. Enforcing a fresh upload (refusing
-`upload: null` slots for `pet`, `claim` and `evidence`) is an open question for when it matters.
+`upload: null` slots for `pet`, `claim` and `evidence`) is [O29](../open-items.md).
 
 ## Place names
 
@@ -317,6 +345,26 @@ rolling window — never a separate counter table. Where a limit must hold under
 on each key, always taken in the same order (reporter, then IP) so two requests cannot wait on
 each other. The numbers live with their flows: «Lo vi» in [04](../product/04-lost-workflow.md) ·
 Validation, SMS in [auth.md](auth.md) · OTP mechanics, upload slots above.
+
+## Lock order
+
+*Decided 2026-10-31 — decision #50 ([00](../product/00-product-map.md)).* Row and advisory locks are
+taken in one order everywhere, so two transactions never wait on each other:
+
+1. **`person` first.** A transaction that locks the person (`People.lock`: sign-in with Google,
+   phone change, publish, phone-code send; the email-code reclaim updates the person row first) does
+   it before any other lock.
+2. Then the advisory locks of the flow (`sms_ip`, `sms_dev`, `phone_otp`; «Lo vi»: reporter key, then
+   IP key), then the `phone_otp` row.
+3. **The person row lock is `FOR NO KEY UPDATE`, never `FOR UPDATE`.** Inserting a row that references
+   `person` (a sighting by a signed-in reporter) takes `FOR KEY SHARE` on it; `FOR UPDATE` conflicts
+   with that and would make the sighting queue behind the person's publish, or deadlock against any
+   path that holds `lost_case` and then waits for `person`.
+4. **A future path that locks a person and then a case** (close, edit) follows the same order:
+   `person`, then `lost_case`. «Lo vi» takes `lost_case … FOR SHARE` (so a sighting never lands on a
+   case that closes meanwhile) and then the foreign-key share lock on `person`; because `person` is
+   only ever locked `FOR NO KEY UPDATE`, the two do not conflict. Such a path gets a race test
+   against a signed-in sighting.
 
 ## Migrations and indexes: partial indexes need literals
 

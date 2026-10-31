@@ -59,7 +59,7 @@
 
 ## Profile
 
-`display_name` (prefilled from OAuth, editable) · `photo?` · `email` (login identity, not editable
+`display_name` (prefilled from OAuth, editable; when the person has not chosen one it is a placeholder derived from the address, which is **never shown publicly** — a public case shows «Alguien» until a name is chosen, [04](../product/04-lost-workflow.md) · Contact visibility; whoever builds the profile update must mark the name as chosen, `person.display_name_chosen`) · `photo?` · `email` (login identity, not editable
 in v1) · `phone?` (below) · `city?` · `bio?` (~280 chars, plain text, **no links** — a bio with a
 WhatsApp link bypasses contact prefs; it is a `report` target like any user content) · contact
 prefs · notification toggles. Nothing else — no address, ID, birthday, gender (Ley 1581 rewards
@@ -97,7 +97,8 @@ buttons. When the WABA exists, existence validation replaces the checkbox.
 overridable per account — [feature-flags.md](feature-flags.md)). Off-path: the number is still
 required, format-validated and stored E.164 exactly like a claimant's, the case goes live, and
 `phone_verified_at` stays null. The number stays unverified until the next publish or change with
-the flag on, which runs the OTP step then. Turning the flag off gives up the three reasons above
+the flag on, which runs the OTP step then, and **an unverified number is never public**: the case has
+no phone contact until it is verified ([04](../product/04-lost-workflow.md) · Contact visibility). Turning the flag off gives up the three reasons above
 for that account; it exists for testing and as the kill switch if SMS pumping outruns the alarm.
 The frontend never reads the flag. The publish form response tells it `phone_step: otp` or
 `unverified`, and it renders the code entry only for `otp`. The flag gates the publish step only; changing the number in settings always verifies it.

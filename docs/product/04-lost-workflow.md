@@ -103,6 +103,20 @@ The publish form includes the **phone step** — verified once, shown prefilled 
 every later publish, re-verified on change: the UI contract lives in
 [eng/auth.md](../eng/auth.md) and applies to all four verticals.
 
+#### Contact visibility
+
+What the public card shows of the publisher (decisions #47 and #48 in [00](00-product-map.md)):
+
+- **An unverified phone is never public.** Only the owner sees the number. A «WhatsApp» link on the
+  public case needs all of: `expose_whatsapp`, the number marked as having WhatsApp, the number
+  **verified**, `in_app_only` off, and an active case. With `publisher_phone_otp` off
+  ([eng/auth.md](../eng/auth.md) · Behind a flag) a case publishes with the number unverified and has
+  no public phone contact — only «Lo vi» and the in-app thread — until the number is verified.
+- **`in_app_only` wins over `expose_whatsapp`** when both arrive: no link.
+- **The publisher's public name is never derived from the email.** Until the person has chosen a name
+  (typed one, or one supplied by Google), the card shows «Alguien» / "Someone". Once chosen, it is
+  shortened as usual («Carolina M.»).
+
 Two invariants enforced at publish:
 
 | Situation | Behavior |
@@ -195,11 +209,11 @@ saved yet. After submit, the reporter can edit or delete their own sighting unti
 | Check | Bound | Where | Error copy |
 |---|---|---|---|
 | Distance from `last_seen_point` | ≤ 30 km | FE + BE | «Ese punto está muy lejos del último lugar donde se vio a Luna» |
-| `seen_at` in the future | reject beyond 5 minutes (device clock drift) | FE + BE | «La hora no puede ser en el futuro» |
+| `seen_at` in the future | the server rejects beyond 5 minutes (device clock drift); the client form rejects any future time | FE + BE | «La hora no puede ser en el futuro» |
 | `seen_at` before the case | ≥ `last_seen_at − 24h` | FE + BE | «Luna se perdió después de esa hora» |
 | Rate, per reporter per case | 1 per 15 min, 5 per day — **the 15-minute rule is waived while the reporter's earlier pin is still inside its correction window**, so «Lo vi otra vez» is never refused as «hace poco» (as written the waiver covers the whole 15 minutes, so the rule never fires — [O25](../open-items.md)) | BE only | «Ya registraste un avistamiento hace poco» |
 | Rate, per reporter global | 20 per day | BE only | same |
-| Rate, per IP (second key) | 20 per case, 80 per day (thin-slice choice: 4× the per-reporter limits so shared networks — NAT, public wifi — are not punished; configurable) | BE only | same |
+| Rate, per IP (second key) | 20 per case, 80 per day (the backend's choice: 4× the per-reporter limits so shared networks — NAT, public wifi — are not punished; configurable; confirming the numbers is in [O26](../open-items.md)) | BE only | same |
 
 **FE validates for feedback, BE enforces.** The distance and time checks are trivial math, so the
 form runs them the moment the pin lands or the time is picked — the user never waits on a round
