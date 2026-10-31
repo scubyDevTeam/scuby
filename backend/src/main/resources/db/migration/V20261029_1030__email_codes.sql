@@ -12,12 +12,11 @@ CREATE TABLE email_code (
 -- code_send: the send log of both code channels (email sign-in, SMS OTP — docs/eng/auth.md · OTP
 -- mechanics) behind the per-target rolling-24 h caps (SMS 5, email 10) and the SMS spend alarm. Rows
 -- older than 30 days are purged (IdentityPurge), so the table is bounded and has no performance index
--- (backend/CLAUDE.md · Migrations and indexes). The device is stored as a hash only.
+-- (backend/CLAUDE.md · Migrations and indexes). Nothing about the requester is stored beyond the account, if any.
 CREATE TABLE code_send (
   id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   channel      text NOT NULL CHECK (channel IN ('email', 'sms')),
   target       text NOT NULL,
   person_id    uuid REFERENCES person (id) ON DELETE SET NULL,
-  device_hash  text NOT NULL,
   sent_at      timestamptz NOT NULL
 );

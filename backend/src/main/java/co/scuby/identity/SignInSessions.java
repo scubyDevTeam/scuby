@@ -12,8 +12,8 @@ import java.util.UUID;
 
 /**
  * Every sign-in ends here: the session the browser carried (if any) ends, a new one starts. The database
- * part ({@link #open}) must run inside the sign-in's own transaction, after the account row is locked, so
- * resolving the account and opening its session are one atomic step; the cookie follows commit.
+ * part ({@link #open}) runs inside the sign-in's own transaction, so resolving the account and opening its
+ * session are one atomic step; the cookie follows commit.
  */
 @Component
 class SignInSessions {
@@ -31,7 +31,7 @@ class SignInSessions {
         return cookies.read(request).map(Hashing::sha256Hex);
     }
 
-    /** Joins the caller's transaction (MANDATORY: a session must never be opened outside the sign-in's lock). */
+    /** Joins the caller's transaction (MANDATORY: a session is opened only with the sign-in's own writes). */
     @Transactional(propagation = Propagation.MANDATORY)
     NewSession open(UUID personId, Optional<String> carriedTokenHash) {
         carriedTokenHash.ifPresent(store::delete);

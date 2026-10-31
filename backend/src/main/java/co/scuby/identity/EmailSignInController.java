@@ -22,7 +22,7 @@ class EmailSignInController {
         this.sessions = sessions;
     }
 
-    /** 204 whether or not a code went out: never reveals whether the address has an account. 429 only for the device/IP caps. */
+    /** 204 whether or not a code went out: never reveals whether the address has an account. */
     @PostMapping("/auth/email/start")
     ResponseEntity<Void> start(Caller caller, @Valid @RequestBody EmailRequests.Start body) {
         signIn.start(body.email(), caller);

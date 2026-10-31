@@ -1,7 +1,7 @@
 -- Phone OTP (docs/eng/auth.md · OTP mechanics). phone_otp: one pending code per (person, number),
 -- stored as an HMAC; 5-minute expiry, 3 attempts, 60 s cooldown. The sends themselves are rows of
--- code_send (channel 'sms', V20261029_1030) behind the throttles (4 per number, 10 per device,
--- 20 per IP per rolling 24 h) and the spend alarm. No index beyond the primary key.
+-- code_send (channel 'sms', V20261029_1030) behind the rules (60 s between sends to a number, 5 per
+-- number per rolling 24 h) and the spend alarm. No index beyond the primary key.
 CREATE TABLE phone_otp (
   person_id   uuid NOT NULL REFERENCES person (id) ON DELETE CASCADE,
   phone       text NOT NULL CHECK (phone ~ '^\+[1-9][0-9]{6,14}$'),

@@ -8,7 +8,6 @@ import co.scuby.platform.web.ErrorCode;
 import co.scuby.uploads.PhotoAttachments;
 import co.scuby.uploads.UploadPurpose;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -16,9 +15,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * «Lo vi». The checks read and call S3 (photos) outside any transaction; only the insert runs in one. The case
- * status is read once outside (for the cheap refusals) and again inside, FOR SHARE, so a sighting never lands on a
- * case closed or purged in between. There are no rate limits here: they are deferred until real patterns are
+ * «Lo vi». The checks read and call S3 (photos) first; the write is one conditional INSERT ... SELECT that only
+ * succeeds while the case is active, so a sighting never lands on a case closed or purged in between and no
+ * transaction or lock is needed. There are no rate limits here: they are deferred until real patterns are
  * seen (docs/product/00-product-map.md, decision log; docs/open-items.md).
  */
 @Service
@@ -28,15 +27,13 @@ class SightingService {
     private final PhoneNumbers phones;
     private final PhotoAttachments photos;
     private final Clock clock;
-    private final TransactionTemplate tx;
 
     SightingService(SightingQueries queries, PhoneNumbers phones, PhotoAttachments photos,
-                    Clock clock, TransactionTemplate tx) {
+                    Clock clock) {
         this.queries = queries;
         this.phones = phones;
         this.photos = photos;
         this.clock = clock;
-        this.tx = tx;
     }
 
     public UUID report(String rawCode, SightingRequest request, Caller caller) {
@@ -57,12 +54,12 @@ class SightingService {
         String contact = request.contactPhone() == null ? null : phones.requireMobile(request.contactPhone(), "contact_phone");
         photos.requireAttachable(request.photos(), UploadPurpose.sighting, caller, "photo_urls");
 
-        return tx.execute(status -> {
-            // The case may have closed or been purged since the read above: look again under a share lock.
-            String current = queries.statusForShare(code).orElseThrow(SightingService::notFound);
-            if (!"active".equals(current)) throw new ApiException(ErrorCode.INVALID_TRANSITION, "the case is not active");
-            return queries.insert(code, point, seenAt, now, request.note(), request.photos(), caller, contact, request.clientId());
-        });
+        // The case may have closed or been purged since the read above: the insert re-checks it in the same statement.
+        return queries.insertIfActive(code, point, seenAt, now, request.note(), request.photos(), caller, contact, request.clientId())
+                      .orElseGet(() -> {
+                          queries.status(code).orElseThrow(SightingService::notFound);
+                          throw new ApiException(ErrorCode.INVALID_TRANSITION, "the case is not active");
+                      });
     }
 
     private static ApiException notFound() {

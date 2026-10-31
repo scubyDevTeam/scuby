@@ -21,13 +21,12 @@ import java.util.UUID;
  *   <li>{@link #prepare}, with NO transaction open: validates the number and, when a code was given for a number
  *       that needs one, reserves the attempt (a wrong code is {@code invalid_code} right here);</li>
  *   <li>{@link #resolve}, INSIDE the publish's transaction and after the publish's own validation (fields,
- *       photos, {@code active_case_exists}): sends the code, consumes the reserved one, or stores the number.
- *       A rolled-back publish leaves a right code usable; its attempt stays spent.</li>
+ *       photos, {@code active_case_exists}): stores the code to send, consumes the reserved one, or stores the
+ *       number. A rolled-back publish leaves a right code usable; its attempt stays spent;</li>
+ *   <li>{@link #deliver}, AFTER the publish's transaction returned (no connection held): sends the SMS of a
+ *       {@link CodeSent}.</li>
  * </ol>
  * Identity stays the only writer of `person` and `phone_otp`.
- *
- * <p>Known and accepted until a real SMS provider exists (R1): the SMS goes out after commit on the request
- * thread, so the request's connection is held during the provider call.
  */
 @ModuleApi
 @Component
@@ -38,8 +37,17 @@ public class PublisherPhone {
     /** Publish with this number; {@code verified} is false only with publisher_phone_otp off (O24). */
     public record Ready(String phone, boolean verified) implements Outcome {}
 
-    /** The SMS went out (or is inside its cooldown): answer `{phone_step: "otp"}` and write nothing else. */
-    public record CodeSent() implements Outcome {}
+    /**
+     * A code was stored (or the number is inside its cooldown, so nothing is pending to send): answer
+     * `{phone_step: "otp"}`, write nothing else, and pass this to {@link #deliver} once the transaction is over.
+     */
+    public static final class CodeSent implements Outcome {
+        private final PhoneOtp.@Nullable Outgoing outgoing;
+
+        private CodeSent(PhoneOtp.@Nullable Outgoing outgoing) {
+            this.outgoing = outgoing;
+        }
+    }
 
     /** Result of {@link #prepare}: pass it, unchanged, to {@link #resolve}. Opaque. */
     public static final class Prepared {
@@ -84,10 +92,10 @@ public class PublisherPhone {
     }
 
     /**
-     * Must run in the publish's transaction. {@code rate_limited} (from the SMS send) and {@code invalid_code}
+     * Must run in the publish's transaction. {@code rate_limited} (from the code store) and {@code invalid_code}
      * must propagate out of that transaction: either one leaves it rollback-only, so catching it and carrying on
-     * ends in an UnexpectedRollbackException. The SMS itself goes out after that transaction commits.
-     * Takes the person row lock first (the order every identity path uses; see PhoneChange).
+     * ends in an UnexpectedRollbackException. The SMS itself goes out in {@link #deliver}, after that transaction.
+     * No row lock: the caller's own constraints (the unique active case per pet) arbitrate races.
      *
      * @throws IllegalArgumentException when {@code caller} is not the account {@code prepared} was made for
      */
@@ -97,13 +105,12 @@ public class PublisherPhone {
         if (!personId.equals(caller.personId())) {
             throw new IllegalArgumentException("the phone step was prepared for another account");
         }
-        Person person = people.lock(personId);
+        Person person = people.get(personId);
         String target = target(person, prepared.bodyPhone);
         return switch (decide(person, target, prepared.codeGiven)) {
             case USE_VERIFIED -> new Ready(target, true);
             case SEND_CODE -> {
-                otp.sendHoldingPersonLock(personId, target, caller);
-                yield new CodeSent();
+                yield new CodeSent(otp.store(personId, target));
             }
             case CHECK_CODE -> {
                 // The code was reserved for one number: it verifies that number only (the stored number may
@@ -119,6 +126,11 @@ public class PublisherPhone {
                 yield new Ready(target, false);
             }
         };
+    }
+
+    /** Sends the SMS of a {@link CodeSent}. Call it after the transaction that produced it has returned: no network call holds a connection. */
+    public void deliver(CodeSent sent) {
+        if (sent.outgoing != null) otp.deliver(sent.outgoing);
     }
 
     private String target(Person person, @Nullable String bodyPhone) {

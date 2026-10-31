@@ -32,16 +32,6 @@ class People {
                  .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED, "the account no longer exists"));
     }
 
-    /**
-     * Reads the row with `FOR NO KEY UPDATE`: serialises with the unlink (an UPDATE of the same row) and with other
-     * lockers, and re-reads the committed state. Unlike FOR UPDATE it does not conflict with the FOR KEY SHARE a
-     * foreign key takes on the row, so a signed-in «Lo vi» (its sighting references the person) never queues behind it.
-     */
-    Person lock(UUID id) {
-        return db.selectFrom(PERSON).where(PERSON.ID.eq(id)).forNoKeyUpdate().fetchOptional().map(People::toPerson)
-                 .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED, "the account no longer exists"));
-    }
-
     Optional<Person> byEmail(String normalizedEmail) {
         return db.selectFrom(PERSON).where(PERSON.EMAIL.eq(normalizedEmail)).fetchOptional().map(People::toPerson);
     }
@@ -51,14 +41,13 @@ class People {
     }
 
     /** Creates the account, or returns the one a concurrent sign-in just created (same email, or same Google identity). */
-    Person create(String normalizedEmail, String displayName, boolean displayNameChosen, @Nullable String googleSub, boolean googleEmailAuthoritative) {
+    Person create(String normalizedEmail, String displayName, boolean displayNameChosen, @Nullable String googleSub) {
         db.insertInto(PERSON)
           .set(PERSON.ID, UUID.randomUUID())
           .set(PERSON.EMAIL, normalizedEmail)
           .set(PERSON.DISPLAY_NAME, displayName)
           .set(PERSON.DISPLAY_NAME_CHOSEN, displayNameChosen)
           .set(PERSON.GOOGLE_SUB, googleSub)
-          .set(PERSON.GOOGLE_EMAIL_AUTHORITATIVE, googleSub == null ? null : googleEmailAuthoritative)
           .set(PERSON.CREATED_AT, clock.instant().atOffset(ZoneOffset.UTC))
           .onConflictDoNothing()   // any unique key: the email, or a google_sub a concurrent sign-in just set
           .execute();
@@ -68,24 +57,9 @@ class People {
     }
 
     /** Sets the Google identity only while the account has none; false when it already has one (never overwritten). */
-    boolean linkGoogle(UUID id, String sub, boolean emailAuthoritative) {
-        return db.update(PERSON).set(PERSON.GOOGLE_SUB, sub).set(PERSON.GOOGLE_EMAIL_AUTHORITATIVE, emailAuthoritative)
+    boolean linkGoogle(UUID id, String sub) {
+        return db.update(PERSON).set(PERSON.GOOGLE_SUB, sub)
                  .where(PERSON.ID.eq(id).and(PERSON.GOOGLE_SUB.isNull()))
-                 .execute() == 1;
-    }
-
-    /**
-     * Drops the Google identity (and its flag) only while it is still non-authoritative; false if nothing changed.
-     * In the same statement it forgets the phone and its verification: whoever held the account through that
-     * link may have attached a number of their own, and the display name came from their Google profile, so it
-     * goes back to {@code resetDisplayName} (derived from the email, so not public).
-     */
-    boolean unlinkNonAuthoritativeGoogle(UUID id, String resetDisplayName) {
-        return db.update(PERSON).setNull(PERSON.GOOGLE_SUB).setNull(PERSON.GOOGLE_EMAIL_AUTHORITATIVE)
-                 .setNull(PERSON.PHONE).setNull(PERSON.PHONE_VERIFIED_AT)
-                 .set(PERSON.DISPLAY_NAME, resetDisplayName)
-                 .set(PERSON.DISPLAY_NAME_CHOSEN, false)
-                 .where(PERSON.ID.eq(id).and(PERSON.GOOGLE_EMAIL_AUTHORITATIVE.isFalse()))
                  .execute() == 1;
     }
 
@@ -99,7 +73,7 @@ class People {
     }
 
     private static Person toPerson(PersonRecord r) {
-        return new Person(r.getId(), r.getDisplayName(), r.getEmail(), r.getGoogleSub(), r.getGoogleEmailAuthoritative(), r.getPhone(),
+        return new Person(r.getId(), r.getDisplayName(), r.getEmail(), r.getGoogleSub(), r.getPhone(),
                 r.getPhoneVerifiedAt() == null ? null : r.getPhoneVerifiedAt().toInstant(),
                 r.getCity(), r.getBio(), r.getNotifyLost(), r.getNotifyFound(), r.getNotifyAdoption(),
                 r.getNotifyHelp(), r.getPhotoUrl());

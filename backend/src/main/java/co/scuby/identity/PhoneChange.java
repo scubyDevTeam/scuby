@@ -9,8 +9,9 @@ import java.time.Clock;
 import java.util.UUID;
 
 /**
- * `/me/phone/verify`: reserve the attempt first (no transaction open), then in one transaction consume the
- * code and store the number verified. Deliberately not @Transactional itself.
+ * `/me/phone` and `/me/phone/verify`. Start: store the code in one transaction, send it after it returns.
+ * Verify: reserve the attempt first (no transaction open), then in one transaction consume the code and store
+ * the number verified. Deliberately not @Transactional itself.
  */
 @Service
 class PhoneChange {
@@ -27,13 +28,16 @@ class PhoneChange {
         this.tx = tx;
     }
 
+    /** A failed send leaves the stored code unused: server_error. A repeat inside the cooldown is a silent success. */
+    public void start(UUID personId, String phone) {
+        PhoneOtp.Outgoing outgoing = tx.execute(status -> otp.store(personId, phone));
+        if (outgoing != null) otp.deliver(outgoing);
+    }
+
     public Person verify(UUID personId, String phone, String code) {
         PhoneOtp.Reservation reservation = otp.reserveAndCheck(personId, phone, code)
                 .orElseThrow(() -> new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code"));
         return tx.execute(status -> {
-            // Person row first, then phone_otp: the order an email-code reclaim takes (unlink, then discard the
-            // codes). The other way round deadlocks with it; after a reclaim commits there is no code to consume.
-            people.lock(personId);
             if (!otp.consume(reservation)) throw new ApiException(ErrorCode.INVALID_CODE, "wrong or expired code");
             people.setPhone(personId, phone, clock.instant());
             return people.get(personId);

@@ -1,6 +1,7 @@
 package co.scuby.identity;
 
 import co.scuby.platform.roles.ApiComponent;
+import co.scuby.platform.security.Caller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -26,8 +27,8 @@ class GoogleSignInController {
     }
 
     @PostMapping("/auth/google")
-    UserView google(@Valid @RequestBody GoogleSignInRequest body, HttpServletRequest request, HttpServletResponse response) {
-        SignedIn done = signIn.signIn(body.credential(), sessions.carried(request));
+    UserView google(@Valid @RequestBody GoogleSignInRequest body, Caller caller, HttpServletRequest request, HttpServletResponse response) {
+        SignedIn done = signIn.signIn(body.credential(), sessions.carried(request), caller.personId());
         sessions.issue(response, done.session());
         return UserView.of(done.person());
     }

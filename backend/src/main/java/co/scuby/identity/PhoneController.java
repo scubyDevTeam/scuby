@@ -2,7 +2,6 @@ package co.scuby.identity;
 
 import co.scuby.platform.roles.ApiComponent;
 import co.scuby.platform.security.Account;
-import co.scuby.platform.security.Caller;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,19 +13,17 @@ import org.springframework.web.bind.annotation.RestController;
 class PhoneController {
 
     private final PhoneNumbers numbers;
-    private final PhoneOtp otp;
     private final PhoneChange change;
 
-    PhoneController(PhoneNumbers numbers, PhoneOtp otp, PhoneChange change) {
+    PhoneController(PhoneNumbers numbers, PhoneChange change) {
         this.numbers = numbers;
-        this.otp = otp;
         this.change = change;
     }
 
     /** Not gated by publisher_phone_otp (that flag gates the publish step only). A repeat inside the cooldown is a silent 204. */
     @PostMapping("/me/phone")
-    ResponseEntity<Void> start(Account account, Caller caller, @Valid @RequestBody PhoneRequests.Start body) {
-        otp.send(account.personId(), numbers.requireMobile(body.phone(), "phone"), caller);
+    ResponseEntity<Void> start(Account account, @Valid @RequestBody PhoneRequests.Start body) {
+        change.start(account.personId(), numbers.requireMobile(body.phone(), "phone"));
         return ResponseEntity.noContent().build();
     }
 

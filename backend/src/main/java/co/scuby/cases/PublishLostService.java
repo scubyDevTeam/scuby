@@ -34,9 +34,10 @@ import static co.scuby.db.generated.Tables.LOST_CASE;
  * (it may call S3: {@code PhotoAttachments} is {@code Propagation.NEVER}) and, with {@code pet_id}, ownership and the
  * {@code active_case_exists} pre-check; (2) {@code PublisherPhone.prepare}, with no transaction open (it counts a code
  * attempt in its own statement); (3) the place name (possibly a network call), then one transaction that calls
- * {@code PublisherPhone.resolve} ({@code Propagation.MANDATORY}: takes the person lock, sends the SMS after commit, or
- * consumes the reserved code) and <b>then</b> re-checks ownership and the active case, so the re-check sees what
- * committed while it waited for the lock. A publish refused or rolled back later leaves the code usable. On {@code CodeSent} the transaction commits and no case is written.
+ * {@code PublisherPhone.resolve} ({@code Propagation.MANDATORY}: stores the code to send, or consumes the reserved
+ * one) and inserts the case; the unique index on the active case per pet arbitrates racing publishes (the loser
+ * gets {@code active_case_exists}, never a 500, and its consumed code rolls back with it). On {@code CodeSent}
+ * the transaction commits and no case is written; the SMS is sent AFTER it returned, with no connection held.
  */
 @Service
 class PublishLostService {
@@ -89,7 +90,12 @@ class PublishLostService {
         // namer is a no-op, and a provider will want a cache keyed by the rounded point.
         GeoPoint point = request.lastSeenPoint().toGeoPoint();
         String placeName = placeNames.forNewCase(point, me);
-        return tx.execute(status -> publishInTransaction(me, caller, request, now, prepared, point, placeName));
+        Object result = tx.execute(status -> publishInTransaction(me, caller, request, now, prepared, point, placeName));
+        if (result instanceof PublisherPhone.CodeSent sent) {
+            publisherPhone.deliver(sent);                 // after execute: no transaction, no pooled connection
+            return PublishView.PhoneStep.OTP;
+        }
+        return result;
     }
 
     private void requireOwnedAndFree(String petId, UUID me) {
@@ -100,20 +106,11 @@ class PublishLostService {
 
     private Object publishInTransaction(UUID me, Caller caller, PublishLostRequest request, Instant now,
                                         PublisherPhone.Prepared prepared, GeoPoint point, @Nullable String placeName) {
-        // resolve takes the person row lock (Propagation.MANDATORY, this transaction). rate_limited and
-        // invalid_code propagate (they leave the transaction rollback-only).
+        // rate_limited and invalid_code propagate (they leave the transaction rollback-only).
         PublisherPhone.Outcome phone = publisherPhone.resolve(prepared, caller);
 
-        // Re-check AFTER resolve, on purpose. Two taps on one account queue on the person lock inside resolve;
-        // a check made before it would have been taken before the wait and could not see the case the first tap
-        // committed meanwhile. Under READ COMMITTED every statement takes a fresh snapshot, so this one sees
-        // anything committed up to the moment the lock was granted. Throwing here rolls back the consumed code
-        // and cancels the after-commit SMS, so a doomed publish never sends one. (The unique index plus
-        // ON CONFLICT below still arbitrates publishes from different accounts that share the pet.)
-        if (request.petId() != null) requireOwnedAndFree(request.petId(), me);
-
         // CodeSent: this transaction commits (the phone_otp row must persist) and no case is inserted.
-        if (phone instanceof PublisherPhone.CodeSent) return PublishView.PhoneStep.OTP;
+        if (phone instanceof PublisherPhone.CodeSent) return phone;
         PublisherPhone.Ready ready = (PublisherPhone.Ready) phone;
 
         UUID petId = request.petId() != null ? UUID.fromString(request.petId()) : pets.createOwned(me, request.pet().toNewPet());
