@@ -59,9 +59,8 @@ public class PhotoAttachments {
             if (sha.isEmpty()) throw refused(field);
             hashes.add(sha.get());
         }
-        List<String> owners = caller.signedIn()
-                ? List.of("p:" + caller.personId(), "d:" + caller.deviceHash())
-                : List.of("d:" + caller.deviceHash());
+        // The account's slots, and the device's (a slot taken before sign-in); both keys come from Caller.ownerKey().
+        List<String> owners = List.of(caller.ownerKey(), new Caller(null, caller.deviceHash(), caller.ipHash()).ownerKey());
         Set<String> slotted = db.select(UPLOAD.SHA256).from(UPLOAD)
                                 .where(UPLOAD.OWNER_KEY.in(owners))
                                 .and(UPLOAD.SHA256.in(hashes))

@@ -29,6 +29,7 @@ class PhotoAttachmentsTest {
     @Autowired ApiClients clients;
     @Autowired TestDb testDb;
     @Autowired MutableClock clock;
+    @Autowired co.scuby.support.Accounts accounts;
 
     @Autowired org.springframework.transaction.support.TransactionTemplate tx;
 
@@ -105,5 +106,41 @@ class PhotoAttachmentsTest {
         assertThatThrownBy(() -> tx.executeWithoutResult(s ->
                 attachments.requireAttachable(List.of(up.getKey()), UploadPurpose.sighting, up.getValue(), "photo_urls")))
                 .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+    }
+
+    /** The Caller of a browser, with the person it is signed in as (null: anonymous). */
+    private Caller callerOf(ApiClient browser, UUID person) {
+        return new Caller(person, Hashing.sha256Hex(browser.cookie("device").orElseThrow()), "i".repeat(64));
+    }
+
+    @Test
+    void aSignedInCallersPetSlotAttaches() {
+        UUID ana = accounts.signIn(api, "ana@correo.co");
+        var up = upload("pet", true);
+        Caller signedIn = callerOf(api, ana);
+        assertThat(signedIn.ownerKey()).startsWith("p:");
+        assertThatCode(() -> attachments.requireAttachable(List.of(up.getKey()), UploadPurpose.pet, signedIn, "photo_urls"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void anotherAccountsSlotIsRefusedEvenOnTheSameDevice() {
+        UUID ana = accounts.signIn(api, "ana@correo.co");
+        var up = upload("pet", true);
+        UUID luis = accounts.person("luis@correo.co");
+        Caller otherAccount = new Caller(luis, "f".repeat(64), "i".repeat(64));
+        assertThatThrownBy(() -> attachments.requireAttachable(List.of(up.getKey()), UploadPurpose.pet, otherAccount, "photo_urls"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(reasonOf(e)).contains("photo_urls"));
+        assertThat(ana).isNotEqualTo(luis);
+    }
+
+    /** Brief behaviour: a slot taken as a device before sign-in still counts on that device after sign-in. */
+    @Test
+    void aDeviceSlotTakenBeforeSignInStillAttachesAfterSignIn() {
+        var up = upload("sighting", true);
+        UUID ana = accounts.signIn(api, "ana@correo.co");
+        Caller afterSignIn = callerOf(api, ana);
+        assertThatCode(() -> attachments.requireAttachable(List.of(up.getKey()), UploadPurpose.sighting, afterSignIn, "photo_urls"))
+                .doesNotThrowAnyException();
     }
 }

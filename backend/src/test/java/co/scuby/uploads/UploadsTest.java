@@ -82,6 +82,24 @@ class UploadsTest {
         assertThat(r.status()).isEqualTo(422);
     }
 
+    @Test
+    void theDevBucketRefusesABodyOverTheContractMaximumAndStoresNothing() {
+        byte[] huge = new byte[10_000_001];
+        String sha = Hashing.sha256Hex(huge);
+        ApiResponse r = api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", huge, "image/jpeg", sha);
+        assertThat(r.status()).isEqualTo(422);
+        assertThat(r.json().at("/error/fields").toString()).contains("too large");
+        assertThat(api.raw(HttpMethod.GET, "/dev-media/" + sha + ".jpg", null).status()).isEqualTo(404);
+    }
+
+    @Test
+    void aMismatchedBodyIsNotStoredEither() {
+        byte[] bytes = photo();
+        String sha = Hashing.sha256Hex(bytes);
+        api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", photo(), "image/jpeg", sha);
+        assertThat(api.raw(HttpMethod.GET, "/dev-media/" + sha + ".jpg", null).status()).isEqualTo(404);
+    }
+
     // Port of backend.test.ts «refuses a hash that is not a SHA-256».
     @Test
     void aHashThatIsNotASha256IsValidationFailed() {

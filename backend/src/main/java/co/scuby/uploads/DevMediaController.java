@@ -17,12 +17,15 @@ import java.util.Map;
 
 /**
  * The development bucket (local and test profiles only): stands in for the presigned S3 PUT and the
- * image CDN. Like S3 with x-amz-checksum-sha256, it refuses bytes that do not match the hash.
+ * image CDN. Never in a deployed process, even one that also has local or test active. Like S3 with x-amz-checksum-sha256, it refuses bytes that do not match the hash.
  */
 @ApiComponent
 @RestController
-@Profile({"local", "test"})
+@Profile("(local | test) & !staging & !prod")
 class DevMediaController {
+
+    /** The contract's maximum photo size (UploadRequest.bytes). */
+    static final long MAX_BYTES = 10_000_000;
 
     private final LocalMediaStore store;
 
@@ -32,6 +35,9 @@ class DevMediaController {
 
     @PutMapping("/dev-media/{sha256:[0-9a-f]{64}}.jpg")
     ResponseEntity<Void> put(@PathVariable String sha256, @RequestBody byte[] bytes) {
+        if (bytes.length > MAX_BYTES) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "body too large", Map.of("(body)", "too large"), Map.of());
+        }
         if (!Hashing.sha256Hex(bytes).equals(sha256)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "bytes do not match the hash", Map.of("(body)", "sha256 mismatch"), Map.of());
         }

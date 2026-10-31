@@ -71,7 +71,10 @@ final class LocalMediaStore implements MediaStore, ClearableCache {
         }
     }
 
+    private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
+
     private Path file(String sha256) {
+        if (!SHA256.matcher(sha256).matches()) throw new IllegalArgumentException("not a lowercase SHA-256");
         return dir.resolve(sha256 + ".jpg");
     }
 }

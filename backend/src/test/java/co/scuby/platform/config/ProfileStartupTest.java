@@ -45,6 +45,41 @@ class ProfileStartupTest {
         }
     }
 
+    /**
+     * /dev-media is an unauthenticated write to disk: it exists under local/test only, and never in a process
+     * that also has a deployed profile (the mixed profiles start when their properties are supplied).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"staging", "prod", "staging,local", "prod,local", "staging,test", "prod,test"})
+    void aDeployedProfileNeverRegistersDevMedia(String profiles) {
+        String deployed = profiles.startsWith("prod") ? "prod" : "staging";
+        ConfigurableApplicationContext context;
+        try {
+            context = start(profiles, REQUIRED.get(deployed));
+        } catch (RuntimeException refusedToStart) {
+            return; // prod,local/prod,test trip the prod test-bypass guard on the local/test yml: no process, no route
+        }
+        try (context) {
+            assertThat(devMediaPatterns(context)).as("/dev-media routes under %s", profiles).isEmpty();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"local", "test"})
+    void localAndTestRegisterDevMedia(String profile) {
+        try (ConfigurableApplicationContext context = start(profile, Map.of())) {
+            assertThat(devMediaPatterns(context)).isNotEmpty();
+        }
+    }
+
+    private static java.util.List<String> devMediaPatterns(ConfigurableApplicationContext context) {
+        var mapping = context.getBean("requestMappingHandlerMapping", org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);
+        return mapping.getHandlerMethods().keySet().stream()
+                .flatMap(info -> info.getPathPatternsCondition().getPatternValues().stream())
+                .filter(p -> p.startsWith("/dev-media"))
+                .toList();
+    }
+
     static Stream<Arguments> eachRequiredProperty() {
         return REQUIRED.entrySet().stream()
                 .flatMap(e -> e.getValue().keySet().stream().map(key -> Arguments.of(e.getKey(), key)));

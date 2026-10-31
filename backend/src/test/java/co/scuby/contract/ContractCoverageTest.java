@@ -34,10 +34,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ContractCoverageTest {
 
     /** Routes that exist on purpose without being in the contract. Anything else must be documented. */
-    static final Set<String> ALLOWED_UNDOCUMENTED_PREFIXES = Set.of(
-            "/actuator", "/error",
-            // Development bucket (profiles local and test only): stands in for the presigned S3 PUT and the image CDN, so it has no contract.
-            "/dev-media");
+    static final Set<String> ALLOWED_UNDOCUMENTED_PREFIXES = Set.of("/actuator", "/error");
+
+    /** Exact "METHOD /template" routes. Development bucket (profiles local and test only): stands in for the presigned S3 PUT and the image CDN, so it has no contract. */
+    static final Set<String> ALLOWED_UNDOCUMENTED_ROUTES = Set.of(
+            "PUT /dev-media/{sha256:[0-9a-f]{64}}.jpg",
+            "GET /dev-media/{sha256:[0-9a-f]{64}}.jpg");
 
     /** Test-only controllers (src/test) and Boot's own error controller. */
     private static boolean isInfrastructure(HandlerMethod handler) {
@@ -73,6 +75,7 @@ class ContractCoverageTest {
         CONTRACT.operations().forEach(o -> documented.add(o.method() + " " + o.path()));
         List<String> undocumented = implementedRoutes().stream()
                 .filter(r -> !documented.contains(r))
+                .filter(r -> !ALLOWED_UNDOCUMENTED_ROUTES.contains(r))
                 .filter(r -> ALLOWED_UNDOCUMENTED_PREFIXES.stream().noneMatch(p -> r.substring(r.indexOf(' ') + 1).startsWith(p)))
                 .toList();
         assertThat(undocumented).as("routes implemented but missing from docs/eng/openapi.json").isEmpty();
