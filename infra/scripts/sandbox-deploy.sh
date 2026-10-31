@@ -17,6 +17,10 @@ POSTGRES_REPO=$(get ecr_repository_urls postgres)
 INSTANCE=$(get instance_id)
 PREFIX=$(get ssm_prefix)
 LOG_GROUP=$(get backend_log_group)
+# Non-secret settings the staging profile requires (docs/eng/staging-rollout.md · Backend settings).
+API_URL=$(get api_url)
+MEDIA_BUCKET=$(get media_bucket)
+IMAGE_URL=$(get image_url)
 REGISTRY="${BACKEND_REPO%%/*}"
 
 echo "== push images"
@@ -39,6 +43,21 @@ else
 fi
 unset current
 
+echo "== code-hash key (generated once by the CLI, kept across runs)"
+# The backend refuses to start on a deployed profile without a key of 32+ characters. Terraform does
+# not manage this parameter (it is not in secret_names), so this script creates it when missing,
+# with openssl at deploy time only: the value never appears in the repo, the state or the log.
+# An existing value is kept: replacing it would invalidate live sign-in codes.
+if key_now=$(aws ssm get-parameter --name "$PREFIX/auth/code-hash-key" --with-decryption \
+  --query Parameter.Value --output text 2>/dev/null) && [ "${#key_now}" -ge 32 ]; then
+  echo "code-hash key already set — reusing it"
+else
+  aws ssm put-parameter --name "$PREFIX/auth/code-hash-key" --type SecureString --overwrite \
+    --value "$(openssl rand -hex 32)" >/dev/null
+  echo "generated a new code-hash key"
+fi
+unset key_now
+
 echo "== waiting for the instance to register with SSM"
 status=""
 for _ in $(seq 1 60); do
@@ -59,8 +78,9 @@ cd /opt/scuby
 echo '$(base64 < "$REPO/infra/compose/sandbox/compose.yaml" | tr -d '\n')' | base64 -d > compose.yaml
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REGISTRY
 DB=\$(aws ssm get-parameter --region us-east-1 --name $PREFIX/db/password --with-decryption --query Parameter.Value --output text)
+CODE_KEY=\$(aws ssm get-parameter --region us-east-1 --name $PREFIX/auth/code-hash-key --with-decryption --query Parameter.Value --output text)
 umask 077
-{ echo "BACKEND_IMAGE=$BACKEND_REPO:sandbox"; echo "POSTGRES_IMAGE=$POSTGRES_REPO:17"; echo "BACKEND_LOG_GROUP=$LOG_GROUP"; echo "DB_PASSWORD=\$DB"; } > .env
+{ echo "BACKEND_IMAGE=$BACKEND_REPO:sandbox"; echo "POSTGRES_IMAGE=$POSTGRES_REPO:17"; echo "BACKEND_LOG_GROUP=$LOG_GROUP"; echo "DB_PASSWORD=\$DB"; echo "CODE_HASH_KEY=\$CODE_KEY"; echo "ALLOWED_ORIGIN=$API_URL"; echo "MEDIA_BUCKET=$MEDIA_BUCKET"; echo "MEDIA_PUBLIC_BASE_URL=$IMAGE_URL"; } > .env
 docker compose up -d
 for i in \$(seq 1 90); do curl -sf localhost:8080/actuator/health && exit 0; sleep 5; done
 docker compose logs --tail 100

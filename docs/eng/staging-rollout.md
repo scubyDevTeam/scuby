@@ -16,6 +16,21 @@ below is one of them, or a piece the sandbox did not need. Staging composes the 
 An item is done when staging has it and the row is deleted, in the same PR. When this table is
 empty, delete this doc and its links.
 
+## Backend settings a deployed profile requires
+
+The backend refuses to start on `staging` or `prod` without these (the list lives in
+`ProfileStartupTest.REQUIRED`; [backend.md](backend.md) · Security). Staging must supply each one;
+the sandbox supplies them from `infra/compose/sandbox/compose.yaml` and `sandbox-deploy.sh`.
+
+| Environment variable | Property | Where staging gets it | Sandbox value |
+|---|---|---|---|
+| `SCUBY_WEB_ALLOWED_ORIGINS` | `scuby.web.allowed-origins` | The web app's public origin(s); not a secret | The API's CloudFront URL (`api_url` output); there is no web client |
+| `SCUBY_AUTH_CODE_HASH_KEY` | `scuby.auth.code-hash-key` | SSM `/scuby/<env>/auth/code-hash-key`, 32+ characters, a secret ([infra.md](infra.md) · Secrets) | Created by the deploy script if missing |
+| `SCUBY_AUTH_GOOGLE_CLIENT_ID` | `scuby.auth.google.client-id` | The web client's Google OAuth client ID; not a secret | Placeholder `sandbox-placeholder.apps.googleusercontent.com`: the sandbox never tests Google sign-in |
+| `SCUBY_MEDIA_BUCKET` | `scuby.media.bucket` | `media_bucket` Terraform output | Same |
+| `SCUBY_MEDIA_REGION` | `scuby.media.region` | The media bucket's region | `us-east-1` |
+| `SCUBY_MEDIA_PUBLIC_BASE_URL` | `scuby.media.public-base-url` | `image_url` Terraform output (the image distribution) | Same |
+
 ## Checklist
 
 | Area | Gap today | Staging does | Step |

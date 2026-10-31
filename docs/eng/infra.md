@@ -171,6 +171,14 @@ arrives with the backend's upload slots, which know each photo's purpose.
 - **Sandbox exceptions:** the deploy script generates the database password and the instance passes
   it to the containers through a `.env` file; nothing is imported from the prefix at start-up yet
   ([staging-rollout.md](staging-rollout.md)).
+- **Code-hash key:** `/scuby/<env>/auth/code-hash-key` (`SecureString`, 32+ characters), the HMAC key
+  that hashes sign-in codes ([backend.md](backend.md) · Security); the backend refuses to start on a
+  deployed profile without it (`SCUBY_AUTH_CODE_HASH_KEY`). A person creates it once per environment
+  (`openssl rand -hex 32`), outside the repo and the chat. In the sandbox the deploy script creates
+  it when missing (Terraform does not manage it) and keeps an existing value. **Rotation:** replace
+  the value and restart the backend; it invalidates only the codes in flight (they expire in
+  minutes), never accounts or sessions. The sandbox parameter outlives `terraform destroy`; it is a
+  free standard parameter and is reused by the next run.
 - **New Relic license key:** `/scuby/<env>/newrelic/license-key`, imported as the property
   `newrelic.license-key`. On a laptop the same value comes from the environment variable
   `NEW_RELIC_LICENSE_KEY`, read from the macOS Keychain. The parameter and the start-up import

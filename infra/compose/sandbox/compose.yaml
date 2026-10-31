@@ -27,6 +27,15 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/scuby
       SPRING_DATASOURCE_USERNAME: scuby
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      # Everything the staging profile refuses to start without (docs/eng/staging-rollout.md).
+      # The deploy script fills these in .env: URLs and bucket from Terraform outputs, the key from SSM.
+      SCUBY_WEB_ALLOWED_ORIGINS: ${ALLOWED_ORIGIN:?}
+      SCUBY_AUTH_CODE_HASH_KEY: ${CODE_HASH_KEY:?}
+      # Placeholder: the sandbox never signs in with Google. It only has to be non-blank and not the local default.
+      SCUBY_AUTH_GOOGLE_CLIENT_ID: sandbox-placeholder.apps.googleusercontent.com
+      SCUBY_MEDIA_BUCKET: ${MEDIA_BUCKET:?}
+      SCUBY_MEDIA_REGION: us-east-1
+      SCUBY_MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:?}
     ports:
       - "8080:8080"
     logging:
