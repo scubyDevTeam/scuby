@@ -29,6 +29,8 @@ final class StatementCeilings {
             Map.entry("POST /cases/{code}/reunite", 4),   // longest path, CaseLifecycleRaceTest (the race loser): session, pre-read (case + other active code), conditional UPDATE (zero rows), re-read; 3 on success (CaseLifecycleTest), 2 for a repeat
             Map.entry("POST /cases/{code}/cancel", 4),    // as reunite
             Map.entry("POST /cases/{code}/reopen", 4),    // longest path, measured by CaseLifecycleRaceTest: session, pre-read, UPDATE (zero rows or the unique violation), re-read or active-code read; 3 on success, 2 on an already active case
+            Map.entry("PATCH /lost-cases/{code}", 5),   // worst path, EditLostTest: session, pre-read (case + pet photos), upload lookup, pet update, case update (the guard); {} is 2, photos already on the pet 4
+            Map.entry("PATCH /cases/{code}", 1),        // the session lookup only: every code is not_found without a query (no table for the other verticals yet)
             Map.entry("POST /auth/google", 7)   // worst case on a session-cache miss with a carried session (the rare races with a simultaneous email-code sign-up of the same address, or an insert that conflicts on google_sub, run 8 to 9 statements and are not pinned): filter lookup, sub lookup, email lookup, person insert + select (or conditional link + re-read), old session DELETE, session insert; a non-authoritative new account (Google creates it, no session) is 5 with no cookie (7 with a stale session cookie) and cannot exceed this
     );
 
