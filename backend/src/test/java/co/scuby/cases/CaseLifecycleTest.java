@@ -179,7 +179,6 @@ class CaseLifecycleTest {
 
     @ParameterizedTest(name = "{0} on {1} → {2}")
     @CsvSource({
-            "reunite, expired,   409",
             "reunite, reunited,  200",
             "reunite, cancelled, 409",
             "cancel,  expired,   409",
@@ -196,6 +195,50 @@ class CaseLifecycleTest {
         assertThat(luna().get(LOST_CASE.RESOLUTION)).as("nothing written").isNull();
         assertThat(luna().get(LOST_CASE.RESOLUTION_ATTRIBUTION)).isNull();
         assertThat(luna().get(LOST_CASE.RESOLVED_AT).toInstant()).isEqualTo(NOW.minus(Duration.ofDays(1)));
+    }
+
+    /** Decision 17: the pet came home after the case expired; the owner closes it as reunited without reopening it first. */
+    @Test
+    void anExpiredCaseCanBeReunitedDirectly() {
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        ApiResponse r = reunite(owner, "7k3pq", "platform_claim");
+        assertThat(r.status()).as(r.body()).isEqualTo(200);
+        assertThat(r.str("/id")).isEqualTo("7K3PQ");
+        Record row = luna();
+        assertThat(row.get(LOST_CASE.STATUS)).isEqualTo("reunited");
+        assertThat(row.get(LOST_CASE.RESOLUTION)).isEqualTo("reunited_home");
+        assertThat(row.get(LOST_CASE.RESOLUTION_ATTRIBUTION)).isEqualTo("platform_claim");
+        assertThat(row.get(LOST_CASE.RESOLVED_AT).toInstant()).isEqualTo(NOW);
+        assertThat(reunite(owner, "7K3PQ", "unknown").str("/id")).as("idempotent, first body kept").isEqualTo("7K3PQ");
+        assertThat(luna().get(LOST_CASE.RESOLUTION_ATTRIBUTION)).isEqualTo("platform_claim");
+    }
+
+    /** The point of decision 17: the case is never `active` (card and phone public) on the way to reunited. A trigger refuses any write of status active. */
+    @Test
+    void reuniteingAnExpiredCaseNeverMakesItPublicAtAnyMoment() {
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        db.execute("CREATE FUNCTION scuby.refuse_active() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN "
+                + "IF NEW.status = 'active' THEN RAISE EXCEPTION 'case was active'; END IF; RETURN NEW; END $$");
+        db.execute("CREATE TRIGGER refuse_active BEFORE UPDATE ON scuby.lost_case FOR EACH ROW EXECUTE FUNCTION scuby.refuse_active()");
+        try {
+            ApiResponse r = reunite(owner, "7K3PQ", "offline");
+            assertThat(r.status()).as(r.body()).isEqualTo(200);
+            assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("reunited");
+            assertThat(clients.newBrowser().get("/cases/{code}", "7K3PQ").isNull("/contact")).isTrue();
+            assertThat(clients.newBrowser().get("/feed").json().get("items")).isEmpty();
+        } finally {
+            db.execute("DROP TRIGGER refuse_active ON scuby.lost_case");
+            db.execute("DROP FUNCTION scuby.refuse_active()");
+        }
+    }
+
+    @Test
+    void aCancelledCaseIsStillInvalidTransitionOnReunite() {
+        cases.close("7K3PQ", "cancelled", NOW.minus(Duration.ofDays(3)));
+        ApiResponse r = reunite(owner, "7K3PQ", "offline");
+        assertThat(r.status()).isEqualTo(409);
+        assertThat(r.errorCode()).isEqualTo("invalid_transition");
+        assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("cancelled");
     }
 
     // --- reopen ---

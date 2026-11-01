@@ -62,14 +62,15 @@ class LifecycleQueries {
                          r.get(other), r.get(superseded)));
     }
 
-    /** Reunite or cancel: only the owner, only from active. False when the guard did not hold (the race loser). */
+    /** Reunite (from active or expired, decision 17) or cancel (from active): only the owner. False when the guard did not hold (the race loser). */
     boolean close(String code, UUID owner, String status, String resolution, @Nullable String attribution, Instant now) {
+        var from = "reunited".equals(status) ? LOST_CASE.STATUS.in(DSL.inline("active"), DSL.inline("expired")) : LOST_CASE.STATUS.eq(DSL.inline("active"));
         return db.update(LOST_CASE)
                  .set(LOST_CASE.STATUS, DSL.inline(status))
                  .set(LOST_CASE.RESOLUTION, resolution)
                  .set(LOST_CASE.RESOLUTION_ATTRIBUTION, attribution)
                  .set(LOST_CASE.RESOLVED_AT, now.atOffset(ZoneOffset.UTC))
-                 .where(LOST_CASE.CODE.eq(code), LOST_CASE.CREATED_BY.eq(owner), LOST_CASE.STATUS.eq(DSL.inline("active")))
+                 .where(LOST_CASE.CODE.eq(code), LOST_CASE.CREATED_BY.eq(owner), from)
                  .execute() == 1;
     }
 

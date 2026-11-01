@@ -25,7 +25,9 @@ class LostLifecycleDerivationTest {
     @CsvSource(nullValues = "null", value = {
             // action,  status,    resolved ago,   outcome
             "REUNITE,  active,    null,           ALLOWED",
-            "REUNITE,  expired,   P1D,            INVALID_TRANSITION",
+            "REUNITE,  expired,   P1D,            ALLOWED",
+            "REUNITE,  expired,   P29D,           ALLOWED",
+            "REUNITE,  expired,   P90D,           ALLOWED",
             "REUNITE,  reunited,  P1D,            ALREADY_DONE",
             "REUNITE,  cancelled, P1D,            INVALID_TRANSITION",
             "CANCEL,   active,    null,           ALLOWED",
