@@ -23,9 +23,9 @@ test(
       await expect(casePage.whatsapp).toHaveAttribute('href', /^https:\/\/wa\.me\//)
     })
 
-    await test.step('its owner, signed in, sees the possible find', async () => {
+    await test.step('its owner, signed in, sees who says they have her', async () => {
       await profile.open()
-      await profile.signIn.withGoogle() // the emulation signs Google into the demo account, Luna’s owner
+      await profile.signIn.withEmailCode('carolina@correo.co') // the seeded owner of Luna’s case
       await expect(profile.name('Carolina Mejía')).toBeVisible()
       await casePage.open('7K3PQ')
       // The owner's «Posible hallazgo» is the claims list (the page shows it instead of the public badge).
