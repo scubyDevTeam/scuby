@@ -8,11 +8,12 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * PATCH /me/profile field rules (docs/eng/auth.md · Profile; L1 design §4.12). Pure. The bio has no links: a WhatsApp link
- * in a bio would bypass the case's contact preferences. Refused, case-insensitive, explicit link forms only: http://,
- * https://, www., wa.me, tel:, mailto:, and a token ending in a known TLD (.com .co .net .org .io .me .ly .link .app .info
- * .biz .xyz .site .online .store .shop). Accepted on purpose: «Av.Poblado», «EE.UU.», «caminar.Vivo», «p.ej.». Accepted
- * misses: a link on a TLD outside the list (decision 12: Spanish prose must not be refused).
+ * PATCH /me/profile field rules (docs/eng/auth.md · Profile; L1 design §4.12). Pure. The bio and the display name have no
+ * links: a WhatsApp link there would bypass the case's contact preferences. Refused, case-insensitive: http://, https://,
+ * www., wa.me, mailto:, and tel: directly followed by + or a digit. Refused only in lowercase: a token ending in a known
+ * TLD (.com .co .net .org .io .me .ly .link .app .info .biz .xyz .site .online .store .shop). Accepted on purpose:
+ * «Av.Poblado», «EE.UU.», «caminar.Vivo», «Medellín.Me encanta», «Tel: 300 123», «p.ej.». Accepted misses: a link on a TLD
+ * outside the list or in capitals (decisions 12 and 13: Spanish prose must not be refused).
  */
 final class ProfileTextDerivation {
 
@@ -21,8 +22,8 @@ final class ProfileTextDerivation {
     static final int CITY_MAX = 80;
 
     private static final Pattern LINK = Pattern.compile(
-            "(?iu)(https?://|\\bwww\\.|\\bwa\\.me|\\btel:|\\bmailto:"
-                    + "|[\\p{L}\\p{N}_-]+\\.(?:com|co|net|org|io|me|ly|link|app|info|biz|xyz|site|online|store|shop)(?![\\p{L}\\p{N}]))");
+            "(?iu:https?://|\\bwww\\.|\\bwa\\.me|\\bmailto:|\\btel:(?=[+\\d]))"
+                    + "|[\\p{L}\\p{N}_-]+\\.(?:com|co|net|org|io|me|ly|link|app|info|biz|xyz|site|online|store|shop)(?![\\p{L}\\p{N}])");
 
     private ProfileTextDerivation() {}
 
@@ -41,6 +42,7 @@ final class ProfileTextDerivation {
             if (raw == null) found.put("display_name", "required");
             else if (trimmedName(raw).isEmpty()) found.put("display_name", "must not be empty");
             else if (length(trimmedName(raw)) > NAME_MAX) found.put("display_name", "at most 80 characters");
+            else if (hasLink(trimmedName(raw))) found.put("display_name", "no links");
         }
         String city = body.city().value();
         if (city != null && length(city) > CITY_MAX) found.put("city", "at most 80 characters");

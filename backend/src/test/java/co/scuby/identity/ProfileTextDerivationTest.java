@@ -39,7 +39,10 @@ class ProfileTextDerivationTest {
             "'WWW.x.org',                                    true",
             "'https://x',                                    true",
             "'wa.me/57300',                                  true",
-            "'MIWEB.COM',                                    true",
+            "'tel:+573001234567',                            true",
+            "'MIWEB.COM',                                    false",
+            "'Medellín.Me encanta',                          false",
+            "'Tel: 300 123 4567',                            false",
             "'mi tienda: foo.shop',                          true",
             "'Av.Poblado',                                   false",
             "'EE.UU.',                                       false",
@@ -59,6 +62,15 @@ class ProfileTextDerivationTest {
     })
     void theBioRefusesExplicitLinkFormsAndKnownTldTokensOnly(String text, boolean link) {
         assertThat(ProfileTextDerivation.hasLink(text)).isEqualTo(link);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+            "wa.me/57300|true", "  www.x.org |true", "mi.com|true", "tel:+57300|true",
+            "Ana M.|false", "Medellín.Me encanta|false", "Tel: 300 123|false", "EE.UU.|false"})
+    void theDisplayNameHasNoLinksEither(String name, boolean refused) {
+        assertThat(ProfileTextDerivation.problems(only("display_name", Patch.of(name))))
+                .isEqualTo(refused ? Map.of("display_name", "no links") : Map.of());
     }
 
     @Test
