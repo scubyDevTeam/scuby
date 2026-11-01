@@ -11,6 +11,7 @@ import type {
   HelpRow,
   LostRow,
   PersonRow,
+  RecoveryClaimRow,
   SightingRow,
   Tables,
 } from './tables'
@@ -67,6 +68,9 @@ export function pendingCheckin(t: Tables, code: string, at = Date.now()) {
     : null
 }
 
+const MAX_CLAIMS_SHOWN = 50
+const lastActive = (c: RecoveryClaimRow) => c.last_active_at ?? c.created_at
+
 function lostView(
   t: Tables,
   row: LostRow,
@@ -98,7 +102,11 @@ function lostView(
         : 0
       : null,
     sightings: t.sightings
-      .filter((s) => s.case_code === row.code && (owner || s.status === 'visible'))
+      .filter(
+        (s) =>
+          s.case_code === row.code &&
+          (owner ? s.status !== 'deleted_by_reporter' : s.status === 'visible'),
+      )
       .sort((a, b) => ms(a.seen_at) - ms(b.seen_at))
       .map((s) => ({
         id: s.id,
@@ -112,13 +120,20 @@ function lostView(
         hidden: s.status !== 'visible',
         ...ownership(s, viewerId, device),
       })),
+    // The newest 50 by last activity, dated by it (#84); `open_claim_count` above counts them all.
     claims: owner
-      ? claims.map((c) => ({
-          id: c.id,
-          phone: c.phone,
-          created_at: c.created_at,
-          status: c.status,
-        }))
+      ? [...claims]
+          .sort(
+            (a, b) =>
+              ms(lastActive(b)) - ms(lastActive(a)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+          )
+          .slice(0, MAX_CLAIMS_SHOWN)
+          .map((c) => ({
+            id: c.id,
+            phone: c.phone,
+            created_at: lastActive(c),
+            status: c.status,
+          }))
       : [],
     pending_checkin: owner ? pendingCheckin(t, row.code) : null,
     contact: contact(t, row),
@@ -379,9 +394,11 @@ function needsLine(row: HelpRow): string {
 /** The pin is the viewer's own, and for how long they may still correct it (04 · Correction window). */
 export const EDIT_WINDOW = 15 * 60_000
 export function ownership(s: SightingRow, viewerId: string | null, device: string | null) {
+  // Decision #73: a pin with a person is that person's; one without is the browser's that sent it.
   const mine =
-    (viewerId !== null && s.reporter_id === viewerId) ||
-    (device !== null && s.reporter_key === device)
+    s.reporter_id !== null
+      ? viewerId !== null && s.reporter_id === viewerId
+      : device !== null && s.reporter_key === device
   const until = ms(s.created_at) + EDIT_WINDOW
   return {
     mine,
@@ -557,30 +574,63 @@ export function myCasesView(t: Tables, personId: string): WireOf<typeof api.list
   )
 }
 
+/**
+ * A newer case of the same pet exists (decision #81): the latest `published_at`, the higher code on a tie.
+ * Only a pet's newest case can be reopened or reactivated by a claim, so an old share link never revives it.
+ */
+export function superseded(t: Tables, row: LostRow): boolean {
+  return Object.values(t.cases).some(
+    (c) =>
+      c.vertical === 'lost' &&
+      c.pet_id === row.pet_id &&
+      c.code !== row.code &&
+      (ms(c.published_at) > ms(row.published_at) ||
+        (ms(c.published_at) === ms(row.published_at) && c.code > row.code)),
+  )
+}
+
+/** «Mis mascotas»: the caller's pets (a pet with no name too, as `name: ""`), the most recently active first (#78). */
 export function petsView(t: Tables, personId: string): WireOf<typeof api.listMyPets> {
   const lostCases = Object.values(t.cases).filter((row): row is LostRow => row.vertical === 'lost')
   return t.pets
-    .filter((pet) => pet.owner_id === personId && pet.name)
+    .filter((pet) => pet.owner_id === personId)
     .map((pet) => {
-      const own = lostCases.filter((row) => row.pet_id === pet.id)
-      const reopenable = own.find(
-        (row) =>
-          row.status === 'expired' &&
-          row.resolved_at !== null &&
-          Date.now() - ms(row.resolved_at) <= REOPEN_WINDOW,
+      // The caller's own cases of the pet; a case someone else made of it does not count.
+      const own = lostCases.filter((row) => row.pet_id === pet.id && row.created_by === personId)
+      const active = own.find((row) => row.status === 'active')
+      const reopenable = own
+        .filter(
+          (row) =>
+            row.status === 'expired' &&
+            row.resolved_at !== null &&
+            Date.now() - ms(row.resolved_at) <= REOPEN_WINDOW &&
+            !superseded(t, row),
+        )
+        .sort(
+          (a, b) => ms(b.resolved_at ?? '') - ms(a.resolved_at ?? '') || (a.code < b.code ? 1 : -1),
+        )[0]
+      const lastActivity = Math.max(
+        ...own.flatMap((row) => [ms(row.published_at), row.resolved_at ? ms(row.resolved_at) : 0]),
+        -1,
       )
       return {
-        id: pet.id,
-        name: pet.name ?? '',
-        species: pet.species,
-        size: pet.size,
-        colors: pet.colors,
-        marks: pet.marks,
-        photo_urls: pet.photo_urls,
-        active_case_code: own.find((row) => row.status === 'active')?.code ?? null,
-        reopenable_case_code: reopenable?.code ?? null,
+        lastActivity,
+        view: {
+          id: pet.id,
+          name: pet.name ?? '',
+          species: pet.species,
+          size: pet.size,
+          colors: pet.colors,
+          marks: pet.marks,
+          photo_urls: pet.photo_urls,
+          active_case_code: active?.code ?? null,
+          // Offered only when nothing is active.
+          reopenable_case_code: active ? null : (reopenable?.code ?? null),
+        },
       }
     })
+    .sort((a, b) => b.lastActivity - a.lastActivity)
+    .map(({ view }) => view)
 }
 
 export const userView = (p: PersonRow): WireOf<typeof api.getSession> => ({

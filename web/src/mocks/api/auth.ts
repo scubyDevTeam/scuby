@@ -28,6 +28,15 @@ function account(email: string): PersonRow {
   return created
 }
 
+// Plain text, no links: a WhatsApp link in the bio or the name bypasses a case's contact preferences
+// (decisions 12 and 13). Refused in any case: http(s)://, www., wa.me, mailto:, and tel: glued to a
+// number. Refused only in lowercase: a word ending in a known domain. «Av.Poblado», «EE.UU.» and
+// «Tel: 300 123» pass.
+const LINK = /https?:\/\/|\bwww\.|\bwa\.me|\bmailto:|\btel:(?=[+\d])/iu
+const DOMAIN =
+  /[\p{L}\p{N}_-]+\.(?:com|co|net|org|io|me|ly|link|app|info|biz|xyz|site|online|store|shop)(?![\p{L}\p{N}])/u
+export const hasLink = (text: string) => LINK.test(text) || DOMAIN.test(text)
+
 export const auth = [
   route(api.getSession, ({ user }) => userView(user)),
 
@@ -105,15 +114,18 @@ export const auth = [
   route(api.getProfile, ({ user }) => profileView(user)),
 
   route(api.updateProfile, ({ user, body }) => {
-    if (body.display_name !== undefined) user.display_name = body.display_name
-    if (body.city !== undefined) user.city = body.city
-    if (body.bio !== undefined) {
-      // Plain text, no links: a bio with a WhatsApp link bypasses contact prefs.
-      if (body.bio && /https?:\/\/|wa\.me|www\./i.test(body.bio)) {
-        throw new Fail('validation_failed', undefined, { bio: 'Sin enlaces' })
-      }
-      user.bio = body.bio
+    // The same rules as the backend (auth.md · Profile), checked before anything is stored.
+    const problems: Record<string, string> = {}
+    const name = body.display_name?.trim()
+    if (name !== undefined) {
+      if (name === '') problems.display_name = 'No puede estar vacío'
+      else if (hasLink(name)) problems.display_name = 'Sin enlaces'
     }
+    if (body.bio && hasLink(body.bio)) problems.bio = 'Sin enlaces'
+    if (Object.keys(problems).length > 0) throw new Fail('validation_failed', undefined, problems)
+    if (name !== undefined) user.display_name = name
+    if (body.city !== undefined) user.city = body.city
+    if (body.bio !== undefined) user.bio = body.bio
     if (body.notification_prefs) user.notification_prefs = body.notification_prefs
     if (body.photo_url !== undefined) user.photo_url = body.photo_url
     return profileView(user)

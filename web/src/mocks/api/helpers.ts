@@ -6,7 +6,7 @@ import { CLAIM_STALE, onClaimOpened, onOwnerInteraction } from '../followup'
 import { notify } from '../notify'
 import { fail, route } from '../route'
 import { ago, DAY, distance, HOUR, iso, metres, ms } from '../rules'
-import { EDIT_WINDOW, ownership, REOPEN_WINDOW } from '../serialize'
+import { EDIT_WINDOW, ownership, REOPEN_WINDOW, superseded } from '../serialize'
 import { mediaUrl } from './media'
 
 const MAX_DISTANCE_M = 30_000
@@ -17,8 +17,10 @@ const BEFORE_CASE = DAY
  * `encodeURIComponent` also leaves `! ' ( ) ~` alone, which URLEncoder encodes.
  */
 function waEncode(text: string): string {
-  return encodeURIComponent(text)
-    .replace(/[!'()~]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+  return encodeURIComponent(text).replace(
+    /[!'()~]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
 }
 
 /** 1 per 15 min and 5 per day per reporter per case; 20 per day per reporter overall (04). */
@@ -53,11 +55,22 @@ function checkSighting(row: LostRow | FoundRow, point: Point, seenAtIso: string)
   return { seenAt, away }
 }
 
-/** One's own pin, still inside its correction window (04): anything else is not theirs to change. */
-function ownEditable(code: string, id: string, userId: string | null, device: string): SightingRow {
+/**
+ * One's own pin, still inside its correction window (04): anything else is not theirs to change. A pin the
+ * reporter deleted is not found (for them too), like the backend; `deleting` lets that repeat through.
+ */
+function ownEditable(
+  code: string,
+  id: string,
+  userId: string | null,
+  device: string,
+  deleting = false,
+): SightingRow {
   const sighting =
     db.sightings.find((s) => s.id === id && s.case_code === code) ?? fail('not_found')
   const mine = ownership(sighting, userId, device)
+  if (sighting.status === 'deleted_by_reporter' && !(deleting && mine.mine)) fail('not_found')
+  if (sighting.status === 'deleted_by_reporter') return sighting
   if (!mine.mine || sighting.status !== 'visible') fail('forbidden')
   if (!mine.editable_until) fail('forbidden')
   return sighting
@@ -132,120 +145,142 @@ export const helpers = [
   }),
 
   // The row exists before the channel opens: the badge appears whatever happens in WhatsApp.
-  route(api.correctSighting, ({ params, body, user, reporterKey }) => {
-    const row = findCase(params.code) ?? fail('not_found')
-    if (row.vertical !== 'lost' && row.vertical !== 'found') fail('not_found')
-    const sighting = ownEditable(row.code, params.sightingId, user?.id ?? null, reporterKey)
-    if (row.status !== 'active') fail('invalid_transition')
-    checkSighting(row, body.point, body.seen_at)
-    // No new row: the pin moves, and the reporter's contact and photos stay with it.
-    sighting.point = body.point
-    sighting.seen_at = body.seen_at
-    sighting.note = body.note
-    return null
-  }),
+  // Backend order: the pin, then whose it is and the window, then the case is active, then the fields.
+  route(
+    api.correctSighting,
+    (ctx) => {
+      const { params, user, reporterKey } = ctx
+      const row = findCase(params.code) ?? fail('not_found')
+      if (row.vertical !== 'lost' && row.vertical !== 'found') fail('not_found')
+      const sighting = ownEditable(row.code, params.sightingId, user?.id ?? null, reporterKey)
+      if (row.status !== 'active') fail('invalid_transition')
+      const { body } = ctx
+      checkSighting(row, body.point, body.seen_at)
+      // No new row: the pin moves, and the reporter's contact and photos stay with it.
+      sighting.point = body.point
+      sighting.seen_at = body.seen_at
+      sighting.note = body.note
+      return null
+    },
+    { lateBody: true },
+  ),
 
+  // A status, never a removal: the pin is gone for everyone, the owner included, and keeps its `client_id`.
+  // Deleting twice answers the same success.
   route(api.deleteSighting, ({ params, user, reporterKey }) => {
     const row = findCase(params.code) ?? fail('not_found')
-    const sighting = ownEditable(row.code, params.sightingId, user?.id ?? null, reporterKey)
-    db.sightings.splice(db.sightings.indexOf(sighting), 1)
+    const sighting = ownEditable(row.code, params.sightingId, user?.id ?? null, reporterKey, true)
+    sighting.status = 'deleted_by_reporter'
     return null
   }),
 
-  route(api.claimRecovery, ({ params, body, user, reporterKey }) => {
-    const code = params.code.toUpperCase()
-    if (db.purged.includes(code)) fail('gone')
-    const row = findCase(code) ?? fail('not_found')
-    if (row.vertical !== 'lost') fail('not_found')
-    // A session is required (the route wrapper answered `unauthorized`); the owner cannot claim their own case.
-    if (row.created_by === user.id) fail('forbidden')
-    // Someone holding the animal is stronger evidence of a live search than the owner tapping
-    // «reabrir» (decision #29): inside the 30-day window, a claim reactivates an archived case —
-    // unless the pet already has another active case.
-    const reopens =
-      row.status === 'expired' &&
-      row.resolved_at !== null &&
-      Date.now() - ms(row.resolved_at) <= REOPEN_WINDOW
-    if (row.status !== 'active' && !reopens) fail('invalid_transition')
-    if (reopens) {
-      const other = Object.values(db.cases).find(
-        (c) =>
-          c.vertical === 'lost' &&
-          c.pet_id === row.pet_id &&
-          c.code !== row.code &&
-          c.status === 'active',
+  // Backend order: the code (gone / not_found), the owner (forbidden), the body, then the case's status.
+  route(
+    api.claimRecovery,
+    (ctx) => {
+      const { params, user, reporterKey } = ctx
+      const code = params.code.toUpperCase()
+      if (db.purged.includes(code)) fail('gone')
+      const row = findCase(code) ?? fail('not_found')
+      if (row.vertical !== 'lost') fail('not_found')
+      // A session is required (the route wrapper answered `unauthorized`); the owner cannot claim their own case.
+      if (row.created_by === user.id) fail('forbidden')
+      const { body } = ctx
+      // Someone holding the animal is stronger evidence of a live search than the owner tapping
+      // «reabrir» (decision #29): inside the 30-day window, a claim reactivates an archived case, but
+      // only the pet's newest one (#81), and not when the pet already has another active case.
+      const reopens =
+        row.status === 'expired' &&
+        row.resolved_at !== null &&
+        Date.now() - ms(row.resolved_at) <= REOPEN_WINDOW
+      if (row.status !== 'active' && !reopens) fail('invalid_transition')
+
+      // The public-contact rule, evaluated on the case as it is at the answer. The mock's contact_phone is always
+      // the publisher's verified one, so `contact_phone_verified` holds by construction.
+      const petName = db.pets.find((p) => p.id === row.pet_id)?.name?.trim()
+      // Same text and encoding as the backend's WhatsappLinks: UTF-8 percent-encoding with spaces as %20.
+      const whatsappText = `Hola, vi tu aviso${petName ? ` de ${petName}` : ''} en Scuby (${row.code}) y creo que lo tengo.`
+      const linkFor = (active: boolean) =>
+        active &&
+        row.contact_prefs.expose_whatsapp &&
+        row.phone_has_whatsapp &&
+        !row.contact_prefs.in_app_only
+          ? `https://wa.me/${row.contact_phone.replace('+', '')}?text=${waEncode(whatsappText)}`
+          : null
+
+      // One claim per person per case (#82). Once the owner answered it, a repeat gets the same claim back,
+      // untouched: no write, no reactivation, no new «posible hallazgo».
+      const mine = db.recoveryClaims.find(
+        (c) => c.case_code === row.code && c.claimant_id === user.id,
       )
-      if (other) fail('active_case_exists', { case_code: other.code })
-      row.status = 'active'
-      row.resolved_at = null
-      row.resolution = null
-      onOwnerInteraction(row.code)
-    }
-    // The link to the claimant's own sighting: only their own visible pin on this case from the last
-    // 24 hours counts; anything else is ignored and the claim is still created.
-    const sighting = body.from_sighting_id
-      ? db.sightings.find(
-          (s) =>
-            s.id === body.from_sighting_id &&
-            s.case_code === row.code &&
-            // Mine: their person, or an anonymous pin from their device (decision 6).
-            (s.reporter_id === user.id || (s.reporter_id === null && s.reporter_key === reporterKey)) &&
-            s.status === 'visible' &&
-            Date.now() - ms(s.created_at) < DAY,
+      if (mine && (mine.status === 'confirmed' || mine.status === 'dismissed')) {
+        return { id: mine.id, whatsapp_url: linkFor(row.status === 'active') }
+      }
+
+      if (reopens) {
+        const other = Object.values(db.cases).find(
+          (c) =>
+            c.vertical === 'lost' &&
+            c.pet_id === row.pet_id &&
+            c.code !== row.code &&
+            c.status === 'active',
         )
-      : undefined
-    // The public-contact rule, evaluated after the reactivation above (the case is active here). The mock's
-    // contact_phone is always the publisher's verified one, so `contact_phone_verified` holds by construction.
-    const whatsapp =
-      row.status === 'active' &&
-      row.contact_prefs.expose_whatsapp &&
-      row.phone_has_whatsapp &&
-      !row.contact_prefs.in_app_only
-    const petName = db.pets.find((p) => p.id === row.pet_id)?.name?.trim()
-    // Same text and encoding as the backend's WhatsappLinks: UTF-8 percent-encoding with spaces as %20.
-    const whatsappText = `Hola, vi tu aviso${petName ? ` de ${petName}` : ''} en Scuby (${row.code}) y creo que lo tengo.`
-    const whatsappUrl = whatsapp
-      ? `https://wa.me/${row.contact_phone.replace('+', '')}?text=${waEncode(whatsappText)}`
-      : null
-    // One open claim per person per case: a repeat refreshes their open (or stale) one — the new phone, and
-    // it counts as fresh again. What the repeat does not send is kept: empty photos or no link leave the
-    // earlier ones.
-    const mine = db.recoveryClaims.find(
-      (c) =>
-        c.case_code === row.code &&
-        c.claimant_id === user.id &&
-        (c.status === 'open' || c.status === 'stale'),
-    )
-    if (mine) {
-      mine.phone = body.phone
-      if (body.photo_urls.length > 0) mine.photo_urls = body.photo_urls
-      if (sighting) mine.from_sighting_id = sighting.id
-      mine.status = 'open'
-      mine.stale_at = iso(Date.now() + CLAIM_STALE)
-      return { id: mine.id, whatsapp_url: whatsappUrl }
-    }
-    const id = newId('claim-')
-    const staleAt = onClaimOpened(row.code, id)
-    db.recoveryClaims.push({
-      id,
-      case_code: row.code,
-      phone: body.phone,
-      claimant_id: user.id,
-      created_at: iso(Date.now()),
-      status: 'open',
-      stale_at: staleAt,
-      photo_urls: body.photo_urls,
-      from_sighting_id: sighting?.id ?? null,
-    })
-    const name = db.pets.find((p) => p.id === row.pet_id)?.name ?? 'tu mascota'
-    notify(
-      row.created_by,
-      'recovery_claim.opened',
-      `Alguien dice que tiene a ${name}. Ábrelo para contactar.`,
-      row.code,
-    )
-    return { id, whatsapp_url: whatsappUrl }
-  }),
+        if (other) fail('active_case_exists', { case_code: other.code })
+        if (superseded(db, row)) fail('invalid_transition')
+        row.status = 'active'
+        row.resolved_at = null
+        row.resolution = null
+        onOwnerInteraction(row.code)
+      }
+      // The link to the claimant's own sighting: only their own visible pin on this case from the last
+      // 24 hours counts; anything else is ignored and the claim is still created.
+      const sighting = body.from_sighting_id
+        ? db.sightings.find(
+            (s) =>
+              s.id === body.from_sighting_id &&
+              s.case_code === row.code &&
+              ownership(s, user.id, reporterKey).mine &&
+              s.status === 'visible' &&
+              Date.now() - ms(s.created_at) < DAY,
+          )
+        : undefined
+      const whatsappUrl = linkFor(true)
+      // A repeat refreshes their open (or stale) one: the new phone, and it counts as fresh again. What the
+      // repeat does not send is kept: empty photos or no link leave the earlier ones.
+      if (mine) {
+        mine.phone = body.phone
+        if (body.photo_urls.length > 0) mine.photo_urls = body.photo_urls
+        if (sighting) mine.from_sighting_id = sighting.id
+        mine.status = 'open'
+        mine.last_active_at = iso(Date.now())
+        mine.stale_at = iso(Date.now() + CLAIM_STALE)
+        return { id: mine.id, whatsapp_url: whatsappUrl }
+      }
+      const id = newId('claim-')
+      const staleAt = onClaimOpened(row.code, id)
+      db.recoveryClaims.push({
+        id,
+        case_code: row.code,
+        phone: body.phone,
+        claimant_id: user.id,
+        created_at: iso(Date.now()),
+        last_active_at: iso(Date.now()),
+        status: 'open',
+        stale_at: staleAt,
+        photo_urls: body.photo_urls,
+        from_sighting_id: sighting?.id ?? null,
+      })
+      const name = db.pets.find((p) => p.id === row.pet_id)?.name ?? 'tu mascota'
+      notify(
+        row.created_by,
+        'recovery_claim.opened',
+        `Alguien dice que tiene a ${name}. Ábrelo para contactar.`,
+        row.code,
+      )
+      return { id, whatsapp_url: whatsappUrl }
+    },
+    { lateBody: true },
+  ),
 
   route(api.recordShare, ({ params, body }) => {
     // A metric, not a feature: an unknown code is not worth an error the client would ignore anyway.

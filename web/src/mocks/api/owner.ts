@@ -23,6 +23,7 @@ import {
   notificationsView,
   petsView,
   REOPEN_WINDOW,
+  superseded,
 } from '../serialize'
 import { DEMO_CODE } from './auth'
 
@@ -51,7 +52,10 @@ const petName = (row: LostRow) => db.pets.find((p) => p.id === row.pet_id)?.name
 
 /** Ends a lost case as reunited, and tells everyone who helped (08 · To helpers). */
 function reunite(row: LostRow, attribution: string) {
-  if (row.status !== 'active') fail('invalid_transition')
+  // Repeating it answers the same success and keeps the first resolution (#71).
+  if (row.status === 'reunited') return
+  // An expired case is reunited directly, without a reopen that would make it public again first (#83).
+  if (row.status !== 'active' && row.status !== 'expired') fail('invalid_transition')
   row.status = 'reunited'
   row.resolution = 'reunited_home'
   row.resolution_attribution = attribution
@@ -68,6 +72,7 @@ function reunite(row: LostRow, attribution: string) {
 }
 
 function cancel(row: LostRow, resolution: string) {
+  if (row.status === 'cancelled') return
   if (row.status !== 'active') fail('invalid_transition')
   row.status = 'cancelled'
   row.resolution = resolution
@@ -75,13 +80,14 @@ function cancel(row: LostRow, resolution: string) {
   closeCheckins(row.code)
 }
 
+const claimOf = (row: LostRow, claimId: string) =>
+  db.recoveryClaims.find((c) => c.id === claimId && c.case_code === row.code) ?? fail('not_found')
+
 function answerClaim(row: LostRow, claimId: string, status: 'confirmed' | 'dismissed') {
-  const claim = db.recoveryClaims.find((c) => c.id === claimId && c.case_code === row.code)
-  if (!claim) fail('not_found')
-  // A stale claim is the absence of a verdict, not a verdict: it can still be confirmed (04).
-  if (claim.status !== 'open' && !(claim.status === 'stale' && status === 'confirmed')) {
-    fail('invalid_transition')
-  }
+  const claim = claimOf(row, claimId)
+  // The answer is revisable and idempotent, in any case status and from any claim status, a stale one
+  // included (#77): repeating the stored answer changes nothing, and confirming never closes the case.
+  if (claim.status === status) return claim
   claim.status = status
   closeClaimCheckins(claim.id)
   if (status === 'confirmed') {
@@ -275,43 +281,60 @@ export const owner = [
     return { code }
   }),
 
-  route(api.reuniteCase, ({ params, user, body }) => {
-    const row = ownedLost(params.code, user)
-    reunite(row, body.resolution_attribution)
-    return { id: row.code }
-  }),
+  // The owner endpoints answer in the backend's order: the case, the owner, the body, then the status.
+  route(
+    api.reuniteCase,
+    (ctx) => {
+      const row = ownedLost(ctx.params.code, ctx.user)
+      reunite(row, ctx.body.resolution_attribution)
+      return { id: row.code }
+    },
+    { lateBody: true },
+  ),
 
-  route(api.editLost, ({ params, user, body }) => {
-    const row = ownedLost(params.code, user)
-    if (row.status !== 'active') fail('invalid_transition')
-    const animal = db.pets.find((p) => p.id === row.pet_id)
-    if (body.photo_urls !== undefined && animal) animal.photo_urls = body.photo_urls
-    if (body.marks !== undefined && animal) animal.marks = body.marks
-    if (body.last_seen_at !== undefined && ms(body.last_seen_at) > Date.now() + 5 * 60_000) {
-      throw new Fail('validation_failed', undefined, { last_seen_at: 'En el futuro' })
-    }
-    const area = row.last_seen
-    if (body.last_seen_point !== undefined) {
-      area.center = body.last_seen_point
-      area.place_name = placeName(body.last_seen_point)
-    }
-    if (body.last_seen_radius_m !== undefined) area.radius_m = body.last_seen_radius_m
-    if (body.last_seen_at !== undefined) area.at = body.last_seen_at
-    // No notification, no broadcast: the neighbours were told once (04).
-    return null
-  }),
+  route(
+    api.editLost,
+    (ctx) => {
+      const { params, user } = ctx
+      const row = ownedLost(params.code, user)
+      const { body } = ctx
+      if (body.last_seen_at !== undefined && ms(body.last_seen_at) > Date.now() + 5 * 60_000) {
+        throw new Fail('validation_failed', undefined, { last_seen_at: 'En el futuro' })
+      }
+      if (row.status !== 'active') fail('invalid_transition')
+      const animal = db.pets.find((p) => p.id === row.pet_id)
+      if (body.photo_urls !== undefined && animal) animal.photo_urls = body.photo_urls
+      if (body.marks !== undefined && animal) animal.marks = body.marks
+      const area = row.last_seen
+      if (body.last_seen_point !== undefined) {
+        area.center = body.last_seen_point
+        area.place_name = placeName(body.last_seen_point)
+      }
+      if (body.last_seen_radius_m !== undefined) area.radius_m = body.last_seen_radius_m
+      if (body.last_seen_at !== undefined) area.at = body.last_seen_at
+      // No notification, no broadcast: the neighbours were told once (04).
+      return null
+    },
+    { lateBody: true },
+  ),
 
-  route(api.cancelCase, ({ params, user, body }) => {
-    const row = ownedLost(params.code, user)
-    cancel(row, body.resolution)
-    return { id: row.code }
-  }),
+  route(
+    api.cancelCase,
+    (ctx) => {
+      const row = ownedLost(ctx.params.code, ctx.user)
+      cancel(row, ctx.body.resolution)
+      return { id: row.code }
+    },
+    { lateBody: true },
+  ),
 
   // An expired case comes back with its sightings and trajectory: lost and found for 30 days, an
   // adoption listing for 90.
   route(api.reopenCase, ({ params, user }) => {
     const row = findCase(params.code) ?? fail('not_found')
     if (row.created_by !== user.id) fail('forbidden')
+    // Reopening a lost case that is already active answers the same success (#71).
+    if (row.vertical === 'lost' && row.status === 'active') return { id: row.code }
     if (row.status !== 'expired' || !row.resolved_at) fail('invalid_transition')
     const window = row.vertical === 'adoption' ? ADOPTION_REOPEN_WINDOW : REOPEN_WINDOW
     if (Date.now() - ms(row.resolved_at) > window) fail('invalid_transition')
@@ -324,6 +347,8 @@ export const owner = [
           c.status === 'active',
       )
       if (other) fail('active_case_exists', { case_code: other.code })
+      // Only the pet's newest case comes back (#81).
+      if (superseded(db, row)) fail('invalid_transition')
     }
     row.status = 'active'
     row.resolved_at = null
@@ -334,34 +359,49 @@ export const owner = [
     return { id: row.code }
   }),
 
-  route(api.answerRecoveryClaim, ({ params, user, body }) => {
-    const row = ownedLost(params.code, user)
-    const claim = answerClaim(row, params.claimId, body.status)
-    if (row.status === 'active') onOwnerInteraction(row.code)
-    return { id: claim.id }
-  }),
+  route(
+    api.answerRecoveryClaim,
+    (ctx) => {
+      const row = ownedLost(ctx.params.code, ctx.user)
+      claimOf(row, ctx.params.claimId)
+      const claim = answerClaim(row, ctx.params.claimId, ctx.body.status)
+      if (row.status === 'active') onOwnerInteraction(row.code)
+      return { id: claim.id }
+    },
+    { lateBody: true },
+  ),
 
-  route(api.moderateSighting, ({ params, user, body }) => {
-    const row = ownedLost(params.code, user)
-    const sighting = db.sightings.find(
-      (s) => s.id === params.sightingId && s.case_code === row.code,
-    )
-    if (!sighting) fail('not_found')
-    if (body.highlighted !== undefined) {
-      if (body.highlighted && !sighting.highlighted_by_owner) {
-        notify(
-          sighting.reporter_id,
-          'sighting.highlighted',
-          `El dueño de ${petName(row)} marcó tu avistamiento como útil.`,
-          row.code,
-        )
+  route(
+    api.moderateSighting,
+    (ctx) => {
+      const { params, user } = ctx
+      const row = ownedLost(params.code, user)
+      // A pin the reporter deleted is invisible to the owner: not found.
+      const sighting = db.sightings.find(
+        (s) =>
+          s.id === params.sightingId &&
+          s.case_code === row.code &&
+          s.status !== 'deleted_by_reporter',
+      )
+      if (!sighting) fail('not_found')
+      const { body } = ctx
+      if (body.highlighted !== undefined) {
+        if (body.highlighted && !sighting.highlighted_by_owner) {
+          notify(
+            sighting.reporter_id,
+            'sighting.highlighted',
+            `El dueño de ${petName(row)} marcó tu avistamiento como útil.`,
+            row.code,
+          )
+        }
+        sighting.highlighted_by_owner = body.highlighted
       }
-      sighting.highlighted_by_owner = body.highlighted
-    }
-    if (body.hidden !== undefined) sighting.status = body.hidden ? 'hidden_by_owner' : 'visible'
-    if (row.status === 'active') onOwnerInteraction(row.code)
-    return { id: sighting.id }
-  }),
+      if (body.hidden !== undefined) sighting.status = body.hidden ? 'hidden_by_owner' : 'visible'
+      if (row.status === 'active') onOwnerInteraction(row.code)
+      return { id: sighting.id }
+    },
+    { lateBody: true },
+  ),
 
   route(api.answerCheckin, ({ params, user, body }) => answerCheckinAs(user, params, body)),
 
