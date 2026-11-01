@@ -35,7 +35,8 @@ Existing reads change to carry claims: `GET /cases/{code}` (`claims[]`, `open_cl
 1. The 13 endpoints run and every integration-tested response validates against the regenerated
    `docs/eng/openapi.json`; `ContractCoverageTest`, ArchUnit and PIT (≥ 80 % on every new `*Derivation`)
    pass in `./mvnw verify`.
-2. The contract change of §6 is merged: `pnpm openapi`, `pnpm test` and `pnpm typecheck` pass in `web/`.
+2. The contract change of §6 is merged: `pnpm openapi`, `pnpm test` and `pnpm typecheck` pass in `web/`, and
+   `pnpm e2e` against the mock passes `@HELP-002`, `@HELP-005` and `@LINK-001` (web CI runs it).
 3. `bash backend/e2e/run-client-e2e.sh` (with the seed additions of §7.6): `@LINK-001` passes;
    `@PLOST-002` and `@PLOST-004` fail only at their «Continuar con Google» step: run locally with that step
    replaced by an email-code sign-in as the demo owner (`carolina@correo.co`), every later step passes;
@@ -104,12 +105,13 @@ CREATE TABLE recovery_claim (
   from_sighting_id    uuid REFERENCES sighting (id),
   status              text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'confirmed', 'dismissed')),
   created_at          timestamptz NOT NULL,
+  last_active_at      timestamptz NOT NULL,
   answered_at         timestamptz,
   CHECK ((lat IS NULL) = (lng IS NULL)),
   CHECK ((status = 'open') = (answered_at IS NULL))
 );
 
--- Integrity: one open claim per claimant per case; settles the double-tap race (INSERT … ON CONFLICT).
+-- Integrity: one open claim per claimant per case; settles the double-tap race (INSERT … ON CONFLICT … DO UPDATE).
 CREATE UNIQUE INDEX recovery_claim_one_open_per_claimant
   ON recovery_claim (case_code, claimant_person_id) WHERE status = 'open';
 ```
@@ -119,8 +121,10 @@ CREATE UNIQUE INDEX recovery_claim_one_open_per_claimant
 - The claimant is always a person (a session is required). There is no device column.
 - `point` is the pair `lat`/`lng`, filled only from `from_sighting_id` (the request carries no point).
 - No `note` column: the contract's claim request has no note, and a column nothing writes is not added (a later contract change adds it with its migration).
-- `stale` is not a stored status. A claim is stale when `status = 'open'` and `created_at + 7 days` is in
-  the past (§3, `ClaimDerivation`).
+- `last_active_at` is when the claimant last said «Lo tengo» on this claim: set at insert, and set again by
+  a repeat while the claim is open (§4.9). `created_at` never moves.
+- `stale` is not a stored status. A claim is stale when `status = 'open'` and `last_active_at + 7 days` is in
+  the past (§3, `ClaimDerivation`). A repeat makes a stale claim fresh again.
 - The foreign keys have no `ON DELETE` action: the purge (L2) and account deletion (L2, decision #28)
   decide what happens to claims.
 
@@ -153,8 +157,8 @@ Nothing writes `city` before L1, so no row can violate it. The request check use
 |---|---|---|---|
 | `REOPEN_WINDOW` | 30 days, inclusive (`!now.isAfter(resolvedAt + 30 d)`; SQL `resolved_at >= :now − 30 d`) | `LostLifecycleDerivation` | reopen, claim reactivation, `/me/pets` |
 | `EDIT_WINDOW` | 15 minutes, exclusive (`now.isBefore(createdAt + 15 min)`; SQL `created_at > :now − 15 min`) | `LostCaseDerivation` (exists) | `editable_until`, correction, delete |
-| `STALE_AFTER` | 7 days; stale iff `createdAt + 7 d` is before `now` (SQL non-stale: `created_at >= :now − 7 d`) | `ClaimDerivation` | claim wire status, `open_claim_count`, `possible_find` |
-| `PREFILL_WINDOW` | 24 hours, exclusive (SQL `created_at > :now − 24 h`) | `ClaimDerivation` | `from_sighting_id` eligibility |
+| `STALE_AFTER` | 7 days; stale iff the claim is open and `lastActiveAt + 7 d` is before `now` (SQL non-stale: `last_active_at >= :now − 7 d`) | `ClaimDerivation` | claim wire status, `open_claim_count`, `possible_find` |
+| `PREFILL_WINDOW` | 24 hours, exclusive (SQL `created_at > :now − 24 h`, the pin's) | `ClaimDerivation` | `from_sighting_id` eligibility |
 | `MAX_CLAIMS_SHOWN` | 50 | `LostCaseQueries` | owner's `claims[]` |
 
 The 5-minute future tolerance of an edit reuses `PublishLostService.CLOCK_DRIFT` (the publish rule).
@@ -179,6 +183,20 @@ them; zero rows after a passing pre-read is the race loser and answers the code 
 where the contract allows it, `{}` is a valid no-op. A generic `Patch<T>` in `platform.web` (absent, null,
 value) is deserialized through Jackson's absent-value and null-value hooks, so records keep the three
 states apart.
+
+**"Mine" for a sighting.** A pin is the caller's when its `reporter_person_id` is the session's person,
+**or** when it has no person (`reporter_person_id IS NULL`) and its `reporter_device_hash` is the caller's
+device. Another person's pin is never mine, whatever device sent it; an anonymous pin stays mine after I sign
+in on the same browser. One rule, `LostCaseDerivation.mine`, for `mine` and `editable_until` in views,
+correction, delete (§4.7–4.8) and the claim's `from_sighting_id` link (§4.9).
+
+**Idempotent transitions.** Reunite on a `reunited` case, cancel on a `cancelled` case, reopen on this case
+while it is `active`, and the reporter's delete of their own pin that is already `deleted_by_reporter` answer
+the same success as the first call (200 with the same body; 204 for delete) and write nothing; they never
+overwrite the first call's resolution or attribution. A different state is still refused: cancel or reopen
+on a `reunited` case is `invalid_transition`. Mechanics: the pre-read answers an already-done action with no
+write; the conditional statement that changes 0 rows after a passing pre-read is followed by one re-read
+that tells "already in the target state" (success) from "another state" (the refusal).
 
 **The claim badge.** `open_claim_count` and `possible_find` count claims with `status = 'open'`, not stale,
 on an **active** case, and are **owner-only**: a non-owner (anonymous, a signed-in stranger, the claimant
@@ -229,28 +247,33 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
 
 - **Auth:** session; owner. **Body:** `resolution_attribution` required, one of `platform_sighting |
   platform_claim | platform_share | offline | unknown`; not checked against evidence.
-- **Order:** session → `not_found` → `forbidden` → body → `active` else `invalid_transition`.
+- **Order:** session → `not_found` → `forbidden` → body → `active` (or already `reunited`: 200, no write)
+  else `invalid_transition`.
 - **Statement:** `UPDATE lost_case SET status = 'reunited', resolution = 'reunited_home',
   resolution_attribution = ?, resolved_at = :now WHERE code = ? AND created_by = ? AND status = 'active'
-  RETURNING code`. Zero rows → `invalid_transition`.
+  RETURNING code`. Zero rows → one re-read: `reunited` → 200 (another request reunited it first; its
+  attribution stays), else `invalid_transition`.
 - Claims are untouched (open ones stop counting because the case is not active). The pet and its
   responsibility link are untouched.
-- **Response:** 200 `Created {id: <case code>}`. **Ceiling 3:** session, pre-read, update.
+- **Response:** 200 `Created {id: <case code>}`, also for a repeat. **Ceiling 4:** session, pre-read, update,
+  re-read (the race loser); 3 on success, 2 for a repeat the pre-read answers.
 - **Resolves:** Q-A1, Q-A2, Q-A7, Q-A9.
 
 ### 4.4 `POST /cases/{code}/cancel`
 
 - As reunite, with **body** `resolution` required, `false_alarm | duplicate`, and `SET status = 'cancelled',
-  resolution = ?, resolved_at = :now`.
+  resolution = ?, resolved_at = :now`. Idempotent on `cancelled` (the first reason stays); `reunited` or
+  `expired` → `invalid_transition`.
 - A cancelled case is still served by `GET /cases/{code}` with `status: cancelled` and `contact: null` (the
   current derivation already nulls the contact off `active`); the feed shows only active cases; «Mis casos»
   lists it; `/me/pets` treats it as neither active nor reopenable.
-- **Response:** 200 `Created {id: <case code>}`. **Ceiling 3.** **Resolves:** Q-A1, Q-A2, Q-A8.
+- **Response:** 200 `Created {id: <case code>}`. **Ceiling 4** (as reunite). **Resolves:** Q-A1, Q-A2, Q-A8.
 
 ### 4.5 `POST /cases/{code}/reopen`
 
 - **Auth:** session; owner. **No body.**
-- **Order:** session → `not_found` → `forbidden` → `invalid_transition` (status not `expired`, or
+- **Order:** session → `not_found` → `forbidden` → this case already `active` (200, no write: a retry, or a
+  claim's reactivation won) → `invalid_transition` (status `reunited`/`cancelled`, or `expired` with
   `resolved_at` outside `REOPEN_WINDOW`) → `active_case_exists` (the pet has another active case;
   `details.case_code` = that case). A purged code is `not_found` (the contract lists no `gone` here).
 - **Statement:** `UPDATE lost_case SET status = 'active', resolution = NULL, resolution_attribution = NULL,
@@ -258,8 +281,8 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
   AND NOT EXISTS (SELECT 1 FROM lost_case other WHERE other.pet_id = lost_case.pet_id AND other.status =
   'active') RETURNING code`. A concurrent publish that wins the pet is settled by
   `lost_case_one_active_per_pet`: the unique violation is caught (constraint name checked) and answered as
-  `active_case_exists` after reading the other code. Zero rows → re-classify (status/window →
-  `invalid_transition`, else `active_case_exists`).
+  `active_case_exists` after reading the other code. Zero rows → re-classify (now `active` → 200, the
+  case is as the owner asked; status/window → `invalid_transition`, else `active_case_exists`).
 - **Keeps** the sightings, the claims (a stale one stays stale) and the original `published_at`; **never
   re-broadcasts** and notifies no one.
 - **Response:** 200 `Created {id: <case code>}`. **Ceiling 4:** session, pre-read, update, active-code read.
@@ -285,8 +308,8 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
 ### 4.7 `POST /cases/{code}/sightings/{sightingId}/correction` — reporter
 
 - **Auth:** public (device cookie or session). Not declared as `session`.
-- **"Mine"** (session wins, `api.md` · Device identity): with a session, `reporter_person_id = :me`; with no
-  session, `reporter_device_hash = :device`. `LostCaseDerivation` changes from OR to this rule for `mine`
+- **"Mine"** (§3, `api.md` · Device identity): `reporter_person_id = :me`, or `reporter_person_id IS NULL AND
+  reporter_device_hash = :device`. `LostCaseDerivation` changes from person-OR-device to this rule for `mine`
   and `editable_until`.
 - **Order:** the sighting is on this case and not `removed_by_moderation`/`deleted_by_reporter`, else
   `not_found` → mine, `visible` and inside `EDIT_WINDOW`, else `forbidden` (a pin the owner hid is no longer
@@ -305,11 +328,13 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
 ### 4.8 `DELETE /cases/{code}/sightings/{sightingId}` — reporter
 
 - **Auth:** public; "mine" as in §4.7.
-- **Order:** `not_found` → `forbidden` (as §4.7). No case-status check: allowed on a closed case while
-  inside the window (the contract lists no `invalid_transition`).
+- **Order:** the caller's own pin already `deleted_by_reporter` → 204, no write (any time) → `not_found`
+  (someone else's deleted pin included) → `forbidden` (as §4.7). No case-status check: allowed on a closed
+  case while inside the window (the contract lists no `invalid_transition`).
 - **Statement:** `UPDATE sighting SET status = 'deleted_by_reporter' WHERE id = ? AND case_code = ? AND
   status = 'visible' AND created_at > :now − 15 min AND <mine>`. Never a hard delete; `client_id` stays
-  taken, so a replayed «Lo vi» with it answers the deleted row's id. Zero rows → re-read and re-classify.
+  taken, so a replayed «Lo vi» with it answers the deleted row's id. Zero rows → re-read: deleted by the
+  caller → 204 (a double tap), else re-classify.
 - **Response:** 204. **Ceiling 4.** **Resolves:** Q-D2, Q-D10.
 
 ### 4.9 `POST /cases/{code}/recovery-claims` — «Lo tengo»
@@ -323,10 +348,11 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
     `validation_failed {phone}`).
   - `photo_urls` ≤ 5, `requireAttachable(urls, claim, caller, "photo_urls")` before the transaction. Stored,
     not exposed.
-  - `from_sighting_id` optional: must be a `visible` sighting on this case whose `reporter_person_id` is the
-    caller **or** whose `reporter_device_hash` is the caller's device (the device clause applies to this
-    link only), created inside `PREFILL_WINDOW`; else `validation_failed {from_sighting_id}`. Its point is
-    copied into `lat`/`lng`; its photos are never copied.
+  - `from_sighting_id` optional, and never an error: when it names a `visible` sighting on this case that is
+    the caller's ("mine", §3) and was created inside `PREFILL_WINDOW`, the claim stores it and copies its
+    point into `lat`/`lng` (its photos never). Otherwise — another case, older, not the caller's, not
+    visible, unknown, or not a UUID (the contract types it as a plain string, so there is no malformed
+    form) — the link is dropped and the claim is stored without it and without a point.
 - **Status:** `active` → insert. `expired` with `resolved_at` inside `REOPEN_WINDOW` → reactivate (decision
   #29) and insert, in one transaction. `expired` outside the window (not yet purged), `reunited` or
   `cancelled` → `invalid_transition`. The pet has another active case → `active_case_exists`
@@ -335,20 +361,30 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
   1. Only for an expired case: the reopen `UPDATE` of §4.5 without the `created_by` guard. Zero rows is not
      an error here (a concurrent claim may have reactivated it first); a unique violation is
      `active_case_exists`.
-  2. `INSERT INTO recovery_claim (…) SELECT …, 'open', :now FROM lost_case WHERE code = ? AND status =
-     'active' ON CONFLICT (case_code, claimant_person_id) WHERE status = 'open' DO NOTHING RETURNING id`.
-  Empty → select the caller's open claim on the case (the dedupe: it is returned, 201, idempotent; an open
-  claim includes a stale one); none → re-read the status and classify. The reactivation holds the case row
-  only until the insert right after it commits.
+  2. ONE statement: `INSERT INTO recovery_claim (…, created_at, last_active_at) SELECT …, 'open', :now, :now
+     FROM lost_case WHERE code = ? AND status = 'active' ON CONFLICT (case_code, claimant_person_id) WHERE
+     status = 'open' DO UPDATE SET phone = excluded.phone, photo_urls = excluded.photo_urls, lat =
+     excluded.lat, lng = excluded.lng, from_sighting_id = excluded.from_sighting_id, last_active_at =
+     excluded.last_active_at RETURNING id`.
+  **A repeat refreshes the claim:** while the caller's claim on the case is open (stale included), the
+  repeat's phone, photos, point and link replace the stored ones and `last_active_at = now`, so a stale
+  claim is fresh again and counts in the badge; its id, `created_at` and status stay, and the answer is the
+  same id. A double tap serializes on the index entry: one row, both answers carry its id.
+  Empty → the case is not active: re-read the status and classify (`invalid_transition`, or
+  `active_case_exists` when the pet has another active case). The refresh applies only when the claim's case
+  is active or is reactivated without conflict: a repeat on an expired case whose pet has another active case
+  answers `active_case_exists`, never the old claim. The reactivation holds the case row only until the write
+  right after it commits.
 - No rate limit (as #54). Writes no notification and no check-in.
-- **Response:** 201 `Claim {id, whatsapp_url}`. `whatsapp_url` is set only when the public-contact rule holds
+- **Response:** 201 `Claim {id, whatsapp_url}`, a repeat included (the contract lists only 201 as this route's
+  success). `whatsapp_url` is set only when the public-contact rule holds
   (`expose_whatsapp AND phone_has_whatsapp AND contact_phone_verified AND NOT in_app_only`, case active),
-  evaluated after any reactivation: a successful insert proves the case is active, and the contact flags
+  evaluated after any reactivation: a returned row proves the case was active when it was written, and the contact flags
   come from the pre-read (no L1 endpoint changes them). The URL is
   `https://wa.me/<digits>?text=<URL-encoded text>` with «Hola, vi tu aviso de {nombre} en Scuby ({código}) y
   creo que lo tengo.» (copy review pending). Otherwise `null`. No `mailto:`.
-- **Ceiling 9:** session, pre-read (case + pet name + contact flags), `supported_countries`, from-sighting
-  read, upload lookup, reactivation, insert, dedupe select, status re-read.
+- **Ceiling 8:** session, pre-read (case + pet name + contact flags), `supported_countries`, from-sighting
+  read, upload lookup, reactivation, upsert, status re-read. A plain claim and a plain repeat are 4.
 - **Resolves:** Q-B1, Q-B2, Q-B3, Q-B4, Q-B5, Q-B6, Q-B7, Q-B8, Q-B10, Q-A4.
 
 ### 4.10 `POST /cases/{code}/claims/{claimId}` — the owner's answer
@@ -413,7 +449,7 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
 
 | Read | Change | Ceiling |
 |---|---|---|
-| `GET /cases/{code}` | Owner only, one more query: `SELECT id, phone, created_at, status, count(*) FILTER (WHERE status = 'open' AND created_at >= :now − 7 d) OVER () FROM recovery_claim WHERE case_code = ? ORDER BY created_at DESC, id DESC LIMIT 50`. `LostCaseFacts` gets `@Nullable ClaimFacts` (null for a non-owner: not queried). `LostCaseDerivation`: owner → `claims[]` with the wire status from `ClaimDerivation` (`stale` when due), `open_claim_count` = the count on an active case, else 0; non-owner → `claims: []`, `open_claim_count: null`. `LostCaseView.openClaimCount` becomes `@Nullable Integer`. Sightings query excludes `deleted_by_reporter` for the owner | 3 → **4** (owner: session, case, sightings, claims; a stranger 3, anonymous 2) |
+| `GET /cases/{code}` | Owner only, one more query: `SELECT id, phone, created_at, last_active_at, status, count(*) FILTER (WHERE status = 'open' AND last_active_at >= :now − 7 d) OVER () FROM recovery_claim WHERE case_code = ? ORDER BY created_at DESC, id DESC LIMIT 50`. `LostCaseFacts` gets `@Nullable ClaimFacts` (null for a non-owner: not queried). `LostCaseDerivation`: owner → `claims[]` with the wire status from `ClaimDerivation` (`stale` when due, from `last_active_at`), `open_claim_count` = the count on an active case, else 0; non-owner → `claims: []`, `open_claim_count: null`. `LostCaseView.openClaimCount` becomes `@Nullable Integer`. Sightings query excludes `deleted_by_reporter` for the owner | 3 → **4** (owner: session, case, sightings, claims; a stranger 3, anonymous 2) |
 | `GET /feed` | `possible_find`: for an item whose `created_by` is the caller, `EXISTS` an open non-stale claim (correlated subquery); for every other item, and for anonymous callers, an inline `NULL` | 3, unchanged |
 | `GET /me/cases` | `open_claim_count`: correlated count of open non-stale claims when the case is active, else 0. Stays a non-null int (the list is the caller's own) | 2, unchanged |
 
@@ -445,19 +481,21 @@ Made by the backend in `web/src/contracts`, then `pnpm openapi` regenerates `doc
 |---|---|
 | `case.ts` `lostCaseWire` | `open_claim_count: z.nullable(z.int().check(z.nonnegative()))`, comment: "Only the owner receives it (null otherwise): a claim must never reduce reach (docs/product/04 · Rule: a recovery claim must never reduce reach)". `LostCase.openClaimCount: number \| null` |
 | `feed.ts` `feedItemWire` | `possible_find: z.nullable(z.boolean())`, same comment. `FeedItem.possibleFind: boolean \| null` |
-| `endpoints/helpers.ts` `claimRecovery` | `auth: 'session'`; errors `['not_found', 'forbidden', 'invalid_transition', 'active_case_exists', 'gone']`; summary says a session is required, the owner cannot claim their own case, and a repeated claim answers the open one |
+| `endpoints/helpers.ts` `claimRecovery` | `auth: 'session'`; errors `['not_found', 'forbidden', 'invalid_transition', 'active_case_exists', 'gone']`; summary says a session is required, the owner cannot claim their own case, a repeated claim refreshes the open one, and an ineligible `from_sighting_id` is ignored |
 | `endpoints/lost.ts` `reopenCase` | errors `[...OWNER_ONLY, 'active_case_exists']` |
 | `domain/lost/actions.ts` | `hasPossibleFind(openClaimCount: number \| null)` → `(openClaimCount ?? 0) > 0` |
 | `mocks/serialize.ts` | `lostView`: `open_claim_count` is `null` unless `owner`; for the owner, the open count on an active case, else 0. `feedItem` takes the viewer and sends `possible_find: null` unless the viewer published the item |
-| `mocks/api/helpers.ts` | `claimRecovery`: `forbidden` for the case's owner, `gone` for a purged code, `active_case_exists` when the reactivation would make a second active case for the pet, the caller's open claim returned on a repeat. The session check comes from the route wrapper |
+| `mocks/api/helpers.ts` | `claimRecovery`: `forbidden` for the case's owner, `gone` for a purged code, `active_case_exists` when the reactivation would make a second active case for the pet (before any repeat is answered), the caller's open claim refreshed on a repeat (new phone, open again). The session check comes from the route wrapper |
 | `mocks/backend.test.ts` | The stranger expects `openClaimCount` `null`; the claim scenarios sign in first |
 | `web/e2e/lost-case.spec.ts` `@LINK-001` | The stranger's step drops the «Posible hallazgo» assertion; a last step signs in as the case's owner by email code (`carolina@correo.co`) and asserts «Posible hallazgo» |
+| `web/e2e/helper-actions.spec.ts` `@HELP-002`, `@HELP-005` | The helper signs in by email code before claiming; the last assertion becomes the badge's absence (the claim sheet's success state is the claimant's feedback). Without it web CI, which runs `pnpm e2e` against the mock, fails |
 
 Only the badge change was a product decision; the `claimRecovery` and `reopenCase` rows make the contract
-list the auth and the codes the decided behaviour answers (§4.5, §4.9). Without them `ApiClient` refuses the
-responses and `ContractCoverageTest` fails. The reason is recorded in decision rows #75 and #76 (§8). The
-other mock behaviour that differs (answers revisable, delete as a status, session-wins `mine`) is listed in
-the handoff, not changed.
+list the auth and the codes the decided behaviour answers (§4.5, §4.9). Without the `claimRecovery` row
+`ApiClient` refuses its `401`/`403`/`410` (statuses the route does not list yet) and `ContractCoverageTest`
+fails; reopen's `409` is already listed, so the `reopenCase` row adds the code for the client. The reason is recorded in decision rows #75 and #76 (§8). The
+other mock behaviour that differs (answers revisable, delete as a status, the "mine" rule, idempotent
+transitions, the WhatsApp link's full contact rule and prefilled text) is listed in the handoff, not changed.
 
 `found-case.ts`'s `open_claim_count` (ownership claims) and `MyCases.open_claim_count` are unchanged.
 
@@ -466,7 +504,7 @@ the handoff, not changed.
 ### 7.1 Leak tests
 
 As an anonymous caller, a signed-in stranger and **the claimant**: `GET /cases/{code}` has `claims: []`,
-`open_claim_count: null`, every `sightings[].contact_phone: null`, no hidden pin; `GET /feed` has
+`open_claim_count: null`, `viewer: public`, the public zone only (snapped center, widened radius), every `sightings[].contact_phone: null`, no hidden pin; `GET /feed` has
 `possible_find: null` on every item. As the owner: the same case has the claims, the count and the
 contacts, including a hidden pin's contact. A pin `deleted_by_reporter` appears for nobody.
 
@@ -478,8 +516,10 @@ asserted, never lock order; never a `500`.
 | Test | Invariant |
 |---|---|
 | Reunite, cancel and edit against a signed-in «Lo vi» | The close never waits for the sighting's uncommitted insert; a sighting committed before the close stays; one inserted after the close commits is `invalid_transition`; an edit and a sighting both commit |
-| A claim against reactivation | Two claimants on one expired case: one reactivation, two claims, case `active`. A claim against a publish for the same pet: exactly one active case, the loser `active_case_exists`. A claim against reopen: case `active`, claim stored, reopen 200 or `invalid_transition` |
-| The same person claims twice at once | One row, both answers carry its id |
+| Close against close | A cancel that meets a committed reunite: `invalid_transition`, the reunite's resolution stays. A retried reunite that meets the first one: 200, the first attribution stays |
+| A claim against reactivation | Two claimants on one expired case: one reactivation, two claims, case `active`. A claim against a publish for the same pet: exactly one active case, the loser `active_case_exists`. A claim against reopen: case `active`, claim stored, reopen 200 (also deterministic: a reopen that meets a held reactivation answers 200) |
+| The same person claims twice at once | One row, both answers carry its id (the second write refreshes it) |
+| A double-tap delete | The second delete meets the first: 204, one status change |
 | A correction at the window edge | At `created_at + 15 min − 1 ms` 204; at `created_at + 15 min` `forbidden` (`MutableClock`); the same for delete |
 
 ### 7.3 Statement ceilings
@@ -492,9 +532,9 @@ several claims and sightings on a case, 1 and 20 pets for `/me/pets`.
 
 | Derivation | Table |
 |---|---|
-| `LostLifecycleDerivation` | (action reunite/cancel/reopen/claim-reactivate × status × `resolved_at` at 29 d, exactly 30 d, 30 d + 1 ms) → allowed or `invalid_transition` |
-| `ClaimDerivation` | Wire status (open at 7 d exactly, stale at 7 d + 1 ms; confirmed and dismissed never stale); badge (owner/non-owner × active/closed × counts); answer outcome (same answer → no change, `confirmed ↔ dismissed`, from open); `from_sighting` eligibility (person, device, other's, not visible, 24 h edge); WhatsApp URL and text (each flag of the contact rule) |
-| `LostCaseDerivation` | `mine` and `editable_until`: session matches, session with a matching device only (not mine), no session with a matching device (mine) |
+| `LostLifecycleDerivation` | (action reunite/cancel/reopen/claim-reactivate × status × `resolved_at` at 29 d, exactly 30 d, 30 d + 1 ms) → allowed, already done (reunite on reunited, cancel on cancelled, reopen on active) or `invalid_transition` |
+| `ClaimDerivation` | Wire status (open 7 d exactly after the last activity, stale at 7 d + 1 ms; confirmed and dismissed never stale); badge (owner/non-owner × active/closed × counts); answer outcome (same answer → no change, `confirmed ↔ dismissed`, from open); `from_sighting` eligibility (mine or not, not visible, 24 h edge); WhatsApp URL and text (each flag of the contact rule) |
+| `LostCaseDerivation` | `mine` and `editable_until`: person match; an anonymous pin from the same device while signed in (mine); another person's pin on the same device (not mine); an anonymous pin from another device (not mine); no session with a matching anonymous pin (mine); no session and a signed-in pin from this device (not mine). The claims' wire status from `last_active_at` |
 | `LostEditDerivation` | Which columns a body writes; point changed or equal; `last_seen_at` at now + 5 min and + 5 min 1 ms |
 | `MyPetsDerivation` | Active hides reopenable; reopenable alone; neither |
 | `ProfileTextDerivation` | Trim and empty name; each link pattern; text that is not a link («Hola. Soy», «3.5 kg») |
@@ -517,12 +557,12 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 
 | # | Decision | Rejected |
 |---|---|---|
-| 71 | Lost-case owner actions: the owner is `created_by`; reunite/cancel/reopen are one conditional `UPDATE` each; reopen within 30 days of `resolved_at` inclusive, keeps sightings and `published_at`, never re-broadcasts; reopen and claim reactivation answer `active_case_exists` when the pet has another active case; a cancelled case is still served, without contact | The responsibility link as the check; refreshing `published_at` on reopen; letting a reopen create a second active case |
+| 71 | Lost-case owner actions: the owner is `created_by`; reunite/cancel/reopen are one conditional `UPDATE` each, and idempotent (an action already done answers its success with no write and never overwrites the first resolution; another state is `invalid_transition`); reopen within 30 days of `resolved_at` inclusive, keeps sightings and `published_at`, never re-broadcasts; reopen and claim reactivation answer `active_case_exists` when the pet has another active case; a cancelled case is still served, without contact | The responsibility link as the check; refreshing `published_at` on reopen; letting a reopen create a second active case; `409` on a repeat |
 | 72 | Editing a lost case writes the shared pet through `Pets`; a moved point re-snaps the public center and resets the place name to the generic label; existing sightings are not revalidated; an open claim never blocks an edit | Calling the place namer in the edit; copying pet fields onto the case; revalidating sightings |
-| 73 | A reporter's pin: "mine" is the person when signed in, else the device; delete is the status `deleted_by_reporter`, never a hard delete, and the `client_id` stays taken | Person-or-device for `mine`; a hard delete (frees the replay key, breaks `sightings_count` and a claim's `from_sighting_id`) |
+| 73 | A reporter's pin: "mine" is the caller's person, or an anonymous pin from the caller's device (another person's pin never; the same rule for views, correction, delete and a claim's link); delete is the status `deleted_by_reporter`, never a hard delete, the `client_id` stays taken, and deleting one's own deleted pin again is a no-op success | Person-or-device for `mine`; the session strictly winning (a reporter who signs in to claim loses their pin); a hard delete (frees the replay key, breaks `sightings_count` and a claim's `from_sighting_id`) |
 | 74 | Owner moderation: hide and highlight are idempotent, independent and allowed in any case status; a moderated pin is `not_found` to the owner | Unhiding a moderated pin |
-| 75 | «Lo tengo» needs a session; one open claim per person per case (a repeat answers it); the owner cannot claim; no rate limit; evidence stored, not shown; WhatsApp link with prefilled text under the public-contact rule; purged code `gone` | Anonymous claims; a rate limit now; copying the sighting's photos |
-| 76 | `open_claim_count`/`possible_find` are owner-only and count open, non-stale claims on active cases; stale is derived (open and 7 days old) | A public badge (it reduces reach); denormalizing the count; a stored `stale` status |
+| 75 | «Lo tengo» needs a session; one open claim per person per case, and a repeat refreshes it (new phone, photos, pin; fresh again) in one statement; a repeat on a case no longer active answers the case's refusal, never the old claim; an ineligible `from_sighting_id` is ignored; the owner cannot claim; no rate limit; evidence stored, not shown; WhatsApp link with prefilled text under the public-contact rule; purged code `gone` | Anonymous claims; a rate limit now; copying the sighting's photos; returning the old claim unchanged on a repeat; refusing the claim over its link |
+| 76 | `open_claim_count`/`possible_find` are owner-only and count open, non-stale claims on active cases; stale is derived (open and 7 days since the claimant's last «Lo tengo», `last_active_at`) | A public badge (it reduces reach); denormalizing the count; a stored `stale` status |
 | 77 | The owner's answer is revisable (`confirmed ↔ dismissed`), idempotent, in any case status, and never closes the case | One-shot answers; dismissing the other claims on confirm |
 | 78 | `/me/pets`: active owner links, nameless pets included, one query, reopenable only without an active case | A query per pet; listing every expired case |
 | 79 | Profile update: sending a name marks it chosen; the bio refuses links and domain-shaped tokens; `city` is free text ≤ 80 until a cities table exists | Three link patterns only; a cities table now |
@@ -530,15 +570,15 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 **Owning docs:**
 
 - `product/04`: `lost_case` resolution values written in L1; `sighting` status `deleted_by_reporter` and the
-  "mine" rule (Correction window); `recovery_claim` (session, claimant a person, evidence stored, prefill
-  rule with the device clause, stale derived); identity ladder (the anonymous «Lo tengo» row now asks to sign
+  "mine" rule (Correction window); `recovery_claim` (session, claimant a person, evidence stored, the link to
+  the claimant's own pin, a repeat refreshes, stale derived from `last_active_at`); identity ladder (the anonymous «Lo tengo» row now asks to sign
   in); editing (the pet is shared, so the change shows on old cases); the owner-only badge. Patch 01 and 02
   where they describe an anonymous claimant, in the same change.
-- `eng/api.md`: Device identity (session wins also for correction and delete; the claimant is a person);
+- `eng/api.md`: Device identity (the "mine" rule of §3 for correction, delete and a claim's link; the claimant is a person);
   Errors (`active_case_exists` on reopen and claims, `gone` on claims); `Created.id` of case actions is the
   case code; remove the «Posible hallazgo» gap.
 - `eng/auth.md` · Profile: the chosen-name rule, the exact bio rule, `city` (link O34).
-- `eng/backend.md`: Concurrency (one open claim per claimant, reactivation then insert, transitions);
+- `eng/backend.md`: Concurrency (one open claim per claimant and the refreshing upsert, reactivation then upsert, idempotent transitions, the accepted claim-against-close shape);
   kept performance indexes (the two new ones); Code structure (`ProfilePhotos`, `Patch<T>`); Testing (the
   race tests).
 
@@ -556,21 +596,26 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 `2026-10-31-backend-thin-slice-fe.md`:
 
 - *Product changes:* «Lo tengo» needs a session (tell the user it is for safety; `@HELP-002` and `@HELP-005`
-  need a sign-in step before claiming); the badge is owner-only (render nothing for `null`); a cancelled case
-  page (`status: cancelled`, no contact); reopen and claims can answer `active_case_exists`, a claim on a
-  purged code `gone`, the owner's own claim `forbidden`; a repeated claim returns the same id; the owner's
-  `claims[]` holds the newest 50; answers are revisable; editing photos or signs changes the pet on every
-  case; a moved zone shows the generic place label; "mine" now follows session-wins; a deleted pin keeps its
-  `client_id`; the profile rules (name chosen on send, bio patterns, `city` ≤ 80).
+  were given a sign-in step; the claim sheet must ask for sign-in); the badge is owner-only (render nothing
+  for `null`; the claimant's feedback is the claim sheet's success state; the public notice is dead copy); a
+  cancelled case page (`status: cancelled`, no contact); idempotent reunite, cancel, reopen and delete; reopen
+  and claims can answer `active_case_exists`, a claim on a purged code `gone`, the owner's own claim
+  `forbidden` (a per-code table of suggested copy); a repeated claim refreshes the open one under the same id;
+  an ineligible `from_sighting_id` is ignored; the owner's `claims[]` holds the newest 50, and the client should
+  show stale and answered claims so the owner can confirm or revise; answers are revisable; editing photos or
+  signs changes the pet on every case; a moved zone shows the generic place label; the "mine" rule; a pin the
+  family hid disappears for its reporter too; a deleted pin keeps its `client_id`; the profile rules (name
+  chosen on send, bio patterns, `city` ≤ 80).
 - *Proposals:* `found_deceased`/`gave_up` (O35); claim evidence in `claims[]` (O36); the «¿Es donde lo
-  viste…?» prefill from the caller's own recent pin (the client's call); copy review of the WhatsApp text.
+  viste…?» prefill from the caller's own recent pin (the client's call); prefilling the claim phone with the
+  person's verified phone; copy review of the WhatsApp text.
 - *E2E:* the `@LINK-001` change and the seed additions of §7.6; the new result table.
 
 ## 9. L2 seams
 
 | Seam | What L1 leaves |
 |---|---|
-| Claim check-ins (+24 h, +72 h) and stale | `recovery_claim.created_at`; stale derived from `STALE_AFTER`. «Aún verificando» needs a stored `stale_at` (a new L2 migration); `ClaimDerivation` then reads it instead of `created_at + 7 d` |
+| Claim check-ins (+24 h, +72 h) and stale | `recovery_claim.created_at` and `last_active_at`; stale derived from `last_active_at + STALE_AFTER`. «Aún verificando» needs a stored `stale_at` (a new L2 migration); `ClaimDerivation` then reads it instead of `last_active_at + 7 d`. A repeat claim refreshes `last_active_at`: L2 decides whether it also reschedules the claim's check-ins |
 | Owner interactions reset time-based check-ins | Only `answered_at` and `resolved_at` are stored. Edits, hides and highlights leave no timestamp: L2 adds one (a column or an event) if it needs them |
 | Notifications (`recovery_claim.opened/confirmed`, `lost_case.reunited`, `sighting.highlighted`) | No outbox rows. Derivable from rows: claims by `created_at`/`answered_at`, helpers of a reunion (visible sightings with a person, claimants). A highlight has no timestamp (above) |
 | Expiry and purge | Expiry writes `status = 'expired'`, `resolved_at`, and `resolution = 'no_response'` after widening `lost_case_resolution_fits_status`. The purge must handle `recovery_claim` and `sighting` rows (no `ON DELETE` action) and O4 |
@@ -585,7 +630,9 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 |---|---|
 | No push for claims | An owner learns of a claim only by opening the case or «Mis casos» (decision #17 makes claims push-only). Must ship (L2) before the first real user |
 | Session-required claims | Fewer claims from finders who will not sign in. Accepted for safety; the client explains it |
-| A stale claim returned on repeat | A person who claims again after 7 days gets their stale claim back and the badge stays off until the owner answers |
+| A repeat replaces the claim's evidence | A repeat takes the repeat's phone, photos and link, even empty ones: a plain re-tap clears earlier photos. Accepted: the repeat is the claimant's current word |
+| A claimant keeps a claim fresh | Anyone can keep their own claim counted by repeating it. The badge is owner-only, so it never reduces reach |
+| A claim can land on a case closed a moment earlier | The `INSERT … SELECT … WHERE status = 'active'` reads its snapshot; a close committing in between does not stop it. Harmless (the badge counts active cases only), the same shape as «Lo vi» against a close; no lock |
 | The edit changes the shared pet | Old cases show the new photos and signs |
 | Reopen keeps `published_at` | A reopened case sorts by its old date in the national feed |
 | Domain-shaped bio rule | False positives («Hola.Soy») answer `validation_failed {bio}`; the client says why |
@@ -602,18 +649,23 @@ Choices this design makes where the product rules are silent, and why.
 2. **Jackson-level body errors come first.** Malformed JSON, a wrong type or an absent required field answer
    `validation_failed` before the lookups (the body cannot be read); field rules follow the decided order.
 3. **Claim error order** is session → `not_found`/`gone` → `forbidden` → body → status, the same shape as the
-   owner endpoints; the dedupe runs at the insert, after the status checks.
+   owner endpoints; the repeat's refresh happens in the write, after the status checks.
 4. **A claim on a case expired more than 30 days ago but not yet purged** answers `invalid_transition`, as
    reopen does.
-5. **A bad `from_sighting_id`** (unknown, another case, not the caller's, not visible, older than 24 h) is
-   `validation_failed {from_sighting_id}`: it is a body field and the contract has no better code.
-6. **The dedupe needs an integrity index**, `recovery_claim_one_open_per_claimant`: a check-then-insert lets a
-   double tap create two rows under `READ COMMITTED`. "Open" is the stored status, so a stale claim counts.
+5. **An ineligible `from_sighting_id`** (unknown, another case, not the caller's, not visible, older than 24 h)
+   is ignored: the claim is stored without the link and without a point. «Lo tengo» always creates a claim; the
+   link is attribution. The contract types the field as a plain string, so there is no malformed form and no
+   `validation_failed {from_sighting_id}`.
+6. **One open claim per person per case needs an integrity index**, `recovery_claim_one_open_per_claimant`: a
+   check-then-insert lets a double tap create two rows under `READ COMMITTED`. "Open" is the stored status, so a
+   stale claim holds the slot, and the repeat's `ON CONFLICT … DO UPDATE` refreshes it in the same statement.
 7. **The profile photo check goes through a `platform` interface** implemented in `uploads`, because
    `identity` may not depend on `uploads`.
-8. **Correction and delete need a `visible` pin.** A pin the owner hid is `forbidden` to its reporter;
-   moderated and deleted pins are `not_found`. With no session, "mine" is the device whatever
-   `reporter_person_id` says.
+8. **Correction and delete need a `visible` pin.** A pin the owner hid is `forbidden` to its reporter, for
+   delete as for correction (the owner already decided on that pin; the reporter cannot withdraw it either);
+   moderated pins and someone else's deleted pins are `not_found`; the reporter's own deleted pin answers a
+   repeat delete with 204. With no session, an anonymous pin from this device is mine and a signed-in pin is
+   not (it is its person's).
 9. **Highlight and hide are independent**: a hidden pin can be highlighted.
 10. **The answer endpoint looks up the claim before reading the body**, like the case itself.
 11. **Reopen and reactivation also clear `resolved_at` and `resolution_attribution`**, so an active case has
@@ -628,6 +680,14 @@ Choices this design makes where the product rules are silent, and why.
 16. **No `recovery_claim.note`**: the request has no note field, so no column is added until one exists.
 17. **`MyCases.open_claim_count` stays a non-null int** (always the owner) and the found vertical's
     `open_claim_count` is untouched.
+18. **A repeat «Lo tengo» answers 201**, like a first claim: the contract lists only 201 as `claimRecovery`'s
+    success.
+19. **A repeat takes the repeat's values** for photos, point and link, even empty ones (the claimant's current
+    word); `created_at` and the claim's id never change, so the owner's list keeps its order.
+20. **Idempotent repeats keep the pre-read classification**: an action the pre-read sees as done costs 2
+    statements; only a 0-row write is followed by a re-read (reunite and cancel ceilings 3 → 4).
+21. **The reporter's repeat delete answers 204 at any time**: the 15-minute window is for changing a pin, and
+    the pin is already gone. 204 is `deleteSighting`'s success.
 
 ## Appendix: question index
 
@@ -669,7 +729,7 @@ Each question raised while preparing this design, restated, and where it is answ
 | Q-C7 | Time bounds of an edit; revalidating sightings | §4.1 |
 | Q-C8 | Does an open claim block an edit | §4.1 (no) |
 | Q-C9 | Editing an expired case | §4.1 (`invalid_transition`) |
-| Q-D1 | `mine`: session wins versus OR | §4.7 |
+| Q-D1 | `mine`: session wins versus OR | §3 ("Mine" for a sighting), §4.7 |
 | Q-D2 | Delete: hard or status | §2.2, §4.8 |
 | Q-D3 | Unhiding a moderated pin; repeats; highlight on hidden | §4.6 |
 | Q-D4 | Case-status checks for moderate, correct, delete | §4.6–4.8 |

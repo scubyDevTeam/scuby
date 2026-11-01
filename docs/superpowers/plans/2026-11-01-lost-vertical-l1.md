@@ -4,7 +4,7 @@
 
 **Goal:** Implement the 13 endpoints of the lost vertical's second backend slice — edit (`PATCH /lost-cases/{code}`, `PATCH /cases/{code}`), reunite, cancel, reopen, owner moderation of a pin, the reporter's correction and delete of their own pin, «Lo tengo» (`POST /cases/{code}/recovery-claims`) and the owner's answer, `GET /me/pets`, `PATCH /me/profile` — plus the owner-only claim badge on `GET /cases/{code}`, `GET /feed` and `GET /me/cases`, the client contract change that badge needs, and the owning docs.
 
-**Architecture:** Everything lives in the existing flat feature packages (`cases`, `pets`, `identity`, `uploads`, `platform`). Every state change is **one conditional SQL statement** (`UPDATE … WHERE <guard> RETURNING`, `INSERT … SELECT … ON CONFLICT … WHERE`), preceded by a read that classifies errors in the decided order; no application locks. Rules are pure `*Derivation` classes (table-tested, PIT ≥ 80 %): `LostLifecycleDerivation`, `ClaimDerivation`, `LostEditDerivation`, `MyPetsDerivation`, `ProfileTextDerivation`, and the session-wins `mine` rule in `LostCaseDerivation`. PATCH bodies use a three-state `Patch<T>` (absent / null / value) deserialized through Jackson's absent- and null-value hooks.
+**Architecture:** Everything lives in the existing flat feature packages (`cases`, `pets`, `identity`, `uploads`, `platform`). Every state change is **one conditional SQL statement** (`UPDATE … WHERE <guard> RETURNING`, `INSERT … SELECT … ON CONFLICT … WHERE`), preceded by a read that classifies errors in the decided order; no application locks. Rules are pure `*Derivation` classes (table-tested, PIT ≥ 80 %): `LostLifecycleDerivation`, `ClaimDerivation`, `LostEditDerivation`, `MyPetsDerivation`, `ProfileTextDerivation`, and the `mine` rule in `LostCaseDerivation` (the caller's person, or an anonymous pin from the caller's device). Owner transitions and the reporter's delete are idempotent: a repeat of an action already done answers its success with no write. PATCH bodies use a three-state `Patch<T>` (absent / null / value) deserialized through Jackson's absent- and null-value hooks.
 
 **Tech Stack:** Java 25, Spring Boot 4.1.2 (Jackson 3, `tools.jackson.*`; annotations stay `com.fasterxml.jackson.annotation.*`), jOOQ 3.21 OSS (codegen from the migrations at build time, in Docker), Flyway, PostgreSQL 17 + PostGIS, Testcontainers, ArchUnit, PIT. Client side (Task 8 only): Node 24, pnpm 10.27.0, Zod mini, Vitest, Playwright.
 
@@ -25,7 +25,7 @@
 - **No application locks (decision #59, `B/CLAUDE.md` rule 11):** `READ COMMITTED`, one atomic conditional statement per invariant; no `FOR UPDATE`, no advisory lock. A pre-read classifies the errors; the write repeats the guard; zero rows after a passing pre-read is the race loser and answers what a re-read classifies. A unique violation from the one-active-case-per-pet index is caught by constraint name (`UniqueViolation.on`) and answered `active_case_exists`, never a `500`.
 - **No pooled connection is held during a network call (`B/CLAUDE.md` rule 7):** `PhotoAttachments.requireAttachable` (S3 HeadObject in staging; `Propagation.NEVER`) runs before any `TransactionTemplate`; services here are never `@Transactional`; the place namer is never called by the edit.
 - **Partial indexes need literals:** every status literal in jOOQ is `DSL.inline("…")` (`lost_case.status = 'active'`, `sighting.status IN ('visible','hidden_by_owner')`, `recovery_claim.status = 'open'`, `responsibility_link.role = 'owner'`); `active_to IS NULL` is `isNull()`.
-- **Time:** `now` is read once per request from the `Clock` bean and passed into SQL as a bind value (`instant.atOffset(ZoneOffset.UTC)`); never `now()` in application SQL; derivations take `now` as a parameter. Constants have one home each (spec §3): `LostLifecycleDerivation.REOPEN_WINDOW` (30 d, inclusive), `LostCaseDerivation.EDIT_WINDOW` (15 min, exclusive), `ClaimDerivation.STALE_AFTER` (7 d; stale iff `createdAt + 7 d` is before now), `ClaimDerivation.PREFILL_WINDOW` (24 h, exclusive), `LostCaseQueries.MAX_CLAIMS_SHOWN` (50); the 5-minute edit drift is `PublishLostService.CLOCK_DRIFT`.
+- **Time:** `now` is read once per request from the `Clock` bean and passed into SQL as a bind value (`instant.atOffset(ZoneOffset.UTC)`); never `now()` in application SQL; derivations take `now` as a parameter. Constants have one home each (spec §3): `LostLifecycleDerivation.REOPEN_WINDOW` (30 d, inclusive), `LostCaseDerivation.EDIT_WINDOW` (15 min, exclusive), `ClaimDerivation.STALE_AFTER` (7 d; stale iff the claim is open and `lastActiveAt + 7 d` is before now; `recovery_claim.last_active_at` is set at insert and by a repeat «Lo tengo»), `ClaimDerivation.PREFILL_WINDOW` (24 h, exclusive), `LostCaseQueries.MAX_CLAIMS_SHOWN` (50); the 5-minute edit drift is `PublishLostService.CLOCK_DRIFT`.
 - **Error order of owner endpoints (spec §3):** session (`unauthorized`) → the case exists (`not_found`; a malformed code or id is `not_found`) → the caller is its owner, `lost_case.created_by` (`forbidden`) → the body (`validation_failed`) → the status (`invalid_transition`, then `active_case_exists`). What Jackson raises while reading the body (malformed JSON, a wrong JSON type, an absent `@JsonProperty(required = true)` field) answers `validation_failed` before any lookup. Controllers bind the body **without `@Valid`**; the service validates it after the owner check. Enum-valued body fields (`resolution_attribution`, `resolution`, a claim answer's `status`) bind as `String` so a wrong value is a body error after the owner check, not a Jackson error before it.
 - **Indexes (`B/CLAUDE.md` · Migrations and indexes):** integrity indexes are justified by the rule they protect; performance indexes only by growth, with the three growth answers, the query, the plan before/after, the write cost and the overlaps in the migration comment, and only after a failing `PlanAssert` check (seed thousands of rows, `ANALYZE`, assert by index name with `PlanAssert.assertUsesIndex` and `PlanAssert.assertNoSeqScan`). **Every new index, of either kind, is appended for human approval** to `/private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a32cac8-27dd-4e61-9ffc-3e46a06d97b9/scratchpad/indexes-for-approval.md` (outside the repo, never committed) and listed in the task report.
 - **Tests (the definition of done is well-designed, passing tests that prove the behaviour):**
@@ -48,17 +48,17 @@
 | Topic | Rule |
 |---|---|
 | Owner | `lost_case.created_by` (`CaseAccessPolicy.isOwner`). A device never makes anyone the owner |
-| Reunite / cancel | Only from `active`. One `UPDATE … WHERE code AND created_by AND status = 'active'`. Reunite writes `resolution = 'reunited_home'` + the attribution (not checked against evidence); cancel writes `false_alarm`/`duplicate`, no attribution; both `resolved_at = now`. Claims, pet and link untouched. `200 {id: code}` |
-| Reopen | Only `expired` with `resolved_at >= now − 30 d` (inclusive). Clears `resolution`, `resolution_attribution`, `resolved_at`; keeps sightings, claims and `published_at`; never re-broadcasts. Another active case for the pet → `409 active_case_exists {case_code}` (after `invalid_transition`). A purged code is `not_found` |
+| Reunite / cancel | Only from `active`. One `UPDATE … WHERE code AND created_by AND status = 'active'`. Reunite writes `resolution = 'reunited_home'` + the attribution (not checked against evidence); cancel writes `false_alarm`/`duplicate`, no attribution; both `resolved_at = now`. Claims, pet and link untouched. `200 {id: code}`. **Idempotent:** reunite on a `reunited` case and cancel on a `cancelled` case answer the same `200 {id: code}` with no write (the first call's resolution and attribution stay); any other status is `invalid_transition` (cancel on `reunited`, reunite on `cancelled`, either on `expired`). Zero rows after a passing pre-read → one re-read tells "already in the target state" (200) from "another state" (`409`) |
+| Reopen | Only `expired` with `resolved_at >= now − 30 d` (inclusive). Clears `resolution`, `resolution_attribution`, `resolved_at`; keeps sightings, claims and `published_at`; never re-broadcasts. Another active case for the pet → `409 active_case_exists {case_code}` (after `invalid_transition`). A purged code is `not_found`. **Idempotent:** reopen on this case while it is `active` (a retry, or a claim's reactivation won the race) answers `200 {id: code}` with no write; on `reunited`/`cancelled` it stays `invalid_transition` |
 | Edit | Active only (`{}` on active = `204` no write; on any other status `409`). Pet photos/marks written through `Pets.updateLook` (the pet is shared: old cases show it). A moved point re-snaps `last_seen_public_lat/lng` with `LocationPrecisionDerivation.publicCenter` and sets `place_name = NULL`; the place namer is never called. `last_seen_at` ≤ now + 5 min. Existing sightings are not revalidated. Photos already on the pet need no upload; new ones go through `PhotoAttachments` (purpose `pet`) before the transaction. An open claim never blocks |
 | `PATCH /cases/{code}` | No table exists for the other verticals: every code `404`, no query |
 | Moderation | Owner; the pin must be `visible` or `hidden_by_owner` on this case, else `404`. `hidden`/`highlighted` independent and idempotent; `{}` no write; any case status. `200 {id: sighting id}` |
-| "Mine" | Session wins: signed in → `reporter_person_id = me`; no session → `reporter_device_hash = device` (whatever `reporter_person_id` says). Used by `mine`, `editable_until`, correction, delete |
+| "Mine" | A pin is mine when `reporter_person_id = me` (the session's person), **or** when it has no person (`reporter_person_id IS NULL`) and `reporter_device_hash = device`. Another person's pin is never mine, whatever device sent it; an anonymous pin from my browser stays mine after I sign in. Used by `mine`, `editable_until`, correction, delete, and the claim's `from_sighting_id` link |
 | Correction | Pin on this case and not moderated/deleted, else `404` → mine, `visible` and `now < created_at + 15 min`, else `403` → case `active`, else `409` → body fields → `seen_at_in_future` → `seen_at_before_case` → `sighting_too_far` (from the snapped center). Photos, contact and the window do not move. `204` |
-| Delete | As correction without the case-status check (allowed on a closed case inside the window). `status = 'deleted_by_reporter'`, never a hard delete; the `client_id` stays taken (a replay answers the deleted row's id). `204` |
-| «Lo tengo» | Session required (contract change, Task 8). Order: `not_found`/`gone` (purged) → `forbidden` (the owner) → body (`phone` required and a supported mobile; `photo_urls` ≤ 5 and uploaded by the caller for purpose `claim`; `from_sighting_id` a `visible` pin on this case by the caller's person **or** device, created within 24 h exclusive, else `validation_failed {from_sighting_id}`; its point is copied, its photos never) → status (`active` insert; `expired` within 30 d → reactivate then insert in one transaction; otherwise `409 invalid_transition`; the pet has another active case → `409 active_case_exists`). One open claim per person per case (a repeat, even of a stale claim, answers the open one, `201`). No rate limit, no notification, no check-in, no outbox row. `201 {id, whatsapp_url}`; the URL only under the public-contact rule (`expose_whatsapp AND phone_has_whatsapp AND contact_phone_verified AND NOT in_app_only`, case active): `https://wa.me/<digits>?text=` + «Hola, vi tu aviso de {nombre} en Scuby ({código}) y creo que lo tengo.» |
+| Delete | As correction without the case-status check (allowed on a closed case inside the window). `status = 'deleted_by_reporter'`, never a hard delete; the `client_id` stays taken (a replay answers the deleted row's id). `204`. **Idempotent:** the reporter's delete of their own pin that is already `deleted_by_reporter` answers `204` again with no write (any time); someone else's deleted pin stays `not_found` |
+| «Lo tengo» | Session required (contract change, Task 8). Order: `not_found`/`gone` (purged) → `forbidden` (the owner) → body (`phone` required and a supported mobile; `photo_urls` ≤ 5 and uploaded by the caller for purpose `claim`) → status (`active` → write; `expired` within 30 d → reactivate then write in one transaction; otherwise `409 invalid_transition`; the pet has another active case → `409 active_case_exists`). `from_sighting_id` is a link, never a refusal: when it names a `visible` pin on this case that is mine ("Mine" above) and was created within 24 h exclusive, the claim stores it and copies its point (never its photos); otherwise (another case, older, not mine, not visible, unknown, not a UUID) the claim is stored **without** the link and without a point. One open claim per person per case: the write is ONE `INSERT … SELECT … ON CONFLICT (case_code, claimant_person_id) WHERE status = 'open' DO UPDATE`; a repeat while the person's claim is open (stale included) **refreshes** it — `phone`, `photo_urls`, the point and `from_sighting_id` take the repeat's values and `last_active_at = now` — and answers the same id, `201` (the contract's only success status for this route). The write runs only while the case is active, so a repeat on a case that is not active (and cannot be reactivated without conflict) answers its refusal (`invalid_transition` or `active_case_exists`), never the old claim. No rate limit, no notification, no check-in, no outbox row. `201 {id, whatsapp_url}`; the URL only under the public-contact rule (`expose_whatsapp AND phone_has_whatsapp AND contact_phone_verified AND NOT in_app_only`, case active): `https://wa.me/<digits>?text=` + «Hola, vi tu aviso de {nombre} en Scuby ({código}) y creo que lo tengo.» |
 | Answer | Owner; claim on this case else `404`; `status` `confirmed`/`dismissed`; revisable, idempotent (same answer = no write), any case status, a stale claim can be answered; never closes the case. `200 {id: claim id}` |
-| Badge | `open_claim_count` / `possible_find` count `status = 'open'` claims created within 7 days, on an active case, **owner only** (non-owner `null`; owner of a closed case `0`/`false`). `GET /me/cases` keeps a non-null int. Owner's `claims[]` = newest 50 with wire status (`stale` derived) |
+| Badge | `open_claim_count` / `possible_find` count `status = 'open'` claims active within 7 days (`last_active_at >= now − 7 d`), on an active case, **owner only** (non-owner `null`; owner of a closed case `0`/`false`). `GET /me/cases` keeps a non-null int. Owner's `claims[]` = newest 50 with wire status (`stale` derived) |
 | `/me/pets` | Active owner links of the caller; nameless pets with `name: ""`; `active_case_code` = the caller's active case; `reopenable_case_code` = latest of the caller's cases expired within 30 d, only when there is no active one; order: latest `greatest(published_at, resolved_at)` of the caller's cases desc nulls last, then `pet.created_at` desc, then id. One query |
 | Profile | PATCH semantics; `display_name` trimmed, 1..80 code points, sending it sets `display_name_chosen = true`; `bio` ≤ 280, no links (`http://`, `https://`, `www.`, `wa.me`, `tel:`, `mailto:`, any `word.tld` token); `city` ≤ 80 (new CHECK); `notification_prefs` all four; `photo_url` = the current one as is, or a `profile` upload of the caller, or `null`. Response = `ProfileView.of` as `GET /me/profile` |
 
@@ -110,12 +110,12 @@ backend/src/test/java/co/scuby/
   pets/      PetsLookTest (5)
 web/ (Task 8 only): src/contracts/case.ts, feed.ts, endpoints/helpers.ts, endpoints/lost.ts, src/domain/lost/actions.ts,
   src/mocks/serialize.ts, src/mocks/api/reads.ts, src/mocks/api/helpers.ts, src/mocks/fixtures.ts, src/mocks/backend.test.ts,
-  e2e/lost-case.spec.ts; regenerated docs/eng/openapi.json
+  src/features/lost/LostCasePage.test.tsx, e2e/lost-case.spec.ts, e2e/helper-actions.spec.ts; regenerated docs/eng/openapi.json
 docs/ (Task 14): product/00-product-map.md, product/01-actors-and-entities.md, product/02-flows.md, product/04-lost-workflow.md,
   open-items.md, eng/api.md, eng/auth.md, eng/backend.md, handoffs/<date>-backend-lost-l1-fe.md; backend/e2e/seed.sql
 ```
 
-**Task order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14. Task 8 (the contract change) comes **before** the claim tasks on purpose: `ApiClient` validates every response against `openapi.json`, and «Lo tengo»'s `401`/`403`/`410` and the nullable badge are not in the contract until Task 8 regenerates it, so Tasks 9–11 cannot pass before it. Tasks 12 and 13 depend only on Tasks 1–4 (and 3 for 13) and may run before 9–11 if a claim task is stuck.
+**Task order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14. Task 8 (the contract change) comes **before** the claim tasks on purpose: `ApiClient` validates every response's status against the statuses `openapi.json` lists for its route, and `claimRecovery`'s `401`/`403`/`410` are not listed until Task 8 regenerates the contract (nor is the nullable badge, which Tasks 10–11 answer), so Tasks 9–11 cannot pass before it. (Reopen's `409 active_case_exists` already validates before Task 8: `409` is listed and the validator checks only the status and the generic `Error` schema; Task 8 adds the code to the list for the client.) Tasks 12 and 13 depend only on Tasks 1–4 (and 3 for 13) and may run before 9–11 if a claim task is stuck.
 
 ---
 ### Task 1: Schema — resolution columns, `deleted_by_reporter`, `recovery_claim`, `person.city`, and the two performance indexes
@@ -132,7 +132,7 @@ The data model of spec §2, all as new migrations. The integrity rules are prove
 - Consumes: `CaseFixtures.luna(UUID)`, `CaseFixtures.sighting(...)`, `Accounts.person(String)`, `SeedVolume.casesAndSightings(DSLContext, int, int)`, `PlanAssert.assertUsesIndex/assertNoSeqScan(DSLContext, Query, String)`, `MutableClock.START`.
 - Produces (jOOQ codegen, used by every later task):
   - `LOST_CASE.RESOLUTION` (`Field<String>`), `LOST_CASE.RESOLUTION_ATTRIBUTION` (`Field<String>`).
-  - `RECOVERY_CLAIM` with `ID (UUID)`, `CASE_CODE (String)`, `CLAIMANT_PERSON_ID (UUID)`, `PHONE (String)`, `PHOTO_URLS (String[])`, `LAT (Double)`, `LNG (Double)`, `FROM_SIGHTING_ID (UUID)`, `STATUS (String)`, `CREATED_AT (OffsetDateTime)`, `ANSWERED_AT (OffsetDateTime)`.
+  - `RECOVERY_CLAIM` with `ID (UUID)`, `CASE_CODE (String)`, `CLAIMANT_PERSON_ID (UUID)`, `PHONE (String)`, `PHOTO_URLS (String[])`, `LAT (Double)`, `LNG (Double)`, `FROM_SIGHTING_ID (UUID)`, `STATUS (String)`, `CREATED_AT (OffsetDateTime)`, `LAST_ACTIVE_AT (OffsetDateTime)`, `ANSWERED_AT (OffsetDateTime)`.
   - Constraint names: `lost_case_resolution_fits_status`, `lost_case_attribution_only_reunited`, `lost_case_active_is_unresolved`, `sighting_status_check`, `recovery_claim_one_open_per_claimant`, `recovery_claim_point_both_or_none`, `recovery_claim_answered_when_not_open`, `person_city_length`.
   - Indexes: `recovery_claim_by_case_recent_idx`, `responsibility_link_by_person_active_idx`.
   - `SeedVolume.claims(DSLContext db, int cases, int claims, String heavyCase, int heavyClaims)`, `SeedVolume.petsOwnedBy(DSLContext db, int people, int pets)`.
@@ -268,8 +268,16 @@ class L1SchemaTest {
     // --- recovery_claim (spec §2.3) ---
 
     private void claim(UUID person, String status, String answeredAt) {
-        db.execute("INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, answered_at) "
-                + "VALUES (gen_random_uuid(), '7K3PQ', ?, '+573001112233', ?, now(), " + answeredAt + ")", person, status);
+        db.execute("INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, last_active_at, answered_at) "
+                + "VALUES (gen_random_uuid(), '7K3PQ', ?, '+573001112233', ?, now(), now(), " + answeredAt + ")", person, status);
+    }
+
+    @Test
+    void aClaimAlwaysCarriesWhenItWasLastActive() {
+        assertThatThrownBy(() -> db.execute("INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at) "
+                + "VALUES (gen_random_uuid(), '7K3PQ', ?, '+573001112233', 'open', now())", claimant))
+                .hasStackTraceContaining("null value in column \"last_active_at\"");
+        assertThat(db.fetchCount(co.scuby.db.generated.Tables.RECOVERY_CLAIM)).isZero();
     }
 
     @Test
@@ -299,9 +307,9 @@ class L1SchemaTest {
             "not E.164                  | phone               | '3001112233'                    | recovery_claim_phone_check",
     })
     void aClaimRowThatBreaksARuleIsRefused(String label, String columns, String values, String constraint) {
-        String sql = "INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, created_at, "
+        String sql = "INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, created_at, last_active_at, "
                 + (columns.contains("phone") ? "" : "phone, ") + (columns.contains("status") ? "" : "status, ") + columns + ") "
-                + "VALUES (gen_random_uuid(), '7K3PQ', ?, now(), "
+                + "VALUES (gen_random_uuid(), '7K3PQ', ?, now(), now(), "
                 + (columns.contains("phone") ? "" : "'+573001112233', ") + (columns.contains("status") ? "" : "'open', ") + values + ")";
         assertThatThrownBy(() -> db.execute(sql, claimant)).as(label).hasStackTraceContaining(constraint);
         assertThat(db.fetchCount(co.scuby.db.generated.Tables.RECOVERY_CLAIM)).isZero();
@@ -309,11 +317,11 @@ class L1SchemaTest {
 
     @Test
     void aClaimMustBeOnAnExistingCaseAndMayPointAtASighting() {
-        assertThatThrownBy(() -> db.execute("INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at) "
-                + "VALUES (gen_random_uuid(), 'ZZZZZ', ?, '+573001112233', 'open', now())", claimant))
+        assertThatThrownBy(() -> db.execute("INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, last_active_at) "
+                + "VALUES (gen_random_uuid(), 'ZZZZZ', ?, '+573001112233', 'open', now(), now())", claimant))
                 .hasStackTraceContaining("recovery_claim_case_code_fkey");
-        db.execute("INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, lat, lng, from_sighting_id, status, created_at) "
-                + "VALUES (gen_random_uuid(), '7K3PQ', ?, '+573001112233', 6.25, -75.59, ?, 'open', now())", claimant, sighting);
+        db.execute("INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, lat, lng, from_sighting_id, status, created_at, last_active_at) "
+                + "VALUES (gen_random_uuid(), '7K3PQ', ?, '+573001112233', 6.25, -75.59, ?, 'open', now(), now())", claimant, sighting);
         assertThat(db.fetchValue("SELECT from_sighting_id FROM scuby.recovery_claim")).isEqualTo(sighting);
         assertThat(db.fetchValue("SELECT photo_urls::text FROM scuby.recovery_claim")).isEqualTo("{}");
     }
@@ -379,8 +387,10 @@ ALTER TABLE sighting DROP CONSTRAINT sighting_status_check,
 -- The claimant is always a person: «Lo tengo» needs a session. No device column, no note column (the contract's claim
 -- request has no note; a later contract change adds it with its own migration).
 -- lat/lng: the point, filled only from from_sighting_id (the request carries no point). Photos are stored, not exposed
--- (open item O36). `stale` is not stored: a claim is stale when status = 'open' and created_at + 7 days is in the past
--- (ClaimDerivation.STALE_AFTER). No ON DELETE action on the foreign keys: the purge and account deletion (L2) decide.
+-- (open item O36). last_active_at: when the claimant last said «Lo tengo» on this claim (set at insert; a repeat while
+-- the claim is open refreshes it). `stale` is not stored: a claim is stale when status = 'open' and last_active_at + 7 days
+-- is in the past (ClaimDerivation.STALE_AFTER). No ON DELETE action on the foreign keys: the purge and account deletion
+-- (L2) decide.
 CREATE TABLE recovery_claim (
   id                  uuid PRIMARY KEY,
   case_code           text NOT NULL REFERENCES lost_case (code),
@@ -392,6 +402,7 @@ CREATE TABLE recovery_claim (
   from_sighting_id    uuid REFERENCES sighting (id),
   status              text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'confirmed', 'dismissed')),
   created_at          timestamptz NOT NULL,
+  last_active_at      timestamptz NOT NULL,
   answered_at         timestamptz,
   CONSTRAINT recovery_claim_point_both_or_none CHECK ((lat IS NULL) = (lng IS NULL)),
   CONSTRAINT recovery_claim_answered_when_not_open CHECK ((status = 'open') = (answered_at IS NULL))
@@ -399,8 +410,9 @@ CREATE TABLE recovery_claim (
 
 -- Integrity index (justified by its rule, not by growth): one open claim per claimant per case. It settles the
 -- double-tap race: the claim is one INSERT … SELECT … ON CONFLICT (case_code, claimant_person_id) WHERE status = 'open'
--- DO NOTHING, and the loser reads the winner's row. "Open" is the stored status, so a stale claim still holds the slot
--- (a repeat answers it). Write cost: one entry per open claim; it leaves the index when the owner answers.
+-- DO UPDATE (the repeat refreshes phone, photos, point, link and last_active_at of the open row and returns its id).
+-- "Open" is the stored status, so a stale claim still holds the slot (a repeat makes it fresh again). Write cost: one
+-- entry per open claim; it leaves the index when the owner answers.
 -- Overlap: recovery_claim_by_case_recent_idx (V20261101_1030) shares the case_code prefix but is not unique and covers
 -- every status. Needs human approval before merge.
 CREATE UNIQUE INDEX recovery_claim_one_open_per_claimant
@@ -469,17 +481,19 @@ Add to `B/src/test/java/co/scuby/cases/SeedVolume.java`, inside the class after 
                 SELECT ('00000000-0000-0000-0003-' || lpad(g::text, 12, '0'))::uuid, 'C' || g, 'c' || g || '@seed.co', now()
                 FROM generate_series(1, 2000) g ON CONFLICT DO NOTHING""");
         db.execute("""
-                INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, answered_at)
+                INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, last_active_at, answered_at)
                 SELECT gen_random_uuid(), 'C' || upper(lpad(to_hex(1 + g % ?), 4, '0')),
                        ('00000000-0000-0000-0003-' || lpad((1 + (g / ?) % 1000)::text, 12, '0'))::uuid, '+573001112233',
                        CASE WHEN g % 3 = 0 THEN 'open' ELSE 'dismissed' END,
                        timestamptz '2026-06-01' + g * interval '1 minute',
+                       timestamptz '2026-06-01' + g * interval '1 minute',
                        CASE WHEN g % 3 = 0 THEN NULL ELSE timestamptz '2026-06-01' + g * interval '1 minute' + interval '1 hour' END
                 FROM generate_series(1, ?) g""", cases, cases, claims);
         db.execute("""
-                INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, answered_at)
+                INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, last_active_at, answered_at)
                 SELECT gen_random_uuid(), ?, ('00000000-0000-0000-0003-' || lpad((1001 + g % 1000)::text, 12, '0'))::uuid,
                        '+573001112233', CASE WHEN g <= 500 THEN 'open' ELSE 'confirmed' END,
+                       timestamptz '2026-09-01' + g * interval '1 minute',
                        timestamptz '2026-09-01' + g * interval '1 minute',
                        CASE WHEN g <= 500 THEN NULL ELSE timestamptz '2026-09-01' + g * interval '1 minute' + interval '1 hour' END
                 FROM generate_series(1, ?) g""", heavyCase, heavyClaims);
@@ -564,7 +578,7 @@ class RecoveryClaimPlanTest {
         var cutoff = MutableClock.START.minus(Duration.ofDays(7)).atOffset(ZoneOffset.UTC);
         return db.select(RECOVERY_CLAIM.ID, RECOVERY_CLAIM.PHONE, RECOVERY_CLAIM.CREATED_AT, RECOVERY_CLAIM.STATUS,
                          DSL.count().filterWhere(RECOVERY_CLAIM.STATUS.eq(DSL.inline("open"))
-                                 .and(RECOVERY_CLAIM.CREATED_AT.ge(cutoff))).over().as("open_non_stale"))
+                                 .and(RECOVERY_CLAIM.LAST_ACTIVE_AT.ge(cutoff))).over().as("open_non_stale"))
                  .from(RECOVERY_CLAIM)
                  .where(RECOVERY_CLAIM.CASE_CODE.eq(code))
                  .orderBy(RECOVERY_CLAIM.CREATED_AT.desc(), RECOVERY_CLAIM.ID.desc())
@@ -655,13 +669,14 @@ Expected: both FAIL with `plan does not use index recovery_claim_by_case_recent_
 --   1. Can the table grow without bound? Yes: claims are never deleted and «Lo tengo» has no rate limit (decision #54's
 --      reasoning applies), so one case can hold thousands.
 --   2. How often does the query run? On every owner view of a case (LostCaseQueries.claimsQuery: the newest 50 of every
---      status, ORDER BY created_at DESC, id DESC, plus count(*) FILTER (WHERE status = 'open' AND created_at >= now − 7 d)
+--      status, ORDER BY created_at DESC, id DESC, plus count(*) FILTER (WHERE status = 'open' AND last_active_at >= now − 7 d)
 --      OVER ()), and per row of «Mis casos» and of the owner's own feed items (the correlated open-claim counts of
 --      MyCasesQueries and FeedQueries).
 --   3. Without it: each runs a full scan of every claim of every case.
 -- Plan before (RecoveryClaimPlanTest, 62,000 claims, ANALYZE): Seq Scan on recovery_claim. Plan after: Index Scan using
 -- recovery_claim_by_case_recent_idx (Limit over the case's entries in created_at order).
--- Write cost: one btree entry (text, timestamptz) per claim insert; status changes do not touch it.
+-- Write cost: one btree entry (text, timestamptz) per claim insert; status changes and a repeat's refresh (which does not
+-- change created_at) do not touch it.
 -- Overlap: recovery_claim_one_open_per_claimant (case_code, claimant_person_id) WHERE status = 'open' shares the case_code
 -- prefix but is partial (open only), so it serves neither the list nor the count over every status; it stays as the
 -- integrity UNIQUE. Needs human approval before merge.
@@ -698,7 +713,7 @@ Append to `/private/tmp/claude-501/-Users-alejandrosuazabuiles-Desktop-scuby/4a3
 ```markdown
 
 ## L1 Task 1 — `recovery_claim_one_open_per_claimant` — integrity (V20261101_1020)
-UNIQUE partial index on recovery_claim (case_code, claimant_person_id) WHERE status = 'open'. Rule: one open claim per person per case; settles the double-tap race of «Lo tengo» (INSERT … ON CONFLICT … WHERE status = 'open' DO NOTHING; the loser reads the winner's row). Write cost: one entry per open claim, removed when answered. Overlap: shares the case_code prefix with recovery_claim_by_case_recent_idx.
+UNIQUE partial index on recovery_claim (case_code, claimant_person_id) WHERE status = 'open'. Rule: one open claim per person per case; settles the double-tap race of «Lo tengo» (INSERT … ON CONFLICT … WHERE status = 'open' DO UPDATE: a repeat refreshes the open row and answers its id). Write cost: one entry per open claim, removed when answered. Overlap: shares the case_code prefix with recovery_claim_by_case_recent_idx.
 
 ## L1 Task 1 — `recovery_claim_by_case_recent_idx` — performance (V20261101_1030)
 recovery_claim (case_code, created_at DESC). Growth: unbounded (never deleted, no rate limit). Query: the owner's claims list + open count on every owner case view; the correlated open-claim counts of «Mis casos» and the owner's feed items. Plan before/after: see the Task 1 report. Write cost: one entry per claim. Overlap: the partial UNIQUE above (open only) cannot serve every-status reads.
@@ -736,8 +751,8 @@ The rules every lifecycle and claim endpoint applies, with no I/O, as the spec's
 **Interfaces:**
 - Consumes: nothing.
 - Produces:
-  - `LostLifecycleDerivation.REOPEN_WINDOW` (`Duration.ofDays(30)`); `enum Action { REUNITE, CANCEL, REOPEN, CLAIM }`; `enum Outcome { ALLOWED, REACTIVATE, INVALID_TRANSITION }`; `static Outcome check(Action, String status, @Nullable Instant resolvedAt, Instant now)`; `static boolean insideReopenWindow(@Nullable Instant resolvedAt, Instant now)`; `static Instant reopenCutoff(Instant now)` (SQL: `resolved_at >= cutoff`); `static boolean isAttribution(@Nullable String)`; `static boolean isCancelReason(@Nullable String)`.
-  - `ClaimDerivation.STALE_AFTER` (7 d), `PREFILL_WINDOW` (24 h); `record ContactFlags(boolean exposeWhatsapp, boolean phoneHasWhatsapp, boolean contactPhoneVerified, boolean inAppOnly)`; `record SightingLink(String status, @Nullable UUID reporterPersonId, String reporterDeviceHash, Instant createdAt)`; `static boolean isStale(String storedStatus, Instant createdAt, Instant now)`; `static String wireStatus(String storedStatus, Instant createdAt, Instant now)`; `static Instant staleCutoff(Instant now)` (SQL non-stale: `created_at >= cutoff`); `static Instant prefillCutoff(Instant now)` (SQL eligible: `created_at > cutoff`); `static @Nullable Integer openClaimCount(boolean owner, String caseStatus, int openNonStale)`; `static boolean isAnswer(@Nullable String)`; `static boolean answerChanges(String storedStatus, String requested)`; `static boolean prefillEligible(SightingLink, UUID claimant, String claimantDevice, Instant now)`; `static @Nullable String whatsappPhone(ContactFlags, String caseStatus, @Nullable String contactPhone)`; `static String whatsappText(@Nullable String petName, String code)`.
+  - `LostLifecycleDerivation.REOPEN_WINDOW` (`Duration.ofDays(30)`); `enum Action { REUNITE, CANCEL, REOPEN, CLAIM }`; `enum Outcome { ALLOWED, REACTIVATE, ALREADY_DONE, INVALID_TRANSITION }` (`ALREADY_DONE`: the case is already in the action's target state — reunite on `reunited`, cancel on `cancelled`, reopen on `active` — so the action answers its success with no write; a claim never gets it); `static Outcome check(Action, String status, @Nullable Instant resolvedAt, Instant now)`; `static boolean insideReopenWindow(@Nullable Instant resolvedAt, Instant now)`; `static Instant reopenCutoff(Instant now)` (SQL: `resolved_at >= cutoff`); `static boolean isAttribution(@Nullable String)`; `static boolean isCancelReason(@Nullable String)`.
+  - `ClaimDerivation.STALE_AFTER` (7 d), `PREFILL_WINDOW` (24 h); `record ContactFlags(boolean exposeWhatsapp, boolean phoneHasWhatsapp, boolean contactPhoneVerified, boolean inAppOnly)`; `record SightingLink(String status, @Nullable UUID reporterPersonId, String reporterDeviceHash, Instant createdAt)`; `static boolean isStale(String storedStatus, Instant lastActiveAt, Instant now)`; `static String wireStatus(String storedStatus, Instant lastActiveAt, Instant now)`; `static Instant staleCutoff(Instant now)` (SQL non-stale: `last_active_at >= cutoff`); `static Instant prefillCutoff(Instant now)` (SQL eligible: `created_at > cutoff`); `static @Nullable Integer openClaimCount(boolean owner, String caseStatus, int openNonStale)`; `static boolean isAnswer(@Nullable String)`; `static boolean answerChanges(String storedStatus, String requested)`; `static boolean prefillEligible(SightingLink, boolean mine, Instant now)` (`mine` is `LostCaseDerivation.mine`, Task 7: the one home of that rule); `static @Nullable String whatsappPhone(ContactFlags, String caseStatus, @Nullable String contactPhone)`; `static String whatsappText(@Nullable String petName, String code)`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -759,7 +774,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Which lifecycle action a lost case allows (docs/product/04 · Case state machine; spec §3, §4.3–4.5, §4.9).
- * Human review: this table is the rule. The reopen window is 30 days from resolved_at, INCLUSIVE.
+ * Human review: this table is the rule. The reopen window is 30 days from resolved_at, INCLUSIVE. An action whose target
+ * state the case is already in is ALREADY_DONE (a retry or a double tap answers its success and writes nothing); any
+ * other state that is not the action's start is INVALID_TRANSITION.
  */
 class LostLifecycleDerivationTest {
 
@@ -770,17 +787,17 @@ class LostLifecycleDerivationTest {
             // action,  status,    resolved ago,   outcome
             "REUNITE,  active,    null,           ALLOWED",
             "REUNITE,  expired,   P1D,            INVALID_TRANSITION",
-            "REUNITE,  reunited,  P1D,            INVALID_TRANSITION",
+            "REUNITE,  reunited,  P1D,            ALREADY_DONE",
             "REUNITE,  cancelled, P1D,            INVALID_TRANSITION",
             "CANCEL,   active,    null,           ALLOWED",
             "CANCEL,   expired,   P1D,            INVALID_TRANSITION",
             "CANCEL,   reunited,  P1D,            INVALID_TRANSITION",
-            "CANCEL,   cancelled, P1D,            INVALID_TRANSITION",
+            "CANCEL,   cancelled, P1D,            ALREADY_DONE",
             "REOPEN,   expired,   P29D,           ALLOWED",
             "REOPEN,   expired,   P30D,           ALLOWED",
             "REOPEN,   expired,   PT720H0.001S,   INVALID_TRANSITION",
             "REOPEN,   expired,   null,           INVALID_TRANSITION",
-            "REOPEN,   active,    null,           INVALID_TRANSITION",
+            "REOPEN,   active,    null,           ALREADY_DONE",
             "REOPEN,   reunited,  P1D,            INVALID_TRANSITION",
             "REOPEN,   cancelled, P1D,            INVALID_TRANSITION",
             "CLAIM,    active,    null,           ALLOWED",
@@ -841,23 +858,20 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * «Lo tengo» rules (docs/product/04 · recovery_claim; spec §3, §4.9, §4.10, §4.13). Human review: these tables are the
- * rules — stale after 7 days (strictly), the owner-only badge, revisable answers, the 24 h prefill, the public-contact rule.
+ * rules — stale 7 days (strictly) after the claimant's last «Lo tengo», the owner-only badge, revisable answers, the 24 h
+ * link to the claimant's own pin, the public-contact rule.
  */
 class ClaimDerivationTest {
 
     static final Instant NOW = Instant.parse("2026-10-14T17:00:00Z");
-    static final UUID ME = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
-    static final UUID SOMEONE = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
-    static final String MY_DEVICE = "1".repeat(64);
-    static final String OTHER_DEVICE = "2".repeat(64);
+    static final String A_DEVICE = "1".repeat(64);
 
-    @ParameterizedTest(name = "{0} created {1} ago → {2}")
+    @ParameterizedTest(name = "{0} last active {1} ago → {2}")
     @CsvSource({
             "open,      PT1H,           open",
             "open,      P6D,            open",
@@ -867,14 +881,14 @@ class ClaimDerivationTest {
             "confirmed, P30D,           confirmed",
             "dismissed, P30D,           dismissed",
     })
-    void staleIsDerivedStrictlyAfterSevenDaysAndOnlyForOpenClaims(String stored, Duration age, String wire) {
-        assertThat(ClaimDerivation.wireStatus(stored, NOW.minus(age), NOW)).isEqualTo(wire);
-        assertThat(ClaimDerivation.isStale(stored, NOW.minus(age), NOW)).isEqualTo("stale".equals(wire));
+    void staleIsDerivedStrictlySevenDaysAfterTheLastActivityAndOnlyForOpenClaims(String stored, Duration idle, String wire) {
+        assertThat(ClaimDerivation.wireStatus(stored, NOW.minus(idle), NOW)).isEqualTo(wire);
+        assertThat(ClaimDerivation.isStale(stored, NOW.minus(idle), NOW)).isEqualTo("stale".equals(wire));
     }
 
     @Test
     void theSqlCutoffsMatchTheJavaRules() {
-        // non-stale in SQL: created_at >= staleCutoff — the instant exactly 7 days ago is not stale in Java either
+        // non-stale in SQL: last_active_at >= staleCutoff — the instant exactly 7 days ago is not stale in Java either
         assertThat(ClaimDerivation.staleCutoff(NOW)).isEqualTo(NOW.minus(Duration.ofDays(7)));
         assertThat(ClaimDerivation.isStale("open", ClaimDerivation.staleCutoff(NOW), NOW)).isFalse();
         // prefill in SQL: created_at > prefillCutoff — exclusive, like the 15-minute window
@@ -917,29 +931,26 @@ class ClaimDerivationTest {
         assertThat(ClaimDerivation.isAnswer(value)).isEqualTo(valid);
     }
 
+    /**
+     * Whether the claim keeps its from_sighting_id link (and copies the pin's point). Whose pin it is comes from the one
+     * "mine" rule (LostCaseDerivation.mine, table-tested in LostCaseDerivationTest); an ineligible pin is ignored, never a
+     * refusal of the claim.
+     */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            // label,                     status,                reporterIsMe, sameDevice, age,         eligible
-            "'my account, 1 h',           visible,               true,  false, PT1H,        true",
-            "'my device only, 1 h',       visible,               false, true,  PT1H,        true",
-            "'someone else',              visible,               false, false, PT1H,        false",
-            "'mine but hidden',           hidden_by_owner,       true,  true,  PT1H,        false",
-            "'mine but moderated',        removed_by_moderation, true,  true,  PT1H,        false",
-            "'mine but deleted',          deleted_by_reporter,   true,  true,  PT1H,        false",
-            "'mine, 23 h 59 min',         visible,               true,  false, PT23H59M,    true",
-            "'mine, exactly 24 h',        visible,               true,  false, PT24H,       false",
-            "'mine, 25 h',                visible,               true,  false, PT25H,       false",
+            // label,                     status,                mine,  age,         eligible
+            "'mine, 1 h',                 visible,               true,  PT1H,        true",
+            "'not mine',                  visible,               false, PT1H,        false",
+            "'mine but hidden',           hidden_by_owner,       true,  PT1H,        false",
+            "'mine but moderated',        removed_by_moderation, true,  PT1H,        false",
+            "'mine but deleted',          deleted_by_reporter,   true,  PT1H,        false",
+            "'mine, 23 h 59 min',         visible,               true,  PT23H59M,    true",
+            "'mine, exactly 24 h',        visible,               true,  PT24H,       false",
+            "'mine, 25 h',                visible,               true,  PT25H,       false",
     })
-    void aClaimPrefillsFromTheCallersOwnRecentVisiblePin(String label, String status, boolean reporterIsMe, boolean sameDevice,
-                                                         Duration age, boolean eligible) {
-        var pin = new SightingLink(status, reporterIsMe ? ME : SOMEONE, sameDevice ? MY_DEVICE : OTHER_DEVICE, NOW.minus(age));
-        assertThat(ClaimDerivation.prefillEligible(pin, ME, MY_DEVICE, NOW)).as(label).isEqualTo(eligible);
-    }
-
-    @Test
-    void anAnonymousPinMatchesOnlyByDevice() {
-        assertThat(ClaimDerivation.prefillEligible(new SightingLink("visible", null, MY_DEVICE, NOW), ME, MY_DEVICE, NOW)).isTrue();
-        assertThat(ClaimDerivation.prefillEligible(new SightingLink("visible", null, OTHER_DEVICE, NOW), ME, MY_DEVICE, NOW)).isFalse();
+    void aClaimLinksOnlyTheCallersOwnRecentVisiblePin(String label, String status, boolean mine, Duration age, boolean eligible) {
+        var pin = new SightingLink(status, null, A_DEVICE, NOW.minus(age));
+        assertThat(ClaimDerivation.prefillEligible(pin, mine, NOW)).as(label).isEqualTo(eligible);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -990,7 +1001,9 @@ import java.util.Set;
 /**
  * Which lifecycle action a lost case allows now (docs/product/04-lost-workflow.md · Case state machine). Pure.
  * Reunite and cancel close an active case; reopen brings back an expired one within REOPEN_WINDOW of resolved_at
- * (inclusive); a claim on an expired case inside the window reactivates it first (decision #29).
+ * (inclusive); a claim on an expired case inside the window reactivates it first (decision #29). An owner action on a
+ * case already in its target state is ALREADY_DONE: the endpoint answers its success and writes nothing (a retry after a
+ * lost response, a double tap, or a race another request won), so the first call's resolution and attribution stay.
  */
 final class LostLifecycleDerivation {
 
@@ -1003,7 +1016,7 @@ final class LostLifecycleDerivation {
 
     enum Action { REUNITE, CANCEL, REOPEN, CLAIM }
 
-    enum Outcome { ALLOWED, REACTIVATE, INVALID_TRANSITION }
+    enum Outcome { ALLOWED, REACTIVATE, ALREADY_DONE, INVALID_TRANSITION }
 
     private LostLifecycleDerivation() {}
 
@@ -1011,8 +1024,9 @@ final class LostLifecycleDerivation {
         boolean active = "active".equals(status);
         boolean reopenable = "expired".equals(status) && insideReopenWindow(resolvedAt, now);
         return switch (action) {
-            case REUNITE, CANCEL -> active ? Outcome.ALLOWED : Outcome.INVALID_TRANSITION;
-            case REOPEN -> reopenable ? Outcome.ALLOWED : Outcome.INVALID_TRANSITION;
+            case REUNITE -> active ? Outcome.ALLOWED : "reunited".equals(status) ? Outcome.ALREADY_DONE : Outcome.INVALID_TRANSITION;
+            case CANCEL -> active ? Outcome.ALLOWED : "cancelled".equals(status) ? Outcome.ALREADY_DONE : Outcome.INVALID_TRANSITION;
+            case REOPEN -> active ? Outcome.ALREADY_DONE : reopenable ? Outcome.ALLOWED : Outcome.INVALID_TRANSITION;
             case CLAIM -> active ? Outcome.ALLOWED : reopenable ? Outcome.REACTIVATE : Outcome.INVALID_TRANSITION;
         };
     }
@@ -1052,13 +1066,14 @@ import java.util.UUID;
 
 /**
  * Recovery-claim rules (docs/product/04-lost-workflow.md · recovery_claim; L1 design §3, §4.9, §4.10). Pure.
- * A claim is stale when it is still open 7 days after it was made; stale is derived, never stored. The badge is
+ * A claim is stale when it is still open 7 days after the claimant's last «Lo tengo» on it (last_active_at: the insert,
+ * or a repeat that refreshed it); stale is derived, never stored. The badge is
  * owner-only: «a claim must never reduce reach» (04 · Rule: a recovery claim must never reduce reach), and a public
  * «Posible hallazgo» tells helpers the search may be over.
  */
 final class ClaimDerivation {
 
-    /** Stale iff createdAt + 7 d is before now (strict); SQL non-stale: created_at >= now − 7 d. */
+    /** Stale iff lastActiveAt + 7 d is before now (strict); SQL non-stale: last_active_at >= now − 7 d. */
     static final Duration STALE_AFTER = Duration.ofDays(7);
     /** A pin prefills a claim when created within 24 h, exclusive; SQL created_at > now − 24 h. */
     static final Duration PREFILL_WINDOW = Duration.ofHours(24);
@@ -1073,13 +1088,13 @@ final class ClaimDerivation {
 
     private ClaimDerivation() {}
 
-    static boolean isStale(String storedStatus, Instant createdAt, Instant now) {
-        return "open".equals(storedStatus) && createdAt.plus(STALE_AFTER).isBefore(now);
+    static boolean isStale(String storedStatus, Instant lastActiveAt, Instant now) {
+        return "open".equals(storedStatus) && lastActiveAt.plus(STALE_AFTER).isBefore(now);
     }
 
-    /** The contract's claim status: the stored one, or `stale` for an open claim past STALE_AFTER. */
-    static String wireStatus(String storedStatus, Instant createdAt, Instant now) {
-        return isStale(storedStatus, createdAt, now) ? "stale" : storedStatus;
+    /** The contract's claim status: the stored one, or `stale` for an open claim idle past STALE_AFTER. */
+    static String wireStatus(String storedStatus, Instant lastActiveAt, Instant now) {
+        return isStale(storedStatus, lastActiveAt, now) ? "stale" : storedStatus;
     }
 
     static Instant staleCutoff(Instant now) {
@@ -1106,12 +1121,12 @@ final class ClaimDerivation {
     }
 
     /**
-     * The claimant's own pin: visible, on this case (the caller's query guarantees it), reported by the claimant's person
-     * OR from the claimant's device (the device clause applies to this link only), and created within PREFILL_WINDOW.
+     * Whether a claim keeps its from_sighting_id link: the pin is on this case (the caller's query guarantees it), visible,
+     * the claimant's own ({@code mine}, from LostCaseDerivation.mine: their person, or an anonymous pin from their device),
+     * and created within PREFILL_WINDOW. An ineligible pin is ignored (the claim is stored without the link), never refused.
      */
-    static boolean prefillEligible(SightingLink pin, UUID claimant, String claimantDevice, Instant now) {
-        boolean theirs = claimant.equals(pin.reporterPersonId()) || claimantDevice.equals(pin.reporterDeviceHash());
-        return "visible".equals(pin.status()) && theirs && pin.createdAt().isAfter(prefillCutoff(now));
+    static boolean prefillEligible(SightingLink pin, boolean mine, Instant now) {
+        return "visible".equals(pin.status()) && mine && pin.createdAt().isAfter(prefillCutoff(now));
     }
 
     /** The owner's number for the claimant's WhatsApp link, only under the public-contact rule on an active case. */
@@ -2025,7 +2040,7 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
 ---
 ### Task 4: Reunite, cancel, reopen — and the harness pieces every later endpoint task uses
 
-`POST /cases/{code}/reunite`, `/cancel`, `/reopen` (spec §4.3–4.5): one conditional `UPDATE` each, a pre-read that classifies errors in the decided order, and the `lost_case_one_active_per_pet` unique violation caught by name. The harness gains `ApiClient.patch/delete`, a reusable `Contention` helper for held-row races, fixtures for closed cases and extra cases of one pet, and `ContractCoverageTest` learns to call session routes that have path variables (none existed before; without the fix it looks up a ceiling for `/cases/x/reunite` and fails).
+`POST /cases/{code}/reunite`, `/cancel`, `/reopen` (spec §4.3–4.5): one conditional `UPDATE` each, a pre-read that classifies errors in the decided order, and the `lost_case_one_active_per_pet` unique violation caught by name. Each is idempotent: on a case already in the action's target state it answers the same `200 {id: code}` with no write; when the `UPDATE` changes 0 rows after a passing pre-read, one re-read tells "already in the target state" (200) from "another state" (`invalid_transition`). The harness gains `ApiClient.patch/delete`, a reusable `Contention` helper for held-row races, fixtures for closed cases and extra cases of one pet, and `ContractCoverageTest` learns to call session routes that have path variables (none existed before; without the fix it looks up a ceiling for `/cases/x/reunite` and fails).
 
 **Files:**
 - Modify: `B/src/test/java/co/scuby/support/ApiClient.java` (add `patch`, `delete`)
@@ -2043,7 +2058,7 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
 - Consumes: `LostLifecycleDerivation` (Task 2); `LOST_CASE.RESOLUTION`, `RESOLUTION_ATTRIBUTION` (Task 1); `CaseCodes.normalize(String) → Optional<String>`; `LostCaseQueries.isPurged(String)`.
 - Produces:
   - `ApiClient.patch(String template, String json, Object... vars)`, `ApiClient.delete(String template, Object... vars)` (checked, like `post`).
-  - `support.Contention(DataSource, DSLContext)` implements `AutoCloseable`: `void hold(String sql, Object... binds)` (a transaction left open on its own connection), `void commit()`, `void awaitWaiters(int n)` (≥ n backends waiting on a lock within 10 s, else `AssertionError`), `close()` rolls back.
+  - `support.Contention(DataSource, DSLContext)` implements `AutoCloseable`: `void hold(String sql, Object... binds)` (a transaction left open on its own connection; its backend pid is kept), `void commit()`, `void awaitWaiters(int n)` (≥ n backends blocked by the held transaction's pid within 10 s, else `AssertionError`; a waiter left by another test never counts), `close()` rolls back.
   - `CaseFixtures.petOf(String code) → UUID`; `CaseFixtures.close(String code, String status, Instant resolvedAt)` (resolution stays NULL); `CaseFixtures.lostCaseForPet(UUID owner, UUID pet, String code, String status, Instant publishedAt) → String`.
   - `platform.db.UniqueViolation.on(Throwable, String constraint) → boolean` (public, domain-free).
   - `CaseAccessPolicy.isOwner(UUID createdBy, @Nullable UUID personId) → boolean`.
@@ -2051,7 +2066,7 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
   - `CaseErrors`: `notFound()`, `notFound(String what)`, `gone()`, `forbidden()`, `forbidden(String message)`, `invalidTransition()`, `activeCaseExists(String code)`, `invalidField(String field, String reason)`, `invalidFields(Map<String,String>)` — each returns an `ApiException`.
   - `OwnerAccess` (`@Component`): `static String code(String raw)` (normalized or `not_found`), `static Optional<UUID> id(String raw)`, `<T> T require(Optional<T> row, Function<T, UUID> createdBy, UUID me)` (`not_found`, then `forbidden`).
   - `LifecycleQueries` (`@Component`): `record LifecycleRow(String code, UUID createdBy, UUID petId, String status, @Nullable Instant resolvedAt, @Nullable String otherActiveCode)`; `Optional<LifecycleRow> load(String code)`; `boolean close(String code, UUID owner, String status, String resolution, @Nullable String attribution, Instant now)`; `boolean reopen(String code, @Nullable UUID owner, Instant now)` (owner null = claim reactivation); `Optional<String> activeCodeFor(UUID petId)`; `static final String ACTIVE_PER_PET = "lost_case_one_active_per_pet"`.
-  - Ceilings: `POST /cases/{code}/reunite` 3, `POST /cases/{code}/cancel` 3, `POST /cases/{code}/reopen` 4.
+  - Ceilings: `POST /cases/{code}/reunite` 4, `POST /cases/{code}/cancel` 4, `POST /cases/{code}/reopen` 4 (each: session, pre-read, `UPDATE`, re-read on the race-loser path; 3 on success; 2 for a repeat the pre-read answers).
 
 - [ ] **Step 1: Harness — `ApiClient.patch/delete`, `Contention`, fixtures, coverage with path variables**
 
@@ -2073,6 +2088,7 @@ import org.jooq.DSLContext;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.concurrent.TimeUnit;
 
@@ -2082,12 +2098,13 @@ import java.util.concurrent.TimeUnit;
  */
 public final class Contention implements AutoCloseable {
 
-    private static final String WAITING =
-            "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()";
+    /** Backends blocked by the holder's pid only: a waiter left behind by another test never counts. */
+    private static final String WAITING = "SELECT count(*) FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid))";
 
     private final DataSource dataSource;
     private final DSLContext db;
     private Connection holder;
+    private int holderPid;
 
     public Contention(DataSource dataSource, DSLContext db) {
         this.dataSource = dataSource;
@@ -2099,6 +2116,11 @@ public final class Contention implements AutoCloseable {
         if (holder != null) throw new IllegalStateException("already holding a transaction");
         holder = dataSource.getConnection();
         holder.setAutoCommit(false);
+        try (PreparedStatement pid = holder.prepareStatement("SELECT pg_backend_pid()");
+             ResultSet rs = pid.executeQuery()) {
+            rs.next();
+            holderPid = rs.getInt(1);
+        }
         try (PreparedStatement ps = holder.prepareStatement(sql)) {
             for (int i = 0; i < binds.length; i++) ps.setObject(i + 1, binds[i]);
             ps.execute();
@@ -2111,15 +2133,15 @@ public final class Contention implements AutoCloseable {
         holder = null;
     }
 
-    /** Returns once at least {@code n} backends wait on a lock; fails after 10 s. */
+    /** Returns once at least {@code n} backends wait on the held transaction; fails after 10 s. */
     public void awaitWaiters(int n) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {
-            Integer waiting = db.fetchOne(WAITING).get(0, Integer.class);
+            Integer waiting = db.fetchOne(WAITING, holderPid).get(0, Integer.class);
             if (waiting != null && waiting >= n) return;
             Thread.sleep(20);
         }
-        throw new AssertionError("no request queued behind the held row within 10 s (waiting: " + db.fetchOne(WAITING).get(0) + ")");
+        throw new AssertionError("no request queued behind the held row within 10 s (waiting: " + db.fetchOne(WAITING, holderPid).get(0) + ")");
     }
 
     @Override
@@ -2336,29 +2358,55 @@ class CaseLifecycleTest {
         assertThat(owner.get("/me/cases").str("/0/status")).isEqualTo("cancelled");
     }
 
-    // --- a case closes once ---
+    // --- a case closes once; a repeat of the same close is a success that writes nothing ---
 
     @Test
-    void aClosedCaseCannotBeClosedAgain() {
+    void aRepeatedReuniteAnswersOkAndKeepsTheFirstCallsAttribution() {
         reunite(owner, "7K3PQ", "offline");
-        ApiResponse again = reunite(owner, "7K3PQ", "unknown");
-        assertThat(again.status()).isEqualTo(409);
-        assertThat(again.errorCode()).isEqualTo("invalid_transition");
+        ApiResponse again = cold(() -> reunite(owner, "7K3PQ", "unknown"));       // a retry after a lost response, another attribution
+        assertThat(again.status()).isEqualTo(200);
+        assertThat(again.str("/id")).isEqualTo("7K3PQ");
+        assertThat(again.statements()).as("answered by the pre-read: %s", again.statements()).hasSize(2);
+        assertThat(luna().get(LOST_CASE.RESOLUTION)).isEqualTo("reunited_home");
+        assertThat(luna().get(LOST_CASE.RESOLUTION_ATTRIBUTION)).as("the first call's attribution stays").isEqualTo("offline");
         ApiResponse cancelAfter = cancel(owner, "7K3PQ", "duplicate");
         assertThat(cancelAfter.status()).isEqualTo(409);
         assertThat(cancelAfter.errorCode()).isEqualTo("invalid_transition");
-        assertThat(luna().get(LOST_CASE.RESOLUTION)).isEqualTo("reunited_home");
-        assertThat(luna().get(LOST_CASE.RESOLUTION_ATTRIBUTION)).isEqualTo("offline");
+        assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("reunited");
     }
 
-    @ParameterizedTest
-    @CsvSource({"expired", "reunited", "cancelled"})
-    void onlyAnActiveCaseCanBeReunitedOrCancelled(String status) {
-        cases.close("7K3PQ", status, NOW.minus(Duration.ofDays(1)));
-        assertThat(reunite(owner, "7K3PQ", "offline").errorCode()).isEqualTo("invalid_transition");
-        assertThat(cancel(owner, "7K3PQ", "duplicate").errorCode()).isEqualTo("invalid_transition");
+    @Test
+    void aRepeatedCancelAnswersOkAndKeepsTheFirstCallsReason() {
+        cancel(owner, "7K3PQ", "duplicate");
+        ApiResponse again = cancel(owner, "7K3PQ", "false_alarm");
+        assertThat(again.status()).isEqualTo(200);
+        assertThat(again.str("/id")).isEqualTo("7K3PQ");
+        assertThat(luna().get(LOST_CASE.RESOLUTION)).isEqualTo("duplicate");
+        ApiResponse reuniteAfter = reunite(owner, "7K3PQ", "offline");
+        assertThat(reuniteAfter.status()).isEqualTo(409);
+        assertThat(reuniteAfter.errorCode()).isEqualTo("invalid_transition");
+        assertThat(luna().get(LOST_CASE.RESOLUTION_ATTRIBUTION)).isNull();
+    }
+
+    @ParameterizedTest(name = "{0} on {1} → {2}")
+    @CsvSource({
+            "reunite, expired,   409",
+            "reunite, reunited,  200",
+            "reunite, cancelled, 409",
+            "cancel,  expired,   409",
+            "cancel,  reunited,  409",
+            "cancel,  cancelled, 200",
+    })
+    void onAClosedCaseOnlyTheSameCloseIsOkAndNothingIsWritten(String action, String status, int expected) {
+        cases.close("7K3PQ", status, NOW.minus(Duration.ofDays(1)));                // resolution left NULL: a write would show
+        ApiResponse r = "reunite".equals(action) ? reunite(owner, "7K3PQ", "offline") : cancel(owner, "7K3PQ", "duplicate");
+        assertThat(r.status()).isEqualTo(expected);
+        if (expected == 409) assertThat(r.errorCode()).isEqualTo("invalid_transition");
+        else assertThat(r.str("/id")).isEqualTo("7K3PQ");
         assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo(status);
-        assertThat(luna().get(LOST_CASE.RESOLUTION)).isNull();
+        assertThat(luna().get(LOST_CASE.RESOLUTION)).as("nothing written").isNull();
+        assertThat(luna().get(LOST_CASE.RESOLUTION_ATTRIBUTION)).isNull();
+        assertThat(luna().get(LOST_CASE.RESOLVED_AT).toInstant()).isEqualTo(NOW.minus(Duration.ofDays(1)));
     }
 
     // --- reopen ---
@@ -2404,8 +2452,14 @@ class CaseLifecycleTest {
     }
 
     @Test
-    void anActiveCaseIsNotReopened() {
-        assertThat(reopen(owner, "7K3PQ").errorCode()).isEqualTo("invalid_transition");
+    void reopenOnAnAlreadyActiveCaseAnswersOkAndWritesNothing() {
+        Instant published = luna().get(LOST_CASE.PUBLISHED_AT).toInstant();
+        ApiResponse r = cold(() -> reopen(owner, "7K3PQ"));                        // a retry, or a claim reactivated it first
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(r.str("/id")).isEqualTo("7K3PQ");
+        assertThat(r.statements()).as("answered by the pre-read: %s", r.statements()).hasSize(2);
+        assertUnchanged();
+        assertThat(luna().get(LOST_CASE.PUBLISHED_AT).toInstant()).isEqualTo(published);
     }
 
     @Test
@@ -2485,6 +2539,7 @@ class CaseLifecycleTest {
           .set(LOST_CASE.RESOLUTION_ATTRIBUTION, (String) null).set(LOST_CASE.RESOLVED_AT, NOW.minusSeconds(60).atOffset(ZoneOffset.UTC)).execute();
         assertThat(cold(() -> reopen(owner, "7K3PQ")).statements()).hasSize(3);                // session, pre-read, conditional update
         assertThat(cold(() -> cancel(owner, "7K3PQ", "duplicate")).statements()).hasSize(3);
+        assertThat(cold(() -> cancel(owner, "7K3PQ", "duplicate")).statements()).as("a repeat, answered by the pre-read").hasSize(2);
         assertThat(cold(() -> reopen(owner, "7K3PQ")).statements()).as("refused by the pre-read").hasSize(2);
     }
 }
@@ -2622,8 +2677,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @IntegrationTest
 class CaseLifecycleRaceTest {
 
-    static final String HELD_SIGHTING = "INSERT INTO scuby.sighting (id, case_code, lat, lng, seen_at, created_at, reporter_device_hash) "
-            + "VALUES (gen_random_uuid(), '7K3PQ', 6.2455, -75.5905, now(), now(), repeat('a', 64))";
+    /** A signed-in «Lo vi» left uncommitted: it holds FOR KEY SHARE on the case row and on its reporter's person row. */
+    static final String HELD_SIGHTING = "INSERT INTO scuby.sighting (id, case_code, lat, lng, seen_at, created_at, reporter_device_hash, reporter_person_id) "
+            + "VALUES (gen_random_uuid(), '7K3PQ', 6.2455, -75.5905, now(), now(), repeat('a', 64), ?)";
+    static final String HELD_REUNITE = "UPDATE scuby.lost_case SET status = 'reunited', resolved_at = now(), resolution = 'reunited_home', "
+            + "resolution_attribution = 'offline' WHERE code = '7K3PQ'";
 
     @Autowired ApiClients clients;
     @Autowired TestDb testDb;
@@ -2662,9 +2720,13 @@ class CaseLifecycleRaceTest {
         return db.select(LOST_CASE.STATUS).from(LOST_CASE).where(LOST_CASE.CODE.eq("7K3PQ")).fetchOne(LOST_CASE.STATUS);
     }
 
+    private String attribution() {
+        return db.select(LOST_CASE.RESOLUTION_ATTRIBUTION).from(LOST_CASE).where(LOST_CASE.CODE.eq("7K3PQ")).fetchOne(LOST_CASE.RESOLUTION_ATTRIBUTION);
+    }
+
     @Test
     void aReuniteNeverWaitsForAnUncommittedSightingAndTheSightingStays() throws Exception {
-        contention.hold(HELD_SIGHTING);
+        contention.hold(HELD_SIGHTING, accounts.person("held@correo.co"));
         Future<ApiResponse> f = pool.submit(() -> owner.post("/cases/{code}/reunite", "{\"resolution_attribution\":\"offline\"}", "7K3PQ"));
         assertThat(f.get(10, TimeUnit.SECONDS).status()).isEqualTo(200);
         contention.commit();
@@ -2674,7 +2736,7 @@ class CaseLifecycleRaceTest {
 
     @Test
     void aCancelNeverWaitsForAnUncommittedSightingEither() throws Exception {
-        contention.hold(HELD_SIGHTING);
+        contention.hold(HELD_SIGHTING, accounts.person("held@correo.co"));
         Future<ApiResponse> f = pool.submit(() -> owner.post("/cases/{code}/cancel", "{\"resolution\":\"duplicate\"}", "7K3PQ"));
         assertThat(f.get(10, TimeUnit.SECONDS).status()).isEqualTo(200);
         contention.commit();
@@ -2719,6 +2781,62 @@ class CaseLifecycleRaceTest {
             assertThat(loser.errorCode()).isEqualTo("invalid_transition");
             assertThat(status()).isEqualTo(rr.status() == 200 ? "reunited" : "cancelled");
         }
+    }
+
+    /**
+     * Deterministic close against close: a reunite is held uncommitted; the cancel passes its pre-read (active), its UPDATE
+     * waits on the row, re-checks status = 'active' after the commit, matches nothing, and its re-read finds `reunited`, a
+     * different state from its own target: invalid_transition. The longest path: session, pre-read, UPDATE, re-read = 4.
+     */
+    @Test
+    void aCancelThatMeetsACommittedReuniteIsInvalidTransitionOnTheLongestPath() throws Exception {
+        contention.hold(HELD_REUNITE);
+        caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
+        Future<ApiResponse> f = pool.submit(() -> owner.post("/cases/{code}/cancel", "{\"resolution\":\"duplicate\"}", "7K3PQ"));
+        contention.awaitWaiters(1);
+        contention.commit();
+        ApiResponse r = f.get(30, TimeUnit.SECONDS);
+        assertThat(r.status()).isEqualTo(409);
+        assertThat(r.errorCode()).isEqualTo("invalid_transition");
+        assertThat(status()).isEqualTo("reunited");
+        assertThat(attribution()).isEqualTo("offline");
+        assertThat(r.statements()).as("%s", r.statements()).hasSize(4);
+    }
+
+    /** A retried reunite that meets the first one in flight: 200, and the first call's attribution stays. */
+    @Test
+    void aRetriedReuniteThatMeetsTheFirstOneAnswersOkAndKeepsItsAttribution() throws Exception {
+        contention.hold(HELD_REUNITE);
+        caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
+        Future<ApiResponse> f = pool.submit(() -> owner.post("/cases/{code}/reunite", "{\"resolution_attribution\":\"unknown\"}", "7K3PQ"));
+        contention.awaitWaiters(1);
+        contention.commit();
+        ApiResponse r = f.get(30, TimeUnit.SECONDS);
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(r.str("/id")).isEqualTo("7K3PQ");
+        assertThat(attribution()).as("never overwritten by the retry").isEqualTo("offline");
+        assertThat(r.statements()).as("%s", r.statements()).hasSize(4);
+    }
+
+    /**
+     * The owner's reopen against a claim's reactivation of the same expired case (the reactivation is the reopen UPDATE
+     * without the owner guard, held uncommitted here): the reopen's UPDATE waits, re-checks status = 'expired' after the
+     * commit, matches nothing, and its re-read finds the case active — what the owner asked for. Both end active: 200.
+     */
+    @Test
+    void aReopenThatMeetsAClaimsReactivationAnswersOkAndTheCaseIsActive() throws Exception {
+        cases.close("7K3PQ", "expired", MutableClock.START.minus(Duration.ofDays(2)));
+        contention.hold("UPDATE scuby.lost_case SET status = 'active', resolution = NULL, resolution_attribution = NULL, resolved_at = NULL "
+                + "WHERE code = '7K3PQ'");
+        caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
+        Future<ApiResponse> f = pool.submit(() -> owner.post("/cases/{code}/reopen", null, "7K3PQ"));
+        contention.awaitWaiters(1);
+        contention.commit();
+        ApiResponse r = f.get(30, TimeUnit.SECONDS);
+        assertThat(r.status()).isEqualTo(200);
+        assertThat(r.str("/id")).isEqualTo("7K3PQ");
+        assertThat(status()).isEqualTo("active");
+        assertThat(r.statements()).as("%s", r.statements()).hasSize(4);
     }
 
     /**
@@ -3065,12 +3183,15 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 /**
  * Reunite, cancel, reopen (docs/product/04-lost-workflow.md · Case state machine; L1 design §4.3–4.5). Order: the case
  * exists → the caller is its owner → the body → the status. Each transition is one conditional UPDATE in autocommit; zero
- * rows after a passing pre-read is the race loser and answers what a re-read classifies. Never re-broadcasts, notifies no
- * one, writes no outbox row (L2 derives what it needs from rows).
+ * rows after a passing pre-read is the race loser and answers what one re-read classifies. Idempotent: a case already in
+ * the action's target state answers the same success with no write (a retry after a lost response, a double tap, or a
+ * race another request won), so the first call's resolution and attribution are never overwritten; any other state is
+ * invalid_transition. Never re-broadcasts, notifies no one, writes no outbox row (L2 derives what it needs from rows).
  */
 @Service
 class CaseLifecycleService {
@@ -3092,11 +3213,7 @@ class CaseLifecycleService {
             throw CaseErrors.invalidField("resolution_attribution", "one of platform_sighting, platform_claim, platform_share, offline, unknown");
         }
         Instant now = clock.instant();
-        if (LostLifecycleDerivation.check(Action.REUNITE, row.status(), row.resolvedAt(), now) != Outcome.ALLOWED
-                || !queries.close(code, me, "reunited", "reunited_home", body.resolutionAttribution(), now)) {
-            throw CaseErrors.invalidTransition();
-        }
-        return code;
+        return close(Action.REUNITE, row, now, () -> queries.close(code, me, "reunited", "reunited_home", body.resolutionAttribution(), now));
     }
 
     String cancel(String rawCode, UUID me, CancelRequest body) {
@@ -3106,18 +3223,29 @@ class CaseLifecycleService {
             throw CaseErrors.invalidField("resolution", "false_alarm or duplicate");
         }
         Instant now = clock.instant();
-        if (LostLifecycleDerivation.check(Action.CANCEL, row.status(), row.resolvedAt(), now) != Outcome.ALLOWED
-                || !queries.close(code, me, "cancelled", body.resolution(), null, now)) {
-            throw CaseErrors.invalidTransition();
-        }
-        return code;
+        return close(Action.CANCEL, row, now, () -> queries.close(code, me, "cancelled", body.resolution(), null, now));
+    }
+
+    /**
+     * One close. ALREADY_DONE on the pre-read answers the code with no write; ALLOWED runs the conditional UPDATE; zero
+     * rows is the race loser, and one re-read tells "already in the target state" (the code, nothing written) from any
+     * other state (invalid_transition).
+     */
+    private String close(Action action, LifecycleRow row, Instant now, BooleanSupplier update) {
+        Outcome before = LostLifecycleDerivation.check(action, row.status(), row.resolvedAt(), now);
+        if (before == Outcome.ALREADY_DONE) return row.code();
+        if (before != Outcome.ALLOWED) throw CaseErrors.invalidTransition();
+        if (update.getAsBoolean()) return row.code();
+        LifecycleRow after = queries.load(row.code()).orElseThrow(CaseErrors::notFound);
+        if (LostLifecycleDerivation.check(action, after.status(), after.resolvedAt(), now) == Outcome.ALREADY_DONE) return row.code();
+        throw CaseErrors.invalidTransition();
     }
 
     String reopen(String rawCode, UUID me) {
         String code = OwnerAccess.code(rawCode);
         LifecycleRow row = owners.require(queries.load(code), LifecycleRow::createdBy, me);
         Instant now = clock.instant();
-        requireReopenable(row, now);
+        if (alreadyActive(row, now)) return code;
         boolean reopened;
         try {
             reopened = queries.reopen(code, me, now);
@@ -3126,16 +3254,21 @@ class CaseLifecycleService {
             throw queries.activeCodeFor(row.petId()).map(CaseErrors::activeCaseExists).orElseGet(CaseErrors::invalidTransition);
         }
         if (reopened) return code;
-        requireReopenable(queries.load(code).orElseThrow(CaseErrors::notFound), now);
+        // The race loser: a claim's reactivation may have made the case active first — what the owner asked for.
+        if (alreadyActive(queries.load(code).orElseThrow(CaseErrors::notFound), now)) return code;
         throw CaseErrors.invalidTransition();
     }
 
-    /** invalid_transition first (status or window), then active_case_exists (spec §4.5). */
-    private static void requireReopenable(LifecycleRow row, Instant now) {
-        if (LostLifecycleDerivation.check(Action.REOPEN, row.status(), row.resolvedAt(), now) != Outcome.ALLOWED) {
-            throw CaseErrors.invalidTransition();
-        }
+    /**
+     * True when this case is already active (reopen has nothing to do); otherwise invalid_transition first (status or
+     * window), then active_case_exists (spec §4.5); false when it is reopenable.
+     */
+    private static boolean alreadyActive(LifecycleRow row, Instant now) {
+        Outcome outcome = LostLifecycleDerivation.check(Action.REOPEN, row.status(), row.resolvedAt(), now);
+        if (outcome == Outcome.ALREADY_DONE) return true;
+        if (outcome != Outcome.ALLOWED) throw CaseErrors.invalidTransition();
         if (row.otherActiveCode() != null) throw CaseErrors.activeCaseExists(row.otherActiveCode());
+        return false;
     }
 }
 ```
@@ -3197,9 +3330,9 @@ and update its javadoc to: `/** cases' `session` endpoints (openapi.json securit
 In `B/src/test/java/co/scuby/support/StatementCeilings.java`, after the `"POST /cases/{code}/sightings"` entry (keep the trailing commas valid), add:
 
 ```java
-            Map.entry("POST /cases/{code}/reunite", 3),   // exactly 3 on a session-cache miss (CaseLifecycleTest): session, pre-read (case + other active code), conditional UPDATE
-            Map.entry("POST /cases/{code}/cancel", 3),    // as reunite
-            Map.entry("POST /cases/{code}/reopen", 4),    // longest path, measured by CaseLifecycleRaceTest: session, pre-read, UPDATE (zero rows or the unique violation), re-read or active-code read; 3 on success
+            Map.entry("POST /cases/{code}/reunite", 4),   // longest path, CaseLifecycleRaceTest (the race loser): session, pre-read (case + other active code), conditional UPDATE (zero rows), re-read; 3 on success (CaseLifecycleTest), 2 for a repeat
+            Map.entry("POST /cases/{code}/cancel", 4),    // as reunite
+            Map.entry("POST /cases/{code}/reopen", 4),    // longest path, measured by CaseLifecycleRaceTest: session, pre-read, UPDATE (zero rows or the unique violation), re-read or active-code read; 3 on success, 2 on an already active case
 ```
 
 - [ ] **Step 5: Run the tests to verify they pass**
@@ -3815,8 +3948,9 @@ class EditLostRaceTest {
 
     @Test
     void anEditAndAnUncommittedSightingBothCommit() throws Exception {
-        contention.hold("INSERT INTO scuby.sighting (id, case_code, lat, lng, seen_at, created_at, reporter_device_hash) "
-                + "VALUES (gen_random_uuid(), '7K3PQ', 6.2455, -75.5905, now(), now(), repeat('a', 64))");
+        // A signed-in «Lo vi» (spec §7.2): the uncommitted insert also holds its reporter's person row.
+        contention.hold("INSERT INTO scuby.sighting (id, case_code, lat, lng, seen_at, created_at, reporter_device_hash, reporter_person_id) "
+                + "VALUES (gen_random_uuid(), '7K3PQ', 6.2455, -75.5905, now(), now(), repeat('a', 64), ?)", accounts.person("held@correo.co"));
         Future<ApiResponse> f = pool.submit(() -> owner.patch("/lost-cases/{code}", "{\"marks\":\"Collar azul\",\"last_seen_radius_m\":250}", "7K3PQ"));
         assertThat(f.get(10, TimeUnit.SECONDS).status()).as("the edit does not wait for the sighting").isEqualTo(204);
         contention.commit();
@@ -4058,7 +4192,7 @@ The owner hides a pin from the public views or highlights it (spec §4.6); the f
 - Test: `B/src/test/java/co/scuby/cases/SightingModerationTest.java`
 
 **Interfaces:**
-- Consumes: `Patch<T>` (Task 3); `OwnerAccess.code/id/require`, `CaseErrors`, `CreatedView`, `ApiClient.patch` (Task 4); `CaseFixtures.sighting(String, GeoPoint, Instant, Instant, UUID, String, String, String)`.
+- Consumes: `Patch<T>` (Task 3); `OwnerAccess.code/id/require`, `CaseErrors`, `CreatedView`, `ApiClient.patch`, `Contention` (Task 4); `CaseFixtures.sighting(String, GeoPoint, Instant, Instant, UUID, String, String, String)`.
 - Produces: `record ModerateSightingRequest(Patch<Boolean> highlighted, Patch<Boolean> hidden)`; `SightingModerationService.moderate(String rawCode, String rawSightingId, UUID me, ModerateSightingRequest body) → CreatedView`; ceiling `PATCH /cases/{code}/sightings/{sightingId}` 3. `LostCaseQueries.sightingsQuery(code, Access.OWNER)` now filters `status IN ('visible','hidden_by_owner')` (inline literals).
 
 - [ ] **Step 1: Write the failing tests**
@@ -4075,6 +4209,7 @@ import co.scuby.support.ApiClient;
 import co.scuby.support.ApiClients;
 import co.scuby.support.ApiResponse;
 import co.scuby.support.CaseFixtures;
+import co.scuby.support.Contention;
 import co.scuby.support.IntegrationTest;
 import co.scuby.support.MutableClock;
 import org.jooq.DSLContext;
@@ -4086,9 +4221,13 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import javax.sql.DataSource;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static co.scuby.db.generated.Tables.SIGHTING;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -4104,6 +4243,7 @@ class SightingModerationTest {
     @Autowired Accounts accounts;
     @Autowired CaseFixtures cases;
     @Autowired DSLContext db;
+    @Autowired DataSource dataSource;
     @Autowired ObjectProvider<ClearableCache> caches;
 
     ApiClient owner;
@@ -4264,6 +4404,32 @@ class SightingModerationTest {
         ApiResponse r = cold(() -> moderate(owner, "7K3PQ", pin, "{\"hidden\":true,\"highlighted\":true}"));
         assertThat(r.status()).isEqualTo(200);
         assertThat(r.statements()).as("%s", r.statements()).hasSize(3);   // session, pre-read (case + pin), update
+    }
+
+    /**
+     * The pin is removed by moderation while the owner hides it: the hide passed its pre-read (visible), its UPDATE waits on
+     * the uncommitted change, re-checks status IN ('visible','hidden_by_owner') after the commit and matches nothing:
+     * not_found, the removal stands, still 3 statements.
+     */
+    @Test
+    void aPinModeratedAwayDuringTheHideIsNotFoundAndStaysRemoved() throws Exception {
+        try (Contention contention = new Contention(dataSource, db)) {
+            contention.hold("UPDATE scuby.sighting SET status = 'removed_by_moderation' WHERE id = ?", pin);
+            caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
+            var pool = Executors.newSingleThreadExecutor();
+            try {
+                Future<ApiResponse> f = pool.submit(() -> moderate(owner, "7K3PQ", pin, "{\"hidden\":true}"));
+                contention.awaitWaiters(1);
+                contention.commit();
+                ApiResponse r = f.get(30, TimeUnit.SECONDS);
+                assertThat(r.status()).isEqualTo(404);
+                assertThat(r.errorCode()).isEqualTo("not_found");
+                assertThat(r.statements()).as("%s", r.statements()).hasSize(3);
+                assertThat(row(pin).get(SIGHTING.STATUS)).isEqualTo("removed_by_moderation");
+            } finally {
+                pool.shutdownNow();
+            }
+        }
     }
 }
 ```
@@ -4441,9 +4607,9 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
 ```
 
 ---
-### Task 7: The reporter's own pin — correction and delete — and the session-wins "mine"
+### Task 7: The reporter's own pin — correction and delete — and the "mine" rule
 
-`POST /cases/{code}/sightings/{sightingId}/correction` and `DELETE /cases/{code}/sightings/{sightingId}` (spec §4.7–4.8) are public: the reporter is the session's person when signed in, else the device (`docs/eng/api.md` · Device identity, session wins). `LostCaseDerivation` changes `mine` from "person OR device" to that rule, so `mine`, `editable_until`, correction and delete agree. Delete is a status; a replayed «Lo vi» with the deleted pin's `client_id` answers that pin's id.
+`POST /cases/{code}/sightings/{sightingId}/correction` and `DELETE /cases/{code}/sightings/{sightingId}` (spec §4.7–4.8) are public. A pin is mine when its `reporter_person_id` is the session's person, **or** when it has no person and its `reporter_device_hash` is the caller's device (`docs/eng/api.md` · Device identity). So another person's pin is never mine on a shared device, and a passer-by who reported anonymously and then signs in to say «Lo tengo» keeps their pin (its correction window, and the claim's link to it). `LostCaseDerivation` changes `mine` from "person OR device" to that rule, so `mine`, `editable_until`, correction, delete and the claim's `from_sighting_id` (Task 9) agree. Delete is a status; a replayed «Lo vi» with the deleted pin's `client_id` answers that pin's id; the reporter's repeat delete of their own deleted pin answers `204` again with no write.
 
 **Files:**
 - Create: `B/src/main/java/co/scuby/platform/web/BodyValidation.java`; Test: `B/src/test/java/co/scuby/platform/web/BodyValidationTest.java`
@@ -4459,7 +4625,7 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
 - Consumes: `OwnerAccess.code/id`, `CaseErrors`, `Contention`, `ApiClient.delete` (Task 4); `SightingRulesDerivation.check(Instant seenAt, Instant now, Instant lastSeenAt, double distanceM) → Optional<Refusal>`; `Spatial.distanceMeters`, `Spatial.geography`.
 - Produces:
   - `platform.web.BodyValidation` (`@Component`, public): `void require(Object body)` — bean validation of a record bound without `@Valid`; `validation_failed` with wire-path fields (list indexes dropped: `photo_urls[2]` → `photo_urls`).
-  - `LostCaseDerivation.mine(@Nullable UUID viewerPerson, String viewerDevice, @Nullable UUID reporterPerson, String reporterDevice) → boolean`; `LostCaseDerivation.editable(boolean mine, boolean visible, Instant createdAt, Instant now) → boolean`.
+  - `LostCaseDerivation.mine(@Nullable UUID viewerPerson, String viewerDevice, @Nullable UUID reporterPerson, String reporterDevice) → boolean` (`viewerPerson` equals `reporterPerson`, or `reporterPerson` is null and the devices are equal; also consumed by Task 9's `from_sighting_id` link); `LostCaseDerivation.editable(boolean mine, boolean visible, Instant createdAt, Instant now) → boolean`.
   - `record SightingCorrectionRequest(PointInput point, OffsetDateTime seenAt, @Nullable String note)` (all three `@JsonProperty(required = true)`).
   - `SightingQueries.OwnPin(String status, Instant createdAt, @Nullable UUID reporterPersonId, String reporterDeviceHash, String caseStatus, Instant lastSeenAt, @Nullable Double distanceM)`; `Optional<OwnPin> ownPin(String code, UUID id, @Nullable GeoPoint point)`; `boolean correct(String code, UUID id, Caller caller, GeoPoint point, Instant seenAt, @Nullable String note, Instant now)`; `boolean deleteOwn(String code, UUID id, Caller caller, Instant now)`.
   - `SightingService.correct(String rawCode, String rawId, Caller caller, SightingCorrectionRequest body)`, `SightingService.delete(String rawCode, String rawId, Caller caller)`.
@@ -4470,22 +4636,37 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
 In `B/src/test/java/co/scuby/cases/LostCaseDerivationTest.java` replace the whole `mineAndTheCorrectionWindow` test (the `@ParameterizedTest` with its `@CsvSource` and method) with:
 
 ```java
+    /** Another person, not the viewer (HELPER) and not the owner. */
+    static final UUID SOMEONE_ELSE = UUID.fromString("00000000-0000-0000-0000-00000000000c");
+
+    /**
+     * "Mine" (docs/eng/api.md · Device identity): the viewer's person, or a pin with no person sent from the viewer's
+     * device. Human review: this table is the rule. reporter = ME (the viewer's person, HELPER), OTHER (another person) or
+     * NONE (an anonymous pin); sameDevice = the pin's device hash is the viewer's.
+     */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            // case,                                         viewerSignedIn, reporterIsViewer, sameDevice, minutesAgo, hidden, mine,  editable
-            "'session matches, from another device',          true,           true,             false,      5,          false,  true,  true",
-            "'session matches, exactly 15 min ago',           true,           true,             false,      15,         false,  true,  false",
-            "'session, only the device matches (not mine)',   true,           false,            true,       5,          false,  false, false",
-            "'no session, the device matches',                false,          false,            true,       5,          false,  true,  true",
-            "'no session, device matches a signed-in pin',    false,          true,             true,       5,          false,  true,  true",
-            "'no session, another device',                    false,          true,             false,      5,          false,  false, false",
-            "'mine but hidden by the owner',                  true,           true,             true,       5,          true,   true,  false",
-            "'someone else',                                  true,           false,            false,      5,          false,  false, false",
+            // case,                                                    viewerSignedIn, reporter, sameDevice, minutesAgo, hidden, mine,  editable
+            "'person match, from another device',                        true,           ME,       false,      5,          false,  true,  true",
+            "'person match, exactly 15 min ago',                         true,           ME,       false,      15,         false,  true,  false",
+            "'anonymous pin from this device, the viewer now signed in', true,           NONE,     true,       5,          false,  true,  true",
+            "'another person''s pin from this device',                   true,           OTHER,    true,       5,          false,  false, false",
+            "'anonymous pin from another device, signed in',             true,           NONE,     false,      5,          false,  false, false",
+            "'no session, anonymous pin from this device',               false,          NONE,     true,       5,          false,  true,  true",
+            "'no session, anonymous pin from another device',            false,          NONE,     false,      5,          false,  false, false",
+            "'no session, a signed-in pin from this device',             false,          ME,       true,       5,          false,  false, false",
+            "'mine but hidden by the owner',                             true,           ME,       true,       5,          true,   true,  false",
+            "'another person, another device',                           true,           OTHER,    false,      5,          false,  false, false",
     })
-    void mineIsTheSessionWhenSignedInElseTheDevice(String label, boolean viewerSignedIn, boolean reporterIsViewer, boolean sameDevice,
-                                                   int minutesAgo, boolean hidden, boolean mine, boolean editable) {
+    void mineIsTheViewersPersonOrAnAnonymousPinFromTheirDevice(String label, boolean viewerSignedIn, String reporter, boolean sameDevice,
+                                                               int minutesAgo, boolean hidden, boolean mine, boolean editable) {
         Instant created = NOW.minus(Duration.ofMinutes(minutesAgo));
-        var s = sighting("01", created, created, reporterIsViewer ? HELPER : null, sameDevice ? MY_DEVICE : OTHER_DEVICE, null, hidden);
+        UUID reporterPerson = switch (reporter) {
+            case "ME" -> HELPER;
+            case "OTHER" -> SOMEONE_ELSE;
+            default -> null;
+        };
+        var s = sighting("01", created, created, reporterPerson, sameDevice ? MY_DEVICE : OTHER_DEVICE, null, hidden);
         // A hidden pin reaches only the owner: in that row the viewer is the owner (but not the reporter).
         Viewer viewer = new Viewer(hidden ? Access.OWNER : Access.PUBLIC, viewerSignedIn ? HELPER : null, MY_DEVICE);
         var view = LostCaseDerivation.derive(luna(List.of(s)), viewer, NOW, ES).sightings().getFirst();
@@ -4500,16 +4681,18 @@ In `B/src/test/java/co/scuby/cases/LostCaseDerivationTest.java` replace the whol
         assertThat(LostCaseDerivation.editable(true, true, created, NOW)).isFalse();
         assertThat(LostCaseDerivation.editable(false, true, NOW, NOW)).isFalse();
         assertThat(LostCaseDerivation.editable(true, false, NOW, NOW)).isFalse();
-        assertThat(LostCaseDerivation.mine(null, MY_DEVICE, HELPER, MY_DEVICE)).isTrue();
-        assertThat(LostCaseDerivation.mine(HELPER, MY_DEVICE, null, MY_DEVICE)).isFalse();
+        assertThat(LostCaseDerivation.mine(null, MY_DEVICE, null, MY_DEVICE)).isTrue();
+        assertThat(LostCaseDerivation.mine(null, MY_DEVICE, HELPER, MY_DEVICE)).as("a signed-in pin is its person's").isFalse();
+        assertThat(LostCaseDerivation.mine(HELPER, MY_DEVICE, null, MY_DEVICE)).as("an anonymous pin of my browser").isTrue();
+        assertThat(LostCaseDerivation.mine(HELPER, MY_DEVICE, SOMEONE_ELSE, MY_DEVICE)).as("another person's, same device").isFalse();
         assertThat(LostCaseDerivation.mine(HELPER, OTHER_DEVICE, HELPER, MY_DEVICE)).isTrue();
     }
 ```
 
 Run: `[mvn] test -Dtest=LostCaseDerivationTest 2>&1 | tail -10`
-Expected: FAIL — `session, only the device matches (not mine)` expects `mine` false and gets true; `cannot find symbol: method editable` / `mine`.
+Expected: FAIL — `cannot find symbol: method editable` / `mine`; once those exist against the old OR rule, `another person's pin from this device` expects `mine` false and gets true.
 
-- [ ] **Step 2: Implement the session-wins rule**
+- [ ] **Step 2: Implement the "mine" rule**
 
 In `B/src/main/java/co/scuby/cases/LostCaseDerivation.java` add the import `java.util.UUID` and replace the `sighting` method with:
 
@@ -4523,11 +4706,13 @@ In `B/src/main/java/co/scuby/cases/LostCaseDerivation.java` add the import `java
     }
 
     /**
-     * "Mine" (docs/eng/api.md · Device identity, session wins): with a session the pin is the caller's when its reporter is
-     * the session's person; with no session, when it came from this device, whatever reporter_person_id says.
+     * "Mine" (docs/eng/api.md · Device identity): the pin's reporter is the caller's person, or the pin has no person and
+     * came from the caller's device. Another person's pin is never mine, whatever device sent it; an anonymous pin from
+     * this browser stays mine after its reporter signs in (they may sign in to say «Lo tengo» and keep their pin).
      */
     static boolean mine(@Nullable UUID viewerPerson, String viewerDevice, @Nullable UUID reporterPerson, String reporterDevice) {
-        return viewerPerson != null ? viewerPerson.equals(reporterPerson) : viewerDevice.equals(reporterDevice);
+        return (viewerPerson != null && viewerPerson.equals(reporterPerson))
+                || (reporterPerson == null && viewerDevice.equals(reporterDevice));
     }
 
     /** Correctable and deletable by its reporter: mine, visible, and now before created_at + 15 min (exclusive). */
@@ -4537,7 +4722,7 @@ In `B/src/main/java/co/scuby/cases/LostCaseDerivation.java` add the import `java
 ```
 
 Run: `[mvn] test -Dtest='LostCaseDerivationTest,CaseEndpointTest' 2>&1 | tail -10`
-Expected: PASS (`CaseEndpointTest.theDeviceThatReportedSeesItsPinAsMine` uses an anonymous reporter, unchanged).
+Expected: PASS (`CaseEndpointTest.theDeviceThatReportedSeesItsPinAsMine` uses an anonymous reporter and an anonymous viewer: mine under both rules).
 
 - [ ] **Step 3: Write the failing endpoint tests**
 
@@ -4708,13 +4893,30 @@ class SightingCorrectionTest {
     }
 
     @Test
-    void sessionWinsASignedInCallerCannotCorrectAnAnonymousPinFromTheirDevice() {
+    void anAnonymousPinStaysTheReportersAfterTheySignInOnTheSameBrowser() {
         accounts.signIn(reporter, "andres@correo.co");          // same browser, same device cookie, now signed in
-        ApiResponse r = correct(reporter, "7K3PQ", pin, GOOD);
+        assertThat(reporter.get("/cases/{code}", "7K3PQ").json().at("/sightings/0/mine").asBoolean()).isTrue();
+        assertThat(correct(reporter, "7K3PQ", pin, GOOD).status()).isEqualTo(204);
+        assertThat(row().get(SIGHTING.NOTE)).isEqualTo("En la esquina");
+    }
+
+    @Test
+    void anotherPersonsPinSentFromThisBrowserIsForbidden() {
+        UUID laura = accounts.person("laura@correo.co");
+        UUID lauras = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, CREATED, CREATED, laura, device, null, "visible");   // a shared device
+        accounts.signIn(reporter, "andres@correo.co");
+        ApiResponse r = correct(reporter, "7K3PQ", lauras, GOOD);
         assertThat(r.status()).isEqualTo(403);
         assertThat(r.errorCode()).isEqualTo("forbidden");
-        assertThat(reporter.get("/cases/{code}", "7K3PQ").json().at("/sightings/0/mine").asBoolean()).isFalse();
-        assertUncorrected();
+        assertThat(db.select(SIGHTING.NOTE).from(SIGHTING).where(SIGHTING.ID.eq(lauras)).fetchOne(SIGHTING.NOTE)).isNull();
+    }
+
+    @Test
+    void aSignedInPinIsNotTheDevicesOnceItsReporterSignsOut() {
+        UUID andres = accounts.person("andres@correo.co");
+        UUID theirs = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, CREATED, CREATED, andres, device, null, "visible");
+        ApiResponse r = correct(reporter, "7K3PQ", theirs, GOOD);   // the same device, no session: a person's pin is that person's
+        assertThat(r.errorCode()).isEqualTo("forbidden");
     }
 
     @Test
@@ -4982,19 +5184,61 @@ class SightingDeleteTest {
     }
 
     @Test
-    void sessionWinsASignedInCallerCannotDeleteAnAnonymousPinFromTheirDevice() {
+    void anAnonymousPinStaysTheReportersToDeleteAfterTheySignIn() {
         accounts.signIn(reporter, "andres@correo.co");
-        assertThat(reporter.delete(PATH, "7K3PQ", pin).errorCode()).isEqualTo("forbidden");
-        assertThat(status(pin)).isEqualTo("visible");
+        assertThat(reporter.delete(PATH, "7K3PQ", pin).status()).isEqualTo(204);
+        assertThat(status(pin)).isEqualTo("deleted_by_reporter");
     }
 
     @Test
-    void aHiddenPinIsForbiddenAndADeletedOneNotFound() {
+    void anotherPersonsPinSentFromThisBrowserIsForbidden() {
+        UUID lauras = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, CREATED, CREATED, accounts.person("laura@correo.co"), device, null, "visible");
+        accounts.signIn(reporter, "andres@correo.co");
+        assertThat(reporter.delete(PATH, "7K3PQ", lauras).errorCode()).isEqualTo("forbidden");
+        assertThat(status(lauras)).isEqualTo("visible");
+    }
+
+    @Test
+    void aHiddenPinIsForbidden() {
         db.update(SIGHTING).set(SIGHTING.STATUS, "hidden_by_owner").where(SIGHTING.ID.eq(pin)).execute();
         assertThat(reporter.delete(PATH, "7K3PQ", pin).errorCode()).isEqualTo("forbidden");
-        db.update(SIGHTING).set(SIGHTING.STATUS, "visible").where(SIGHTING.ID.eq(pin)).execute();
+        assertThat(status(pin)).isEqualTo("hidden_by_owner");
+    }
+
+    @Test
+    void deletingTwiceAnswers204BothTimesEvenAfterTheWindowAndWritesNothingMore() {
         assertThat(reporter.delete(PATH, "7K3PQ", pin).status()).isEqualTo(204);
-        assertThat(reporter.delete(PATH, "7K3PQ", pin).errorCode()).as("twice").isEqualTo("not_found");
+        caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
+        ApiResponse again = reporter.delete(PATH, "7K3PQ", pin);                      // a retry after a lost response
+        assertThat(again.status()).isEqualTo(204);
+        assertThat(again.statements()).as("answered by the pre-read: %s", again.statements()).hasSize(1);   // anonymous: the pre-read
+        clock.set(CREATED.plus(Duration.ofHours(2)));
+        assertThat(reporter.delete(PATH, "7K3PQ", pin).status()).as("already done: the window no longer matters").isEqualTo(204);
+        assertThat(status(pin)).isEqualTo("deleted_by_reporter");
+        assertThat(clients.newBrowser().delete(PATH, "7K3PQ", pin).errorCode()).as("someone else's deleted pin").isEqualTo("not_found");
+        assertThat(owner.delete(PATH, "7K3PQ", pin).errorCode()).isEqualTo("not_found");
+    }
+
+    /** A double tap: the first delete is held uncommitted; the second waits, matches nothing, re-reads, finds it done: 204. */
+    @Test
+    void aDeleteThatMeetsTheFirstOneInFlightAnswers204() throws Exception {
+        ApiClient helper = clients.newBrowser();
+        UUID andres = accounts.signIn(helper, "andres@correo.co");
+        UUID theirs = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, CREATED, CREATED, andres, "9".repeat(64), null, "visible");
+        contention.hold("UPDATE scuby.sighting SET status = 'deleted_by_reporter' WHERE id = ?", theirs);
+        caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
+        var pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<ApiResponse> f = pool.submit(() -> helper.delete(PATH, "7K3PQ", theirs));
+            contention.awaitWaiters(1);
+            contention.commit();
+            ApiResponse r = f.get(30, TimeUnit.SECONDS);
+            assertThat(r.status()).isEqualTo(204);
+            assertThat(r.statements()).as("%s", r.statements()).hasSize(4);   // session, pre-read, update (zero rows), re-read
+            assertThat(status(theirs)).isEqualTo("deleted_by_reporter");
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     @ParameterizedTest
@@ -5214,11 +5458,15 @@ In `B/src/main/java/co/scuby/cases/SightingQueries.java` add the imports `org.jo
                          r.value6().toInstant(), r.value7()));
     }
 
-    /** Session wins: the person when signed in, else the device (docs/eng/api.md · Device identity). */
+    /**
+     * "Mine" in SQL, as LostCaseDerivation.mine: the caller's person, or a pin with no person from the caller's device
+     * (docs/eng/api.md · Device identity). Another person's pin never matches, whatever device sent it.
+     */
     private static Condition reportedBy(Caller caller) {
-        return caller.personId() != null
-                ? SIGHTING.REPORTER_PERSON_ID.eq(caller.personId())
-                : SIGHTING.REPORTER_DEVICE_HASH.eq(caller.deviceHash());
+        Condition anonymousFromThisDevice = SIGHTING.REPORTER_PERSON_ID.isNull().and(SIGHTING.REPORTER_DEVICE_HASH.eq(caller.deviceHash()));
+        return caller.personId() == null
+                ? anonymousFromThisDevice
+                : SIGHTING.REPORTER_PERSON_ID.eq(caller.personId()).or(anonymousFromThisDevice);
     }
 
     /** Visible and inside the 15-minute window: created_at > now − 15 min (exclusive, as LostCaseDerivation.editable). */
@@ -5273,15 +5521,29 @@ In `B/src/main/java/co/scuby/cases/SightingService.java`: add the imports `co.sc
         throw new ApiException(ErrorCode.INVALID_TRANSITION, "the case is not active");
     }
 
-    /** «Borrar» (L1 design §4.8): as correct without the case-status check; a status, never a hard delete. */
+    /**
+     * «Borrar» (L1 design §4.8): as correct without the case-status check; a status, never a hard delete. Idempotent: the
+     * caller's own pin already deleted_by_reporter answers 204 again with no write (a retry after a lost response, or a
+     * double tap whose first delete won the race); someone else's deleted pin stays not_found.
+     */
     public void delete(String rawCode, String rawId, Caller caller) {
         String code = CaseCodes.normalize(rawCode).orElseThrow(SightingService::notFound);
         UUID id = OwnerAccess.id(rawId).orElseThrow(SightingService::noSuchSighting);
         Instant now = clock.instant();
-        classify(queries.ownPin(code, id, null).orElseThrow(SightingService::noSuchSighting), caller, now, false);
+        SightingQueries.OwnPin pin = queries.ownPin(code, id, null).orElseThrow(SightingService::noSuchSighting);
+        if (deletedByCaller(pin, caller)) return;
+        classify(pin, caller, now, false);
         if (queries.deleteOwn(code, id, caller, now)) return;
-        classify(queries.ownPin(code, id, null).orElseThrow(SightingService::noSuchSighting), caller, now, false);
+        SightingQueries.OwnPin after = queries.ownPin(code, id, null).orElseThrow(SightingService::noSuchSighting);
+        if (deletedByCaller(after, caller)) return;
+        classify(after, caller, now, false);
         throw new ApiException(ErrorCode.FORBIDDEN, "this pin can no longer be deleted");
+    }
+
+    /** Already in the delete's target state, and the caller's: nothing to do. */
+    private static boolean deletedByCaller(SightingQueries.OwnPin pin, Caller caller) {
+        return "deleted_by_reporter".equals(pin.status())
+                && LostCaseDerivation.mine(caller.personId(), caller.deviceHash(), pin.reporterPersonId(), pin.reporterDeviceHash());
     }
 
     private static void classify(SightingQueries.OwnPin pin, Caller caller, Instant now, boolean needsActiveCase) {
@@ -5310,7 +5572,7 @@ In `B/src/main/java/co/scuby/cases/SightingService.java`: add the imports `co.sc
 In `B/src/main/java/co/scuby/cases/SightingController.java` add the imports `org.springframework.web.bind.annotation.DeleteMapping`; and, after `report`:
 
 ```java
-    /** correctSighting: 204. Public (device or session; session wins). Bound without @Valid: the order of spec §4.7 decides. */
+    /** correctSighting: 204. Public (the caller's person, or an anonymous pin from their device). Bound without @Valid: the order of spec §4.7 decides. */
     @PostMapping("/cases/{code}/sightings/{sightingId}/correction")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void correct(@PathVariable String code, @PathVariable String sightingId, Caller caller, @RequestBody SightingCorrectionRequest body) {
@@ -5329,7 +5591,7 @@ In `StatementCeilings` add:
 
 ```java
             Map.entry("POST /cases/{code}/sightings/{sightingId}/correction", 4),   // longest path, SightingCorrectionTest: session, pre-read (pin + case + distance), update (zero rows), re-read; 3 signed in, 2 anonymous
-            Map.entry("DELETE /cases/{code}/sightings/{sightingId}", 4),            // as correction (SightingDeleteTest)
+            Map.entry("DELETE /cases/{code}/sightings/{sightingId}", 4),            // as correction (SightingDeleteTest: the hide race and the double-tap race); a repeat of a done delete is the pre-read only
 ```
 
 `CasesSecurityRules` gets no line: both routes are public.
@@ -5341,7 +5603,7 @@ Expected: PASS. `ContractCoverageTest` does not list correction or delete among 
 
 - [ ] **Step 7: Run the whole suite and commit**
 
-Run: `[mvn] verify 2>&1 | tail -10` — Expected: `BUILD SUCCESS`; PIT still ≥ 80 % with the new `mine`/`editable` rows.
+Run: `[mvn] verify 2>&1 | tail -10` — Expected: `BUILD SUCCESS`; PIT still ≥ 80 % with the new `mine`/`editable` rows (a surviving mutant of either `mine` clause means a missing row: add it).
 
 ```bash
 git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 add \
@@ -5353,19 +5615,19 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
   backend/src/test/java/co/scuby/support/StatementCeilings.java \
   backend/src/test/java/co/scuby/cases/SightingCorrectionTest.java backend/src/test/java/co/scuby/cases/SightingDeleteTest.java \
   backend/src/test/java/co/scuby/cases/OwnPinPrecedenceTest.java
-git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 commit -m "feat: a reporter corrects or deletes their own pin; mine is the session when signed in, else the device"
+git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 commit -m "feat: a reporter corrects or deletes their own pin; mine is their person or an anonymous pin from their device"
 ```
 
 ---
 ### Task 8: The contract change — owner-only claim badge, «Lo tengo» needs a session, `active_case_exists` on reopen and claims
 
-**The only task that edits `web/`.** The backend owns this change (spec §6): it edits `web/src/contracts`, regenerates `docs/eng/openapi.json` with `pnpm openapi`, brings the client mock to the same behaviour, and moves `@LINK-001`'s «Posible hallazgo» assertion to the owner. Only the badge was a product decision (decision row #76, Task 14); the `claimRecovery` and `reopenCase` rows make the contract list the auth and the codes the decided behaviour answers (rows #75 and #71) — without them `ApiClient` refuses the responses of Tasks 9–10 and `ContractCoverageTest` fails.
+**The only task that edits `web/`.** The backend owns this change (spec §6): it edits `web/src/contracts`, regenerates `docs/eng/openapi.json` with `pnpm openapi`, brings the client mock to the same behaviour, moves `@LINK-001`'s «Posible hallazgo» assertion to the owner, and gives `@HELP-002` and `@HELP-005` the sign-in step a claim now needs (they would otherwise break web CI, which runs `pnpm e2e` against the mock). Only the badge was a product decision (decision row #76, Task 14); the `claimRecovery` and `reopenCase` rows make the contract list the auth and the codes the decided behaviour answers (rows #75 and #71). Without them `ApiClient` refuses `claimRecovery`'s `401`/`403`/`410` in Task 9 (those statuses are not listed for the route yet) and `ContractCoverageTest` fails; reopen's `409` is already listed, so Task 4's tests pass before this task — the code is added for the client.
 
 **Files (all under `W/web/` except the regenerated document):**
 - Modify: `src/contracts/case.ts`, `src/contracts/feed.ts`, `src/contracts/endpoints/helpers.ts`, `src/contracts/endpoints/lost.ts`, `src/domain/lost/actions.ts`
 - Modify: `src/mocks/serialize.ts`, `src/mocks/api/reads.ts`, `src/mocks/fixtures.ts`, `src/mocks/api/helpers.ts`, `src/mocks/backend.test.ts`
 - Modify: `src/features/lost/LostCasePage.test.tsx` (a helper no longer sees the badge)
-- Modify: `e2e/lost-case.spec.ts`
+- Modify: `e2e/lost-case.spec.ts`, `e2e/helper-actions.spec.ts` (a claim signs in first; the claimant never sees the badge)
 - Regenerated: `W/docs/eng/openapi.json`
 
 **Interfaces:**
@@ -5465,14 +5727,19 @@ describe('«Lo tengo» (04 · recovery_claim; decisions #75, #76)', () => {
     expect((await failure(claim('GONE5'))).code).toBe('gone')
   })
 
-  it('a repeat answers the open claim', async () => {
+  it('a repeat refreshes the open claim: same id, the new phone, one row', async () => {
     const pedro = await asNewcomer('pedro.ruiz@correo.co')
     const first = await claim('7K3PQ')
-    const again = await claim('7K3PQ')
+    const again = (await call(
+      api.claimRecovery,
+      { params: { code: '7K3PQ' }, body: { phone: '+573009998877' } },
+      asIs,
+    )) as { id: string }
     expect(again.id).toBe(first.id)
-    expect(
-      db.recoveryClaims.filter((c) => c.case_code === '7K3PQ' && c.claimant_id === pedro.id),
-    ).toHaveLength(1)
+    const mine = db.recoveryClaims.filter((c) => c.case_code === '7K3PQ' && c.claimant_id === pedro.id)
+    expect(mine).toHaveLength(1)
+    expect(mine[0]?.phone).toBe('+573009998877')
+    expect(mine[0]?.status).toBe('open')
   })
 
   it('the badge is null in the feed for everyone but the publisher', async () => {
@@ -5508,7 +5775,7 @@ with
 (the page itself is not changed: it already shows the owner the claims list «Posibles hallazgos» instead of the public badge — the test `sees who says they have her … instead of the public badge` stays as it is).
 
 Run: `$P test src/mocks/backend.test.ts src/features/lost/LostCasePage.test.tsx 2>&1 | tail -15`
-Expected: FAIL — the stranger's `openClaimCount` is `1` (not null), `needs a session` gets a claim instead of `unauthorized`, the feed's `possibleFind` is `false`/`true` for anonymous callers, and the page still shows a helper «Posible hallazgo.».
+Expected: FAIL — the stranger's `openClaimCount` is `1` (not null), `needs a session` gets a claim instead of `unauthorized`, `a repeat refreshes the open claim` finds two rows, the feed's `possibleFind` is `false`/`true` for anonymous callers, and the page still shows a helper «Posible hallazgo.».
 
 - [ ] **Step 3: Change the contract**
 
@@ -5557,8 +5824,10 @@ export const claimRecovery = endpoint({
   summary:
     '«Lo tengo» on a lost case. Needs a session: the claimant is a person, for the owner’s safety (say so in the UI). ' +
     'The case’s owner cannot claim it. Creates the claim, then answers the channel to the owner; a repeated claim by ' +
-    'the same person answers their open one. On a case archived less than 30 days ago it reactivates it first ' +
-    '(decision #29), unless the pet has another active case.',
+    'the same person refreshes their open one (the new phone, photos and pin; it counts as fresh again) and answers ' +
+    'its id. A `from_sighting_id` that is not the caller’s own visible pin of the last 24 hours is ignored, never ' +
+    'refused. On a case archived less than 30 days ago it reactivates it first (decision #29), unless the pet has ' +
+    'another active case (`active_case_exists`).',
   auth: 'session',
   body: recoveryClaimRequest,
   status: 201,
@@ -5699,19 +5968,25 @@ with
     }
     const whatsapp = row.contact_prefs.expose_whatsapp && row.phone_has_whatsapp
     const whatsappUrl = whatsapp ? `https://wa.me/${row.contact_phone.replace('+', '')}` : null
-    // One open claim per person per case: a repeat answers the open one, a stale one included (decision #75).
+    if (reopens) {
+      row.status = 'active'
+      row.resolved_at = null
+      row.resolution = null
+      onOwnerInteraction(row.code)
+    }
+    // One open claim per person per case: a repeat refreshes the open one, a stale one included — the
+    // new phone, and it counts as fresh again (decision #75).
     const open = db.recoveryClaims.find(
       (c) =>
         c.case_code === row.code &&
         c.claimant_id === user.id &&
         (c.status === 'open' || c.status === 'stale'),
     )
-    if (open) return { id: open.id, whatsapp_url: whatsappUrl }
-    if (reopens) {
-      row.status = 'active'
-      row.resolved_at = null
-      row.resolution = null
-      onOwnerInteraction(row.code)
+    if (open) {
+      open.phone = body.phone
+      open.status = 'open'
+      open.stale_at = iso(Date.now() + 7 * DAY)
+      return { id: open.id, whatsapp_url: whatsappUrl }
     }
     const id = newId('claim-')
     const staleAt = onClaimOpened(row.code, id)
@@ -5759,7 +6034,84 @@ In `W/web/e2e/lost-case.spec.ts`, inside the `@LINK-001` test:
     })
 ```
 
-(`@HELP-002` and `@HELP-005` also claim as a stranger; they need a sign-in step before claiming — the client's change, listed in the handoff of Task 14. They are not edited here.)
+- [ ] **Step 5b: Give `@HELP-002` and `@HELP-005` a sign-in step**
+
+Both claim as a stranger and then expect the public «Posible hallazgo.» notice. After this task the mock answers an anonymous claim `401` and sends the badge to nobody but the owner, so both would fail in web CI. The claimant signs in first the way `@LINK-001` (above) and `found.spec.ts` do — the `profile` fixture's email-code sign-in — as a newcomer (`pedro.ruiz@correo.co`, the account `publish-found.spec.ts` creates the same way), and the last assertion becomes the badge's absence: the claimant's feedback is the claim sheet's own success state, which `casePage.claimRecovery` already waits for («Ya le avisamos a su familia.»).
+
+In `W/web/e2e/helper-actions.spec.ts`:
+
+(a) in the `@HELP-002` test, replace
+
+```ts
+  async ({ casePage }) => {
+    await test.step('nobody has said they have Milo', async () => {
+```
+
+with
+
+```ts
+  async ({ casePage, profile }) => {
+    await test.step('«Lo tengo» needs an account: the helper signs in first (decision #75)', async () => {
+      await profile.open()
+      await profile.signIn.withEmailCode('pedro.ruiz@correo.co')
+      await expect(profile.email('pedro.ruiz@correo.co')).toBeVisible()
+    })
+
+    await test.step('nobody has said they have Milo', async () => {
+```
+
+and replace
+
+```ts
+    await test.step('the claim exists whatever happens in WhatsApp: the page says so', async () => {
+      await expect(casePage.possibleFind).toBeVisible()
+    })
+```
+
+with
+
+```ts
+    await test.step('the claim exists whatever happens in WhatsApp; the badge is the family’s only', async () => {
+      // The claim sheet's «Ya le avisamos a su familia.» (checked inside claimRecovery) is the claimant's
+      // feedback; «Posible hallazgo» never reaches anyone but the owner (decision #76).
+      await expect(casePage.possibleFind).toHaveCount(0)
+    })
+```
+
+(b) in the `@HELP-005` test, replace
+
+```ts
+  async ({ casePage }) => {
+    await test.step('Kira’s notice was archived: no sighting, but «La tengo» is there', async () => {
+```
+
+with
+
+```ts
+  async ({ casePage, profile }) => {
+    await test.step('«Lo tengo» needs an account: the helper signs in first (decision #75)', async () => {
+      await profile.open()
+      await profile.signIn.withEmailCode('pedro.ruiz@correo.co')
+      await expect(profile.email('pedro.ruiz@correo.co')).toBeVisible()
+    })
+
+    await test.step('Kira’s notice was archived: no sighting, but «La tengo» is there', async () => {
+```
+
+and replace
+
+```ts
+      await expect(casePage.text('Este aviso fue archivado.')).toHaveCount(0)
+      await expect(casePage.possibleFind).toBeVisible()
+```
+
+with
+
+```ts
+      await expect(casePage.text('Este aviso fue archivado.')).toHaveCount(0)
+      // Active again for everyone; the badge stays the owner's (decision #76).
+      await expect(casePage.possibleFind).toHaveCount(0)
+```
 
 - [ ] **Step 6: Regenerate the contract and run the client's checks**
 
@@ -5769,13 +6121,20 @@ Run, in `W/web`:
 $P openapi 2>&1 | tail -3
 $P exec biome check --write src/contracts/case.ts src/contracts/feed.ts src/contracts/endpoints/helpers.ts src/contracts/endpoints/lost.ts \
   src/domain/lost/actions.ts src/mocks/serialize.ts src/mocks/api/reads.ts src/mocks/fixtures.ts src/mocks/api/helpers.ts \
-  src/mocks/backend.test.ts src/features/lost/LostCasePage.test.tsx e2e/lost-case.spec.ts
+  src/mocks/backend.test.ts src/features/lost/LostCasePage.test.tsx e2e/lost-case.spec.ts e2e/helper-actions.spec.ts
 $P typecheck 2>&1 | tail -5
 $P test 2>&1 | tail -8
 $P lint 2>&1 | tail -3
 ```
 
-Expected: `openapi` rewrites `docs/eng/openapi.json`; `typecheck` prints no errors; `test` passes (the new `«Lo tengo»` describe included; the file count equals Step 1's plus none new); `lint` clean. Then check the regenerated document says what the backend will answer:
+Expected: `openapi` rewrites `docs/eng/openapi.json`; `typecheck` prints no errors; `test` passes (the new `«Lo tengo»` describe included; the file count equals Step 1's plus none new); `lint` clean.
+
+Then run the three changed e2e specs against the mock, as web CI does (`.github/workflows/web.yml` runs the `e2e` script, `playwright test`, whose web server builds and serves the app with `VITE_API_MOCK=true`). Locally the config drives the installed Google Chrome (`channel: 'chrome'`); the web server runs `pnpm exec vite …`, so `pnpm` must be on the PATH it inherits — `npx --yes pnpm@10.27.0` puts it there when `pnpm` is not installed:
+
+Run: `cd /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1/web && if command -v pnpm >/dev/null 2>&1; then P=pnpm; else P="npx --yes pnpm@10.27.0"; fi && $P e2e --grep "@HELP-002|@HELP-005|@LINK-001" 2>&1 | tail -15`
+Expected: the list reporter prints one `✓` line per test — `[mobile] › helper-actions.spec.ts … @HELP-002`, `[mobile] › helper-actions.spec.ts … @HELP-005`, `[mobile] › lost-case.spec.ts … @LINK-001` — and ends with `3 passed`. If Chrome is not installed, run `$P exec playwright install chromium` and repeat with `CI=1` in front (CI uses Playwright's Chromium). Record the output in the report.
+
+Then check the regenerated document says what the backend will answer:
 
 Run: `python3 -I -c "import json;d=json.load(open('/Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1/docs/eng/openapi.json'));o=d['paths']['/cases/{code}/recovery-claims']['post'];print(o['security'],sorted(o['responses']));print(d['components']['schemas']['LostCase']['properties']['open_claim_count']);print(d['paths']['/cases/{code}/reopen']['post']['responses']['409']['description'])"`
 Expected: `[{'session': []}] ['201', '401', '403', '404', '409', '410', '422', '429', '500']`, an `anyOf` with `{"type": "null"}`, and a 409 description naming both `invalid_transition` and `active_case_exists`.
@@ -5787,21 +6146,21 @@ Expected: PASS (the backend still answers `0` and `false`, which the widened sch
 
 - [ ] **Step 8: Commit (web/ and the regenerated document only)**
 
-Run: `git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 status --porcelain` — Expected: only the 12 `web/` files above and `docs/eng/openapi.json` modified (no `node_modules`, no lockfile change). If the lockfile changed, `git checkout -- web/pnpm-lock.yaml` (Step 1 used `--frozen-lockfile`, so it must not).
+Run: `git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 status --porcelain` — Expected: only the 13 `web/` files above and `docs/eng/openapi.json` modified (no `node_modules`, no `dist-e2e*`, no `test-results/`, no lockfile change). If the lockfile changed, `git checkout -- web/pnpm-lock.yaml` (Step 1 used `--frozen-lockfile`, so it must not).
 
 ```bash
 git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 add \
   web/src/contracts/case.ts web/src/contracts/feed.ts web/src/contracts/endpoints/helpers.ts web/src/contracts/endpoints/lost.ts \
   web/src/domain/lost/actions.ts web/src/mocks/serialize.ts web/src/mocks/api/reads.ts web/src/mocks/fixtures.ts \
   web/src/mocks/api/helpers.ts web/src/mocks/backend.test.ts web/src/features/lost/LostCasePage.test.tsx \
-  web/e2e/lost-case.spec.ts docs/eng/openapi.json
+  web/e2e/lost-case.spec.ts web/e2e/helper-actions.spec.ts docs/eng/openapi.json
 git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 commit -m "feat: contract — owner-only claim badge, «Lo tengo» needs a session, active_case_exists on reopen and claims"
 ```
 
 ---
 ### Task 9: «Lo tengo» — `POST /cases/{code}/recovery-claims`
 
-A signed-in helper says they have the animal (spec §4.9). One open claim per person per case is enforced by `recovery_claim_one_open_per_claimant` with `INSERT … SELECT … ON CONFLICT … WHERE status = 'open' DO NOTHING`; on an expired case inside the window the reactivation (the reopen `UPDATE` without the owner guard) and the insert run in one transaction. The answer carries the owner's WhatsApp link with the prefilled text only under the public-contact rule. No rate limit, notification, check-in or outbox row.
+A signed-in helper says they have the animal (spec §4.9). One open claim per person per case is enforced by `recovery_claim_one_open_per_claimant` with ONE statement, `INSERT … SELECT … FROM lost_case WHERE status = 'active' ON CONFLICT (case_code, claimant_person_id) WHERE status = 'open' DO UPDATE`: a repeat by the same person while their claim is open (stale included) refreshes it — the repeat's phone, photos, point and `from_sighting_id`, and `last_active_at = now` — and returns its id, so a person still holding the dog whose owner never answered can come back with a new number and the claim counts again. Because the statement only writes while the case is active, a repeat on a case that is not active answers the case's refusal (`invalid_transition`, or `active_case_exists` when the pet has another active case), never the old claim. On an expired case inside the window the reactivation (the reopen `UPDATE` without the owner guard) and the write run in one transaction. `from_sighting_id` is a link, never a refusal: an ineligible one (another case, older than 24 h, not the caller's, not visible, unknown, not a UUID — the contract types it as a plain string) is dropped and the claim is stored without it. The answer carries the owner's WhatsApp link with the prefilled text only under the public-contact rule. No rate limit, notification, check-in or outbox row.
 
 **Files:**
 - Create: `B/src/main/java/co/scuby/cases/RecoveryClaimRequest.java`, `ClaimCreatedView.java`, `WhatsappLinks.java`, `RecoveryClaimQueries.java`, `RecoveryClaimService.java`, `RecoveryClaimController.java`
@@ -5810,28 +6169,34 @@ A signed-in helper says they have the animal (spec §4.9). One open claim per pe
 - Test: `B/src/test/java/co/scuby/cases/WhatsappLinksTest.java`, `RecoveryClaimTest.java`, `RecoveryClaimPrecedenceTest.java`, `RecoveryClaimRaceTest.java`
 
 **Interfaces:**
-- Consumes: the regenerated contract (Task 8); `ClaimDerivation`, `LostLifecycleDerivation` (Task 2); `LifecycleQueries.reopen/load/activeCodeFor/ACTIVE_PER_PET`, `OwnerAccess`, `CaseErrors`, `CaseAccessPolicy.isOwner`, `UniqueViolation`, `Contention`, `CaseFixtures.close/lostCaseForPet/petOf` (Task 4); `BodyValidation` (Task 7); `Photos.uploaded` (Task 5); `PhoneNumbers.requireMobile(String, String)`; `PhotoAttachments.requireAttachable`; `LostCaseQueries.isPurged`; `PublicTextDerivation.whatsappUrl(String)`; `PublishBodies.withPetId(String, String)`.
+- Consumes: the regenerated contract (Task 8); `ClaimDerivation`, `LostLifecycleDerivation` (Task 2); `LifecycleQueries.reopen/load/activeCodeFor/ACTIVE_PER_PET`, `OwnerAccess`, `CaseErrors`, `CaseAccessPolicy.isOwner`, `UniqueViolation`, `Contention`, `CaseFixtures.close/lostCaseForPet/petOf` (Task 4); `BodyValidation`, `LostCaseDerivation.mine` (Task 7); `Photos.uploaded` (Task 5); `PhoneNumbers.requireMobile(String, String)`; `PhotoAttachments.requireAttachable`; `LostCaseQueries.isPurged`; `PublicTextDerivation.whatsappUrl(String)`; `PublishBodies.withPetId(String, String)`.
 - Produces:
   - `record RecoveryClaimRequest(@JsonProperty(required = true) @Nullable String phone, @Nullable @Size(max = 5) List<@NotBlank String> photoUrls, @Nullable String fromSightingId)` with `List<String> photos()`.
   - `record ClaimCreatedView(String id, @Nullable String whatsappUrl)` — the contract's `Claim`.
   - `WhatsappLinks.withText(String e164, String text) → String`.
-  - `RecoveryClaimQueries`: `record ClaimCase(String code, UUID createdBy, UUID petId, @Nullable String petName, String status, @Nullable Instant resolvedAt, ClaimDerivation.ContactFlags flags, @Nullable String publicPhone)`; `record PinForClaim(ClaimDerivation.SightingLink link, GeoPoint point)`; `Optional<ClaimCase> caseForClaim(String code)`; `Optional<PinForClaim> pin(String code, UUID id)`; `Optional<UUID> insertIfActive(String code, UUID claimant, String phone, List<String> photos, @Nullable GeoPoint point, @Nullable UUID fromSighting, Instant now)`; `Optional<UUID> openClaimOf(String code, UUID claimant)`.
+  - `RecoveryClaimQueries`: `record ClaimCase(String code, UUID createdBy, UUID petId, @Nullable String petName, String status, @Nullable Instant resolvedAt, ClaimDerivation.ContactFlags flags, @Nullable String publicPhone)`; `record PinForClaim(ClaimDerivation.SightingLink link, GeoPoint point)`; `Optional<ClaimCase> caseForClaim(String code)`; `Optional<PinForClaim> pin(String code, UUID id)`; `Optional<UUID> upsertIfActive(String code, UUID claimant, String phone, List<String> photos, @Nullable GeoPoint point, @Nullable UUID fromSighting, Instant now)` (the new claim's id, or the refreshed open claim's id; empty when the case is not active).
   - `RecoveryClaimService.claim(String rawCode, Account account, Caller caller, RecoveryClaimRequest body) → ClaimCreatedView`.
-  - `CaseFixtures.claim(String code, UUID claimant, String phone, Instant createdAt, String status) → UUID` (answered_at = created + 1 h unless open).
-  - Ceiling `POST /cases/{code}/recovery-claims` 9.
+  - `CaseFixtures.claim(String code, UUID claimant, String phone, Instant createdAt, String status) → UUID` (last_active_at = created_at; answered_at = created + 1 h unless open) and `CaseFixtures.claim(String code, UUID claimant, String phone, Instant createdAt, Instant lastActiveAt, String status) → UUID` (a claim a repeat refreshed).
+  - Ceiling `POST /cases/{code}/recovery-claims` 8.
 
 - [ ] **Step 1: Write the failing tests**
 
 Add to `B/src/test/java/co/scuby/support/CaseFixtures.java` (import `static co.scuby.db.generated.Tables.RECOVERY_CLAIM`):
 
 ```java
-    /** A recovery claim as «Lo tengo» stores it; answered an hour after it was made unless it is open. */
+    /** A recovery claim as «Lo tengo» stores it, never repeated (last active when made); answered an hour after it was made unless it is open. */
     public UUID claim(String code, UUID claimant, String phone, Instant createdAt, String status) {
+        return claim(code, claimant, phone, createdAt, createdAt, status);
+    }
+
+    /** As above, with the claimant's last «Lo tengo» on it at {@code lastActiveAt} (a repeat refreshed it). */
+    public UUID claim(String code, UUID claimant, String phone, Instant createdAt, Instant lastActiveAt, String status) {
         UUID id = UUID.randomUUID();
         db.insertInto(RECOVERY_CLAIM)
           .set(RECOVERY_CLAIM.ID, id).set(RECOVERY_CLAIM.CASE_CODE, code).set(RECOVERY_CLAIM.CLAIMANT_PERSON_ID, claimant)
           .set(RECOVERY_CLAIM.PHONE, phone).set(RECOVERY_CLAIM.STATUS, status)
           .set(RECOVERY_CLAIM.CREATED_AT, createdAt.atOffset(ZoneOffset.UTC))
+          .set(RECOVERY_CLAIM.LAST_ACTIVE_AT, lastActiveAt.atOffset(ZoneOffset.UTC))
           .set(RECOVERY_CLAIM.ANSWERED_AT, "open".equals(status) ? null : createdAt.plusSeconds(3600).atOffset(ZoneOffset.UTC))
           .execute();
         return id;
@@ -5910,6 +6275,7 @@ class RecoveryClaimTest {
     @Autowired Accounts accounts;
     @Autowired CaseFixtures cases;
     @Autowired DSLContext db;
+    @Autowired MutableClock clock;
     @Autowired ObjectProvider<ClearableCache> caches;
 
     ApiClient owner;
@@ -5962,6 +6328,7 @@ class RecoveryClaimTest {
         assertThat(c.get(RECOVERY_CLAIM.PHONE)).isEqualTo("+573001112233");
         assertThat(c.get(RECOVERY_CLAIM.STATUS)).isEqualTo("open");
         assertThat(c.get(RECOVERY_CLAIM.CREATED_AT).toInstant()).isEqualTo(NOW);
+        assertThat(c.get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant()).isEqualTo(NOW);
         assertThat(c.get(RECOVERY_CLAIM.ANSWERED_AT)).isNull();
         assertThat(c.get(RECOVERY_CLAIM.LAT)).isNull();
         assertThat(c.get(RECOVERY_CLAIM.PHOTO_URLS)).isEmpty();
@@ -5988,21 +6355,91 @@ class RecoveryClaimTest {
     }
 
     @Test
-    void aRepeatAnswersTheOpenClaimWithoutASecondRow() {
+    void aRepeatRefreshesTheOpenClaimWithTheNewPhonePhotosAndPin() {
         String first = claim("").str("/id");
-        ApiResponse again = claim(helper, "7K3PQ", "{\"phone\":\"+573009998877\"}");
-        assertThat(again.status()).isEqualTo(201);
+        clock.advance(Duration.ofHours(1));
+        UUID pin = cases.sighting("7K3PQ", new co.scuby.platform.db.GeoPoint(6.25, -75.59), NOW, NOW, andres, "9".repeat(64), null, "visible");
+        String photo = Photos.uploaded(helper, "claim", "repeat-photo");
+        ApiResponse again = claim(helper, "7K3PQ", "{\"phone\":\"+573009998877\",\"photo_urls\":[\"" + photo + "\"],\"from_sighting_id\":\"" + pin + "\"}");
+        assertThat(again.status()).as("the contract's only success status for claimRecovery").isEqualTo(201);
         assertThat(again.str("/id")).isEqualTo(first);
         assertThat(again.str("/whatsapp_url")).isEqualTo(LUNA_URL);
         assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
-        assertThat(theClaim().get(RECOVERY_CLAIM.PHONE)).as("the open claim is answered as it is").isEqualTo("+573001112233");
+        Record c = theClaim();
+        assertThat(c.get(RECOVERY_CLAIM.PHONE)).as("the claimant's current number").isEqualTo("+573009998877");
+        assertThat(List.of(c.get(RECOVERY_CLAIM.PHOTO_URLS))).containsExactly(photo);
+        assertThat(c.get(RECOVERY_CLAIM.FROM_SIGHTING_ID)).isEqualTo(pin);
+        assertThat(c.get(RECOVERY_CLAIM.LAT)).isEqualTo(6.25);
+        assertThat(c.get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant()).isEqualTo(NOW.plus(Duration.ofHours(1)));
+        assertThat(c.get(RECOVERY_CLAIM.CREATED_AT).toInstant()).as("the claim keeps its birth").isEqualTo(NOW);
+        assertThat(c.get(RECOVERY_CLAIM.STATUS)).isEqualTo("open");
     }
 
     @Test
-    void aStaleClaimStillHoldsTheSlotAndIsAnsweredOnARepeat() {
+    void aRepeatTakesTheRepeatsValuesSoAPlainRepeatClearsTheEarlierPhotosAndLink() {
+        UUID pin = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, NOW.minusSeconds(600), NOW.minusSeconds(600), andres, "9".repeat(64), null, "visible");
+        String photo = Photos.uploaded(helper, "claim", "first-photo");
+        claim(",\"photo_urls\":[\"" + photo + "\"],\"from_sighting_id\":\"" + pin + "\"");
+        assertThat(claim("").status()).isEqualTo(201);
+        Record c = theClaim();
+        assertThat(c.get(RECOVERY_CLAIM.PHOTO_URLS)).isEmpty();
+        assertThat(c.get(RECOVERY_CLAIM.FROM_SIGHTING_ID)).isNull();
+        assertThat(c.get(RECOVERY_CLAIM.LAT)).isNull();
+    }
+
+    @Test
+    void aRepeatMakesAStaleClaimFreshAgainUnderTheSameId() {
         UUID stale = cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(8)), "open");
-        assertThat(claim("").str("/id")).isEqualTo(stale.toString());
+        ApiResponse r = claim(helper, "7K3PQ", "{\"phone\":\"+573009998877\"}");
+        assertThat(r.status()).isEqualTo(201);
+        assertThat(r.str("/id")).isEqualTo(stale.toString());
         assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
+        assertThat(theClaim().get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant()).isEqualTo(NOW);
+        assertThat(theClaim().get(RECOVERY_CLAIM.PHONE)).isEqualTo("+573009998877");
+        assertThat(ClaimDerivation.isStale("open", theClaim().get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant(), NOW)).isFalse();
+    }
+
+    @Test
+    void aRepeatOnAnExpiredCaseInsideTheWindowReactivatesItAndRefreshesTheClaim() {
+        UUID stale = cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(9)), "open");
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(2)));
+        ApiResponse r = claim("");
+        assertThat(r.status()).isEqualTo(201);
+        assertThat(r.str("/id")).isEqualTo(stale.toString());
+        assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("active");
+        assertThat(theClaim().get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant()).isEqualTo(NOW);
+    }
+
+    /**
+     * The claimant comes back from the old poster, but the case expired and the family published a new case for the pet:
+     * the repeat answers active_case_exists naming the live case (where the family is looking), never the old claim, and
+     * hands out no WhatsApp link. The old claim is left exactly as it was.
+     */
+    @Test
+    void aRepeatOnAnExpiredCaseWhosePetHasAnotherActiveCaseIsActiveCaseExistsNeverTheOldClaim() {
+        UUID old = cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(5)), "open");
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        cases.lostCaseForPet(carolina, cases.petOf("7K3PQ"), "NEW22", "active", NOW.minus(Duration.ofDays(1)));
+        ApiResponse r = claim(helper, "7K3PQ", "{\"phone\":\"+573009998877\"}");
+        assertThat(r.status()).isEqualTo(409);
+        assertThat(r.errorCode()).isEqualTo("active_case_exists");
+        assertThat(r.str("/error/details/case_code")).isEqualTo("NEW22");
+        assertThat(r.body()).doesNotContain(old.toString()).doesNotContain("wa.me");
+        assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
+        assertThat(theClaim().get(RECOVERY_CLAIM.PHONE)).isEqualTo("+573001112233");
+        assertThat(theClaim().get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant()).isEqualTo(NOW.minus(Duration.ofDays(5)));
+        assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("expired");
+    }
+
+    @Test
+    void aRepeatOnAReunitedCaseIsInvalidTransitionNeverTheOldClaim() {
+        UUID old = cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(1)), "open");
+        cases.close("7K3PQ", "reunited", NOW.minusSeconds(60));
+        ApiResponse r = claim("");
+        assertThat(r.status()).isEqualTo(409);
+        assertThat(r.errorCode()).isEqualTo("invalid_transition");
+        assertThat(r.body()).doesNotContain(old.toString()).doesNotContain("wa.me");
+        assertThat(theClaim().get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant()).isEqualTo(NOW.minus(Duration.ofDays(1)));
     }
 
     @Test
@@ -6086,37 +6523,52 @@ class RecoveryClaimTest {
     }
 
     @Test
-    void aPinFromTheCallersDeviceCountsAsTheirsForThisLink() {
+    void anAnonymousPinFromTheCallersBrowserStaysTheirsAfterTheySignIn() {
+        // The passer-by reported «Lo vi» without an account, caught the dog, and signed in to say «Lo tengo».
         UUID pin = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, NOW.minusSeconds(600), NOW.minusSeconds(600), null, helperDevice, null, "visible");
         assertThat(claim(",\"from_sighting_id\":\"" + pin + "\"").status()).isEqualTo(201);
         assertThat(theClaim().get(RECOVERY_CLAIM.FROM_SIGHTING_ID)).isEqualTo(pin);
+        assertThat(theClaim().get(RECOVERY_CLAIM.LAT)).isEqualTo(CaseFixtures.MEDELLIN.lat());
     }
 
+    /** The link is attribution, never a reason to lose a claim: an ineligible pin is dropped and the claim is stored without it. */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            // label,                 reporterIsHelper, status,          ageMinutes, onThisCase
-            "'someone elses pin',      false,            visible,         60,         true",
-            "'hidden by the owner',    true,             hidden_by_owner, 60,         true",
-            "'deleted by its reporter',true,             deleted_by_reporter, 5,      true",
-            "'exactly 24 h old',       true,             visible,         1440,       true",
-            "'on another case',        true,             visible,         60,         false",
+            // label,                                  reporter, sameDevice, status,              ageMinutes, onThisCase
+            "'an anonymous pin from another device',   NONE,     false,      visible,             60,         true",
+            "'another person''s pin from this device', OTHER,    true,       visible,             60,         true",
+            "'hidden by the owner',                    HELPER,   false,      hidden_by_owner,     60,         true",
+            "'deleted by its reporter',                HELPER,   false,      deleted_by_reporter, 5,          true",
+            "'exactly 24 h old',                       HELPER,   false,      visible,             1440,       true",
+            "'on another case',                        HELPER,   false,      visible,             60,         false",
     })
-    void aPinThatIsNotTheCallersRecentVisibleOneHereIsValidationFailed(String label, boolean reporterIsHelper, String status,
-                                                                        int ageMinutes, boolean onThisCase) {
+    void aPinThatIsNotTheCallersRecentVisibleOneHereIsIgnoredAndTheClaimIsStored(String label, String reporter, boolean sameDevice,
+                                                                                  String status, int ageMinutes, boolean onThisCase) {
         cases.lostCase(carolina, "OTH22", "Toby", "dog", CaseFixtures.MEDELLIN, 300, "active", NOW.minusSeconds(7200));
         Instant at = NOW.minus(Duration.ofMinutes(ageMinutes));
-        UUID pin = cases.sighting(onThisCase ? "7K3PQ" : "OTH22", CaseFixtures.MEDELLIN, at, at, reporterIsHelper ? andres : null,
-                "8".repeat(64), null, status);
+        UUID reporterPerson = switch (reporter) {
+            case "HELPER" -> andres;
+            case "OTHER" -> accounts.person("laura@correo.co");
+            default -> null;
+        };
+        UUID pin = cases.sighting(onThisCase ? "7K3PQ" : "OTH22", CaseFixtures.MEDELLIN, at, at, reporterPerson,
+                sameDevice ? helperDevice : "8".repeat(64), null, status);
         ApiResponse r = claim(",\"from_sighting_id\":\"" + pin + "\"");
-        assertThat(r.status()).as(label).isEqualTo(422);
-        assertThat(r.json().at("/error/fields").has("from_sighting_id")).as(label).isTrue();
-        assertThat(db.fetchCount(RECOVERY_CLAIM)).isZero();
+        assertThat(r.status()).as(label).isEqualTo(201);
+        assertThat(r.str("/whatsapp_url")).as(label).isEqualTo(LUNA_URL);
+        Record c = theClaim();
+        assertThat(c.get(RECOVERY_CLAIM.FROM_SIGHTING_ID)).as(label).isNull();
+        assertThat(c.get(RECOVERY_CLAIM.LAT)).as(label).isNull();
+        assertThat(c.get(RECOVERY_CLAIM.LNG)).as(label).isNull();
     }
 
     @ParameterizedTest
     @CsvSource({"not-a-uuid", "00000000-0000-0000-0000-000000000099"})
-    void anUnknownOrMalformedFromSightingIdIsValidationFailed(String id) {
-        assertThat(claim(",\"from_sighting_id\":\"" + id + "\"").json().at("/error/fields").has("from_sighting_id")).isTrue();
+    void anUnknownOrNonUuidFromSightingIdIsIgnored(String id) {
+        // The contract types from_sighting_id as a plain string, so a non-UUID is an unknown pin, not a malformed field.
+        ApiResponse r = claim(",\"from_sighting_id\":\"" + id + "\"");
+        assertThat(r.status()).isEqualTo(201);
+        assertThat(theClaim().get(RECOVERY_CLAIM.FROM_SIGHTING_ID)).isNull();
     }
 
     @Test
@@ -6165,19 +6617,21 @@ class RecoveryClaimTest {
     }
 
     @Test
-    void theHappyPathIsFourStatementsAndTheWorstPathNine() {
+    void theHappyPathIsFourStatementsARepeatTooAndTheWorstPathEight() {
         ApiResponse plain = cold(() -> claim(""));
-        assertThat(plain.statements()).as("%s", plain.statements()).hasSize(4);   // session, pre-read, supported_countries, insert
+        assertThat(plain.statements()).as("%s", plain.statements()).hasSize(4);   // session, pre-read, supported_countries, upsert
+        ApiResponse repeat = cold(() -> claim(""));
+        assertThat(repeat.statements()).as("the refresh is the same one statement: %s", repeat.statements()).hasSize(4);
         db.deleteFrom(RECOVERY_CLAIM).execute();
-        // Worst: expired inside the window, the pet has another active case, a prefill pin and a photo.
+        // Worst: expired inside the window, the pet has another active case, a linked pin and a photo.
         cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
         cases.lostCaseForPet(carolina, cases.petOf("7K3PQ"), "NEW22", "active", NOW.minus(Duration.ofDays(1)));
         UUID pin = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, NOW.minusSeconds(600), NOW.minusSeconds(600), andres, "9".repeat(64), null, "visible");
         String photo = Photos.uploaded(helper, "claim", "worst-path");
         ApiResponse worst = cold(() -> claim(",\"from_sighting_id\":\"" + pin + "\",\"photo_urls\":[\"" + photo + "\"]"));
         assertThat(worst.errorCode()).isEqualTo("active_case_exists");
-        // session, pre-read, supported_countries, pin read, upload lookup, reactivation (0 rows), insert (empty), dedupe select, re-read
-        assertThat(worst.statements()).as("%s", worst.statements()).hasSize(9);
+        // session, pre-read, supported_countries, pin read, upload lookup, reactivation (0 rows), upsert (empty), re-read
+        assertThat(worst.statements()).as("%s", worst.statements()).hasSize(8);
     }
 }
 ```
@@ -6202,7 +6656,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** session → not_found / gone → forbidden (the owner) → body (phone, photos, from_sighting_id) → status (spec §4.9, assumption 3). */
+/** session → not_found / gone → forbidden (the owner) → body (phone, photos; from_sighting_id is never an error) → status (spec §4.9, assumption 3). */
 @IntegrationTest
 class RecoveryClaimPrecedenceTest {
 
@@ -6249,8 +6703,9 @@ class RecoveryClaimPrecedenceTest {
     }
 
     @Test
-    void aBadPhoneIsNamedBeforeABadFromSighting() {
+    void aBadPhoneIsTheOnlyFieldNamedAnIneligibleLinkIsNeverAnError() {
         var r = helper.post(PATH, "{\"phone\":\"+5716012345\",\"from_sighting_id\":\"x\"}", "7K3PQ");
+        assertThat(r.errorCode()).isEqualTo("validation_failed");
         assertThat(r.json().at("/error/fields").has("phone")).isTrue();
         assertThat(r.json().at("/error/fields").has("from_sighting_id")).isFalse();
     }
@@ -6369,13 +6824,38 @@ class RecoveryClaimRaceTest {
             ApiClient b = twinOf(a);
             var barrier = new CyclicBarrier(2);
             Future<ApiResponse> fa = pool.submit(together(barrier, () -> a.post(PATH, BODY, "7K3PQ")));
-            Future<ApiResponse> fb = pool.submit(together(barrier, () -> b.post(PATH, BODY, "7K3PQ")));
+            Future<ApiResponse> fb = pool.submit(together(barrier, () -> b.post(PATH, "{\"phone\":\"+573009998877\"}", "7K3PQ")));
             ApiResponse ra = fa.get(30, TimeUnit.SECONDS);
             ApiResponse rb = fb.get(30, TimeUnit.SECONDS);
             assertThat(List.of(ra.status(), rb.status())).as("round %d", n).containsOnly(201);
             assertThat(ra.str("/id")).isEqualTo(rb.str("/id"));
             assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
+            assertThat(db.select(RECOVERY_CLAIM.PHONE).from(RECOVERY_CLAIM).fetchOne(RECOVERY_CLAIM.PHONE))
+                    .as("the later of the two writes").isIn("+573001112233", "+573009998877");
         }
+    }
+
+    /**
+     * Deterministic double tap: the first «Lo tengo» is held uncommitted; the second's upsert waits on the first's entry in
+     * recovery_claim_one_open_per_claimant, then takes the DO UPDATE branch on the committed row: one row, the same id, the
+     * second tap's phone, never a 500.
+     */
+    @Test
+    void aSecondTapThatMeetsTheFirstInFlightRefreshesTheSameRow() throws Exception {
+        round(0, true);
+        ApiClient helper = clients.newBrowser();
+        UUID andres = accounts.signIn(helper, "andres@correo.co");
+        UUID first = UUID.randomUUID();
+        contention.hold("INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, last_active_at) "
+                + "VALUES (?, '7K3PQ', ?, '+573001112233', 'open', now(), now())", first, andres);
+        Future<ApiResponse> f = pool.submit(() -> helper.post(PATH, "{\"phone\":\"+573009998877\"}", "7K3PQ"));
+        contention.awaitWaiters(1);
+        contention.commit();
+        ApiResponse r = f.get(30, TimeUnit.SECONDS);
+        assertThat(r.status()).isEqualTo(201);
+        assertThat(r.str("/id")).isEqualTo(first.toString());
+        assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
+        assertThat(db.select(RECOVERY_CLAIM.PHONE).from(RECOVERY_CLAIM).fetchOne(RECOVERY_CLAIM.PHONE)).isEqualTo("+573009998877");
     }
 
     @Test
@@ -6429,8 +6909,8 @@ class RecoveryClaimRaceTest {
             ApiResponse reopened = fr.get(30, TimeUnit.SECONDS);
             ApiResponse claimed = fc.get(30, TimeUnit.SECONDS);
             assertThat(claimed.status()).as("round %d: %s", n, claimed.body()).isEqualTo(201);
-            assertThat(reopened.status()).as("round %d", n).isIn(200, 409);
-            if (reopened.status() == 409) assertThat(reopened.errorCode()).isEqualTo("invalid_transition");
+            // Reopen is idempotent: whoever made the case active first, the owner asked for active and got it.
+            assertThat(reopened.status()).as("round %d: %s", n, reopened.body()).isEqualTo(200);
             assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
             assertThat(db.select(LOST_CASE.STATUS).from(LOST_CASE).where(LOST_CASE.CODE.eq("7K3PQ")).fetchOne(LOST_CASE.STATUS)).isEqualTo("active");
         }
@@ -6481,7 +6961,8 @@ import java.util.List;
 /**
  * RecoveryClaimRequest (web/src/contracts/actions.ts). phone is required (absent = a Jackson error; null and a number that
  * is not a supported mobile are validation_failed {phone}); photo_urls ≤ 5, stored and not exposed (O36); from_sighting_id
- * must be the caller's own recent visible pin on this case. Bound without @Valid: the order of spec §4.9 decides.
+ * links the claim to the caller's own recent visible pin on this case when it is one, and is ignored otherwise (a plain
+ * string in the contract: never a field error). Bound without @Valid: the order of spec §4.9 decides.
  */
 record RecoveryClaimRequest(@JsonProperty(required = true) @Nullable String phone,
                             @Nullable @Size(max = 5) List<@NotBlank String> photoUrls,
@@ -6593,37 +7074,39 @@ class RecoveryClaimQueries {
     }
 
     /**
-     * One statement: the claim is inserted only while the case is active (no lock), and ON CONFLICT on the partial unique
-     * index (one open claim per claimant per case; the predicate is the same inline literal) a double tap inserts nothing.
-     * Empty: a conflict (the caller then reads their open claim) or a case that is not active.
+     * One statement (no lock): the claim is written only while the case is active. ON CONFLICT on the partial unique index
+     * (one open claim per claimant per case; the predicate is the same inline literal) the caller's open claim — a stale
+     * one included — is refreshed instead: the repeat's phone, photos, point and link, and last_active_at = now; its id,
+     * created_at and status stay. A double tap serializes on the index entry and refreshes the one row. Returns the new or
+     * refreshed claim's id; empty when the case is not active (the caller re-reads it to say why), so a claim on a case
+     * that is not active is never answered.
      */
-    Optional<UUID> insertIfActive(String code, UUID claimant, String phone, List<String> photos, @Nullable GeoPoint point,
+    Optional<UUID> upsertIfActive(String code, UUID claimant, String phone, List<String> photos, @Nullable GeoPoint point,
                                   @Nullable UUID fromSighting, Instant now) {
         UUID id = UUID.randomUUID();
         return db.insertInto(RECOVERY_CLAIM, RECOVERY_CLAIM.ID, RECOVERY_CLAIM.CASE_CODE, RECOVERY_CLAIM.CLAIMANT_PERSON_ID,
                          RECOVERY_CLAIM.PHONE, RECOVERY_CLAIM.PHOTO_URLS, RECOVERY_CLAIM.LAT, RECOVERY_CLAIM.LNG,
-                         RECOVERY_CLAIM.FROM_SIGHTING_ID, RECOVERY_CLAIM.STATUS, RECOVERY_CLAIM.CREATED_AT)
+                         RECOVERY_CLAIM.FROM_SIGHTING_ID, RECOVERY_CLAIM.STATUS, RECOVERY_CLAIM.CREATED_AT, RECOVERY_CLAIM.LAST_ACTIVE_AT)
                  .select(db.select(DSL.val(id, RECOVERY_CLAIM.ID), LOST_CASE.CODE, DSL.val(claimant, RECOVERY_CLAIM.CLAIMANT_PERSON_ID),
                                    DSL.val(phone, RECOVERY_CLAIM.PHONE), DSL.val(photos.toArray(String[]::new), RECOVERY_CLAIM.PHOTO_URLS),
                                    DSL.val(point == null ? null : point.lat(), RECOVERY_CLAIM.LAT),
                                    DSL.val(point == null ? null : point.lng(), RECOVERY_CLAIM.LNG),
                                    DSL.val(fromSighting, RECOVERY_CLAIM.FROM_SIGHTING_ID), DSL.inline("open", RECOVERY_CLAIM.STATUS),
-                                   DSL.val(now.atOffset(ZoneOffset.UTC), RECOVERY_CLAIM.CREATED_AT))
+                                   DSL.val(now.atOffset(ZoneOffset.UTC), RECOVERY_CLAIM.CREATED_AT),
+                                   DSL.val(now.atOffset(ZoneOffset.UTC), RECOVERY_CLAIM.LAST_ACTIVE_AT))
                            .from(LOST_CASE)
                            .where(LOST_CASE.CODE.eq(code), LOST_CASE.STATUS.eq(DSL.inline("active"))))
                  .onConflict(RECOVERY_CLAIM.CASE_CODE, RECOVERY_CLAIM.CLAIMANT_PERSON_ID)
                  .where(RECOVERY_CLAIM.STATUS.eq(DSL.inline("open")))
-                 .doNothing()
+                 .doUpdate()
+                 .set(RECOVERY_CLAIM.PHONE, DSL.excluded(RECOVERY_CLAIM.PHONE))
+                 .set(RECOVERY_CLAIM.PHOTO_URLS, DSL.excluded(RECOVERY_CLAIM.PHOTO_URLS))
+                 .set(RECOVERY_CLAIM.LAT, DSL.excluded(RECOVERY_CLAIM.LAT))
+                 .set(RECOVERY_CLAIM.LNG, DSL.excluded(RECOVERY_CLAIM.LNG))
+                 .set(RECOVERY_CLAIM.FROM_SIGHTING_ID, DSL.excluded(RECOVERY_CLAIM.FROM_SIGHTING_ID))
+                 .set(RECOVERY_CLAIM.LAST_ACTIVE_AT, DSL.excluded(RECOVERY_CLAIM.LAST_ACTIVE_AT))
                  .returning(RECOVERY_CLAIM.ID)
                  .fetchOptional(r -> r.get(RECOVERY_CLAIM.ID));
-    }
-
-    /** The caller's open claim on the case (a stale one included: "open" is the stored status). */
-    Optional<UUID> openClaimOf(String code, UUID claimant) {
-        return db.select(RECOVERY_CLAIM.ID).from(RECOVERY_CLAIM)
-                 .where(RECOVERY_CLAIM.CASE_CODE.eq(code), RECOVERY_CLAIM.CLAIMANT_PERSON_ID.eq(claimant),
-                        RECOVERY_CLAIM.STATUS.eq(DSL.inline("open")))
-                 .fetchOptional(RECOVERY_CLAIM.ID);
     }
 }
 ```
@@ -6645,6 +7128,7 @@ import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.BodyValidation;
 import co.scuby.uploads.PhotoAttachments;
 import co.scuby.uploads.UploadPurpose;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -6655,11 +7139,13 @@ import java.util.UUID;
 
 /**
  * «Lo tengo» (docs/product/04-lost-workflow.md · recovery_claim; L1 design §4.9). Order: the code exists (not_found; a
- * purged one gone) → the caller is not the owner (forbidden) → the body: phone, photo count, from_sighting_id, then the
- * photos (S3 in staging: outside any transaction) → the status. Then one transaction: the reactivation of an expired case
- * (decision #29; zero rows is not an error, a concurrent claim may have done it) and the conditional insert. Empty insert →
- * the caller's open claim (the dedupe, 201), else a re-read classifies (invalid_transition, active_case_exists). No rate
- * limit (as #54), no notification, no check-in, no outbox row (L2 derives them from rows).
+ * purged one gone) → the caller is not the owner (forbidden) → the body: phone, photo count, then the photos (S3 in
+ * staging: outside any transaction) → the status. from_sighting_id is a link, never an error: kept (with the pin's point)
+ * only when it is the caller's own visible pin on this case from the last 24 h, else dropped. Then one transaction: the
+ * reactivation of an expired case (decision #29; zero rows is not an error, a concurrent claim may have done it) and the
+ * one-statement upsert, which inserts the claim or refreshes the caller's open one (a repeat). Empty upsert → the case is
+ * not active, and a re-read says why (invalid_transition, active_case_exists): an old claim is never answered on a case
+ * that is not active. No rate limit (as #54), no notification, no check-in, no outbox row (L2 derives them from rows).
  */
 @Service
 class RecoveryClaimService {
@@ -6698,38 +7184,44 @@ class RecoveryClaimService {
         if (body.phone() == null) throw CaseErrors.invalidField("phone", "required");
         String phone = phones.requireMobile(body.phone(), "phone");
         validation.require(body);
-        GeoPoint point = null;
-        UUID fromSighting = null;
-        if (body.fromSightingId() != null) {
-            fromSighting = OwnerAccess.id(body.fromSightingId()).orElseThrow(RecoveryClaimService::notYourRecentPin);
-            RecoveryClaimQueries.PinForClaim pin = queries.pin(code, fromSighting).orElseThrow(RecoveryClaimService::notYourRecentPin);
-            if (!ClaimDerivation.prefillEligible(pin.link(), me, caller.deviceHash(), now)) throw notYourRecentPin();
-            point = pin.point();
-        }
+        Optional<RecoveryClaimQueries.PinForClaim> link = linkedPin(code, body.fromSightingId(), caller, now);
         photos.requireAttachable(body.photos(), UploadPurpose.claim, caller, "photo_urls");
 
         Outcome outcome = LostLifecycleDerivation.check(Action.CLAIM, found.status(), found.resolvedAt(), now);
         if (outcome == Outcome.INVALID_TRANSITION) throw CaseErrors.invalidTransition();
-        GeoPoint claimPoint = point;
-        UUID claimFrom = fromSighting;
-        Optional<UUID> inserted;
+        GeoPoint claimPoint = link.map(RecoveryClaimQueries.PinForClaim::point).orElse(null);
+        UUID claimFrom = link.isPresent() ? UUID.fromString(body.fromSightingId()) : null;
+        Optional<UUID> written;
         try {
-            inserted = tx.execute(status -> {
+            written = tx.execute(status -> {
                 if (outcome == Outcome.REACTIVATE) lifecycle.reopen(code, null, now);
-                return queries.insertIfActive(code, me, phone, body.photos(), claimPoint, claimFrom, now);
+                return queries.upsertIfActive(code, me, phone, body.photos(), claimPoint, claimFrom, now);
             });
         } catch (RuntimeException e) {
             if (!UniqueViolation.on(e, LifecycleQueries.ACTIVE_PER_PET)) throw e;
             throw lifecycle.activeCodeFor(found.petId()).map(CaseErrors::activeCaseExists).orElseGet(CaseErrors::invalidTransition);
         }
-        UUID id = inserted.or(() -> queries.openClaimOf(code, me)).orElseThrow(() -> refusalAfterEmptyInsert(code, now));
+        // A row came back, so the case was active when it was written: the link follows the contact rule on an active case.
+        UUID id = written.orElseThrow(() -> refusalAfterEmptyWrite(code, now));
         String wa = ClaimDerivation.whatsappPhone(found.flags(), "active", found.publicPhone());
         return new ClaimCreatedView(id.toString(),
                 wa == null ? null : WhatsappLinks.withText(wa, ClaimDerivation.whatsappText(found.petName(), code)));
     }
 
-    /** Nothing inserted and no open claim of the caller: the case is not active; say why. */
-    private ApiException refusalAfterEmptyInsert(String code, Instant now) {
+    /**
+     * The pin the claim grew out of, when it is the caller's own (LostCaseDerivation.mine: their person, or an anonymous pin
+     * from their device), visible, on this case and from the last 24 h; empty otherwise — absent, not a UUID, unknown, or
+     * ineligible. Never an error: the claim is what matters, the link is attribution.
+     */
+    private Optional<RecoveryClaimQueries.PinForClaim> linkedPin(String code, @Nullable String rawId, Caller caller, Instant now) {
+        if (rawId == null) return Optional.empty();
+        return OwnerAccess.id(rawId).flatMap(id -> queries.pin(code, id)).filter(pin -> ClaimDerivation.prefillEligible(pin.link(),
+                LostCaseDerivation.mine(caller.personId(), caller.deviceHash(), pin.link().reporterPersonId(), pin.link().reporterDeviceHash()),
+                now));
+    }
+
+    /** Nothing written: the case is not active (and could not be reactivated); say why. */
+    private ApiException refusalAfterEmptyWrite(String code, Instant now) {
         LifecycleRow row = lifecycle.load(code).orElse(null);
         if (row == null) return CaseErrors.notFound();
         if (LostLifecycleDerivation.check(Action.CLAIM, row.status(), row.resolvedAt(), now) == Outcome.INVALID_TRANSITION) {
@@ -6737,10 +7229,6 @@ class RecoveryClaimService {
         }
         if (row.otherActiveCode() != null) return CaseErrors.activeCaseExists(row.otherActiveCode());
         return CaseErrors.invalidTransition();
-    }
-
-    private static ApiException notYourRecentPin() {
-        return CaseErrors.invalidField("from_sighting_id", "your own visible sighting on this case, from the last 24 hours");
     }
 }
 ```
@@ -6760,7 +7248,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** claimRecovery: 201 {id, whatsapp_url}, also for a repeat (the open claim). A session is required (contract, decision #75). */
+/** claimRecovery: 201 {id, whatsapp_url}, also for a repeat (the refreshed open claim; 201 is the contract's only success status). A session is required (contract, decision #75). */
 @ApiComponent
 @RestController
 class RecoveryClaimController {
@@ -6788,7 +7276,7 @@ In `CasesSecurityRules.authorize` add:
 In `StatementCeilings` add:
 
 ```java
-            Map.entry("POST /cases/{code}/recovery-claims", 9),   // worst path, RecoveryClaimTest: session, pre-read (case + pet name + contact), supported_countries, from-sighting read, upload lookup, reactivation, insert, dedupe select, status re-read; the plain claim is 4
+            Map.entry("POST /cases/{code}/recovery-claims", 8),   // worst path, RecoveryClaimTest: session, pre-read (case + pet name + contact), supported_countries, from-sighting read, upload lookup, reactivation, upsert (insert or refresh), status re-read; the plain claim and a plain repeat are 4
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -6809,7 +7297,7 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
   backend/src/test/java/co/scuby/support/StatementCeilings.java backend/src/test/java/co/scuby/cases/WhatsappLinksTest.java \
   backend/src/test/java/co/scuby/cases/RecoveryClaimTest.java backend/src/test/java/co/scuby/cases/RecoveryClaimPrecedenceTest.java \
   backend/src/test/java/co/scuby/cases/RecoveryClaimRaceTest.java
-git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 commit -m "feat: «Lo tengo» — one open claim per person per case, reactivation in the same transaction, WhatsApp link under the contact rule"
+git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 commit -m "feat: «Lo tengo» — one open claim per person per case, a repeat refreshes it, reactivation in the same transaction, WhatsApp link under the contact rule"
 ```
 
 ---
@@ -6822,14 +7310,14 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
 - Modify: `RecoveryClaimQueries.java` (answer target, answer), `RecoveryClaimService.java` (`answer`), `RecoveryClaimController.java` (route)
 - Modify: `LostCaseFacts.java`, `LostCaseQueries.java`, `CaseReads.java`, `LostCaseView.java`, `LostCaseDerivation.java`
 - Modify: `CasesSecurityRules`, `StatementCeilings` (`GET /cases/{code}` 3 → 4; answer 3)
-- Modify tests: `LostCaseDerivationTest.java`, `CaseStatementsTest.java`, `CaseEndpointTest.java`, `LostParityTest.java`, `RecoveryClaimPlanTest.java`
+- Modify tests: `LostCaseDerivationTest.java`, `CaseStatementsTest.java`, `CaseEndpointTest.java` (the owner-only null count, and the owner read's statement count 3 → 4), `LostParityTest.java`, `RecoveryClaimPlanTest.java`
 - Test: `B/src/test/java/co/scuby/cases/ClaimAnswerTest.java`, `ClaimLeakTest.java`
 
 **Interfaces:**
 - Consumes: `ClaimDerivation.wireStatus/openClaimCount/staleCutoff/isAnswer/answerChanges` (Task 2); `OwnerAccess`, `CaseErrors`, `CreatedView` (Task 4); `CaseFixtures.claim` (Task 9).
 - Produces:
   - `record ClaimAnswerRequest(@JsonProperty(required = true) @Nullable String status)`; `RecoveryClaimService.answer(String rawCode, String rawClaimId, UUID me, ClaimAnswerRequest body) → CreatedView`.
-  - `LostCaseFacts` gains a last component `@Nullable ClaimFacts claims` and `withClaims(ClaimFacts)`; nested `record ClaimFacts(List<ClaimRow> newest, int openNonStale)`, `record ClaimRow(UUID id, String phone, Instant createdAt, String status)`.
+  - `LostCaseFacts` gains a last component `@Nullable ClaimFacts claims` and `withClaims(ClaimFacts)`; nested `record ClaimFacts(List<ClaimRow> newest, int openNonStale)`, `record ClaimRow(UUID id, String phone, Instant createdAt, Instant lastActiveAt, String status)` (stale is derived from `lastActiveAt`).
   - `LostCaseQueries.MAX_CLAIMS_SHOWN = 50`; `Select<? extends Record> claimsQuery(String code, Instant now)`; `LostCaseFacts.ClaimFacts claims(String code, Instant now)`.
   - `LostCaseView.openClaimCount` becomes `@Nullable Integer`; `claims` becomes `List<LostCaseView.ClaimView>` with `record ClaimView(String id, String phone, Instant createdAt, String status)`.
   - Ceilings: `GET /cases/{code}` 4 (owner), `POST /cases/{code}/claims/{claimId}` 3.
@@ -6846,7 +7334,13 @@ In `B/src/test/java/co/scuby/cases/LostCaseDerivationTest.java`:
 
 ```java
     static LostCaseFacts.ClaimRow claim(String id, Duration age, String status) {
-        return new LostCaseFacts.ClaimRow(UUID.fromString("00000000-0000-0000-0000-0000000000" + id), "+573001112233", NOW.minus(age), status);
+        return claim(id, age, age, status);
+    }
+
+    /** A claim made {@code age} ago whose claimant last said «Lo tengo» {@code idle} ago. */
+    static LostCaseFacts.ClaimRow claim(String id, Duration age, Duration idle, String status) {
+        return new LostCaseFacts.ClaimRow(UUID.fromString("00000000-0000-0000-0000-0000000000" + id), "+573001112233", NOW.minus(age),
+                NOW.minus(idle), status);
     }
 
     static final LostCaseFacts.ClaimFacts THREE_CLAIMS = new LostCaseFacts.ClaimFacts(List.of(
@@ -6881,6 +7375,16 @@ In `B/src/test/java/co/scuby/cases/LostCaseDerivationTest.java`:
     }
 
     @Test
+    void aClaimIsStaleByItsLastActivityNotByWhenItWasMade() {
+        var refreshed = new LostCaseFacts.ClaimFacts(List.of(
+                claim("d1", Duration.ofDays(9), Duration.ofHours(1), "open"),      // made 9 days ago, repeated an hour ago
+                claim("d2", Duration.ofDays(2), Duration.ofDays(8), "open")), 1);  // (not producible, but proves the field read)
+        LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(refreshed), OWNER_VIEW, NOW, ES);
+        assertThat(view.claims()).extracting(LostCaseView.ClaimView::status).containsExactly("open", "stale");
+        assertThat(view.claims().getFirst().createdAt()).as("the wire keeps when the claim was made").isEqualTo(NOW.minus(Duration.ofDays(9)));
+    }
+
+    @Test
     void anOwnerWithNoClaimsLoadedGetsAnEmptyListAndZero() {
         LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(new LostCaseFacts.ClaimFacts(List.of(), 0)), OWNER_VIEW, NOW, ES);
         assertThat(view.claims()).isEmpty();
@@ -6908,7 +7412,8 @@ record LostCaseFacts(String code, String status, @Nullable Instant resolvedAt, U
     /** The owner's claims: the newest MAX_CLAIMS_SHOWN of every status, and the open non-stale count over all of them. Null for a non-owner: not queried. */
     record ClaimFacts(List<ClaimRow> newest, int openNonStale) {}
 
-    record ClaimRow(UUID id, String phone, Instant createdAt, String status) {}
+    /** lastActiveAt: the claimant's last «Lo tengo» on it (stale is derived from it); createdAt: when it was first made. */
+    record ClaimRow(UUID id, String phone, Instant createdAt, Instant lastActiveAt, String status) {}
 
     LostCaseFacts withSightings(List<SightingFacts> loaded) {
         return new LostCaseFacts(code, status, resolvedAt, createdBy, pet, center, radiusM, lastSeenAt, placeName,
@@ -6926,20 +7431,27 @@ and update its javadoc: `What the database says about a lost case, loaded accord
 `B/src/main/java/co/scuby/cases/LostCaseQueries.java` — add the imports `java.time.Instant`, `java.time.ZoneOffset`, `static co.scuby.db.generated.Tables.RECOVERY_CLAIM`; in `loadCase` replace `r.get(LOST_CASE.PLACE_NAME), r.get(PUBLISHER_NAME), r.get(WHATSAPP_PHONE), List.of()));` with `r.get(LOST_CASE.PLACE_NAME), r.get(PUBLISHER_NAME), r.get(WHATSAPP_PHONE), List.of(), null));`; and add:
 
 ```java
-    /** The owner's claim list shows at most this many: the newest (L1 design §4.13). */
+    /**
+     * The owner's claim list shows at most this many: the newest by when each claim was made (L1 design §4.13). Accepted
+     * limit: with more than 50 newer claims, an older open claim (a refreshed one included: a repeat does not move
+     * created_at) is counted in open_claim_count but not listed. Realistic only under spam; ordering open claims first
+     * would lose the index order, so measure the plan before changing it.
+     */
     static final int MAX_CLAIMS_SHOWN = 50;
 
     /**
      * The owner's claims in one query: the newest MAX_CLAIMS_SHOWN of every status, newest first, each row carrying the count
-     * of open, non-stale claims of the whole case (a window over every matching row, computed before the LIMIT). Read through
-     * recovery_claim_by_case_recent_idx (RecoveryClaimPlanTest). Owner only: CaseReads never calls it for anyone else.
+     * of open, non-stale claims of the whole case (non-stale by last_active_at; a window over every matching row, computed
+     * before the LIMIT). Read through recovery_claim_by_case_recent_idx (RecoveryClaimPlanTest). Owner only: CaseReads never
+     * calls it for anyone else.
      */
     Select<? extends Record> claimsQuery(String code, Instant now) {
         Field<Integer> openNonStale = DSL.count()
                 .filterWhere(RECOVERY_CLAIM.STATUS.eq(DSL.inline("open"))
-                        .and(RECOVERY_CLAIM.CREATED_AT.ge(ClaimDerivation.staleCutoff(now).atOffset(ZoneOffset.UTC))))
+                        .and(RECOVERY_CLAIM.LAST_ACTIVE_AT.ge(ClaimDerivation.staleCutoff(now).atOffset(ZoneOffset.UTC))))
                 .over().as("open_non_stale");
-        return db.select(RECOVERY_CLAIM.ID, RECOVERY_CLAIM.PHONE, RECOVERY_CLAIM.CREATED_AT, RECOVERY_CLAIM.STATUS, openNonStale)
+        return db.select(RECOVERY_CLAIM.ID, RECOVERY_CLAIM.PHONE, RECOVERY_CLAIM.CREATED_AT, RECOVERY_CLAIM.LAST_ACTIVE_AT,
+                         RECOVERY_CLAIM.STATUS, openNonStale)
                  .from(RECOVERY_CLAIM)
                  .where(RECOVERY_CLAIM.CASE_CODE.eq(code))
                  .orderBy(RECOVERY_CLAIM.CREATED_AT.desc(), RECOVERY_CLAIM.ID.desc())
@@ -6950,7 +7462,7 @@ and update its javadoc: `What the database says about a lost case, loaded accord
         var rows = claimsQuery(code, now).fetch();
         int open = rows.isEmpty() ? 0 : rows.getFirst().get("open_non_stale", Integer.class);
         return new LostCaseFacts.ClaimFacts(rows.map(r -> new LostCaseFacts.ClaimRow(r.get(RECOVERY_CLAIM.ID), r.get(RECOVERY_CLAIM.PHONE),
-                r.get(RECOVERY_CLAIM.CREATED_AT).toInstant(), r.get(RECOVERY_CLAIM.STATUS))), open);
+                r.get(RECOVERY_CLAIM.CREATED_AT).toInstant(), r.get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant(), r.get(RECOVERY_CLAIM.STATUS))), open);
     }
 ```
 
@@ -7003,7 +7515,7 @@ and add:
         if (!owner || facts.claims() == null) return List.of();
         return facts.claims().newest().stream()
                 .map(c -> new LostCaseView.ClaimView(c.id().toString(), c.phone(), c.createdAt(),
-                        ClaimDerivation.wireStatus(c.status(), c.createdAt(), now)))
+                        ClaimDerivation.wireStatus(c.status(), c.lastActiveAt(), now)))
                 .toList();
     }
 ```
@@ -7038,7 +7550,25 @@ with
     }
 ```
 
-In `B/src/test/java/co/scuby/cases/CaseEndpointTest.java`, in `assertNothingOwnerOnly`, after `        assertThat(r.json().get("claims")).isEmpty();` add `        assertThat(r.isNull("/open_claim_count")).isTrue();`.
+In `B/src/test/java/co/scuby/cases/CaseEndpointTest.java`:
+
+(a) in `assertNothingOwnerOnly`, after `        assertThat(r.json().get("claims")).isEmpty();` add `        assertThat(r.isNull("/open_claim_count")).isTrue();`;
+
+(b) in `theStatementCountDoesNotGrowWithSightings` (the owner's read on a cold session cache, now one query more), replace
+
+```java
+        ApiResponse r = owner.get("/cases/{code}", "7K3PQ");    // ApiClient enforces the ceiling (3)
+        assertThat(r.json().get("sightings")).hasSize(28);
+        assertThat(r.statements()).hasSizeLessThanOrEqualTo(3);
+```
+
+with
+
+```java
+        ApiResponse r = owner.get("/cases/{code}", "7K3PQ");    // ApiClient enforces the ceiling (4: + the owner's claims)
+        assertThat(r.json().get("sightings")).hasSize(28);
+        assertThat(r.statements()).hasSize(4);                   // session, case, sightings, claims — whatever the sighting count
+```
 
 In `B/src/test/java/co/scuby/cases/LostParityTest.java` replace
 
@@ -7280,6 +7810,7 @@ class ClaimLeakTest {
     ApiClient owner;
     ApiClient stranger;
     ApiClient claimant;
+    ApiClient laura;             // the stale claim's claimant
     UUID deleted;
 
     @BeforeEach
@@ -7290,9 +7821,11 @@ class ClaimLeakTest {
         accounts.signIn(stranger, "stranger@correo.co");
         claimant = clients.newBrowser();
         UUID andres = accounts.signIn(claimant, "andres@correo.co");
+        laura = clients.newBrowser();
+        UUID lauraId = accounts.signIn(laura, "laura@correo.co");
         cases.luna(carolina);
         cases.claim("7K3PQ", andres, "+573114440001", NOW.minus(Duration.ofHours(1)), "open");
-        cases.claim("7K3PQ", accounts.person("laura@correo.co"), "+573114440002", NOW.minus(Duration.ofDays(10)), "open");
+        cases.claim("7K3PQ", lauraId, "+573114440002", NOW.minus(Duration.ofDays(10)), "open");
         cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, NOW.minusSeconds(7200), NOW.minusSeconds(7200), null, "3".repeat(64), "+573114440003", "visible");
         cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, NOW.minusSeconds(3600), NOW.minusSeconds(3600), null, "4".repeat(64), "+573114440004", "hidden_by_owner");
         deleted = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, NOW.minusSeconds(600), NOW.minusSeconds(600), andres, "5".repeat(64), "+573114440005", "deleted_by_reporter");
@@ -7300,6 +7833,10 @@ class ClaimLeakTest {
 
     private void assertNoPrivateFacts(ApiResponse r, String who) {
         assertThat(r.status()).as(who).isEqualTo(200);
+        assertThat(r.str("/viewer")).as(who).isEqualTo("public");
+        // The public zone only: the snapped center and the widened radius, never the exact point (decision #69).
+        assertThat(r.json().at("/last_seen/radius_m").asDouble()).as(who).isEqualTo(200.0);
+        assertThat(r.json().at("/last_seen/center/lng").asDouble()).as(who).isEqualTo(-75.580392);
         assertThat(r.json().get("claims")).as(who).isEmpty();
         assertThat(r.isNull("/open_claim_count")).as(who).isTrue();
         assertThat(r.json().get("sightings")).as(who).hasSize(1);
@@ -7335,6 +7872,25 @@ class ClaimLeakTest {
         ApiResponse r = owner.get("/cases/{code}", "7K3PQ");
         assertThat(r.json().get("claims")).hasSize(2);
         assertThat(r.json().get("open_claim_count").asInt()).isZero();
+    }
+
+    /**
+     * Laura's claim went stale (10 days without an answer); she still has the dog and taps «Lo tengo» again with a new
+     * number: the same claim becomes fresh, the owner sees it as open with the new number, and the badge counts it again.
+     */
+    @Test
+    void aRepeatClaimMakesAStaleClaimFreshAndTheOwnersCountIncludesItAgain() {
+        ApiResponse before = owner.get("/cases/{code}", "7K3PQ");
+        assertThat(before.str("/claims/1/status")).isEqualTo("stale");
+        assertThat(before.json().get("open_claim_count").asInt()).isEqualTo(1);
+        ApiResponse again = laura.post("/cases/{code}/recovery-claims", "{\"phone\":\"+573114440009\"}", "7K3PQ");
+        assertThat(again.status()).isEqualTo(201);
+        ApiResponse after = owner.get("/cases/{code}", "7K3PQ");
+        assertThat(after.json().get("claims")).hasSize(2);
+        assertThat(after.str("/claims/1/id")).isEqualTo(again.str("/id"));
+        assertThat(after.str("/claims/1/status")).isEqualTo("open");
+        assertThat(after.str("/claims/1/phone")).isEqualTo("+573114440009");
+        assertThat(after.json().get("open_claim_count").asInt()).as("Andrés's and Laura's again").isEqualTo(2);
     }
 
     @Test
@@ -7528,10 +8084,12 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
         cases.claim("7K3PQ", b, "+573001112244", MutableClock.START.minusSeconds(60), "open");
         cases.claim("7K3PQ", accounts.person("pedro@correo.co"), "+573001112255", MutableClock.START.minus(java.time.Duration.ofDays(8)), "open");
         cases.claim("7K3PQ", accounts.person("ana@correo.co"), "+573001112266", MutableClock.START.minusSeconds(60), "dismissed");
+        cases.claim("7K3PQ", accounts.person("julian@correo.co"), "+573001112277", MutableClock.START.minus(java.time.Duration.ofDays(9)),
+                MutableClock.START.minusSeconds(600), "open");                                 // made 9 days ago, repeated 10 min ago: fresh
         cases.claim("EXP22", a, "+573001112233", MutableClock.START.minusSeconds(3600), "open");
         ApiResponse r = cold(carolinaBrowser);
         assertThat(codes(r)).containsExactly("7K3PQ", "EXP22");
-        assertThat(r.json().at("/0/open_claim_count").asInt()).as("two open, one stale, one dismissed").isEqualTo(2);
+        assertThat(r.json().at("/0/open_claim_count").asInt()).as("two open, one refreshed, one stale, one dismissed").isEqualTo(3);
         assertThat(r.json().at("/1/open_claim_count").asInt()).as("not active").isZero();
         assertThat(r.statements()).hasSize(2);
     }
@@ -7588,10 +8146,12 @@ class FeedBadgeTest {
         cases.lostCase(carolina, "STL22", "Mia", "cat", CaseFixtures.MEDELLIN, 300, "active", NOW.minusSeconds(3600));   // stale claim only
         cases.lostCase(carolina, "CNF22", "Max", "dog", CaseFixtures.MEDELLIN, 300, "active", NOW.minusSeconds(7200));   // confirmed only
         cases.lostCase(julian, "OTH22", "Otro", "dog", CaseFixtures.MEDELLIN, 300, "active", NOW.minusSeconds(60));      // someone else's
+        cases.lostCase(carolina, "RFR22", "Nube", "cat", CaseFixtures.MEDELLIN, 300, "active", NOW.minusSeconds(5400));  // a refreshed claim only
         cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofHours(1)), "open");
         cases.claim("STL22", andres, "+573001112233", NOW.minus(Duration.ofDays(8)), "open");
         cases.claim("CNF22", andres, "+573001112233", NOW.minus(Duration.ofDays(1)), "confirmed");
         cases.claim("OTH22", andres, "+573001112233", NOW.minus(Duration.ofHours(1)), "open");
+        cases.claim("RFR22", andres, "+573001112233", NOW.minus(Duration.ofDays(9)), NOW.minus(Duration.ofHours(2)), "open");
     }
 
     private static JsonNode item(ApiResponse feed, String code) {
@@ -7605,7 +8165,7 @@ class FeedBadgeTest {
         accounts.signIn(stranger, "stranger@correo.co");
         for (ApiClient viewer : new ApiClient[] {clients.newBrowser(), stranger, claimant}) {
             ApiResponse feed = viewer.get("/feed");
-            assertThat(feed.json().get("items")).hasSize(4);
+            assertThat(feed.json().get("items")).hasSize(5);
             feed.json().get("items").forEach(i -> assertThat(i.get("possible_find").isNull()).as(i.toString()).isTrue());
         }
     }
@@ -7617,13 +8177,14 @@ class FeedBadgeTest {
         assertThat(item(feed, "STL22").get("possible_find").asBoolean()).as("stale does not count").isFalse();
         assertThat(item(feed, "CNF22").get("possible_find").asBoolean()).as("answered does not count").isFalse();
         assertThat(item(feed, "STL22").get("possible_find").isNull()).isFalse();
+        assertThat(item(feed, "RFR22").get("possible_find").asBoolean()).as("made 9 days ago, repeated 2 h ago: fresh").isTrue();
         assertThat(item(feed, "OTH22").get("possible_find").isNull()).as("someone else's item").isTrue();
     }
 
     @Test
     void theBadgeDoesNotChangeTheFeedsOrderOrMembership() {
-        // A claim never reduces reach (docs/product/04): the same four items in the same order for everyone.
-        assertThat(codes(carolinaBrowser.get("/feed"))).hasSize(4).isEqualTo(codes(clients.newBrowser().get("/feed")));
+        // A claim never reduces reach (docs/product/04): the same five items in the same order for everyone.
+        assertThat(codes(carolinaBrowser.get("/feed"))).hasSize(5).isEqualTo(codes(clients.newBrowser().get("/feed")));
     }
 
     private static java.util.List<String> codes(ApiResponse feed) {
@@ -7635,7 +8196,7 @@ class FeedBadgeTest {
     @Test
     void theStatementCountIsUnchanged() {
         caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
-        assertThat(carolinaBrowser.get("/feed").statements()).hasSizeLessThanOrEqualTo(3);
+        assertThat(carolinaBrowser.get("/feed").statements()).as("national: session, the query").hasSize(2);
         caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
         assertThat(carolinaBrowser.get("/feed?lat=6.25&lng=-75.59").statements()).as("local hit").hasSize(2);
     }
@@ -7656,6 +8217,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The correlated open-claim counts of the publisher's feed items and of «Mis casos» (spec §4.13) must not scan every claim:
@@ -7679,12 +8242,22 @@ class ClaimCountPlanTest {
 
     @Test
     void thePublishersFeedBadgeDoesNotScanTheClaims() {
-        PlanAssert.assertNoSeqScan(db, feed.nationalQuery(null, 100, SEED_PUBLISHER, MutableClock.START), "recovery_claim");
+        var q = feed.nationalQuery(null, 100, SEED_PUBLISHER, MutableClock.START);
+        PlanAssert.assertNoSeqScan(db, q, "recovery_claim");
+        assertReadThroughAClaimIndex(q);
     }
 
     @Test
     void misCasosCountsDoNotScanTheClaims() {
-        PlanAssert.assertNoSeqScan(db, myCases.query(SEED_PUBLISHER, MutableClock.START), "recovery_claim");
+        var q = myCases.query(SEED_PUBLISHER, MutableClock.START);
+        PlanAssert.assertNoSeqScan(db, q, "recovery_claim");
+        assertReadThroughAClaimIndex(q);
+    }
+
+    /** By index name, as the plan checks require: either of the two indexes leading with case_code. */
+    private void assertReadThroughAClaimIndex(org.jooq.Query q) {
+        assertThat(PlanAssert.plan(db, q)).containsAnyOf(" using recovery_claim_by_case_recent_idx ",
+                " using recovery_claim_one_open_per_claimant ", "Bitmap Index Scan on recovery_claim_");
     }
 }
 ```
@@ -7718,7 +8291,7 @@ record FeedRow(String code, @Nullable String petName, String species, @Nullable 
         if (viewer == null) return DSL.inline((Boolean) null, SQLDataType.BOOLEAN).as("possible_find");
         var openNonStale = DSL.exists(DSL.selectOne().from(RECOVERY_CLAIM)
                 .where(RECOVERY_CLAIM.CASE_CODE.eq(LOST_CASE.CODE), RECOVERY_CLAIM.STATUS.eq(DSL.inline("open")),
-                       RECOVERY_CLAIM.CREATED_AT.ge(ClaimDerivation.staleCutoff(now).atOffset(ZoneOffset.UTC))));
+                       RECOVERY_CLAIM.LAST_ACTIVE_AT.ge(ClaimDerivation.staleCutoff(now).atOffset(ZoneOffset.UTC))));
         return DSL.when(LOST_CASE.CREATED_BY.eq(viewer), DSL.field(openNonStale)).as("possible_find");
     }
 
@@ -7806,7 +8379,7 @@ record MyCaseRow(String code, String status, Instant publishedAt, @Nullable Stri
         return DSL.when(LOST_CASE.STATUS.eq(DSL.inline("active")),
                         DSL.field(DSL.selectCount().from(RECOVERY_CLAIM)
                                 .where(RECOVERY_CLAIM.CASE_CODE.eq(LOST_CASE.CODE), RECOVERY_CLAIM.STATUS.eq(DSL.inline("open")),
-                                       RECOVERY_CLAIM.CREATED_AT.ge(ClaimDerivation.staleCutoff(now).atOffset(ZoneOffset.UTC)))))
+                                       RECOVERY_CLAIM.LAST_ACTIVE_AT.ge(ClaimDerivation.staleCutoff(now).atOffset(ZoneOffset.UTC)))))
                   .otherwise(DSL.inline(0))
                   .as("open_claim_count");
     }
@@ -7974,10 +8547,11 @@ class MyPetsEndpointTest {
         cases.lostCase(carolina, "MAX22", "Max", "dog", CaseFixtures.MEDELLIN, 300, "active", daysAgo(50));
         cases.close("MAX22", "expired", daysAgo(40));                                                    // outside the window
         cases.ownedPet(carolina, null, daysAgo(100));                                                     // no case, no name
+        cases.ownedPet(carolina, "Nube", daysAgo(50));                                                    // no case, newer pet: before the nameless one
 
         ApiResponse r = carolinaBrowser.get("/me/pets");
         assertThat(r.status()).isEqualTo(200);
-        assertThat(names(r)).containsExactly("Luna", "Toby", "Mia", "Max", "");
+        assertThat(names(r)).as("case activity desc, nulls last, then pet.created_at desc").containsExactly("Luna", "Toby", "Mia", "Max", "Nube", "");
         assertThat(pet(r, "Luna").get("active_case_code").asString()).isEqualTo("7K3PQ");
         assertThat(pet(r, "Luna").get("reopenable_case_code").isNull()).isTrue();
         assertThat(pet(r, "Toby").get("active_case_code").isNull()).isTrue();
@@ -8616,12 +9190,12 @@ The durable parts of the design land in their owning docs (spec §8): decision r
 In `W/docs/product/00-product-map.md`, insert after the row that starts `| 70 |` (the last row of the decision-log table):
 
 ```markdown
-| 71 | Lost-case owner actions *(2026-11-01)* | **The owner of a lost case is `lost_case.created_by`. Reunite, cancel and reopen are one conditional `UPDATE` each, with no lock (#59). Reunite writes `resolution = reunited_home` and the attribution the owner picked (not checked against evidence); cancel writes `false_alarm` or `duplicate`. Reopen takes an `expired` case within 30 days of `resolved_at` (inclusive), clears the resolution data, keeps its sightings, its claims and its `published_at`, and never re-broadcasts. Reopen, and a claim that would reactivate a case, answer `active_case_exists` with the other case's code when the pet has another active case. A cancelled case is still served (`status: cancelled`, no contact). `Created.id` of a case action is the case code.** Mechanics: [04](04-lost-workflow.md) · Case state machine | The responsibility link as the owner check (a transferred pet would hand its old cases to the new owner); refreshing `published_at` on reopen (a reopened case would jump to the top of the national feed); letting a reopen create a second active case for the pet |
+| 71 | Lost-case owner actions *(2026-11-01)* | **The owner of a lost case is `lost_case.created_by`. Reunite, cancel and reopen are one conditional `UPDATE` each, with no lock (#59). Reunite writes `resolution = reunited_home` and the attribution the owner picked (not checked against evidence); cancel writes `false_alarm` or `duplicate`. Reopen takes an `expired` case within 30 days of `resolved_at` (inclusive), clears the resolution data, keeps its sightings, its claims and its `published_at`, and never re-broadcasts. Reopen, and a claim that would reactivate a case, answer `active_case_exists` with the other case's code when the pet has another active case. A cancelled case is still served (`status: cancelled`, no contact). `Created.id` of a case action is the case code. The three actions are idempotent: reunite on a reunited case, cancel on a cancelled case and reopen on a case that is already active answer the same success and write nothing, so a retry after a lost response, a double tap or a race another request won never shows the anxious owner an error, and the first call's resolution and attribution are never overwritten; any other state stays `invalid_transition` (cancel or reopen on a reunited case).** Mechanics: [04](04-lost-workflow.md) · Case state machine | The responsibility link as the owner check (a transferred pet would hand its old cases to the new owner); refreshing `published_at` on reopen (a reopened case would jump to the top of the national feed); letting a reopen create a second active case for the pet; answering a repeat with `409` (the owner sees a failure after their action succeeded) |
 | 72 | Editing a lost case *(2026-11-01, amends #27)* | **Photos and signs belong to the pet: an edit writes them through the pets feature, so they change on every case of that pet, past ones included. A moved last-seen point re-snaps the public center (#69) and resets the place name to the generic label; the place namer is not called (a network call). `last_seen_at` may be up to 5 minutes ahead, with no lower bound; existing sightings are not revalidated; an open claim never blocks an edit; only an `active` case can be edited.** Mechanics: [04](04-lost-workflow.md) · Editing a published case | Calling the place namer in the edit; copying the pet's fields onto the case; revalidating existing sightings against the new zone |
-| 73 | A reporter's own pin *(2026-11-01)* | **"Mine" is the session's person when the caller is signed in, else the device, whatever `reporter_person_id` says — the same rule for `mine`, `editable_until`, correction and delete. Correction and delete need the pin `visible` and inside its 15 minutes (a pin the owner hid is no longer the reporter's to change); correction also needs the case active, delete does not. Delete is the status `deleted_by_reporter`, never a hard delete: the row, its `client_id` (a replayed «Lo vi» answers the deleted pin's id) and any claim's `from_sighting_id` stay; the pin reaches nobody, the owner included.** Mechanics: [04](04-lost-workflow.md) · Correction window; [api.md](../eng/api.md) · Device identity | Person-or-device for "mine" (a signed-in person could change an anonymous pin sent from a shared device); a hard delete (frees the replay key so a retried «Lo vi» creates a new pin, and breaks `sightings_count` and a claim's `from_sighting_id`) |
+| 73 | A reporter's own pin *(2026-11-01)* | **A pin is "mine" when its reporter is the caller's person, or when it has no person and was sent from the caller's device. Another person's pin is never mine, whatever device sent it; an anonymous pin stays its reporter's after they sign in on the same browser — the passer-by who reported «Lo vi» without an account and then signs in to say «Lo tengo» keeps the pin, its correction window and the claim's link to it. The same rule for `mine`, `editable_until`, correction, delete and a claim's `from_sighting_id`. Correction and delete need the pin `visible` and inside its 15 minutes (a pin the owner hid is no longer the reporter's to change or to withdraw); correction also needs the case active, delete does not. Delete is the status `deleted_by_reporter`, never a hard delete: the row, its `client_id` (a replayed «Lo vi» answers the deleted pin's id) and any claim's `from_sighting_id` stay; the pin reaches nobody, the owner included. Deleting one's own deleted pin again answers the same success and writes nothing.** Mechanics: [04](04-lost-workflow.md) · Correction window; [api.md](../eng/api.md) · Device identity | Person-or-device for "mine" (a signed-in person could change another person's pin sent from a shared device); the session strictly winning (a reporter who signs in to claim loses their own anonymous pin); a hard delete (frees the replay key so a retried «Lo vi» creates a new pin, and breaks `sightings_count` and a claim's `from_sighting_id`) |
 | 74 | Owner moderation of a pin *(2026-11-01)* | **The owner hides a pin (`hidden_by_owner`) or highlights it; the two are independent (a hidden pin can be highlighted), idempotent, and allowed in any case status. The owner still sees a hidden pin, with its contact. A pin removed by moderation or deleted by its reporter is `not_found` to the owner too.** Mechanics: [04](04-lost-workflow.md) · sighting | Letting the owner unhide a pin moderation removed |
-| 75 | «Lo tengo» needs a session *(2026-11-01)* | **A claim needs a session: the claimant is a person (the client tells them it is for the owner's safety). One open claim per person per case, enforced by a partial unique index; a repeat — a stale claim included — answers the open one. The owner cannot claim their own case (`forbidden`); a purged code is `gone`. No rate limit (as #54). Evidence is stored, not shown: photos, and a point copied from the claimant's own visible pin on the case from the last 24 hours (theirs by account or by device). The answer carries the owner's WhatsApp link with a prefilled Spanish text («Hola, vi tu aviso de {nombre} en Scuby ({código}) y creo que lo tengo.») only under the public-contact rule; no `mailto:`. The contract's `claimRecovery` became `session` with `forbidden`, `active_case_exists` and `gone`, and `reopenCase` lists `active_case_exists`: the behaviour above answers them, so the contract lists them.** Mechanics: [04](04-lost-workflow.md) · recovery_claim | Anonymous claims with a phone only (nothing ties a claim to someone the owner or moderation can act on); a rate limit now (no abuse pattern seen yet); copying the sighting's photos onto the claim |
-| 76 | The claim badge is the owner's only *(2026-11-01)* | **`open_claim_count` on the case page and `possible_find` on feed items reach only the case's owner — `null` for anyone else, the claimant included — and count claims that are `open` and not stale, on an active case (the owner of a closed case gets `0` / `false`). Stale is derived, never stored: a claim still open 7 days after it was made. «Mis casos» keeps a non-null count (it is always the owner's). The owner's `claims[]` holds the newest 50, with the derived status.** Why: «a claim must never reduce reach» ([04](04-lost-workflow.md) · Rule: a recovery claim must never reduce reach), and a public «Posible hallazgo» tells helpers the search may be over. Mechanics: [04](04-lost-workflow.md) · recovery_claim | A public badge (it reduces reach); denormalizing the count on the case; a stored `stale` status |
+| 75 | «Lo tengo» needs a session *(2026-11-01)* | **A claim needs a session: the claimant is a person (the client tells them it is for the owner's safety). One open claim per person per case, enforced by a partial unique index; a repeat while that claim is open — a stale one included — refreshes it with the repeat's phone, photos and pin, and makes it fresh again (`last_active_at`), so the person still holding the animal can come back with a new number after the owner went silent. A repeat on a case that is no longer active answers the case's refusal (`invalid_transition`, or `active_case_exists` naming the pet's live case), never the old claim. The owner cannot claim their own case (`forbidden`); a purged code is `gone`. No rate limit (as #54). Evidence is stored, not shown: photos, and a point copied from the claimant's own visible pin on the case from the last 24 hours ("mine" as #73). A `from_sighting_id` that does not qualify is ignored and the claim is stored without it: the link is attribution, never a reason to lose a claim. The answer carries the owner's WhatsApp link with a prefilled Spanish text («Hola, vi tu aviso de {nombre} en Scuby ({código}) y creo que lo tengo.») only under the public-contact rule; no `mailto:`. The contract's `claimRecovery` became `session` with `forbidden`, `active_case_exists` and `gone`, and `reopenCase` lists `active_case_exists`: the behaviour above answers them, so the contract lists them.** Mechanics: [04](04-lost-workflow.md) · recovery_claim | Anonymous claims with a phone only (nothing ties a claim to someone the owner or moderation can act on); a rate limit now (no abuse pattern seen yet); copying the sighting's photos onto the claim; answering a repeat with the old claim unchanged (the new number and photos were lost, and a stale claim stayed invisible); refusing the whole claim over an ineligible `from_sighting_id` |
+| 76 | The claim badge is the owner's only *(2026-11-01)* | **`open_claim_count` on the case page and `possible_find` on feed items reach only the case's owner — `null` for anyone else, the claimant included — and count claims that are `open` and not stale, on an active case (the owner of a closed case gets `0` / `false`). Stale is derived, never stored: a claim still open 7 days after the claimant's last «Lo tengo» on it (`last_active_at`). «Mis casos» keeps a non-null count (it is always the owner's). The owner's `claims[]` holds the newest 50, with the derived status.** Why: «a claim must never reduce reach» ([04](04-lost-workflow.md) · Rule: a recovery claim must never reduce reach), and a public «Posible hallazgo» tells helpers the search may be over. Mechanics: [04](04-lost-workflow.md) · recovery_claim | A public badge (it reduces reach); denormalizing the count on the case; a stored `stale` status |
 | 77 | The owner's answer to a claim *(2026-11-01)* | **The owner confirms or dismisses a claim at any time and in any case status, and may change the answer (`confirmed ↔ dismissed`); repeating the current answer writes nothing; a stale claim can be answered. Confirming never closes the case — only reunite does — and leaves the other claims as they are; several claims may be confirmed.** Mechanics: [04](04-lost-workflow.md) · recovery_claim | One-shot answers; dismissing the other claims when one is confirmed |
 | 78 | «Mis mascotas» (`GET /me/pets`) *(2026-11-01)* | **The caller's active owner links, nameless pets included (`name: ""`), in one query. `active_case_code` is the caller's active case of the pet; `reopenable_case_code` is the latest of the caller's cases of it that expired within 30 days, only when none is active. Ordered by the latest publish or close among the caller's cases of the pet; pets without a case last.** Mechanics: [04](04-lost-workflow.md) · Publishing | A query per pet; listing every expired case |
 | 79 | Profile update *(2026-11-01)* | **Sending a display name, even unchanged, marks it chosen, so it becomes the public name (#48); there is no way back. The bio refuses, case-insensitive, `http://`, `https://`, `www.`, `wa.me`, `tel:`, `mailto:` and any domain-shaped token (a word, a dot, two or more letters); «Hola.Soy» is an accepted false positive. `city` is free text of at most 80 characters until a cities table exists (O34). The four notification switches come together. A new profile photo must be the caller's own `profile` upload; the current one is accepted as it is.** Mechanics: [auth.md](../eng/auth.md) · Profile | Only the URL patterns (a bare `ana.com` or `wa.me/…` would pass); a cities table now (its only consumer, adoption, is not built) |
@@ -8652,14 +9226,16 @@ anonymous «Lo tengo» phone — a claim's entire value is the contact channel; 
 (c) At the end of the **Correction window** paragraph (after `(remove) can take it off the map.`), add:
 
 ```markdown
-"Mine" is the session's person when the reporter is signed in, else the device — whatever
-`reporter_person_id` says (decision #73). The pin must still be `visible`: once the owner hides it, it is
-no longer the reporter's to change. A correction also needs the case `active`; a delete does not. **A
-delete is a status**, `deleted_by_reporter`, never a hard delete: the row stays, so its `client_id` stays
-taken (a replayed «Lo vi» answers it), `sightings_count` stays a count of visible pins and a claim's
-`from_sighting_id` never dangles; the pin reaches nobody, the owner included. The owner hides and
-highlights pins independently, in any case status; a pin moderation removed or its reporter deleted is
-invisible to the owner too (decision #74).
+A pin is "mine" when its reporter is my account, or when it has no account and was sent from this
+browser (decision #73): another person's pin is never mine, and an anonymous pin stays mine after I
+sign in here. The pin must still be `visible`: once the owner hides it, it is no longer the reporter's
+to change or withdraw, and it disappears from the reporter's view too. A correction also needs the case
+`active`; a delete does not. **A delete is a status**, `deleted_by_reporter`, never a hard delete: the
+row stays, so its `client_id` stays taken (a replayed «Lo vi» answers it), `sightings_count` stays a
+count of visible pins and a claim's `from_sighting_id` never dangles; the pin reaches nobody, the owner
+included, and deleting it again is a no-op success. The owner hides and highlights pins independently,
+in any case status; a pin moderation removed or its reporter deleted is invisible to the owner too
+(decision #74).
 ```
 
 (d) At the end of the **Editing a published case** paragraph (after `reopening comes first.`), add:
@@ -8676,9 +9252,13 @@ revalidated; an open claim never blocks an edit (decision #72).
 ```markdown
 `case_id` (the case's code), `claimant` (a person: «Lo tengo» needs a session, decision #75), `phone`,
 `point?`, `photos[]`, `from_sighting_id?`, `status: open | confirmed | dismissed`, `created_at`,
-`answered_at?`. `stale` is derived, not stored: a claim still open 7 days after it was made. The check-in
-fields (`verifying_since`, `stale_at`) arrive with the follow-up loop. One open claim per person per case;
-«Lo tengo» again answers the open one.
+`last_active_at`, `answered_at?`. `stale` is derived, not stored: a claim still open 7 days after the
+claimant's last «Lo tengo» on it (`last_active_at`). The check-in fields (`verifying_since`, `stale_at`)
+arrive with the follow-up loop. One open claim per person per case: «Lo tengo» again, while it is open
+(stale included), refreshes it — the new phone, photos and pin, and `last_active_at` — so it counts again
+and the owner sees the claimant's current number. On a case that is no longer active the repeat gets the
+case's answer (reactivated inside 30 days, or `active_case_exists` with the pet's live case), never the
+old claim.
 ```
 
 (f) In **Rule: «Lo tengo» always creates a claim before it opens a channel**, replace `The tempting implementation for anonymous users is a bare WhatsApp deep link` with `The tempting implementation is a bare WhatsApp deep link`, replace `The
@@ -8695,12 +9275,14 @@ stranger's path is the high-volume one; it cannot be the one we don't see.`, and
 
 (g) In the **From sighting to claim** paragraph, replace `if a registered user with a visible sighting on this case **< 24h old** taps
 it` with `if a signed-in user with a visible sighting on this case **< 24h old** (theirs by account, or
-sent from this device) taps it`.
+sent from this browser without an account) taps it`, and append to that paragraph: `A link that does not
+qualify (another case, older, not theirs, hidden) is ignored: the claim is stored without it.`
 
 (h) At the end of the paragraph that starts `The owner owes the claim an answer`, add: `The answer is revisable
 (`confirmed ↔ dismissed`) and never closes the case — only reunite does (decision #77). The «posible
 hallazgo» badge and its count are shown **to the owner only** (decision #76; Rule: a recovery claim must
-never reduce reach).`
+never reduce reach). Reunite, cancel and reopen are idempotent: repeating one the case already reflects
+is a success that changes nothing (decision #71).`
 
 (i) In the *Rejected state* table, in the `pending_confirmation` row, replace `(index on `recovery_claim (case_id, status)`). A UI badge ("posible hallazgo"), not a status.` with `(read through `recovery_claim_by_case_recent_idx`). A UI badge ("posible hallazgo") for the owner only, not a status.`
 
@@ -8729,12 +9311,13 @@ Expected: no output (every anonymous-claimant sentence is patched).
 (b) In *Device identity*, replace the bullet that starts `- **What it identifies.** The anonymous reporter or claimant of a sighting or a «lo tengo»:` (through `It also scopes an anonymous upload slot (*Uploads*).`) with:
 
 ```markdown
-- **What it identifies.** The anonymous reporter of a sighting: with no session it authorizes correcting
-  or deleting their own sighting inside its window, and marks it `mine` on the case. **A signed-in
-  session wins**, there too: with one, "mine" is the session's person, whatever device sent the pin
-  (decision #73). A «lo tengo» claimant is always a person (decision #75); the device only links a claim
-  to the claimant's own recent pin. There are no per-reporter rate limits for now
-  ([04](../product/04-lost-workflow.md) · Validation). It also scopes an anonymous upload slot (*Uploads*).
+- **What it identifies.** The anonymous reporter of a sighting: it authorizes correcting or deleting their
+  own sighting inside its window, and marks it `mine` on the case. A pin is mine when its reporter is the
+  session's person, **or** when it has no person and came from this device (decision #73): another
+  person's pin is never mine on a shared device, and an anonymous pin stays mine after its reporter signs
+  in on the same browser. A «lo tengo» claimant is always a person (decision #75); the same rule decides
+  whether a claim's `from_sighting_id` is the claimant's own pin. There are no per-reporter rate limits for
+  now ([04](../product/04-lost-workflow.md) · Validation). It also scopes an anonymous upload slot (*Uploads*).
 ```
 
 (c) In the *Errors* table, replace the `forbidden` row's last cell `Signed in, but it is someone else's case, claim or notification` with `Signed in, but it is someone else's case, claim or notification; the owner claiming their own case; a pin that is not the caller's to correct or delete`; the `active_case_exists` row's last cell `The pet already has an active lost case; `details.case_code`` with `The pet already has an active lost case (publish, reopen, or a claim that would reactivate a case); `details.case_code``; and the `not_found · gone` row's last cell `Unknown · purged (a printed poster's code still resolves)` with `Unknown · purged (a printed poster's code still resolves: `GET /cases/:code` and «Lo tengo»; owner actions answer `not_found`)`.
@@ -8744,7 +9327,8 @@ Expected: no output (every anonymous-claimant sentence is patched).
 ```markdown
 - **Endpoints the e2e specs need** — the backend now implements `/me/pets`, case edit, reopen, claims and the
   profile update; Google sign-in (@AUTH-002, @PLOST-002, @PLOST-004) is still missing. «Lo tengo» needs a
-  session: @HELP-002 and @HELP-005 need a sign-in step before claiming.
+  session: @HELP-002 and @HELP-005 sign in by email code before claiming, and the client's claim sheet must
+  ask for sign-in.
 ```
 
 `W/docs/eng/auth.md` · *Profile*: replace `whoever builds the profile update must mark the name as chosen, `person.display_name_chosen`)` with `sending a name in the profile update, even unchanged, marks it chosen, `person.display_name_chosen`; there is no way back, decision #79)`, and replace `` `city?` · `bio?` (~280 chars, plain text, **no links** — a bio with a
@@ -8764,14 +9348,23 @@ bypasses contact prefs; it is a `report` target like any user content)
 ```markdown
 - **Lifecycle transitions.** Reunite, cancel, reopen and edit are one conditional `UPDATE … WHERE code = ? AND
   created_by = ? AND status = …` each; a pre-read classifies the errors, and zero rows after it is the race loser,
-  answered as a re-read classifies. A reopen — or a claim's reactivation — that loses to a publish of the same pet
+  answered as one re-read classifies. Reunite, cancel, reopen and the reporter's delete are idempotent: a case or
+  pin already in the action's target state answers the same success with no write — on the pre-read, or on the
+  re-read when another request won the race — so a retry never overwrites the first call's resolution; another
+  state is `invalid_transition`. A reopen — or a claim's reactivation — that loses to a publish of the same pet
   fails on `lost_case_one_active_per_pet`; the unique violation is caught by its constraint name and answered
   `active_case_exists`, never a `500`. An edit writes the pet first and the case last, as the guard, so a close
   that commits in between rolls the pet change back.
-- **One open claim per claimant.** «Lo tengo» is `INSERT … SELECT … FROM lost_case WHERE status = 'active' ON
-  CONFLICT (case_code, claimant_person_id) WHERE status = 'open' DO NOTHING`; the loser reads the winner's row. On
-  an expired case the reactivation and the insert run in one transaction, so the case row is held only until that
-  insert commits.
+- **One open claim per claimant.** «Lo tengo» is one `INSERT … SELECT … FROM lost_case WHERE status = 'active' ON
+  CONFLICT (case_code, claimant_person_id) WHERE status = 'open' DO UPDATE`: a repeat refreshes the open row (phone,
+  photos, point, link, `last_active_at`) and returns its id; a double tap serializes on the index entry and
+  leaves one row. Nothing is written, and nothing old is answered, when the case is not active. On an expired case
+  the reactivation and the upsert run in one transaction, so the case row is held only until that write commits.
+- **Accepted, not locked:** a claim or a correction can land on a case closed a moment earlier. The
+  `INSERT … SELECT … WHERE status = 'active'` (and the correction's `EXISTS`) reads its snapshot, and the
+  foreign-key check's `KEY SHARE` does not conflict with the close's `NO KEY UPDATE`, so a close committing in
+  between does not stop it. The outcome is harmless — the badge counts active cases only and the case is
+  closed — the same shape as «Lo vi» against a close. Do not "fix" it with a lock.
 ```
 
 (b) In *Where a lock remains*, replace `A future path that closes or
@@ -8781,7 +9374,7 @@ edits a case holds its row only for its own `UPDATE` and has a race test against
 (`CaseLifecycleRaceTest`, `EditLostRaceTest`); a lock beyond that needs a decision-log row saying why an atomic
 statement does not do.`
 
-(c) In *Race tests*, replace `(`CodeRaceTest`, `PublishLostTest`, `SightingRaceTest`)` with `(`CodeRaceTest`, `PublishLostTest`, `SightingRaceTest`, `CaseLifecycleRaceTest`, `EditLostRaceTest`, `RecoveryClaimRaceTest`, and the held-row cases of `SightingCorrectionTest` and `SightingDeleteTest`, through `support.Contention`)` and append to that paragraph: ` A close never waits for an uncommitted sighting; two claims on one expired case reactivate it once; a claim and a publish for the same pet leave exactly one active case; a double tap on «Lo tengo» stores one claim.`
+(c) In *Race tests*, replace `(`CodeRaceTest`, `PublishLostTest`, `SightingRaceTest`)` with `(`CodeRaceTest`, `PublishLostTest`, `SightingRaceTest`, `CaseLifecycleRaceTest`, `EditLostRaceTest`, `RecoveryClaimRaceTest`, and the held-row cases of `SightingCorrectionTest` and `SightingDeleteTest`, through `support.Contention`)` and append to that paragraph: ` A close never waits for an uncommitted sighting; two claims on one expired case reactivate it once; a claim and a publish for the same pet leave exactly one active case; a double tap on «Lo tengo» stores one claim; a retried reunite keeps the first attribution; a reopen that meets a claim's reactivation answers 200 with the case active.`
 
 (d) *Migrations and indexes: kept performance indexes*: append:
 
@@ -8851,19 +9444,35 @@ and what the client must do.
 
 | Change | Decision · owning doc | What the client must do |
 |---|---|---|
-| **«Lo tengo» needs a session.** The claimant is a person. | #75 · [04](../product/04-lost-workflow.md) · recovery_claim | Ask the person to sign in before the claim sheet, and say it is for the owner's safety. @HELP-002 and @HELP-005 need a sign-in step before claiming |
-| **The badge is the owner's only.** `open_claim_count` and `possible_find` are `null` for everyone else, the claimant included. | #76 | Render nothing for `null` (the contract already types them nullable). The case page's public «Posible hallazgo.» notice can no longer show: remove or repurpose it |
+| **«Lo tengo» needs a session.** The claimant is a person. | #75 · [04](../product/04-lost-workflow.md) · recovery_claim | Ask the person to sign in before the claim sheet, and say it is for the owner's safety. @HELP-002 and @HELP-005 were given an email-code sign-in step before claiming; the claim sheet itself must ask for sign-in |
+| **The badge is the owner's only.** `open_claim_count` and `possible_find` are `null` for everyone else, the claimant included. | #76 | Render nothing for `null` (the contract already types them nullable). The case page's public «Posible hallazgo.» notice and its copy `lost.page.possible_find_body` can no longer show: remove or repurpose them. The claimant never sees the badge; the claim sheet's success state («Ya le avisamos a su familia.») is their feedback |
 | **A cancelled case is still served**, with `status: cancelled` and `contact: null`. | #71 | A page for `cancelled` |
-| **Reopen and «Lo tengo» can answer `active_case_exists`** (`details.case_code`: the pet's other active case); a claim on a purged code answers `gone`; the owner's own claim `forbidden`. | #71, #75 · [api.md](../eng/api.md) · Errors | Handle the three codes |
-| **A repeated claim returns the same id** (the person's open claim, a stale one included). | #75 | Nothing; do not treat it as a new claim |
-| **The owner's `claims[]` holds the newest 50**; `stale` is derived (open and 7 days old). | #76 | Nothing |
+| **Reunite, cancel, reopen and deleting your own pin are idempotent**: repeating one that already happened answers the same success (reopen on an active case included). Cancel or reopen on a reunited case stays `invalid_transition`. | #71, #73 | Retry on a lost connection without fear; on `invalid_transition`, refetch the case (it may be reunited — good news) |
+| **Reopen and «Lo tengo» can answer `active_case_exists`** (`details.case_code`: the pet's other active case); a claim on a purged code answers `gone`; the owner's own claim `forbidden`. | #71, #75 · [api.md](../eng/api.md) · Errors | Handle the codes (table below) instead of «revisa tu conexión» |
+| **A repeated claim refreshes the person's open claim** (a stale one included): same id, the new phone and photos, and it counts again. On a case that is no longer active it answers that case's refusal, never the old claim. | #75 | Let the claimant send «Lo tengo» again; do not treat it as a new claim |
+| **A `from_sighting_id` that is not the claimant's own visible pin of the last 24 hours is ignored**, never refused: the claim is stored without it. | #75 | Nothing to handle; send it when you have it |
+| **The owner's `claims[]` holds the newest 50**; `stale` is derived (open and 7 days since the claimant's last «Lo tengo»). | #76 | Show `stale` claims to the owner too (collapsed), and answered ones, so the owner can still confirm a stale claim and revise a mis-tapped answer — today's `ClaimsList` shows only `open` |
 | **Answers are revisable** (`confirmed ↔ dismissed`), and confirming never closes the case. | #77 | Offer «cambiar respuesta»; close with reunite |
 | **Editing photos or signs changes the pet on every case of it**, old ones included; a moved zone shows the generic place label. | #72 · [04](../product/04-lost-workflow.md) · Editing a published case | Say so in the edit form |
-| **"Mine" follows session-wins**: signed in, a pin is yours only if your account sent it. | #73 · [api.md](../eng/api.md) · Device identity | The mock's person-or-device rule differs; the backend's is the rule |
+| **"Mine"**: a pin is yours if your account sent it, or if it was sent without an account from this browser — so it stays yours after you sign in. Another person's pin is never yours. | #73 · [api.md](../eng/api.md) · Device identity | Find the claimant's own pin by `mine` to send `from_sighting_id` |
+| **A pin the family hid disappears for its reporter too**, and can no longer be corrected or deleted by them. | #73 | Do not word it as a failed send: the reporter may otherwise report again |
 | **A deleted pin keeps its `client_id`**: a replayed «Lo vi» answers the deleted pin's id. | #73 | Nothing |
 | **Profile rules:** sending a name marks it chosen (it becomes public); the bio refuses links and domain-shaped words («Hola.Soy» included); `city` ≤ 80 characters. | #79 · [auth.md](../eng/auth.md) · Profile | Explain a refused bio; send the name only when the person edits it |
 
-The emulated backend still differs on: answers being revisable, delete as a status, and session-wins "mine".
+Error codes the client can turn into helpful copy:
+
+| Endpoint and code | Suggested behaviour |
+|---|---|
+| «Lo tengo» `active_case_exists` | Open `details.case_code` and the claim sheet there («Este aviso tiene uno más reciente») |
+| «Lo tengo» `invalid_transition` | Refetch the case: it may be reunited |
+| «Lo tengo» `gone` | Show the purged-case page |
+| «Lo tengo» `forbidden` | Never shown: the owner has no «Lo tengo» button |
+| Publish `active_case_exists` after a stranger's claim reactivated the old case | «Tu aviso anterior se reactivó porque alguien dice que lo tiene», with a link to it |
+| Correction or delete `forbidden` | Use `editable_until` to say «pasaron los 15 minutos» |
+
+The emulated backend still differs on: answers being revisable, delete as a status, the "mine" rule (the mock
+uses person-or-device), idempotent reunite, cancel and reopen, and «Lo tengo»'s WhatsApp link (the mock checks only
+`expose_whatsapp` and `phone_has_whatsapp`, not `contact_phone_verified` or `in_app_only`, and adds no `?text=`).
 
 ## 3. Proposals to the client
 
@@ -8871,6 +9480,8 @@ The emulated backend still differs on: answers being revisable, delete as a stat
 - Claim evidence (photos, point, `from_sighting_id`) in the owner's `claims[]` — [O36](../open-items.md).
 - The «¿Es donde lo viste…?» prefill from the caller's own recent pin is the client's call (the backend accepts
   `from_sighting_id`).
+- Prefill the claim sheet's phone with the signed-in person's verified phone (04 · Registered: «no form»), so a
+  claimant does not type someone else's number by mistake.
 - A copy review of the WhatsApp text: «Hola, vi tu aviso de {nombre} en Scuby ({código}) y creo que lo tengo.»
 
 ## 4. E2E against the real backend
@@ -8961,8 +9572,9 @@ INSERT INTO scuby.lost_case (code, pet_id, created_by, status, published_at, res
 ```sql
 
 -- spec 2026-11-01 §7.6: an open claim on Luna by Andrés Rojas (the claim @LINK-001's owner step finds)
-INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at) VALUES
-  (gen_random_uuid(), '7K3PQ', '00000000-0000-0000-0000-00000000ca03', '+573114829017', 'open', now() - interval '3 hours');
+INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, last_active_at) VALUES
+  (gen_random_uuid(), '7K3PQ', '00000000-0000-0000-0000-00000000ca03', '+573114829017', 'open', now() - interval '3 hours',
+   now() - interval '3 hours');
 ```
 
 - [ ] **Step 7: Final verification**
@@ -8995,7 +9607,7 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
 
 ## Self-review (run by the plan's author; kept for the reader)
 
-**Spec coverage.** §1 scope: the 13 endpoints are Tasks 4 (reunite, cancel, reopen), 5 (`editLost`, `editCase`), 6 (`moderateSighting`), 7 (`correctSighting`, `deleteSighting`), 9 (`claimRecovery`), 10 (`answerRecoveryClaim`), 12 (`listMyPets`), 13 (`updateProfile`); the changed reads are Tasks 10 (`GET /cases/{code}`) and 11 (`GET /feed`, `GET /me/cases`); out-of-scope items become O37/O38/O35 (Task 14). §1 done-when: `[mvn] verify` (every task, Task 14), `pnpm openapi/test/typecheck` (Task 8, re-run in Task 14), the e2e run and seed (Task 14; the Google-step replacement is a human check because `web/` is frozen). §2 migrations: Task 1, the two performance indexes after their RED plan checks. §3 constants and the badge: Task 2 (homes), Tasks 10–11 (use). Error order, Jackson-first and bodies without `@Valid`: Global Constraints, every precedence test. §4.1–4.13: Tasks 4–13 as listed. §5 package placement: `Pets.updateLook` (5), `Patch` (3), `ProfilePhotos`/`ProfilePhotoCheck` (13), `CasesSecurityRules` lines per task (4, 5, 6, 9, 10, 12). §6 contract change: Task 8 (all nine rows). §7.1 leak tests: `ClaimLeakTest`, `FeedBadgeTest`, `SightingModerationTest`, `SightingDeleteTest`. §7.2 races: `CaseLifecycleRaceTest` and `EditLostRaceTest` (close/edit vs «Lo vi»), `RecoveryClaimRaceTest` (reactivation, publish, reopen, double tap), window edges in `SightingCorrectionTest`/`SightingDeleteTest` (`MutableClock`). §7.3 ceilings: every task's `StatementCeilings` lines, pinned exactly. §7.4 derivation tables: Tasks 2, 3, 7, 10, 11. §7.5 precedence: one per endpoint group. §7.6 seed: Task 14. §8 docs: Task 14. §9 seams: nothing to build (no outbox rows, no notifications — asserted in `RecoveryClaimTest`).
+**Spec coverage.** §1 scope: the 13 endpoints are Tasks 4 (reunite, cancel, reopen), 5 (`editLost`, `editCase`), 6 (`moderateSighting`), 7 (`correctSighting`, `deleteSighting`), 9 (`claimRecovery`), 10 (`answerRecoveryClaim`), 12 (`listMyPets`), 13 (`updateProfile`); the changed reads are Tasks 10 (`GET /cases/{code}`) and 11 (`GET /feed`, `GET /me/cases`); out-of-scope items become O37/O38/O35 (Task 14). §1 done-when: `[mvn] verify` (every task, Task 14), `pnpm openapi/test/typecheck` (Task 8, re-run in Task 14), the e2e run and seed (Task 14; the Google-step replacement is a human check because `web/` is frozen). §2 migrations: Task 1, the two performance indexes after their RED plan checks. §3 constants and the badge: Task 2 (homes), Tasks 10–11 (use). Error order, Jackson-first and bodies without `@Valid`: Global Constraints, every precedence test. §4.1–4.13: Tasks 4–13 as listed. §5 package placement: `Pets.updateLook` (5), `Patch` (3), `ProfilePhotos`/`ProfilePhotoCheck` (13), `CasesSecurityRules` lines per task (4, 5, 6, 9, 10, 12). §6 contract change: Task 8 (all nine rows). §7.1 leak tests: `ClaimLeakTest`, `FeedBadgeTest`, `SightingModerationTest`, `SightingDeleteTest`. §7.2 races: `CaseLifecycleRaceTest` (close vs a signed-in «Lo vi»; close vs close, deterministic; a retried reunite keeps the first attribution; reopen vs a claim's reactivation, both active) and `EditLostRaceTest` (edit vs a signed-in «Lo vi»), `RecoveryClaimRaceTest` (reactivation, publish, reopen, double tap under a barrier and held), `SightingDeleteTest` (double-tap delete), `SightingModerationTest` (a hide that loses to moderation), window edges in `SightingCorrectionTest`/`SightingDeleteTest` (`MutableClock`). §7.3 ceilings: every task's `StatementCeilings` lines, pinned exactly. §7.4 derivation tables: Tasks 2, 3, 7, 10, 11. §7.5 precedence: one per endpoint group. §7.6 seed: Task 14. §8 docs: Task 14. §9 seams: nothing to build (no outbox rows, no notifications — asserted in `RecoveryClaimTest`).
 
 **Resolved where the spec was silent:**
 1. The contract change (spec §6) runs as Task 8, before the claim tasks, because `ApiClient` validates every response against `openapi.json` and «Lo tengo»'s `401/403/410` and the nullable badge are not in the contract before it.
@@ -9005,3 +9617,17 @@ git -C /Users/alejandrosuazabuiles/Desktop/scuby-monorepo/.worktrees/be-lost-l1 
 5. The e2e seed lacked the snapped public centers that the `lost_case` table requires; Task 14 adds them.
 6. `@LINK-001`'s owner step asserts the claims list «Posibles hallazgos» (with the claimant's number), not the text «Posible hallazgo.»: the client's page shows the owner the list instead of the public badge, and the badge is now owner-only, so that text shows to nobody.
 7. The claim pre-read loads the owner's number only when the contact preferences make it public (case status left out, so a reactivating claim can still get the link): the derivation re-checks the flags and the status.
+8. A repeat «Lo tengo» answers `201`, like a first claim: the contract lists only `201` as `claimRecovery`'s success, and `ApiClient` refuses any status the contract does not list.
+9. The contract types `from_sighting_id` as a plain string (no UUID format), so there is no malformed form of it: a non-UUID is an unknown pin and is ignored like any ineligible one; the claim has no `validation_failed {from_sighting_id}` path at all.
+10. A repeat «Lo tengo» takes the repeat's values for photos, point and link even when they are empty: the repeat is the claimant's current word (decided: "updates phone, photo_urls, point and from_sighting_id").
+11. Idempotent transitions keep the pre-read classification and add one re-read only when the `UPDATE` changes 0 rows; a repeat the pre-read already sees as done is 2 statements, and the race-loser path is 4 (reunite and cancel ceilings 3 → 4).
+12. The reporter's repeat delete of their own deleted pin answers `204` at any time (the window is for changing a pin, and the pin is already gone); the contract's success for `deleteSighting` is `204`, so "the same answer as the first success" is `204`.
+
+**Type consistency (re-checked after the red-team revision).** `LostLifecycleDerivation.Outcome` gains `ALREADY_DONE` (Task 2), consumed by `CaseLifecycleService` (Task 4); `RecoveryClaimService` compares only `INVALID_TRANSITION`/`REACTIVATE`, so a claim never meets it. `ClaimDerivation.prefillEligible(SightingLink, boolean mine, Instant)` (Task 2) is called only by `RecoveryClaimService.linkedPin` (Task 9) with `LostCaseDerivation.mine` (Task 7). `isStale`/`wireStatus` take `lastActiveAt` (Task 2) and are fed `ClaimRow.lastActiveAt` (Task 10) and `RECOVERY_CLAIM.LAST_ACTIVE_AT` (Tasks 1, 9). `RecoveryClaimQueries.upsertIfActive` (Task 9) replaces `insertIfActive` and the dedupe select everywhere. `CaseFixtures.claim` has a 5- and a 6-argument form (Task 9), used by Tasks 10 and 11. Ceilings: reunite 4, cancel 4, reopen 4, correction 4, delete 4, claim 8, `GET /cases/{code}` 4.
+
+**Placeholders.** None: every step carries its code, command and expected output. `<today>` in Task 14 is computed by the step that uses it.
+
+## Red-team items not taken
+
+- **Part 1 M2 (sub-microsecond edge of the 15-minute window):** truncating `now` in every service is a change across all of them for a ±0.5 µs edge no person can hit; accepted.
+- **Part 1 M6 (pre-flight count before `lost_case_active_is_unresolved`):** no code path writes an active case with `resolved_at`, and the test databases are fresh; a hand-edited local database is fixed by hand.
