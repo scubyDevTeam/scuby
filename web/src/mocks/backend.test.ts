@@ -21,6 +21,7 @@ import {
   uploadBody,
 } from '../contracts/owner'
 import { parseProfile, parseUser } from '../contracts/session'
+import { env } from '../env'
 import { DEMO_LINKS, linkToken } from './api/links'
 import { db, type LostRow, resetDb } from './db'
 import { DEMO_OWNER_ID as DEMO_OWNER_ID_FOR_TESTS } from './fixtures'
@@ -342,17 +343,14 @@ describe('the owner’s side (04 · state machine)', () => {
     expect(error.code).toBe('forbidden')
   })
 
-  it('a case closes once: reuniting it again is `invalid_transition`', async () => {
+  it('a case closes once: reuniting it again answers the same success and keeps the first attribution', async () => {
     await asCarolina()
-    const reunite = () =>
-      call(
-        api.reuniteCase,
-        { params: { code: '7K3PQ' }, body: { resolution_attribution: 'platform_claim' } },
-        asIs,
-      )
-    await reunite()
-    expect((await failure(reunite())).code).toBe('invalid_transition')
+    const reunite = (resolution_attribution: 'platform_claim' | 'offline') =>
+      call(api.reuniteCase, { params: { code: '7K3PQ' }, body: { resolution_attribution } }, asIs)
+    await reunite('platform_claim')
+    await reunite('offline')
     expect((await caseOf('7K3PQ')).status).toBe('reunited')
+    expect(db.cases['7K3PQ']?.resolution_attribution).toBe('platform_claim')
   })
 
   it('starring a pin tells its registered reporter', async () => {
@@ -391,7 +389,9 @@ describe('the follow-up loop (04 · Schedule)', () => {
       { params: { code: '7K3PQ' }, body: { phone: '+573001112233' } },
       asIs,
     )) as { id: string; whatsapp_url: string | null }
-    expect(claim.whatsapp_url).toMatch(/^https:\/\/wa\.me\/573000000000\?text=Hola%2C%20vi%20tu%20aviso/)
+    expect(claim.whatsapp_url).toMatch(
+      /^https:\/\/wa\.me\/573000000000\?text=Hola%2C%20vi%20tu%20aviso/,
+    )
 
     await asCarolina()
     later(25 * HOUR)
@@ -1342,13 +1342,12 @@ describe('the account (auth.md · Profile, 08 · inbox)', () => {
 describe('one request, one transaction', () => {
   it('a request refused part-way leaves no trace', async () => {
     await asCarolina()
-    // A claim check-in whose claim was already dismissed: the check-in is marked answered first,
-    // then confirming the claim is refused.
-    db.recoveryClaims[0]!.status = 'dismissed'
+    // A claim check-in whose claim is gone: the check-in is marked answered first, then the claim
+    // is not found and the whole request is undone.
     db.checkins.push({
       id: 'ck-due',
       case_code: '7K3PQ',
-      claim_id: 'claim-luna',
+      claim_id: 'claim-missing',
       trigger: 'post_recovery_claim',
       scheduled_at: new Date(Date.now() - HOUR).toISOString(),
       responded_at: null,
@@ -1358,11 +1357,11 @@ describe('one request, one transaction', () => {
     const error = await failure(
       call(
         api.answerCheckin,
-        { params: { code: '7K3PQ', checkinId: 'ck-due' }, body: { response: 'claim_confirmed' } },
+        { params: { code: '7K3PQ', checkinId: 'ck-due' }, body: { response: 'claim_dismissed' } },
         asIs,
       ),
     )
-    expect(error.code).toBe('invalid_transition')
+    expect(error.code).toBe('not_found')
     expect(db.checkins.find((c) => c.id === 'ck-due')?.responded_at).toBeNull()
     expect((await caseOf('7K3PQ')).status).toBe('active')
   })
@@ -2285,5 +2284,531 @@ describe('«Lo tengo» (04 · recovery_claim; decisions #75, #76)', () => {
     await asCarolina()
     const mine = await call(api.getFeed, { query: {} }, parseFeed)
     expect(mine.items.find((i) => i.code === '7K3PQ')?.possibleFind).toBe(true)
+  })
+})
+
+describe('parity with the backend (lost L1: decisions #71–#84)', () => {
+  type Wire = {
+    status: string
+    open_claim_count: number | null
+    claims: { id: string; created_at: string; status: string }[]
+    sightings: { id: string; mine: boolean; editable_until: string | null }[]
+  }
+  const wire = (code: string) => call(api.getCase, { params: { code } }, asIs) as Promise<Wire>
+  const claim = (code: string, phone = '+573001112233') =>
+    call(api.claimRecovery, { params: { code }, body: { phone } }, asIs) as Promise<{
+      id: string
+      whatsapp_url: string | null
+    }>
+  const answer = (code: string, claimId: string, status: 'confirmed' | 'dismissed') =>
+    call(api.answerRecoveryClaim, { params: { code, claimId }, body: { status } }, asIs)
+  const reunite = (code: string) =>
+    call(api.reuniteCase, { params: { code }, body: { resolution_attribution: 'unknown' } }, asIs)
+  const lost = (code: string): LostRow => {
+    const row = db.cases[code]
+    if (row?.vertical !== 'lost') throw new Error(`${code} is not lost`)
+    return row
+  }
+  const pin = (fields: Record<string, unknown> = {}) =>
+    call(
+      api.reportSighting,
+      {
+        params: { code: '7K3PQ' },
+        body: {
+          point: { lat: 6.2455, lng: -75.5905 },
+          seen_at: new Date().toISOString(),
+          note: null,
+          contact_phone: null,
+          ...fields,
+        },
+      },
+      (raw) => (raw as { id: string }).id,
+    )
+  const myPets = () =>
+    call(api.listMyPets, {}, asIs) as Promise<
+      {
+        id: string
+        name: string
+        active_case_code: string | null
+        reopenable_case_code: string | null
+      }[]
+    >
+  /** A newer case of the same pet as `code`, with the given status. */
+  function newerCaseOf(code: string, status: LostRow['status'], newCode = 'NEWER') {
+    const base = lost(code)
+    db.cases[newCode] = {
+      ...base,
+      code: newCode,
+      status,
+      published_at: new Date(Date.now() + HOUR).toISOString(),
+      resolved_at: status === 'active' ? null : new Date().toISOString(),
+    }
+  }
+  function expire(code: string, daysAgo = 1) {
+    Object.assign(lost(code), {
+      status: 'expired',
+      resolved_at: new Date(Date.now() - daysAgo * DAY).toISOString(),
+    })
+  }
+
+  describe('the owner’s answer to a claim (#77)', () => {
+    it('flips between confirmed and dismissed, and a repeat changes nothing', async () => {
+      await asCarolina()
+      await answer('7K3PQ', 'claim-luna', 'confirmed')
+      expect(db.recoveryClaims[0]?.status).toBe('confirmed')
+      const notifications = db.notifications.length
+      await answer('7K3PQ', 'claim-luna', 'confirmed')
+      expect(db.notifications).toHaveLength(notifications)
+      await answer('7K3PQ', 'claim-luna', 'dismissed')
+      expect(db.recoveryClaims[0]?.status).toBe('dismissed')
+      await answer('7K3PQ', 'claim-luna', 'dismissed')
+      await answer('7K3PQ', 'claim-luna', 'confirmed')
+      expect(db.recoveryClaims[0]?.status).toBe('confirmed')
+      // Confirming never closes the case.
+      expect((await wire('7K3PQ')).status).toBe('active')
+    })
+
+    it('answers a stale claim either way, and on a case that is no longer active', async () => {
+      await asCarolina()
+      db.recoveryClaims[0]!.status = 'stale'
+      await answer('7K3PQ', 'claim-luna', 'dismissed')
+      await reunite('7K3PQ')
+      await answer('7K3PQ', 'claim-luna', 'confirmed')
+      expect(db.recoveryClaims[0]?.status).toBe('confirmed')
+    })
+
+    it('a claim that is not on this case is not found', async () => {
+      await asCarolina()
+      expect((await failure(answer('7K3PQ', 'claim-nope', 'confirmed'))).code).toBe('not_found')
+    })
+  })
+
+  describe('“mine” for a pin (#73)', () => {
+    it('an anonymous pin stays the browser’s after signing in', async () => {
+      const id = await pin()
+      await asNewcomer('pedro.ruiz@correo.co')
+      const own = (await wire('7K3PQ')).sightings.find((s) => s.id === id)
+      expect(own?.mine).toBe(true)
+      expect(own?.editable_until).not.toBeNull()
+    })
+
+    it('a pin that has a person is only that person’s, not the browser’s', async () => {
+      const pedro = await asNewcomer('pedro.ruiz@correo.co')
+      const id = await pin()
+      expect((await wire('7K3PQ')).sightings.find((s) => s.id === id)?.mine).toBe(true)
+      signOut()
+      expect((await wire('7K3PQ')).sightings.find((s) => s.id === id)?.mine).toBe(false)
+      await asNewcomer('ana.gomez@correo.co')
+      expect((await wire('7K3PQ')).sightings.find((s) => s.id === id)?.mine).toBe(false)
+      expect(db.sightings.find((s) => s.id === id)?.reporter_id).toBe(pedro.id)
+    })
+
+    it('the claim link uses the same rule', async () => {
+      await asNewcomer('ana.gomez@correo.co')
+      const someone = await pin()
+      db.sightings.find((s) => s.id === someone)!.reporter_id = 'user-andres'
+      const made = (await call(
+        api.claimRecovery,
+        { params: { code: '7K3PQ' }, body: { phone: '+573001112233', from_sighting_id: someone } },
+        asIs,
+      )) as { id: string }
+      expect(db.recoveryClaims.find((c) => c.id === made.id)?.from_sighting_id).toBeNull()
+    })
+  })
+
+  describe('deleting a pin is a status change (#73)', () => {
+    const del = (id: string) =>
+      call(api.deleteSighting, { params: { code: '7K3PQ', sightingId: id } }, asIs)
+
+    it('the pin is gone for everyone, the owner included; the row stays', async () => {
+      const id = await pin()
+      await del(id)
+      expect(db.sightings.find((s) => s.id === id)?.status).toBe('deleted_by_reporter')
+      expect((await wire('7K3PQ')).sightings.some((s) => s.id === id)).toBe(false)
+      await asCarolina()
+      expect((await wire('7K3PQ')).sightings.some((s) => s.id === id)).toBe(false)
+    })
+
+    it('deleting again answers the same success; others still cannot find it', async () => {
+      const id = await pin()
+      await del(id)
+      await del(id)
+      db.sightings.find((s) => s.id === id)!.reporter_key = 'device-someone-else'
+      expect((await failure(del(id))).code).toBe('not_found')
+    })
+
+    it('a deleted pin can be neither corrected nor moderated; its client_id replays to its id', async () => {
+      const client_id = 'a3c0f3de-5f3b-4b0b-8f0e-111111111111'
+      const id = await pin({ client_id })
+      await del(id)
+      expect(await pin({ client_id })).toBe(id)
+      expect(
+        (
+          await failure(
+            call(
+              api.correctSighting,
+              {
+                params: { code: '7K3PQ', sightingId: id },
+                body: {
+                  point: { lat: 6.2455, lng: -75.5905 },
+                  seen_at: new Date().toISOString(),
+                  note: null,
+                },
+              },
+              asIs,
+            ),
+          )
+        ).code,
+      ).toBe('not_found')
+      await asCarolina()
+      expect(
+        (
+          await failure(
+            call(
+              api.moderateSighting,
+              { params: { code: '7K3PQ', sightingId: id }, body: { hidden: true } },
+              asIs,
+            ),
+          )
+        ).code,
+      ).toBe('not_found')
+    })
+
+    it('a closed case still lets the reporter delete', async () => {
+      const id = await pin()
+      await asCarolina()
+      await reunite('7K3PQ')
+      signOut()
+      await del(id)
+      expect(db.sightings.find((s) => s.id === id)?.status).toBe('deleted_by_reporter')
+    })
+  })
+
+  describe('«Mis mascotas» (#78, #81)', () => {
+    it('lists a pet with no name as an empty name', async () => {
+      await asCarolina()
+      db.pets.push({
+        id: 'pet-sinnombre',
+        name: null,
+        owner_id: DEMO_OWNER_ID_FOR_TESTS,
+        custody_state: 'claimed',
+        health_flags: [],
+        species: 'cat',
+        size: 'small',
+        colors: ['white'],
+        marks: null,
+        chip_number: null,
+        photo_urls: [],
+      })
+      const pets = await myPets()
+      expect(pets.find((p) => p.id === 'pet-sinnombre')?.name).toBe('')
+    })
+
+    it('counts only the caller’s own cases of a pet', async () => {
+      await asCarolina()
+      lost('7K3PQ').created_by = 'user-julian'
+      const luna = (await myPets()).find((p) => p.id === 'pet-luna')
+      expect(luna?.active_case_code).toBeNull()
+    })
+
+    it('offers only the pet’s newest case to reopen, and nothing while one is active', async () => {
+      await asCarolina()
+      expire('7K3PQ', 1)
+      expect((await myPets()).find((p) => p.id === 'pet-luna')?.reopenable_case_code).toBe('7K3PQ')
+      newerCaseOf('7K3PQ', 'reunited')
+      expect((await myPets()).find((p) => p.id === 'pet-luna')?.reopenable_case_code).toBeNull()
+      lost('NEWER').status = 'active'
+      lost('NEWER').resolved_at = null
+      const luna = (await myPets()).find((p) => p.id === 'pet-luna')
+      expect(luna).toMatchObject({ active_case_code: 'NEWER', reopenable_case_code: null })
+    })
+
+    it('puts the most recently active pet first', async () => {
+      await asCarolina()
+      const before = (await myPets()).map((p) => p.id)
+      const second = before[1]
+      if (!second) throw new Error('needs two pets')
+      const row = Object.values(db.cases).find(
+        (c): c is LostRow =>
+          c.vertical === 'lost' && c.pet_id === second && c.created_by === 'user-carolina',
+      )
+      if (!row) throw new Error('needs a case')
+      row.published_at = new Date(Date.now() + DAY).toISOString()
+      expect((await myPets())[0]?.id).toBe(second)
+    })
+  })
+
+  describe('no links in the bio or the name (#79, #80)', () => {
+    const update = (body: Record<string, unknown>) => call(api.updateProfile, { body }, asIs)
+    const refused = [
+      'https://scuby.co',
+      'mira www.scuby.co',
+      'escríbeme a wa.me/573001112233',
+      'mailto:a@b.co',
+      'tel:+573001112233',
+      'tel:3001112233',
+      'mi sitio es luna.com',
+      'visita hola.shop ya',
+      'HTTP://X',
+    ]
+    const accepted = [
+      'Av.Poblado',
+      'EE.UU.',
+      'caminar.Vivo',
+      'Medellín.Me encanta',
+      'Tel: 300 123',
+      'p.ej. así',
+    ]
+
+    it.each(refused)('refuses «%s» in the bio and in the name', async (text) => {
+      await asCarolina()
+      const bio = await failure(update({ bio: text }))
+      expect(bio.code).toBe('validation_failed')
+      expect(Object.keys(bio.fields ?? {})).toEqual(['bio'])
+      const name = await failure(update({ display_name: text }))
+      expect(Object.keys(name.fields ?? {})).toEqual(['display_name'])
+    })
+
+    it.each(accepted)('accepts «%s» in the bio and in the name', async (text) => {
+      await asCarolina()
+      await update({ bio: text })
+      await update({ display_name: text })
+    })
+
+    it('a name of spaces is refused, and a name is stored trimmed', async () => {
+      await asCarolina()
+      expect((await failure(update({ display_name: '   ' }))).code).toBe('validation_failed')
+      await update({ display_name: '  Carolina  ' })
+      expect(db.persons.find((p) => p.id === 'user-carolina')?.display_name).toBe('Carolina')
+    })
+
+    it('stores nothing when one field is refused', async () => {
+      await asCarolina()
+      const before = db.persons.find((p) => p.id === 'user-carolina')?.city
+      await failure(update({ city: 'Cali', bio: 'wa.me/57' }))
+      expect(db.persons.find((p) => p.id === 'user-carolina')?.city).toBe(before)
+    })
+  })
+
+  describe('only the pet’s newest case comes back (#81)', () => {
+    it('the owner cannot reopen an older case once a newer one exists', async () => {
+      await asCarolina()
+      expire('7K3PQ', 1)
+      newerCaseOf('7K3PQ', 'cancelled')
+      const reopen = () => call(api.reopenCase, { params: { code: '7K3PQ' } }, asIs)
+      expect((await failure(reopen())).code).toBe('invalid_transition')
+      delete db.cases.NEWER
+      await reopen()
+      expect(lost('7K3PQ').status).toBe('active')
+    })
+
+    it('a newer active case is still `active_case_exists`, named first', async () => {
+      await asCarolina()
+      expire('7K3PQ', 1)
+      newerCaseOf('7K3PQ', 'active')
+      const error = await failure(call(api.reopenCase, { params: { code: '7K3PQ' } }, asIs))
+      expect(error).toMatchObject({ code: 'active_case_exists' })
+    })
+
+    it('a claim on an older link does not reactivate it, whatever the newer case’s status', async () => {
+      await asNewcomer('pedro.ruiz@correo.co')
+      expire('7K3PQ', 1)
+      for (const status of ['reunited', 'cancelled', 'expired'] as const) {
+        newerCaseOf('7K3PQ', status)
+        expect((await failure(claim('7K3PQ'))).code).toBe('invalid_transition')
+        expect(lost('7K3PQ').status).toBe('expired')
+        delete db.cases.NEWER
+      }
+      await claim('7K3PQ')
+      expect(lost('7K3PQ').status).toBe('active')
+    })
+
+    it('on a tie of published_at the higher code is the newer', async () => {
+      await asCarolina()
+      expire('7K3PQ', 1)
+      newerCaseOf('7K3PQ', 'reunited', 'ZZZZZ')
+      lost('ZZZZZ').published_at = lost('7K3PQ').published_at
+      expect((await failure(call(api.reopenCase, { params: { code: '7K3PQ' } }, asIs))).code).toBe(
+        'invalid_transition',
+      )
+    })
+  })
+
+  describe('one claim per person per case (#82)', () => {
+    it.each(['confirmed', 'dismissed'] as const)(
+      'a repeat after the owner %s it returns the same claim, untouched',
+      async (verdict) => {
+        const pedro = await asNewcomer('pedro.ruiz@correo.co')
+        const first = await claim('7K3PQ')
+        const row = db.recoveryClaims.find((c) => c.id === first.id)!
+        row.status = verdict
+        const before = { ...row }
+        const again = await claim('7K3PQ', '+573009998877')
+        expect(again.id).toBe(first.id)
+        expect(again.whatsapp_url).toBe(first.whatsapp_url)
+        expect(row).toEqual(before)
+        expect(db.recoveryClaims.filter((c) => c.claimant_id === pedro.id)).toHaveLength(1)
+      },
+    )
+
+    it('an answered claim on an archived case does not revive it', async () => {
+      await asNewcomer('pedro.ruiz@correo.co')
+      const first = await claim('7K3PQ')
+      db.recoveryClaims.find((c) => c.id === first.id)!.status = 'dismissed'
+      expire('7K3PQ', 1)
+      expect((await claim('7K3PQ')).id).toBe(first.id)
+      expect(lost('7K3PQ').status).toBe('expired')
+    })
+
+    it('a reunited case still refuses the repeat', async () => {
+      await asNewcomer('pedro.ruiz@correo.co')
+      const first = await claim('7K3PQ')
+      db.recoveryClaims.find((c) => c.id === first.id)!.status = 'confirmed'
+      lost('7K3PQ').status = 'reunited'
+      expect((await failure(claim('7K3PQ'))).code).toBe('invalid_transition')
+    })
+  })
+
+  describe('an expired case can be reunited directly (#83)', () => {
+    it('closes it without ever being active again; a cancelled one still refuses', async () => {
+      await asCarolina()
+      expire('7K3PQ', 3)
+      await reunite('7K3PQ')
+      expect(lost('7K3PQ')).toMatchObject({ status: 'reunited', resolution: 'reunited_home' })
+      lost('7K3PQ').status = 'cancelled'
+      expect((await failure(reunite('7K3PQ'))).code).toBe('invalid_transition')
+    })
+  })
+
+  describe('the owner’s claims are ordered and dated by last activity (#84)', () => {
+    it('a claim refreshed today comes first and shows today’s time', async () => {
+      const pedro = await asNewcomer('pedro.ruiz@correo.co')
+      const first = await claim('7K3PQ')
+      later(9 * DAY)
+      const mine = db.recoveryClaims.find((c) => c.id === first.id)!
+      expect(mine.claimant_id).toBe(pedro.id)
+      // The seeded claim is older than Pedro's; Pedro's repeat today makes his the latest.
+      await claim('7K3PQ', '+573009998877')
+      signOut()
+      await asCarolina()
+      const claims = (await wire('7K3PQ')).claims
+      expect(claims[0]?.id).toBe(first.id)
+      expect(claims[0]?.created_at).toBe(new Date().toISOString())
+      expect(mine.created_at).not.toBe(claims[0]?.created_at)
+    })
+
+    it('shows the newest 50 and counts every open claim', async () => {
+      await asCarolina()
+      for (let n = 0; n < 60; n++) {
+        db.recoveryClaims.push({
+          id: `claim-${n}`,
+          case_code: '7K3PQ',
+          phone: '+573001112233',
+          claimant_id: `p${n}`,
+          created_at: new Date(Date.now() - n * HOUR).toISOString(),
+          status: 'open',
+          stale_at: new Date(Date.now() + DAY).toISOString(),
+        })
+      }
+      const seen = await wire('7K3PQ')
+      expect(seen.claims).toHaveLength(50)
+      expect(seen.open_claim_count).toBe(61)
+    })
+  })
+
+  describe('idempotent endings (#71)', () => {
+    it('cancel twice and reopen on an active case answer the same success', async () => {
+      await asCarolina()
+      const cancel = () =>
+        call(
+          api.cancelCase,
+          { params: { code: '7K3PQ' }, body: { resolution: 'false_alarm' } },
+          asIs,
+        )
+      await cancel()
+      await cancel()
+      expect(lost('7K3PQ').status).toBe('cancelled')
+      expect((await failure(call(api.reopenCase, { params: { code: '7K3PQ' } }, asIs))).code).toBe(
+        'invalid_transition',
+      )
+      lost('7K3PQ').status = 'active'
+      await call(api.reopenCase, { params: { code: '7K3PQ' } }, asIs)
+      expect(lost('7K3PQ').status).toBe('active')
+    })
+  })
+
+  describe('the body is checked after the lookups, in the backend’s order', () => {
+    const badReunite = { resolution_attribution: 'nope' }
+    const reuniteWith = (code: string, body: unknown) =>
+      call(api.reuniteCase, { params: { code }, body: body as never }, asIs)
+
+    it('not_found, then forbidden, then validation_failed, then invalid_transition', async () => {
+      await asNewcomer('pedro.ruiz@correo.co')
+      expect((await failure(reuniteWith('NOPE1', badReunite))).code).toBe('not_found')
+      expect((await failure(reuniteWith('7K3PQ', badReunite))).code).toBe('forbidden')
+      signOut()
+      await asCarolina()
+      expect((await failure(reuniteWith('7K3PQ', badReunite))).code).toBe('validation_failed')
+      lost('7K3PQ').status = 'cancelled'
+      expect((await failure(reuniteWith('7K3PQ', badReunite))).code).toBe('validation_failed')
+      expect(
+        (await failure(reuniteWith('7K3PQ', { resolution_attribution: 'unknown' }))).code,
+      ).toBe('invalid_transition')
+    })
+
+    it('an edit of a closed case with a bad body is validation_failed first', async () => {
+      await asCarolina()
+      lost('7K3PQ').status = 'reunited'
+      const edit = (body: unknown) =>
+        call(api.editLost, { params: { code: '7K3PQ' }, body: body as never }, asIs)
+      expect((await failure(edit({ last_seen_radius_m: -5 }))).code).toBe('validation_failed')
+      expect((await failure(edit({ marks: 'collar' }))).code).toBe('invalid_transition')
+    })
+
+    it('a claim: the owner is forbidden before the phone is checked, the phone before the status', async () => {
+      const badClaim = (code: string) =>
+        call(api.claimRecovery, { params: { code }, body: { phone: 'abc' } as never }, asIs)
+      await asCarolina()
+      expect((await failure(badClaim('7K3PQ'))).code).toBe('forbidden')
+      signOut()
+      await asNewcomer('pedro.ruiz@correo.co')
+      lost('7K3PQ').status = 'reunited'
+      expect((await failure(badClaim('7K3PQ'))).code).toBe('validation_failed')
+      expect((await failure(claim('7K3PQ'))).code).toBe('invalid_transition')
+    })
+
+    it('an answer: the claim is looked up before the status is checked', async () => {
+      await asCarolina()
+      const bad = (claimId: string) =>
+        call(
+          api.answerRecoveryClaim,
+          { params: { code: '7K3PQ', claimId }, body: { status: 'maybe' } as never },
+          asIs,
+        )
+      expect((await failure(bad('claim-nope'))).code).toBe('not_found')
+      expect((await failure(bad('claim-luna'))).code).toBe('validation_failed')
+    })
+
+    it('moderation: the pin is looked up before the body', async () => {
+      await asCarolina()
+      const bad = (sightingId: string) =>
+        call(
+          api.moderateSighting,
+          { params: { code: '7K3PQ', sightingId }, body: { hidden: 'si' } as never },
+          asIs,
+        )
+      expect((await failure(bad('s-nope'))).code).toBe('not_found')
+      expect((await failure(bad('s3'))).code).toBe('validation_failed')
+    })
+
+    it('a body that is not JSON is refused before any lookup', async () => {
+      await asNewcomer('pedro.ruiz@correo.co')
+      const response = await fetch(new URL('/cases/NOPE1/reunite', env.apiUrl), {
+        method: 'POST',
+        body: 'not json',
+        headers: { 'content-type': 'application/json' },
+      })
+      expect(response.status).toBe(422)
+    })
   })
 })
