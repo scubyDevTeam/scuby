@@ -363,11 +363,16 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
      `active_case_exists`.
   2. ONE statement: `INSERT INTO recovery_claim (…, created_at, last_active_at) SELECT …, 'open', :now, :now
      FROM lost_case WHERE code = ? AND status = 'active' ON CONFLICT (case_code, claimant_person_id) WHERE
-     status = 'open' DO UPDATE SET phone = excluded.phone, photo_urls = excluded.photo_urls, lat =
-     excluded.lat, lng = excluded.lng, from_sighting_id = excluded.from_sighting_id, last_active_at =
-     excluded.last_active_at RETURNING id`.
+     status = 'open' DO UPDATE SET phone = excluded.phone, photo_urls = CASE WHEN
+     cardinality(excluded.photo_urls) > 0 THEN excluded.photo_urls ELSE recovery_claim.photo_urls END, lat =
+     COALESCE(excluded.lat, recovery_claim.lat), lng = COALESCE(excluded.lng, recovery_claim.lng),
+     from_sighting_id = COALESCE(excluded.from_sighting_id, recovery_claim.from_sighting_id),
+     last_active_at = excluded.last_active_at RETURNING id`.
   **A repeat refreshes the claim:** while the caller's claim on the case is open (stale included), the
-  repeat's phone, photos, point and link replace the stored ones and `last_active_at = now`, so a stale
+  repeat's phone always replaces the stored one and `last_active_at = now`; what the repeat does not send is
+  kept: empty `photo_urls`, an absent point and an absent or ineligible `from_sighting_id`
+  leave the stored photos, point and link as they are, while photos, a point or an eligible link that are
+  sent replace them (the point only ever comes from the link), so a stale
   claim is fresh again and counts in the badge; its id, `created_at` and status stay, and the answer is the
   same id. A double tap serializes on the index entry: one row, both answers carry its id.
   Empty → the case is not active: re-read the status and classify (`invalid_transition`, or
@@ -561,7 +566,7 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 | 72 | Editing a lost case writes the shared pet through `Pets`; a moved point re-snaps the public center and resets the place name to the generic label; existing sightings are not revalidated; an open claim never blocks an edit | Calling the place namer in the edit; copying pet fields onto the case; revalidating sightings |
 | 73 | A reporter's pin: "mine" is the caller's person, or an anonymous pin from the caller's device (another person's pin never; the same rule for views, correction, delete and a claim's link); delete is the status `deleted_by_reporter`, never a hard delete, the `client_id` stays taken, and deleting one's own deleted pin again is a no-op success | Person-or-device for `mine`; the session strictly winning (a reporter who signs in to claim loses their pin); a hard delete (frees the replay key, breaks `sightings_count` and a claim's `from_sighting_id`) |
 | 74 | Owner moderation: hide and highlight are idempotent, independent and allowed in any case status; a moderated pin is `not_found` to the owner | Unhiding a moderated pin |
-| 75 | «Lo tengo» needs a session; one open claim per person per case, and a repeat refreshes it (new phone, photos, pin; fresh again) in one statement; a repeat on a case no longer active answers the case's refusal, never the old claim; an ineligible `from_sighting_id` is ignored; the owner cannot claim; no rate limit; evidence stored, not shown; WhatsApp link with prefilled text under the public-contact rule; purged code `gone` | Anonymous claims; a rate limit now; copying the sighting's photos; returning the old claim unchanged on a repeat; refusing the claim over its link |
+| 75 | «Lo tengo» needs a session; one open claim per person per case, and a repeat refreshes it (the new phone always; photos, pin and link only when sent; fresh again) in one statement; a repeat on a case no longer active answers the case's refusal, never the old claim; an ineligible `from_sighting_id` is ignored; the owner cannot claim; no rate limit; evidence stored, not shown; WhatsApp link with prefilled text under the public-contact rule; purged code `gone` | Anonymous claims; a rate limit now; copying the sighting's photos; returning the old claim unchanged on a repeat; refusing the claim over its link |
 | 76 | `open_claim_count`/`possible_find` are owner-only and count open, non-stale claims on active cases; stale is derived (open and 7 days since the claimant's last «Lo tengo», `last_active_at`) | A public badge (it reduces reach); denormalizing the count; a stored `stale` status |
 | 77 | The owner's answer is revisable (`confirmed ↔ dismissed`), idempotent, in any case status, and never closes the case | One-shot answers; dismissing the other claims on confirm |
 | 78 | `/me/pets`: active owner links, nameless pets included, one query, reopenable only without an active case | A query per pet; listing every expired case |
@@ -630,7 +635,7 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 |---|---|
 | No push for claims | An owner learns of a claim only by opening the case or «Mis casos» (decision #17 makes claims push-only). Must ship (L2) before the first real user |
 | Session-required claims | Fewer claims from finders who will not sign in. Accepted for safety; the client explains it |
-| A repeat replaces the claim's evidence | A repeat takes the repeat's phone, photos and link, even empty ones: a plain re-tap clears earlier photos. Accepted: the repeat is the claimant's current word |
+| A repeat keeps the claim's evidence it does not resend | The phone always updates; empty `photo_urls`, an absent point and an absent `from_sighting_id` keep the stored values, so a plain re-tap never clears earlier photos. Cost: a claimant cannot remove evidence by repeating |
 | A claimant keeps a claim fresh | Anyone can keep their own claim counted by repeating it. The badge is owner-only, so it never reduces reach |
 | A claim can land on a case closed a moment earlier | The `INSERT … SELECT … WHERE status = 'active'` reads its snapshot; a close committing in between does not stop it. Harmless (the badge counts active cases only), the same shape as «Lo vi» against a close; no lock |
 | The edit changes the shared pet | Old cases show the new photos and signs |
