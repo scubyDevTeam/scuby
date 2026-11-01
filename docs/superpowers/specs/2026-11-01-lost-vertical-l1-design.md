@@ -437,8 +437,7 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
     Sending it, even unchanged, sets `display_name_chosen = true` (the public name stops being «Alguien»,
     decision #48). There is no way back to "not chosen".
   - `bio`: ≤ 280 code points, or `null`; no links: `ProfileTextDerivation.hasLink` refuses, case-insensitive,
-    `http://`, `https://`, `www.`, `wa.me`, `tel:`, `mailto:` and any domain-shaped token (a word, a dot,
-    two or more letters: `word.tld`) → `validation_failed {bio}`.
+    `http://`, `https://`, `www.`, `wa.me`, `tel:`, `mailto:` and a word ending in a known domain (`.com`, `.co`, `.net`, `.org`, `.io`, `.me`, `.ly`, `.link`, `.app`, `.info`, `.biz`, `.xyz`, `.site`, `.online`, `.store`, `.shop`; «Av.Poblado» and «EE.UU.» pass) → `validation_failed {bio}`.
   - `city`: free text ≤ 80 code points (the new CHECK), or `null`.
   - `notification_prefs`: all four booleans together (the contract requires them); stored only.
   - `photo_url`: the current `person.photo_url` is accepted as is; another one must pass the photo check
@@ -570,7 +569,7 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 | 76 | `open_claim_count`/`possible_find` are owner-only and count open, non-stale claims on active cases; stale is derived (open and 7 days since the claimant's last «Lo tengo», `last_active_at`) | A public badge (it reduces reach); denormalizing the count; a stored `stale` status |
 | 77 | The owner's answer is revisable (`confirmed ↔ dismissed`), idempotent, in any case status, and never closes the case | One-shot answers; dismissing the other claims on confirm |
 | 78 | `/me/pets`: active owner links, nameless pets included, one query, reopenable only without an active case | A query per pet; listing every expired case |
-| 79 | Profile update: sending a name marks it chosen; the bio refuses links and domain-shaped tokens; `city` is free text ≤ 80 until a cities table exists | Three link patterns only; a cities table now |
+| 79 | Profile update: sending a name marks it chosen; the bio refuses clear link forms and words ending in a known domain; `city` is free text ≤ 80 until a cities table exists | Three link patterns only; a cities table now |
 
 **Owning docs:**
 
@@ -640,7 +639,7 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 | A claim can land on a case closed a moment earlier | The `INSERT … SELECT … WHERE status = 'active'` reads its snapshot; a close committing in between does not stop it. Harmless (the badge counts active cases only), the same shape as «Lo vi» against a close; no lock |
 | The edit changes the shared pet | Old cases show the new photos and signs |
 | Reopen keeps `published_at` | A reopened case sorts by its old date in the national feed |
-| Domain-shaped bio rule | False positives («Hola.Soy») answer `validation_failed {bio}`; the client says why |
+| Known-domain bio rule | A link on a domain outside the list passes; accepted so ordinary prose is never refused |
 | No lock on edit's two statements | The pet row is updated before the case guard; a close in between rolls the pet update back (asserted by the race test) |
 | Contract rows beyond the badge (§6) | The client must accept the `claimRecovery` auth and both new error lists |
 
