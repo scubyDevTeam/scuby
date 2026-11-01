@@ -1,4 +1,5 @@
 // What a helper does without an account (docs/product/04 · sighting, recovery_claim; 09).
+import { brand } from '../../brand'
 import { api } from '../../contracts/api'
 import type { Point } from '../../contracts/primitives'
 import { db, type FoundRow, findCase, type LostRow, newId, type SightingRow } from '../db'
@@ -199,7 +200,7 @@ export const helpers = [
       // the publisher's verified one, so `contact_phone_verified` holds by construction.
       const petName = db.pets.find((p) => p.id === row.pet_id)?.name?.trim()
       // Same text and encoding as the backend's WhatsappLinks: UTF-8 percent-encoding with spaces as %20.
-      const whatsappText = `Hola, vi tu aviso${petName ? ` de ${petName}` : ''} en Scuby (${row.code}) y creo que lo tengo.`
+      const whatsappText = `Hola, vi tu aviso${petName ? ` de ${petName}` : ''} en ${brand.name} (${row.code}) y creo que lo tengo.`
       const linkFor = (active: boolean) =>
         active &&
         row.contact_prefs.expose_whatsapp &&

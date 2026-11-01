@@ -4,6 +4,7 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, call } from '../api-client/http'
+import { brand } from '../brand'
 import { parseInterest } from '../contracts/adoption'
 import { parseNearbyAlerts } from '../contracts/alerts'
 import { api } from '../contracts/api'
@@ -2189,7 +2190,9 @@ describe('«Lo tengo» (04 · recovery_claim; decisions #75, #76)', () => {
     const url = (await claim('7K3PQ')).whatsapp_url
     expect(url).toBe(
       `https://wa.me/${row.contact_phone.replace('+', '')}?text=` +
-        'Hola%2C%20vi%20tu%20aviso%20de%20Luna%20%28la%20%27%C3%B1%27%21%29%20en%20Scuby%20%287K3PQ%29%20y%20creo%20que%20lo%20tengo.',
+        'Hola%2C%20vi%20tu%20aviso%20de%20Luna%20%28la%20%27%C3%B1%27%21%29%20en%20' +
+        encodeURIComponent(brand.name) +
+        '%20%287K3PQ%29%20y%20creo%20que%20lo%20tengo.',
     )
   })
 
@@ -2231,7 +2234,7 @@ describe('«Lo tengo» (04 · recovery_claim; decisions #75, #76)', () => {
         { params: { code: '7K3PQ' }, body: { phone: '+573001112233', photo_urls } },
         asIs,
       )
-    const photo = (n: number) => `https://cdn.scuby.test/claims/${n}.jpg`
+    const photo = (n: number) => `https://cdn.media.test/claims/${n}.jpg`
     await send([photo(1)])
     const row = () => db.recoveryClaims.find((c) => c.claimant_id === pedro.id)
     await send([])
@@ -2541,8 +2544,8 @@ describe('parity with the backend (lost L1: decisions #71–#84)', () => {
   describe('no links in the bio or the name (#79, #80)', () => {
     const update = (body: Record<string, unknown>) => call(api.updateProfile, { body }, asIs)
     const refused = [
-      'https://scuby.co',
-      'mira www.scuby.co',
+      'https://marca.co',
+      'mira www.marca.co',
       'escríbeme a wa.me/573001112233',
       'mailto:a@b.co',
       'tel:+573001112233',
