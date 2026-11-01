@@ -117,6 +117,13 @@ class SightingDeleteTest {
     }
 
     @Test
+    void theReportersOwnModeratedPinIsNotFound() {
+        db.update(SIGHTING).set(SIGHTING.STATUS, "removed_by_moderation").where(SIGHTING.ID.eq(pin)).execute();
+        assertThat(reporter.delete(PATH, "7K3PQ", pin).errorCode()).isEqualTo("not_found");
+        assertThat(status(pin)).isEqualTo("removed_by_moderation");
+    }
+
+    @Test
     void someoneElseTheOwnerIncludedIsForbidden() {
         assertThat(clients.newBrowser().delete(PATH, "7K3PQ", pin).errorCode()).isEqualTo("forbidden");
         assertThat(owner.delete(PATH, "7K3PQ", pin).errorCode()).isEqualTo("forbidden");

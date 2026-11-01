@@ -101,6 +101,9 @@ class SightingCorrectionTest {
         assertThat(s.get(SIGHTING.CONTACT_PHONE)).isEqualTo("+573001112233");
         assertThat(s.get(SIGHTING.CREATED_AT).toInstant()).isEqualTo(CREATED);
         assertThat(reporter.get("/cases/{code}", "7K3PQ").str("/sightings/0/editable_until")).isEqualTo("2026-10-14T17:10:00Z");
+        // The contact stays the owner's to read after a correction: the reporter and a stranger see none.
+        assertThat(clients.newBrowser().get("/cases/{code}", "7K3PQ").json().at("/sightings/0/contact_phone").isNull()).isTrue();
+        assertThat(reporter.get("/cases/{code}", "7K3PQ").json().at("/sightings/0/contact_phone").isNull()).isTrue();
     }
 
     @Test
@@ -194,7 +197,7 @@ class SightingCorrectionTest {
     }
 
     @Test
-    void theSightingRulesApplyInTheirOrder() {
+    void eachSightingRuleRefusesItsOwnBody() {
         assertThat(correct(reporter, "7K3PQ", pin, GOOD.replace("2026-10-14T16:50:00Z", "2026-10-14T17:06:00Z")).errorCode())
                 .isEqualTo("seen_at_in_future");
         assertThat(correct(reporter, "7K3PQ", pin, GOOD.replace("2026-10-14T16:50:00Z", "2026-10-11T16:00:00Z")).errorCode())
