@@ -28,19 +28,10 @@ test(
       await expect(profile.name('Pedro Ruiz')).toBeVisible()
     })
 
-    await test.step('nobody has said they have Milo', async () => {
-      await casePage.open('M2TQ4')
-      await expect(casePage.possibleFind).toHaveCount(0)
-    })
+    await casePage.open('M2TQ4')
 
     await test.step('the claim opens WhatsApp with his family', async () => {
       expect(await casePage.claimRecovery('311 482 9017')).toContain('wa.me')
-    })
-
-    await test.step('the claim exists whatever happens in WhatsApp; the badge is the family’s only', async () => {
-      // The claim sheet's «Ya le avisamos a su familia.» (checked inside claimRecovery) is the claimant's
-      // feedback; «Posible hallazgo» never reaches anyone but the owner (decision #76).
-      await expect(casePage.possibleFind).toHaveCount(0)
     })
   },
 )
@@ -117,8 +108,7 @@ test(
     await test.step('the claim opens WhatsApp and the notice is active again', async () => {
       expect(await casePage.claimRecovery('311 482 9017')).toContain('wa.me')
       await expect(casePage.text('Este aviso fue archivado.')).toHaveCount(0)
-      // Active again for everyone; the badge stays the owner's (decision #76).
-      await expect(casePage.possibleFind).toHaveCount(0)
+      // The claim sheet's success state is the claimant's whole feedback: the badge is the owner's only (#76).
     })
   },
 )

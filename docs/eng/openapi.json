@@ -4053,7 +4053,7 @@
     "/cases/{code}/recovery-claims": {
       "post": {
         "operationId": "claimRecovery",
-        "summary": "«Lo tengo» on a lost case. Needs a session: the claimant is a person, for the owner’s safety (say so in the UI). The case’s owner cannot claim it. Creates the claim, then answers the channel to the owner; a repeated claim by the same person refreshes their open one (the new phone, photos and pin; it counts as fresh again) and answers its id. A `from_sighting_id` that is not the caller’s own visible pin of the last 24 hours is ignored, never refused. On a case archived less than 30 days ago it reactivates it first (decision #29), unless the pet has another active case (`active_case_exists`).",
+        "summary": "«Lo tengo» on a lost case. Needs a session: the claimant is a person, for the owner’s safety (say so in the UI). The case’s owner cannot claim it. Creates the claim, then answers the channel to the owner; a repeated claim by the same person refreshes their open one (the new phone always; photos and pin only when sent; it counts as fresh again) and answers its id; once the owner has answered it, a repeat answers that same claim unchanged (one claim per person per case). A `from_sighting_id` that is not the caller’s own visible pin of the last 24 hours is ignored, never refused. On a case archived less than 30 days ago it reactivates it first (decision #29) when it is the pet’s newest case, unless the pet has another active case (`active_case_exists`).",
         "tags": [
           "cases"
         ],

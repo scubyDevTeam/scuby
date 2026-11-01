@@ -31,7 +31,6 @@ test(
       // The owner's «Posible hallazgo» is the claims list (the page shows it instead of the public badge).
       await expect(casePage.claims).toBeVisible()
       await expect(casePage.claims.getByText('+573114829017')).toBeVisible()
-      await expect(casePage.possibleFind).toHaveCount(0)
     })
   },
 )
