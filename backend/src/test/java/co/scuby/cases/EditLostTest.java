@@ -1,8 +1,6 @@
 package co.scuby.cases;
 
-import co.scuby.platform.cache.ClearableCache;
 import co.scuby.platform.db.GeoPoint;
-import co.scuby.platform.flags.FeatureFlags;
 import co.scuby.support.Accounts;
 import co.scuby.support.ApiClient;
 import co.scuby.support.ApiClients;
@@ -17,7 +15,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
@@ -41,7 +38,7 @@ class EditLostTest {
     @Autowired Accounts accounts;
     @Autowired CaseFixtures cases;
     @Autowired DSLContext db;
-    @Autowired ObjectProvider<ClearableCache> caches;
+    @Autowired co.scuby.support.TestDb testDb;
 
     ApiClient owner;
     ApiClient stranger;
@@ -74,9 +71,7 @@ class EditLostTest {
     }
 
     private ApiResponse cold(java.util.function.Supplier<ApiResponse> call) {
-        // The local media store is a ClearableCache too, but clearing it deletes the uploaded photos: keep it, clear the lookups.
-        caches.orderedStream().filter(c -> !(c instanceof FeatureFlags) && !c.getClass().getSimpleName().equals("LocalMediaStore"))
-              .forEach(ClearableCache::clear);
+        testDb.cold();
         return call.get();
     }
 

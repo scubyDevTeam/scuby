@@ -1,7 +1,5 @@
 package co.scuby.identity;
 
-import co.scuby.platform.cache.ClearableCache;
-import co.scuby.platform.flags.FeatureFlags;
 import co.scuby.support.Accounts;
 import co.scuby.support.ApiClient;
 import co.scuby.support.ApiClients;
@@ -16,7 +14,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.ZoneOffset;
@@ -33,7 +30,7 @@ class ProfileUpdateTest {
     @Autowired Accounts accounts;
     @Autowired CaseFixtures cases;
     @Autowired DSLContext db;
-    @Autowired ObjectProvider<ClearableCache> caches;
+    @Autowired co.scuby.support.TestDb testDb;
 
     ApiClient api;
     UUID ana;
@@ -54,9 +51,7 @@ class ProfileUpdateTest {
     }
 
     private ApiResponse cold(java.util.function.Supplier<ApiResponse> call) {
-        // Not the flags, and not the dev media store (its clear() deletes the stored photos the call is about).
-        caches.orderedStream().filter(c -> !(c instanceof FeatureFlags) && !c.getClass().getSimpleName().equals("LocalMediaStore"))
-              .forEach(ClearableCache::clear);
+        testDb.cold();
         return call.get();
     }
 
