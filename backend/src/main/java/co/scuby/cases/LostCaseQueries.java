@@ -32,14 +32,18 @@ class LostCaseQueries {
     }
 
     /**
-     * The publisher's number only when it is public: active, exposed, on WhatsApp, not «only in the app», and verified by SMS code (with the
-     * publisher_phone_otp flag off a case is published with the number unverified, and that is never public).
-     * Otherwise NULL — never loaded.
+     * THE public-contact rule, written once (a privacy rule: it decides whether a person's number becomes public): the
+     * publisher's number only when it is exposed, on WhatsApp, not «only in the app», and verified by SMS code (with the
+     * publisher_phone_otp flag off a case is published with the number unverified, and that is never public). The case
+     * status is left out on purpose: a claim may reactivate an expired case and the link is computed after that.
+     * Otherwise NULL, never loaded. Every reader of the number goes through this field or {@link #WHATSAPP_PHONE}.
      */
-    static final Field<String> WHATSAPP_PHONE = DSL.when(
-                    DSL.condition(LOST_CASE.EXPOSE_WHATSAPP).and(LOST_CASE.PHONE_HAS_WHATSAPP).and(LOST_CASE.CONTACT_PHONE_VERIFIED).and(LOST_CASE.IN_APP_ONLY.isFalse()).and(LOST_CASE.STATUS.eq(DSL.inline("active"))),
-                    LOST_CASE.CONTACT_PHONE)
-            .as("whatsapp_phone");
+    static final Field<String> CONTACT_IF_PUBLIC = DSL.when(
+            DSL.condition(LOST_CASE.EXPOSE_WHATSAPP).and(LOST_CASE.PHONE_HAS_WHATSAPP).and(LOST_CASE.CONTACT_PHONE_VERIFIED).and(LOST_CASE.IN_APP_ONLY.isFalse()),
+            LOST_CASE.CONTACT_PHONE);
+
+    /** The case page's number: {@link #CONTACT_IF_PUBLIC} while the case is active; NULL once it is closed. */
+    static final Field<String> WHATSAPP_PHONE = DSL.when(LOST_CASE.STATUS.eq(DSL.inline("active")), CONTACT_IF_PUBLIC).as("whatsapp_phone");
 
     /** The publisher's name only when they chose it; a name derived from the email is never loaded for display (review I3). */
     static final Field<String> PUBLISHER_NAME = DSL.when(DSL.condition(PERSON.DISPLAY_NAME_CHOSEN), PERSON.DISPLAY_NAME).as("publisher_name");

@@ -23,17 +23,12 @@ import static co.scuby.db.generated.Tables.SIGHTING;
 class RecoveryClaimQueries {
 
     record ClaimCase(String code, UUID createdBy, UUID petId, @Nullable String petName, String status, @Nullable Instant resolvedAt,
-                     ClaimDerivation.ContactFlags flags, @Nullable String publicPhone) {}
+                     @Nullable String publicPhone) {}
 
     record PinForClaim(ClaimDerivation.SightingLink link, GeoPoint point) {}
 
-    /**
-     * The publisher's number only when the case's contact preferences make it public — the case status left out on purpose,
-     * since a claim may reactivate an expired case and the link is computed after that. A private number is never loaded.
-     */
-    static final Field<String> PUBLIC_PHONE = DSL.when(DSL.condition(LOST_CASE.EXPOSE_WHATSAPP).and(LOST_CASE.PHONE_HAS_WHATSAPP)
-                    .and(LOST_CASE.CONTACT_PHONE_VERIFIED).and(LOST_CASE.IN_APP_ONLY.isFalse()), LOST_CASE.CONTACT_PHONE)
-            .as("public_phone");
+    /** The number, only under the public-contact rule and whatever the status (the claim may reactivate the case first). */
+    private static final Field<String> PUBLIC_PHONE = LostCaseQueries.CONTACT_IF_PUBLIC.as("public_phone");
 
     private final DSLContext db;
 
@@ -43,14 +38,11 @@ class RecoveryClaimQueries {
 
     Optional<ClaimCase> caseForClaim(String code) {
         return db.select(LOST_CASE.CODE, LOST_CASE.CREATED_BY, LOST_CASE.PET_ID, PET.NAME, LOST_CASE.STATUS, LOST_CASE.RESOLVED_AT,
-                         LOST_CASE.EXPOSE_WHATSAPP, LOST_CASE.PHONE_HAS_WHATSAPP, LOST_CASE.CONTACT_PHONE_VERIFIED, LOST_CASE.IN_APP_ONLY,
                          PUBLIC_PHONE)
                  .from(LOST_CASE).join(PET).on(PET.ID.eq(LOST_CASE.PET_ID))
                  .where(LOST_CASE.CODE.eq(code))
                  .fetchOptional(r -> new ClaimCase(r.get(LOST_CASE.CODE), r.get(LOST_CASE.CREATED_BY), r.get(LOST_CASE.PET_ID), r.get(PET.NAME),
                          r.get(LOST_CASE.STATUS), r.get(LOST_CASE.RESOLVED_AT) == null ? null : r.get(LOST_CASE.RESOLVED_AT).toInstant(),
-                         new ClaimDerivation.ContactFlags(r.get(LOST_CASE.EXPOSE_WHATSAPP), r.get(LOST_CASE.PHONE_HAS_WHATSAPP),
-                                 r.get(LOST_CASE.CONTACT_PHONE_VERIFIED), r.get(LOST_CASE.IN_APP_ONLY)),
                          r.get(PUBLIC_PHONE)));
     }
 

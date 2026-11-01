@@ -111,6 +111,24 @@ class RecoveryClaimTest {
         assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
     }
 
+    /** One rule for the number (LostCaseQueries.CONTACT_IF_PUBLIC): the claim's link and the case page's link agree on every state of the case. */
+    @ParameterizedTest(name = "{0}, case {1}")
+    @CsvSource({"expose_whatsapp = true, active", "expose_whatsapp = false, active", "phone_has_whatsapp = false, active",
+            "contact_phone_verified = false, active", "in_app_only = true, active",
+            "expose_whatsapp = true, expired", "expose_whatsapp = false, expired", "in_app_only = true, expired"})
+    void theClaimsLinkAndTheCasePagesLinkAgreeOnTheSameCaseState(String assignment, String caseStatus) {
+        db.execute("UPDATE scuby.lost_case SET " + assignment + " WHERE code = '7K3PQ'");
+        if ("expired".equals(caseStatus)) cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(2)));
+        ApiResponse claimed = claim("");                     // an expired case is reactivated by the claim, then the page is read
+        assertThat(claimed.status()).isEqualTo(201);
+        ApiResponse page = clients.newBrowser().get("/cases/{code}", "7K3PQ");
+        assertThat(page.str("/status")).isEqualTo("active");
+        String pageLink = page.isNull("/contact") || page.isNull("/contact/whatsapp_url") ? null : page.str("/contact/whatsapp_url");
+        String claimLink = claimed.isNull("/whatsapp_url") ? null : claimed.str("/whatsapp_url");
+        assertThat(claimLink == null ? null : claimLink.substring(0, claimLink.indexOf('?'))).isEqualTo(pageLink);
+        assertThat(pageLink != null).as("public only when nothing is withheld").isEqualTo("expose_whatsapp = true".equals(assignment));
+    }
+
     @Test
     void theOwnerCannotClaimTheirOwnCase() {
         ApiResponse r = claim(owner, "7K3PQ", "{\"phone\":\"+573001112233\"}");

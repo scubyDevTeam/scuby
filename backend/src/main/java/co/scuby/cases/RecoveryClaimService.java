@@ -90,7 +90,7 @@ class RecoveryClaimService {
         }
         // A row came back, so the case was active when it was written: the link follows the contact rule on an active case.
         UUID id = written.orElseThrow(() -> refusalAfterEmptyWrite(code, now));
-        String wa = ClaimDerivation.whatsappPhone(found.flags(), "active", found.publicPhone());
+        String wa = found.publicPhone();
         return new ClaimCreatedView(id.toString(),
                 wa == null ? null : WhatsappLinks.withText(wa, ClaimDerivation.whatsappText(found.petName(), code)));
     }

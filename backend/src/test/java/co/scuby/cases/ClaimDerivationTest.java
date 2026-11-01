@@ -1,6 +1,5 @@
 package co.scuby.cases;
 
-import co.scuby.cases.ClaimDerivation.ContactFlags;
 import co.scuby.cases.ClaimDerivation.SightingLink;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -101,23 +100,6 @@ class ClaimDerivationTest {
     void aClaimLinksOnlyTheCallersOwnRecentVisiblePin(String label, String status, boolean mine, Duration age, boolean eligible) {
         var pin = new SightingLink(status, null, A_DEVICE, NOW.minus(age));
         assertThat(ClaimDerivation.prefillEligible(pin, mine, NOW)).as(label).isEqualTo(eligible);
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @CsvSource(nullValues = "null", value = {
-            // label,                expose, hasWa, verified, inAppOnly, caseStatus, phone,          expected
-            "'public',               true,   true,  true,     false,     active,     +573114829017,  +573114829017",
-            "'not exposed',          false,  true,  true,     false,     active,     +573114829017,  null",
-            "'not on WhatsApp',      true,   false, true,     false,     active,     +573114829017,  null",
-            "'not verified',         true,   true,  false,    false,     active,     +573114829017,  null",
-            "'only in the app',      true,   true,  true,     true,      active,     +573114829017,  null",
-            "'case not active',      true,   true,  true,     false,     expired,    +573114829017,  null",
-            "'number not loaded',    true,   true,  true,     false,     active,     null,           null",
-    })
-    void theOwnersNumberIsHandedOverOnlyUnderThePublicContactRule(String label, boolean expose, boolean hasWa, boolean verified,
-                                                                   boolean inAppOnly, String caseStatus, String phone, String expected) {
-        var flags = new ContactFlags(expose, hasWa, verified, inAppOnly);
-        assertThat(ClaimDerivation.whatsappPhone(flags, caseStatus, phone)).as(label).isEqualTo(expected);
     }
 
     @Test

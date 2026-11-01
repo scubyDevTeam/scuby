@@ -23,9 +23,6 @@ final class ClaimDerivation {
 
     private static final Set<String> ANSWERS = Set.of("confirmed", "dismissed");
 
-    /** The publisher's contact preferences, as stored on the case. */
-    record ContactFlags(boolean exposeWhatsapp, boolean phoneHasWhatsapp, boolean contactPhoneVerified, boolean inAppOnly) {}
-
     /** The pin a claim says it grew out of (from_sighting_id). */
     record SightingLink(String status, @Nullable UUID reporterPersonId, String reporterDeviceHash, Instant createdAt) {}
 
@@ -70,12 +67,6 @@ final class ClaimDerivation {
      */
     static boolean prefillEligible(SightingLink pin, boolean mine, Instant now) {
         return "visible".equals(pin.status()) && mine && pin.createdAt().isAfter(prefillCutoff(now));
-    }
-
-    /** The owner's number for the claimant's WhatsApp link, only under the public-contact rule on an active case. */
-    static @Nullable String whatsappPhone(ContactFlags flags, String caseStatus, @Nullable String contactPhone) {
-        boolean publicContact = flags.exposeWhatsapp() && flags.phoneHasWhatsapp() && flags.contactPhoneVerified() && !flags.inAppOnly();
-        return publicContact && "active".equals(caseStatus) ? contactPhone : null;
     }
 
     /** Spanish for every locale: the owner reads it and no owner language is stored (spec assumption 13). */
