@@ -118,7 +118,7 @@ class LostCaseQueries {
      * of open, non-stale claims of the whole case. That filtered window (not a total) is the one thing the contract needs
      * beyond the page: open_claim_count must cover claims past the 50th, and a second statement would break the owner's
      * ceiling of 4. Non-stale is last_active_at >= now - 7 d (inclusive; ClaimDerivation.STALE_AFTER, pinned by ClaimLeakTest).
-     * Read through recovery_claim_by_case_active_idx (RecoveryClaimPlanTest). Owner only: CaseReads never calls it for anyone else.
+     * Read through the case_code prefix of recovery_claim_one_per_claimant (RecoveryClaimPlanTest). Owner only: CaseReads never calls it for anyone else.
      */
     Select<? extends Record> claimsQuery(String code, Instant now) {
         Field<Integer> openNonStale = DSL.count()

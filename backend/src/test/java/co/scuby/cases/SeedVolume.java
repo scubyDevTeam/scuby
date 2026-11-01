@@ -92,4 +92,26 @@ final class SeedVolume {
         db.execute("ANALYZE scuby.pet");
         db.execute("ANALYZE scuby.responsibility_link");
     }
+
+    /**
+     * {@code casesPerPet} cases for each of the {@code pets} pets seeded by {@link #petsOwnedBy} (so {@code pets * casesPerPet}
+     * cases), created by the pet's owner (person 1 + g % people). Case k of pet g was published k days after 2026-01-01 plus g
+     * minutes; every case is expired (resolved an hour later) except the last case of one pet in ten, which is active (the
+     * one-active-per-pet rule holds). Codes are five hex digits (up to 1,048,575 cases). Then ANALYZE.
+     */
+    static void casesPerPet(DSLContext db, int people, int pets, int casesPerPet) {
+        db.execute("""
+                INSERT INTO scuby.lost_case (code, pet_id, created_by, status, published_at, resolved_at, contact_phone, contact_phone_verified,
+                  phone_has_whatsapp, expose_whatsapp, expose_email, in_app_only, last_seen_lat, last_seen_lng, last_seen_public_lat,
+                  last_seen_public_lng, last_seen_radius_m, last_seen_at)
+                SELECT upper(lpad(to_hex((p - 1) * ? + k), 5, '0')),
+                  ('00000000-0000-0000-0005-' || lpad(p::text, 12, '0'))::uuid,
+                  ('00000000-0000-0000-0004-' || lpad((1 + p % ?)::text, 12, '0'))::uuid,
+                  CASE WHEN k = ? AND p % 10 = 0 THEN 'active' ELSE 'expired' END,
+                  timestamptz '2026-01-01' + k * interval '1 day' + p * interval '1 minute',
+                  CASE WHEN k = ? AND p % 10 = 0 THEN NULL ELSE timestamptz '2026-01-01' + k * interval '1 day' + p * interval '1 minute' + interval '1 hour' END,
+                  '+573007152284', true, true, true, false, false, 6.25, -75.59, 6.25, -75.59, 300, timestamptz '2026-01-01'
+                FROM generate_series(1, ?) p, generate_series(1, ?) k""", casesPerPet, people, casesPerPet, casesPerPet, pets, casesPerPet);
+        db.execute("ANALYZE scuby.lost_case");
+    }
 }
