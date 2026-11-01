@@ -19,5 +19,6 @@ class CasesSecurityRules implements SecurityRules {
         rules.requestMatchers(HttpMethod.PATCH, "/lost-cases/*").authenticated();
         rules.requestMatchers(HttpMethod.PATCH, "/cases/*").authenticated();
         rules.requestMatchers(HttpMethod.PATCH, "/cases/*/sightings/*").authenticated();
+        rules.requestMatchers(HttpMethod.POST, "/cases/*/recovery-claims").authenticated();
     }
 }

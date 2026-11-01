@@ -1,0 +1,117 @@
+package co.scuby.cases;
+
+import co.scuby.cases.LifecycleQueries.LifecycleRow;
+import co.scuby.cases.LostLifecycleDerivation.Action;
+import co.scuby.cases.LostLifecycleDerivation.Outcome;
+import co.scuby.identity.PhoneNumbers;
+import co.scuby.platform.db.GeoPoint;
+import co.scuby.platform.db.UniqueViolation;
+import co.scuby.platform.security.Account;
+import co.scuby.platform.security.Caller;
+import co.scuby.platform.web.ApiException;
+import co.scuby.platform.web.BodyValidation;
+import co.scuby.uploads.PhotoAttachments;
+import co.scuby.uploads.UploadPurpose;
+import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * «Lo tengo» (docs/product/04-lost-workflow.md · recovery_claim; L1 design §4.9). Order: the code exists (not_found; a
+ * purged one gone) → the caller is not the owner (forbidden) → the body: phone, photo count, then the photos (S3 in
+ * staging: outside any transaction) → the status. from_sighting_id is a link, never an error: kept (with the pin's point)
+ * only when it is the caller's own visible pin on this case from the last 24 h, else dropped. Then one transaction: the
+ * reactivation of an expired case (decision #29; zero rows is not an error, a concurrent claim may have done it) and the
+ * one-statement upsert, which inserts the claim or refreshes the caller's open one (a repeat). Empty upsert → the case is
+ * not active, and a re-read says why (invalid_transition, active_case_exists): an old claim is never answered on a case
+ * that is not active. No rate limit (as #54), no notification, no check-in, no outbox row (L2 derives them from rows).
+ */
+@Service
+class RecoveryClaimService {
+
+    private final RecoveryClaimQueries queries;
+    private final LifecycleQueries lifecycle;
+    private final LostCaseQueries cases;
+    private final CaseAccessPolicy policy;
+    private final PhoneNumbers phones;
+    private final PhotoAttachments photos;
+    private final BodyValidation validation;
+    private final TransactionTemplate tx;
+    private final Clock clock;
+
+    RecoveryClaimService(RecoveryClaimQueries queries, LifecycleQueries lifecycle, LostCaseQueries cases, CaseAccessPolicy policy,
+                         PhoneNumbers phones, PhotoAttachments photos, BodyValidation validation, TransactionTemplate tx, Clock clock) {
+        this.queries = queries;
+        this.lifecycle = lifecycle;
+        this.cases = cases;
+        this.policy = policy;
+        this.phones = phones;
+        this.photos = photos;
+        this.validation = validation;
+        this.tx = tx;
+        this.clock = clock;
+    }
+
+    ClaimCreatedView claim(String rawCode, Account account, Caller caller, RecoveryClaimRequest body) {
+        String code = OwnerAccess.code(rawCode);
+        UUID me = account.personId();
+        Instant now = clock.instant();
+        RecoveryClaimQueries.ClaimCase found = queries.caseForClaim(code)
+                .orElseThrow(() -> cases.isPurged(code) ? CaseErrors.gone() : CaseErrors.notFound());
+        if (policy.isOwner(found.createdBy(), me)) throw CaseErrors.forbidden("the owner cannot claim their own case");
+
+        if (body.phone() == null) throw CaseErrors.invalidField("phone", "required");
+        String phone = phones.requireMobile(body.phone(), "phone");
+        validation.require(body);
+        Optional<RecoveryClaimQueries.PinForClaim> link = linkedPin(code, body.fromSightingId(), caller, now);
+        photos.requireAttachable(body.photos(), UploadPurpose.claim, caller, "photo_urls");
+
+        Outcome outcome = LostLifecycleDerivation.check(Action.CLAIM, found.status(), found.resolvedAt(), now);
+        if (outcome == Outcome.INVALID_TRANSITION) throw CaseErrors.invalidTransition();
+        GeoPoint claimPoint = link.map(RecoveryClaimQueries.PinForClaim::point).orElse(null);
+        UUID claimFrom = link.isPresent() ? UUID.fromString(body.fromSightingId()) : null;
+        Optional<UUID> written;
+        try {
+            written = tx.execute(status -> {
+                if (outcome == Outcome.REACTIVATE) lifecycle.reopen(code, null, now);
+                return queries.upsertIfActive(code, me, phone, body.photos(), claimPoint, claimFrom, now);
+            });
+        } catch (RuntimeException e) {
+            if (!UniqueViolation.on(e, LifecycleQueries.ACTIVE_PER_PET)) throw e;
+            throw lifecycle.activeCodeFor(found.petId()).map(CaseErrors::activeCaseExists).orElseGet(CaseErrors::invalidTransition);
+        }
+        // A row came back, so the case was active when it was written: the link follows the contact rule on an active case.
+        UUID id = written.orElseThrow(() -> refusalAfterEmptyWrite(code, now));
+        String wa = ClaimDerivation.whatsappPhone(found.flags(), "active", found.publicPhone());
+        return new ClaimCreatedView(id.toString(),
+                wa == null ? null : WhatsappLinks.withText(wa, ClaimDerivation.whatsappText(found.petName(), code)));
+    }
+
+    /**
+     * The pin the claim grew out of, when it is the caller's own (LostCaseDerivation.mine: their person, or an anonymous pin
+     * from their device), visible, on this case and from the last 24 h; empty otherwise — absent, not a UUID, unknown, or
+     * ineligible. Never an error: the claim is what matters, the link is attribution.
+     */
+    private Optional<RecoveryClaimQueries.PinForClaim> linkedPin(String code, @Nullable String rawId, Caller caller, Instant now) {
+        if (rawId == null) return Optional.empty();
+        return OwnerAccess.id(rawId).flatMap(id -> queries.pin(code, id)).filter(pin -> ClaimDerivation.prefillEligible(pin.link(),
+                LostCaseDerivation.mine(caller.personId(), caller.deviceHash(), pin.link().reporterPersonId(), pin.link().reporterDeviceHash()),
+                now));
+    }
+
+    /** Nothing written: the case is not active (and could not be reactivated); say why. */
+    private ApiException refusalAfterEmptyWrite(String code, Instant now) {
+        LifecycleRow row = lifecycle.load(code).orElse(null);
+        if (row == null) return CaseErrors.notFound();
+        if (LostLifecycleDerivation.check(Action.CLAIM, row.status(), row.resolvedAt(), now) == Outcome.INVALID_TRANSITION) {
+            return CaseErrors.invalidTransition();
+        }
+        if (row.otherActiveCode() != null) return CaseErrors.activeCaseExists(row.otherActiveCode());
+        return CaseErrors.invalidTransition();
+    }
+}

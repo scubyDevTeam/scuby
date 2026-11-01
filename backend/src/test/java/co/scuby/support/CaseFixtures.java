@@ -12,6 +12,7 @@ import java.util.UUID;
 import static co.scuby.db.generated.Tables.LOST_CASE;
 import static co.scuby.db.generated.Tables.PET;
 import static co.scuby.db.generated.Tables.PURGED_CASE_CODE;
+import static co.scuby.db.generated.Tables.RECOVERY_CLAIM;
 import static co.scuby.db.generated.Tables.RESPONSIBILITY_LINK;
 import static co.scuby.db.generated.Tables.SIGHTING;
 
@@ -113,5 +114,23 @@ public final class CaseFixtures {
     public void purge(String code) {
         db.insertInto(PURGED_CASE_CODE).set(PURGED_CASE_CODE.CODE, code)
           .set(PURGED_CASE_CODE.PURGED_AT, MutableClock.START.atOffset(ZoneOffset.UTC)).execute();
+    }
+
+    /** A recovery claim as «Lo tengo» stores it, never repeated (last active when made); answered an hour after it was made unless it is open. */
+    public UUID claim(String code, UUID claimant, String phone, Instant createdAt, String status) {
+        return claim(code, claimant, phone, createdAt, createdAt, status);
+    }
+
+    /** As above, with the claimant's last «Lo tengo» on it at {@code lastActiveAt} (a repeat refreshed it). */
+    public UUID claim(String code, UUID claimant, String phone, Instant createdAt, Instant lastActiveAt, String status) {
+        UUID id = UUID.randomUUID();
+        db.insertInto(RECOVERY_CLAIM)
+          .set(RECOVERY_CLAIM.ID, id).set(RECOVERY_CLAIM.CASE_CODE, code).set(RECOVERY_CLAIM.CLAIMANT_PERSON_ID, claimant)
+          .set(RECOVERY_CLAIM.PHONE, phone).set(RECOVERY_CLAIM.STATUS, status)
+          .set(RECOVERY_CLAIM.CREATED_AT, createdAt.atOffset(ZoneOffset.UTC))
+          .set(RECOVERY_CLAIM.LAST_ACTIVE_AT, lastActiveAt.atOffset(ZoneOffset.UTC))
+          .set(RECOVERY_CLAIM.ANSWERED_AT, "open".equals(status) ? null : createdAt.plusSeconds(3600).atOffset(ZoneOffset.UTC))
+          .execute();
+        return id;
     }
 }
