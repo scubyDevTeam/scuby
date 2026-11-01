@@ -107,9 +107,8 @@ class LostCaseQueries {
     }
 
     /**
-     * The owner's claim list shows at most this many: the newest by when each claim was made (L1 design §4.13). Accepted
-     * limit: with more than 50 newer claims, an older open claim (a refreshed one included: a repeat does not move
-     * created_at) is counted in open_claim_count but not listed. Realistic only under spam; ordering open claims first
+     * The owner's claim list shows at most this many: the newest by each claim's last activity (decision 18; L1 design §4.13). Accepted
+     * limit: with more than 50 newer claims, an older open claim (a refreshed claim moves up, decision 18) is counted in open_claim_count but not listed. Realistic only under spam; ordering open claims first
      * would lose the index order, so measure the plan before changing it.
      */
     static final int MAX_CLAIMS_SHOWN = 50;
@@ -119,7 +118,7 @@ class LostCaseQueries {
      * of open, non-stale claims of the whole case. That filtered window (not a total) is the one thing the contract needs
      * beyond the page: open_claim_count must cover claims past the 50th, and a second statement would break the owner's
      * ceiling of 4. Non-stale is last_active_at >= now - 7 d (inclusive; ClaimDerivation.STALE_AFTER, pinned by ClaimLeakTest).
-     * Read through recovery_claim_by_case_recent_idx (RecoveryClaimPlanTest). Owner only: CaseReads never calls it for anyone else.
+     * Read through recovery_claim_by_case_active_idx (RecoveryClaimPlanTest). Owner only: CaseReads never calls it for anyone else.
      */
     Select<? extends Record> claimsQuery(String code, Instant now) {
         Field<Integer> openNonStale = DSL.count()
@@ -130,7 +129,7 @@ class LostCaseQueries {
                          RECOVERY_CLAIM.STATUS, openNonStale)
                  .from(RECOVERY_CLAIM)
                  .where(RECOVERY_CLAIM.CASE_CODE.eq(code))
-                 .orderBy(RECOVERY_CLAIM.CREATED_AT.desc(), RECOVERY_CLAIM.ID.desc())
+                 .orderBy(RECOVERY_CLAIM.LAST_ACTIVE_AT.desc(), RECOVERY_CLAIM.ID.desc())
                  .limit(MAX_CLAIMS_SHOWN);
     }
 

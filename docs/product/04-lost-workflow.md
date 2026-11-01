@@ -288,7 +288,7 @@ claimant's last «Lo tengo» on it (`last_active_at`). The check-in fields (`ver
 arrive with the follow-up loop. One open claim per person per case: «Lo tengo» again, while it is open
 (stale included), refreshes it — the new phone always, and the photos, pin and sighting link when the
 repeat sends them (what it leaves out is kept) — and sets `last_active_at`, so it counts again and the
-owner sees the claimant's current number. On a case that is no longer active the repeat gets the
+owner sees the claimant's current number. The owner's list shows `last_active_at` as the claim's time and orders by it, newest first (decision #84). On a case that is no longer active the repeat gets the
 case's answer (reactivated inside 30 days, or `active_case_exists` with the pet's live case), never the
 old claim.
 
@@ -372,6 +372,7 @@ stateDiagram-v2
     [*] --> active: owner publishes
     active --> active: sighting / recovery_claim / checkin "sigue perdida"
     active --> reunited: owner confirms
+    expired --> reunited: owner confirms (no reopen first, decision #83)
     active --> expired: 2 consecutive check-ins unanswered
     active --> cancelled: owner deletes (false alarm, duplicate)
     expired --> active: owner reopens (1 tap, ≤30 days)
@@ -385,7 +386,7 @@ Four statuses. Deliberate — every candidate fifth state turned out to be deriv
 
 | Rejected state | Why it's derived instead |
 |---|---|
-| `pending_confirmation` | = `EXISTS recovery_claim WHERE status = 'open'`, computed inside the query that already fetches the case (read through `recovery_claim_by_case_recent_idx`). A UI badge ("posible hallazgo") for the owner only, not a status. If it ever shows in profiling, denormalize `open_claim_count` on the case, maintained in the same transaction — still not a status, never a cache layer |
+| `pending_confirmation` | = `EXISTS recovery_claim WHERE status = 'open'`, computed inside the query that already fetches the case (read through the case_code prefix of `recovery_claim_one_per_claimant`). A UI badge ("posible hallazgo") for the owner only, not a status. If it ever shows in profiling, denormalize `open_claim_count` on the case, maintained in the same transaction — still not a status, never a cache layer |
 | `paused` | v2. No evidence owners want to mute a search mid-search |
 | `draft` | The publish form is one screen; there is nothing to draft |
 | `archived` | A retention phase applied to terminal cases, not a lifecycle state |

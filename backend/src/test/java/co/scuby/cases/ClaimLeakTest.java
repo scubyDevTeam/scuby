@@ -114,10 +114,23 @@ class ClaimLeakTest {
         assertThat(again.status()).isEqualTo(201);
         ApiResponse after = owner.get("/cases/{code}", "7K3PQ");
         assertThat(after.json().get("claims")).hasSize(2);
-        assertThat(after.str("/claims/1/id")).isEqualTo(again.str("/id"));
-        assertThat(after.str("/claims/1/status")).isEqualTo("open");
-        assertThat(after.str("/claims/1/phone")).isEqualTo("+573114440009");
+        assertThat(after.str("/claims/0/id")).as("refreshed, so first (decision 18)").isEqualTo(again.str("/id"));
+        assertThat(after.str("/claims/0/status")).isEqualTo("open");
+        assertThat(after.str("/claims/0/phone")).isEqualTo("+573114440009");
         assertThat(after.json().get("open_claim_count").asInt()).as("Andrés's and Laura's again").isEqualTo(2);
+    }
+
+    /** Decision 18: a claim made 10 days ago and refreshed now is listed first and shows now as its time, not «hace 10 días». */
+    @Test
+    void aClaimRefreshedTodayAppearsFirstAndShowsTodaysTime() {
+        ApiResponse before = owner.get("/cases/{code}", "7K3PQ");
+        assertThat(before.str("/claims/0/phone")).isEqualTo("+573114440001");
+        laura.post("/cases/{code}/recovery-claims", "{\"phone\":\"+573114440009\"}", "7K3PQ");
+        ApiResponse after = owner.get("/cases/{code}", "7K3PQ");
+        assertThat(after.str("/claims/0/phone")).isEqualTo("+573114440009");
+        assertThat(Instant.parse(after.str("/claims/0/created_at"))).isEqualTo(NOW);
+        assertThat(after.str("/claims/1/phone")).isEqualTo("+573114440001");
+        assertThat(Instant.parse(after.str("/claims/1/created_at"))).isEqualTo(NOW.minus(Duration.ofHours(1)));
     }
 
     @Test

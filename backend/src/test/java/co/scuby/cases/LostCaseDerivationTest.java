@@ -252,7 +252,7 @@ class LostCaseDerivationTest {
                 claim("d2", Duration.ofDays(2), Duration.ofDays(8), "open")), 1);  // (not producible, but proves the field read)
         LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(refreshed), OWNER_VIEW, NOW, ES);
         assertThat(view.claims()).extracting(LostCaseView.ClaimView::status).containsExactly("open", "stale");
-        assertThat(view.claims().getFirst().createdAt()).as("the wire keeps when the claim was made").isEqualTo(NOW.minus(Duration.ofDays(9)));
+        assertThat(view.claims().getFirst().createdAt()).as("decision 18: the wire shows the last activity").isEqualTo(NOW.minus(Duration.ofHours(1)));
     }
 
     @Test

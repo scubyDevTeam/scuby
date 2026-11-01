@@ -68,11 +68,11 @@ final class LostCaseDerivation {
         return new LostCaseView.ContactView(PublicTextDerivation.publicName(facts.publisherName(), locale), whatsapp);
     }
 
-    /** Owner only, in the query's order (newest first); a non-owner gets [] whatever the facts hold. */
+    /** Owner only, in the query's order (latest activity first; the wire created_at is last_active_at, decision 18); a non-owner gets [] whatever the facts hold. */
     private static List<LostCaseView.ClaimView> claims(LostCaseFacts facts, boolean owner, Instant now) {
         if (!owner || facts.claims() == null) return List.of();
         return facts.claims().newest().stream()
-                .map(c -> new LostCaseView.ClaimView(c.id().toString(), c.phone(), c.createdAt(),
+                .map(c -> new LostCaseView.ClaimView(c.id().toString(), c.phone(), c.lastActiveAt(),
                         ClaimDerivation.wireStatus(c.status(), c.lastActiveAt(), now)))
                 .toList();
     }
