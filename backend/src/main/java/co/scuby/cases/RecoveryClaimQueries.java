@@ -30,7 +30,7 @@ class RecoveryClaimQueries {
      * the link is built). {@code activePhone}: the same while the case is active (what the case page shows), for an answer that writes nothing.
      */
     record ClaimCase(String code, UUID createdBy, UUID petId, @Nullable String petName, String status, @Nullable Instant resolvedAt,
-                     @Nullable String publicPhone, @Nullable String activePhone, @Nullable OwnClaim own) {
+                     @Nullable String publicPhone, @Nullable String activePhone, @Nullable String otherActiveCode, @Nullable OwnClaim own) {
         /** The owner already answered the caller's claim on this case: a repeat gets it back untouched (decision #82). */
         boolean answered() {
             return own != null && !"open".equals(own.status());
@@ -49,16 +49,16 @@ class RecoveryClaimQueries {
         this.db = db;
     }
 
-    /** The case, the caller's own claim on it (one statement) and the number under the contact rule. */
+    /** The case, the caller's own claim on it, another active case of the pet and the number under the contact rule (one statement). */
     Optional<ClaimCase> caseForClaim(String code, UUID claimant) {
         return db.select(LOST_CASE.CODE, LOST_CASE.CREATED_BY, LOST_CASE.PET_ID, PET.NAME, LOST_CASE.STATUS, LOST_CASE.RESOLVED_AT,
-                         PUBLIC_PHONE, ACTIVE_PHONE, RECOVERY_CLAIM.ID, RECOVERY_CLAIM.STATUS)
+                         PUBLIC_PHONE, ACTIVE_PHONE, LifecycleQueries.OTHER_ACTIVE_CODE, RECOVERY_CLAIM.ID, RECOVERY_CLAIM.STATUS)
                  .from(LOST_CASE).join(PET).on(PET.ID.eq(LOST_CASE.PET_ID))
                  .leftJoin(RECOVERY_CLAIM).on(RECOVERY_CLAIM.CASE_CODE.eq(LOST_CASE.CODE), RECOVERY_CLAIM.CLAIMANT_PERSON_ID.eq(claimant))
                  .where(LOST_CASE.CODE.eq(code))
                  .fetchOptional(r -> new ClaimCase(r.get(LOST_CASE.CODE), r.get(LOST_CASE.CREATED_BY), r.get(LOST_CASE.PET_ID), r.get(PET.NAME),
                          r.get(LOST_CASE.STATUS), r.get(LOST_CASE.RESOLVED_AT) == null ? null : r.get(LOST_CASE.RESOLVED_AT).toInstant(),
-                         r.get(PUBLIC_PHONE), r.get(ACTIVE_PHONE),
+                         r.get(PUBLIC_PHONE), r.get(ACTIVE_PHONE), r.get(LifecycleQueries.OTHER_ACTIVE_CODE),
                          r.get(RECOVERY_CLAIM.ID) == null ? null : new OwnClaim(r.get(RECOVERY_CLAIM.ID), r.get(RECOVERY_CLAIM.STATUS))));
     }
 

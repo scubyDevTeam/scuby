@@ -1,6 +1,5 @@
 package co.scuby.cases;
 
-import co.scuby.cases.LifecycleQueries.LifecycleRow;
 import co.scuby.cases.LostLifecycleDerivation.Action;
 import co.scuby.cases.LostLifecycleDerivation.Outcome;
 import co.scuby.identity.PhoneNumbers;
@@ -133,13 +132,11 @@ class RecoveryClaimService {
      * the read. Say why, or hand the answered claim back.
      */
     private ClaimCreatedView afterEmptyWrite(String code, UUID me, Instant now) {
-        LifecycleRow row = lifecycle.load(code).orElse(null);
-        if (row == null) throw CaseErrors.notFound();
-        if (LostLifecycleDerivation.check(Action.CLAIM, row.status(), row.resolvedAt(), now) == Outcome.INVALID_TRANSITION) {
+        RecoveryClaimQueries.ClaimCase fresh = queries.caseForClaim(code, me).orElseThrow(CaseErrors::notFound);
+        if (LostLifecycleDerivation.check(Action.CLAIM, fresh.status(), fresh.resolvedAt(), now) == Outcome.INVALID_TRANSITION) {
             throw CaseErrors.invalidTransition();
         }
-        if (row.otherActiveCode() != null) throw CaseErrors.activeCaseExists(row.otherActiveCode());
-        RecoveryClaimQueries.ClaimCase fresh = queries.caseForClaim(code, me).orElseThrow(CaseErrors::notFound);
+        if (fresh.otherActiveCode() != null) throw CaseErrors.activeCaseExists(fresh.otherActiveCode());
         if (fresh.answered()) return view(fresh.own().id(), fresh.activePhone(), fresh.petName(), code);
         // Otherwise the case is no longer claimable: an older case of the pet (only the newest is reactivated), or it expired
         // between the pre-read and the write (nothing expires cases in L1; the L2 expiry job should retry or reactivate here).

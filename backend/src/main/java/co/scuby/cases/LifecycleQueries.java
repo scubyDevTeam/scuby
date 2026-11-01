@@ -29,6 +29,11 @@ class LifecycleQueries {
 
     private static final LostCase OTHER = LOST_CASE.as("other");
 
+    /** The code of another active case of the same pet, if any (the active_case_exists pre-check); a scalar subquery on LOST_CASE. */
+    static final Field<String> OTHER_ACTIVE_CODE = DSL.field(DSL.select(OTHER.CODE).from(OTHER)
+            .where(OTHER.PET_ID.eq(LOST_CASE.PET_ID), OTHER.STATUS.eq(DSL.inline("active")), OTHER.CODE.ne(LOST_CASE.CODE)))
+            .as("other_active_code");
+
     /**
      * The one definition of «a newer case of the same pet exists» (decision #81): newest is the latest published_at, the
      * higher code on a tie. Only the newest case of a pet can be reopened, reactivated by a claim or offered by /me/pets, so
@@ -48,9 +53,7 @@ class LifecycleQueries {
 
     /** The case, and the code of another active case of the same pet, if any (the active_case_exists pre-check). */
     Optional<LifecycleRow> load(String code) {
-        Field<String> other = DSL.field(DSL.select(OTHER.CODE).from(OTHER)
-                .where(OTHER.PET_ID.eq(LOST_CASE.PET_ID), OTHER.STATUS.eq(DSL.inline("active")), OTHER.CODE.ne(LOST_CASE.CODE)))
-                .as("other_active_code");
+        Field<String> other = OTHER_ACTIVE_CODE;
         Field<Boolean> superseded = DSL.field(superseded(LOST_CASE)).as("superseded");
         return db.select(LOST_CASE.CODE, LOST_CASE.CREATED_BY, LOST_CASE.PET_ID, LOST_CASE.STATUS, LOST_CASE.RESOLVED_AT, other, superseded)
                  .from(LOST_CASE).where(LOST_CASE.CODE.eq(code))

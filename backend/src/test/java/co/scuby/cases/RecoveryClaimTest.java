@@ -271,6 +271,14 @@ class RecoveryClaimTest {
     }
 
     @Test
+    void aRepeatAfterTheAnswerIsThreeStatementsAndNoneIsAWrite() {
+        cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(1)), "confirmed");
+        ApiResponse r = cold(() -> claim(""));
+        assertThat(r.status()).isEqualTo(201);
+        assertThat(r.statements()).as("session, pre-read (case + own claim), supported_countries: %s", r.statements()).hasSize(3);
+    }
+
+    @Test
     void aRepeatAfterTheAnswerHasNoWhatsappLinkWhenTheContactIsPrivate() {
         cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(1)), "confirmed");
         db.execute("UPDATE scuby.lost_case SET in_app_only = true WHERE code = '7K3PQ'");
