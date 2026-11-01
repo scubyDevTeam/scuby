@@ -13,6 +13,7 @@ class CasesSecurityRules implements SecurityRules {
     public void authorize(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry rules) {
         rules.requestMatchers(HttpMethod.POST, "/lost-cases").authenticated();
         rules.requestMatchers(HttpMethod.GET, "/me/cases").authenticated();
+        rules.requestMatchers(HttpMethod.GET, "/me/pets").authenticated();
         rules.requestMatchers(HttpMethod.POST, "/cases/*/reunite").authenticated();
         rules.requestMatchers(HttpMethod.POST, "/cases/*/cancel").authenticated();
         rules.requestMatchers(HttpMethod.POST, "/cases/*/reopen").authenticated();

@@ -133,4 +133,21 @@ public final class CaseFixtures {
           .execute();
         return id;
     }
+
+    /** A dog owned by {@code owner}, with no case (name may be null: a found animal's pet has none). */
+    public UUID ownedPet(UUID owner, @Nullable String name, Instant createdAt) {
+        UUID pet = UUID.randomUUID();
+        db.insertInto(PET).set(PET.ID, pet).set(PET.NAME, name).set(PET.SPECIES, "dog").set(PET.SIZE, (String) null)
+          .set(PET.CUSTODY_STATE, "claimed").set(PET.CREATED_AT, createdAt.atOffset(ZoneOffset.UTC)).execute();
+        db.insertInto(RESPONSIBILITY_LINK).set(RESPONSIBILITY_LINK.ID, UUID.randomUUID())
+          .set(RESPONSIBILITY_LINK.PERSON_ID, owner).set(RESPONSIBILITY_LINK.PET_ID, pet)
+          .set(RESPONSIBILITY_LINK.ROLE, "owner").set(RESPONSIBILITY_LINK.ACTIVE_FROM, createdAt.atOffset(ZoneOffset.UTC)).execute();
+        return pet;
+    }
+
+    /** Ends the pet's active owner link. */
+    public void unlink(UUID pet, Instant at) {
+        db.update(RESPONSIBILITY_LINK).set(RESPONSIBILITY_LINK.ACTIVE_TO, at.atOffset(ZoneOffset.UTC))
+          .where(RESPONSIBILITY_LINK.PET_ID.eq(pet), RESPONSIBILITY_LINK.ACTIVE_TO.isNull()).execute();
+    }
 }
