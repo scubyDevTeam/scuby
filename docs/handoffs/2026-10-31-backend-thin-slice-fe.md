@@ -85,6 +85,10 @@ Each row gives the behaviour, the decision that owns it (in
 | **Reunite, cancel, reopen and deleting your own pin are idempotent**: repeating one that already happened answers the same success (reopen on an active case included). Cancel or reopen on a reunited case stays `invalid_transition`. | #71, #73 | Retry on a lost connection without fear; on `invalid_transition`, refetch the case (it may be reunited) |
 | **Reopen and «Lo tengo» can answer `active_case_exists`** (`details.case_code`: the pet's other active case); a claim on a purged code answers `gone`; the owner's own claim `forbidden`. **Contract change:** `claimRecovery` now requires a session and lists `forbidden`, `active_case_exists` and `gone`; `reopenCase` lists `active_case_exists`; `open_claim_count` and `possible_find` are nullable. | #71, #75 · [api.md](../eng/api.md) · Errors | The contract changed because the behaviour above answers those codes and a response the contract does not list is refused by `ApiClient`. Handle the codes (table below) instead of «revisa tu conexión» |
 | **A repeated claim refreshes the person's open claim** (a stale one included): same id, the new phone always, and photos, point and sighting link only when the repeat sends them; it counts again. A repeat answers `201` like the first. On a case that is no longer active it answers that case's refusal, never the old claim. | #75 | Let the claimant send «Lo tengo» again; do not treat it as a new claim |
+| **One claim per person per case, even after the owner answered it.** A repeat after a confirm or a dismiss answers `201` with that same claim and, when the case is active and its contact is public, the WhatsApp link; nothing is written, an archived case is not reactivated, and the owner's badge does not come back. Tapping «Lo tengo» again is the claimant's way back to the WhatsApp link (they cannot see their own claim on the case page). | #82 · [04](../product/04-lost-workflow.md) · recovery_claim | Do not hide «Lo tengo» from someone who already claimed; treat the answer as the same success, and do not promise that the owner will be told again |
+| **Only the pet's newest case can be reopened, or reactivated by a claim.** If the pet has a newer case (even one already reunited or cancelled), an old expired case answers `invalid_transition` on reopen and on a claim, or `active_case_exists` when the pet's newer case is active. `/me/pets` offers `reopenable_case_code` only for the newest case, and only when the pet has no active case. | #81 · [04](../product/04-lost-workflow.md) · Case state machine | An old share link to an archived search no longer revives it: show the archived notice without «Reactivar». On `invalid_transition` after a claim on an archived case, refetch the case |
+| **«Ya apareció» works on an expired case directly** (no reopen first, any time before the purge), so the card and the phone never turn public again just to be closed. Cancel on an expired case, and reunite on a cancelled one, stay `invalid_transition`. | #83 | Offer «Ya apareció» on the archived notice for its owner |
+| **The owner's claims show and sort by the claimant's last activity.** `claims[].created_at` is the time of the claimant's last «Lo tengo», and the list is newest first. A claim made 9 days ago and repeated today reads as just now. | #84 | Render it as the claim's time ("hace un momento"); do not look for the real creation date, the contract has none |
 | **A `from_sighting_id` that is not the claimant's own visible pin of the last 24 hours is ignored**, never refused: the claim is stored without it. | #75 | Nothing to handle; send it when you have it |
 | **The owner's `claims[]` holds the newest 50**; `stale` is derived (open and 7 days since the claimant's last «Lo tengo»). | #76 | Show `stale` and answered claims to the owner too, so the owner can still confirm a stale claim and revise a mis-tapped answer |
 | **Answers are revisable** (`confirmed ↔ dismissed`), and confirming never closes the case. | #77 | Offer «cambiar respuesta»; close with reunite |
@@ -101,12 +105,32 @@ Error codes the client can turn into helpful copy:
 |---|---|
 | «Lo tengo» `active_case_exists` | Open `details.case_code` and the claim sheet there |
 | «Lo tengo» `invalid_transition` | Refetch the case: it may be reunited |
-| «Lo tengo» `gone` | Show the purged-case page |
+| «Lo tengo» `gone` | Show the purged-case page. A purged code is `gone` only on `GET /cases/{code}` and on «Lo tengo»; on reopen, edit, the owner's answer, moderation, correction, delete and «Lo vi» it is `not_found` (the contract lists no `gone` there). Do not treat that as a bug |
 | «Lo tengo» `forbidden` | Never shown: the owner has no «Lo tengo» button |
 | Correction or delete `forbidden` | Use `editable_until` to say the 15 minutes passed |
+| Correction `not_found` on a pin you sent | The pin was deleted or removed; refetch the case |
 
-The emulated backend still differs on: delete as a status, idempotent reunite, cancel and reopen, and the
-claim's phone and mobile checks.
+**The emulated backend** (`web/src/mocks/`) answers like the backend on what a screen can observe for the lost
+vertical's actions ([decision #86](../product/00-product-map.md); each behaviour is a scenario in
+`web/src/mocks/backend.test.ts`): revisable and idempotent claim answers, "mine" by person or by device, deleting a pin
+as a status, nameless pets in `/me/pets`, the no-links rule on the bio and the name, the newest-case rule,
+one claim per person, reuniting an expired case, claims dated by last activity, idempotent reunite, cancel and
+reopen, and the error order (case, owner, body, status). It still differs in the following ways, on purpose; do not
+write a spec that depends on any of them being the same against the backend.
+
+| # | Mock | Backend | Why the mock keeps it |
+|---|---|---|---|
+| 1 | Claim, reunite, highlight and answer write notifications and check-ins (inbox, home banner, one-tap emails) | L1 writes none; they arrive with L2 | The inbox and the check-in screens are built and specified against them |
+| 2 | A published or moved zone gets a neighbourhood name («Laureles») | The generic label «Zona marcada en el mapa» ([O39](../open-items.md)) | The specs and the demo read better with names; not a behaviour to build on |
+| 3 | A phone is checked by the contract's `+` format only | `validation_failed` for a number that is not a mobile of a supported country (claim `phone`, sighting `contact_phone`) | The mock carries no phone library; show the field error when the backend answers it |
+| 4 | Nobody checks that a photo URL was uploaded by the caller or exists | `validation_failed` on `photo_urls` for a photo not uploaded by the caller for that purpose ([O29](../open-items.md)) | The emulated bucket does not track slots |
+| 5 | A body with a wrong type or a missing field is refused after the lookups, like a bad value | A malformed body (wrong JSON type) is refused before any lookup; a bad value is refused after them | Only a body that is not JSON at all is told apart; the screens cannot send the rest |
+| 6 | The public name is the display name from the start | The name is «Alguien» until the person sends one, and sending it marks it chosen (#48, #79) | The mock does not model `display_name_chosen` |
+| 7 | «Lo vi» is limited (1 per 15 minutes per case, 5 per case a day, 20 a day) | No limits (#54) | Remove them from the mock with the contract text ([O27](../open-items.md) item 3) |
+| 8 | The feed substitutes Medellín when no point is sent, returns exact public centers and every sighting | National feed, snapped centers, 200 sightings (#41, #63, #64) | See the product-change rows above |
+| 9 | A correction's distance is measured from the case's exact point | From the snapped public center | A boundary case only |
+| 10 | `PATCH /cases/{code}` edits found, adoption and help cases, and reopen works on them | `not_found` for every code until those verticals exist | Their screens are built against the mock |
+| 11 | Pets with the same last activity keep insertion order; a claim's stale status is stored by the follow-up loop | Ordered by the pet's creation date; stale is derived from `last_active_at` | Not observable on a screen |
 
 ## 3. Contract proposals
 
@@ -128,7 +152,9 @@ client holds the pen until the contract moves to `openapi.yaml` (decision #34).
 - `found_deceased` and `gave_up`: which endpoint or field carries them: [O35](../open-items.md).
 - Claim evidence (photos, point, `from_sighting_id`) in the owner's `claims[]`: [O36](../open-items.md).
 - The «¿Es donde lo viste…?» prefill from the caller's own recent pin is the client's call (the backend accepts
-  `from_sighting_id`).
+  `from_sighting_id`). A sighting on the wire has no `created_at`, so use `seen_at` as the proxy for the 24-hour
+  rule: a pin seen less than 24 hours ago was created less than 24 hours ago, so it is always eligible. A report
+  made late simply does not prefill.
 - Prefill the claim sheet's phone with the signed-in person's verified phone, so a claimant does not type
   someone else's number by mistake.
 - A copy review of the WhatsApp text: «Hola, vi tu aviso de {nombre} en Scuby ({código}) y creo que lo tengo.»
@@ -163,8 +189,11 @@ bash backend/run-local.sh down     # stops this checkout's project
   URL and the photo URL both point at `http://localhost:8080/dev-media/{sha256}.jpg`, and a photo counts as
   processed as soon as its bytes arrive ([backend.md](../eng/backend.md) · Uploads and media).
 - **Seed data:** `run-local.sh` starts with an empty database; only the e2e script loads
-  [`backend/e2e/seed.sql`](../../backend/e2e/seed.sql), which holds three lost cases (`7K3PQ` active, `H4PPY`
-  reunited, `PEL4S` expired 3 days ago), an open claim on `7K3PQ` and three people at `@correo.co`. It can be loaded by hand into the local project. It **wipes the
+  [`backend/e2e/seed.sql`](../../backend/e2e/seed.sql), which holds five lost cases (`7K3PQ` active, `H4PPY`
+  reunited, `PEL4S` expired 3 days ago, `M2TQ4` active for Milo, `ARCH2` expired for Kira with `resolution` NULL
+  because L1 has no `no_response` value), an open claim on `7K3PQ` and three people at `@correo.co`. Luna has one
+  photo, [`backend/e2e/luna.jpg`](../../backend/e2e/luna.jpg), which `run-client-e2e.sh` stores in `/dev-media` after
+  the seed: the edit form sends a pet's photos back and the backend requires 1 to 6. It can be loaded by hand into the local project. It **wipes the
   people, sessions, pets, cases, sightings and uploads first**:
 
   ```bash
@@ -194,18 +223,17 @@ test bypass, because the specs sign in with those.
 the owner signing in by email code (`carolina@correo.co`) and finding the claim in «Posibles hallazgos»; a
 stranger no longer sees «Posible hallazgo.».
 
-Last run (branch `be/lost-l1`, 2026-11-01), the default set plus `@HELP-002` and `@HELP-005`: **18 tests, 9
-pass, 9 fail; no failure is a backend bug.** The first run (branch `be/thin-slice`, 2026-10-31) had 16 tests, 8
-pass, 8 fail.
+Last run (branch `be/lost-l1`, 2026-11-01), the default set plus `@HELP-002` and `@HELP-005`: **18 tests, 11 pass, 7
+fail; no failure is a backend bug.** The first run (branch `be/thin-slice`, 2026-10-31) had 16 tests, 8 pass, 8 fail.
 
 | Tag | Title | 2026-10-31 | 2026-11-01 | Why it fails |
 |---|---|---|---|---|
 | @AUTH-001 | email-code sign-in | pass | pass | |
 | @AUTH-002 | sign in with Google | fail | fail | No «Continuar con Google» button (no real Google client id in the build) |
 | @PLOST-001 | publish a lost pet | pass | pass | |
-| @PLOST-002 | reactivate an expired notice | fail | fail | Stops at «Continuar con Google» (30 s timeout); the steps after it need a signed-in Carolina and have not run against the backend |
+| @PLOST-002 | reactivate an expired notice | fail | fail | Stops at «Continuar con Google» (30 s timeout). **With the Google step replaced by the email code: pass** (see below) |
 | @PLOST-003 | second sign-in | pass | pass | |
-| @PLOST-004 | two tabs, one backend | fail | fail | Same: stops at «Continuar con Google» |
+| @PLOST-004 | two tabs, one backend | fail | fail | Same. **With the Google step replaced by the email code: pass** |
 | @LINK-001 | shared link: who, where, what | fail | pass | |
 | @LINK-002 | reunited case | pass | pass | |
 | @LINK-003 | purged case `GONE5` | pass | pass | |
@@ -216,23 +244,26 @@ pass, 8 fail.
 | @MAP-001 | grouped pins | fail | fail | Same: `total` 9 expected |
 | @MAP-002 | sighting sheet by keyboard | pass | pass | |
 | @OFFLINE-001 | «Lo vi» with no signal | pass | pass | The queued sighting is replayed once through its `client_id` |
-| @HELP-002 | «La tengo conmigo» | not run | fail | Opens the mock's case `M2TQ4`, which is not in `seed.sql` (the button is never found) |
-| @HELP-005 | «La tengo» on an archived notice | not run | fail | Opens the mock's case `ARCH2`, which is not in `seed.sql` |
+| @HELP-002 | «La tengo conmigo» | not run | pass | Signs in by email code, opens `M2TQ4`, the claim opens `wa.me` |
+| @HELP-005 | «La tengo» on an archived notice | not run | pass | Opens `ARCH2`: the claim reactivates it |
 
-To check @PLOST-002 and @PLOST-004 beyond the Google step, replace their «Continuar con Google» sign-in in
-`web/e2e/publish-lost.spec.ts` with `signIn.withEmailCode('carolina@correo.co')`.
+**@PLOST-002 and @PLOST-004 beyond the Google step.** Run once against the real backend (2026-11-01) with the
+sign-in step of the two page objects that open them (`openLostAsDemoOwner` in `web/e2e/pages/PublishPage.ts` and
+`openAsDemoOwner` in `web/e2e/pages/MyCasesPage.ts`) changed from `this.signIn.withGoogle()` to
+`this.signIn.withEmailCode('carolina@correo.co')`, then reverted: **2 of 2 pass**. @PLOST-002 proves `/me/pets` and the
+reopen from the client, and @PLOST-004 the edit. To repeat it:
+`SCUBY_E2E_GREP='@PLOST-002|@PLOST-004' bash backend/e2e/run-client-e2e.sh` with that temporary edit.
 
 ## 6. Suggested next steps for the client
 
 - **Use the backend's default test identities in the specs:** `*@e2e.scuby.test` and `+57 300 000 00xx`.
   Then `compose.e2e.yaml`'s extra bypass for `correo.co` and `+573007152284` can go
   ([api.md](../eng/api.md) · Proposals, E2E test identities).
-- **@HELP-002 and @HELP-005** open cases that exist only in the mock (`M2TQ4`, `ARCH2`). To run them against the
-  backend, either add those rows to `seed.sql` or point the specs at seeded cases.
 - **A cross-actor journey spec:** the owner publishes, a stranger sees the case in the feed and sends «Lo vi»,
   and the owner sees the pin. Use two browser contexts, depend on no seed rows, and run it nightly against the
   real backend.
-- **A Google test bypass for e2e**, so @AUTH-002, @PLOST-002 and @PLOST-004 can run against the backend
+- **Sign in by email code in the lost-case page objects** (`openLostAsDemoOwner`, `openAsDemoOwner`), or a Google
+  test bypass for e2e, so @AUTH-002, @PLOST-002 and @PLOST-004 can run against the backend
   ([api.md](../eng/api.md) · Proposals, E2E Google sign-in).
 - **The FEED and MAP specs** assume the mock's mixed 9-case feed. They will pass against the backend only once
   found, adoption and help exist, or once they assert lost-only content.
