@@ -26,6 +26,9 @@ final class StatementCeilings {
             Map.entry("GET /me/cases", 2),   // exactly 2 on a session-cache miss, 1 or 20 cases (MyCasesEndpointTest): session lookup, the cases query. Excludes the flag snapshot load
             Map.entry("GET /feed", 3),   // session lookup when signed in, local query, national fallback. Excludes the flag snapshot load
             Map.entry("POST /cases/{code}/sightings", 8),   // the longest path, measured by SightingRaceTest: a retry (client_id, phone, photo) on a case that closes mid-request, on a session-cache miss: session, case + distance, replay, supported_countries, upload lookup, conditional insert (empty), replay re-select, status (then 409). The ON CONFLICT race path is 7. SightingPrecedenceTest pins the single-request paths (5 plain, 6 with phone and photo). Excludes the flag snapshot load
+            Map.entry("POST /cases/{code}/reunite", 4),   // longest path, CaseLifecycleRaceTest (the race loser): session, pre-read (case + other active code), conditional UPDATE (zero rows), re-read; 3 on success (CaseLifecycleTest), 2 for a repeat
+            Map.entry("POST /cases/{code}/cancel", 4),    // as reunite
+            Map.entry("POST /cases/{code}/reopen", 4),    // longest path, measured by CaseLifecycleRaceTest: session, pre-read, UPDATE (zero rows or the unique violation), re-read or active-code read; 3 on success, 2 on an already active case
             Map.entry("POST /auth/google", 7)   // worst case on a session-cache miss with a carried session (the rare races with a simultaneous email-code sign-up of the same address, or an insert that conflicts on google_sub, run 8 to 9 statements and are not pinned): filter lookup, sub lookup, email lookup, person insert + select (or conditional link + re-read), old session DELETE, session insert; a non-authoritative new account (Google creates it, no session) is 5 with no cookie (7 with a stale session cookie) and cannot exceed this
     );
 

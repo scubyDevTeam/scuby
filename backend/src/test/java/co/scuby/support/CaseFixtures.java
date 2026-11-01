@@ -83,6 +83,33 @@ public final class CaseFixtures {
         return id;
     }
 
+    /** The pet a case was published for. */
+    public UUID petOf(String code) {
+        return db.select(LOST_CASE.PET_ID).from(LOST_CASE).where(LOST_CASE.CODE.eq(code)).fetchOne(LOST_CASE.PET_ID);
+    }
+
+    /** Closes a case as expiry or an earlier close left it: status and resolved_at set, resolution left NULL. */
+    public void close(String code, String status, Instant resolvedAt) {
+        db.update(LOST_CASE).set(LOST_CASE.STATUS, status).set(LOST_CASE.RESOLVED_AT, resolvedAt.atOffset(ZoneOffset.UTC))
+          .where(LOST_CASE.CODE.eq(code)).execute();
+    }
+
+    /** Another case for an existing pet, at Medellín, 300 m; the pet's owner link is not touched. */
+    public String lostCaseForPet(UUID owner, UUID pet, String code, String status, Instant publishedAt) {
+        GeoPoint publicAt = LocationPrecisionDerivation.publicCenter(MEDELLIN);
+        db.insertInto(LOST_CASE)
+          .set(LOST_CASE.CODE, code).set(LOST_CASE.PET_ID, pet).set(LOST_CASE.CREATED_BY, owner)
+          .set(LOST_CASE.STATUS, status).set(LOST_CASE.PUBLISHED_AT, publishedAt.atOffset(ZoneOffset.UTC))
+          .set(LOST_CASE.RESOLVED_AT, "active".equals(status) ? null : publishedAt.plusSeconds(86_400).atOffset(ZoneOffset.UTC))
+          .set(LOST_CASE.CONTACT_PHONE, LUNA_PHONE).set(LOST_CASE.CONTACT_PHONE_VERIFIED, true).set(LOST_CASE.PHONE_HAS_WHATSAPP, true)
+          .set(LOST_CASE.EXPOSE_WHATSAPP, true).set(LOST_CASE.EXPOSE_EMAIL, false).set(LOST_CASE.IN_APP_ONLY, false)
+          .set(LOST_CASE.LAST_SEEN_LAT, MEDELLIN.lat()).set(LOST_CASE.LAST_SEEN_LNG, MEDELLIN.lng())
+          .set(LOST_CASE.LAST_SEEN_PUBLIC_LAT, publicAt.lat()).set(LOST_CASE.LAST_SEEN_PUBLIC_LNG, publicAt.lng())
+          .set(LOST_CASE.LAST_SEEN_RADIUS_M, 300.0).set(LOST_CASE.LAST_SEEN_AT, publishedAt.atOffset(ZoneOffset.UTC))
+          .execute();
+        return code;
+    }
+
     public void purge(String code) {
         db.insertInto(PURGED_CASE_CODE).set(PURGED_CASE_CODE.CODE, code)
           .set(PURGED_CASE_CODE.PURGED_AT, MutableClock.START.atOffset(ZoneOffset.UTC)).execute();
