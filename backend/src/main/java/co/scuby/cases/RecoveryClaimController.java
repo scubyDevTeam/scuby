@@ -21,6 +21,12 @@ class RecoveryClaimController {
         this.service = service;
     }
 
+    /** answerRecoveryClaim: 200 {id: the claim id}. */
+    @PostMapping("/cases/{code}/claims/{claimId}")
+    CreatedView answer(@PathVariable String code, @PathVariable String claimId, Account account, @RequestBody ClaimAnswerRequest body) {
+        return service.answer(code, claimId, account.personId(), body);
+    }
+
     @PostMapping("/cases/{code}/recovery-claims")
     @ResponseStatus(HttpStatus.CREATED)
     ClaimCreatedView claim(@PathVariable String code, Account account, Caller caller, @RequestBody RecoveryClaimRequest body) {

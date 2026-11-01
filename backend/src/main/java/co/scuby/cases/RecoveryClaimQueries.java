@@ -54,6 +54,27 @@ class RecoveryClaimQueries {
                          r.get(PUBLIC_PHONE)));
     }
 
+    record AnswerTarget(UUID createdBy, @Nullable UUID claimId, @Nullable String claimStatus) {}
+
+    /** The case's owner and, when it is on this case, the claim and its stored status (one statement). */
+    Optional<AnswerTarget> answerTarget(String code, Optional<UUID> claimId) {
+        return db.select(LOST_CASE.CREATED_BY, RECOVERY_CLAIM.ID, RECOVERY_CLAIM.STATUS)
+                 .from(LOST_CASE)
+                 .leftJoin(RECOVERY_CLAIM).on(RECOVERY_CLAIM.CASE_CODE.eq(LOST_CASE.CODE),
+                         claimId.map(RECOVERY_CLAIM.ID::eq).orElse(DSL.falseCondition()))
+                 .where(LOST_CASE.CODE.eq(code))
+                 .fetchOptional(r -> new AnswerTarget(r.value1(), r.value2(), r.value3()));
+    }
+
+    /** The answer, unless it is already the stored one (status <> ?): repeating an answer writes nothing. */
+    void answer(String code, UUID claimId, String status, Instant now) {
+        db.update(RECOVERY_CLAIM)
+          .set(RECOVERY_CLAIM.STATUS, status)
+          .set(RECOVERY_CLAIM.ANSWERED_AT, now.atOffset(ZoneOffset.UTC))
+          .where(RECOVERY_CLAIM.ID.eq(claimId), RECOVERY_CLAIM.CASE_CODE.eq(code), RECOVERY_CLAIM.STATUS.ne(status))
+          .execute();
+    }
+
     /** The pin a claim says it grew out of, on this case. */
     Optional<PinForClaim> pin(String code, UUID id) {
         return db.select(SIGHTING.STATUS, SIGHTING.REPORTER_PERSON_ID, SIGHTING.REPORTER_DEVICE_HASH, SIGHTING.CREATED_AT, SIGHTING.LAT, SIGHTING.LNG)

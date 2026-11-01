@@ -8,6 +8,8 @@ import org.jooq.Select;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +18,7 @@ import static co.scuby.db.generated.Tables.LOST_CASE;
 import static co.scuby.db.generated.Tables.PERSON;
 import static co.scuby.db.generated.Tables.PET;
 import static co.scuby.db.generated.Tables.PURGED_CASE_CODE;
+import static co.scuby.db.generated.Tables.RECOVERY_CLAIM;
 import static co.scuby.db.generated.Tables.SIGHTING;
 
 /** Reads for GET /cases/{code}: one query for the case, one for its sightings — never one per sighting. */
@@ -58,7 +61,7 @@ class LostCaseQueries {
                                  Arrays.asList(r.get(PET.COLORS)), r.get(PET.MARKS), Arrays.asList(r.get(PET.PHOTO_URLS))),
                          new GeoPoint(r.get(LOST_CASE.LAST_SEEN_LAT), r.get(LOST_CASE.LAST_SEEN_LNG)),
                          r.get(LOST_CASE.LAST_SEEN_RADIUS_M), r.get(LOST_CASE.LAST_SEEN_AT).toInstant(),
-                         r.get(LOST_CASE.PLACE_NAME), r.get(PUBLISHER_NAME), r.get(WHATSAPP_PHONE), List.of()));
+                         r.get(LOST_CASE.PLACE_NAME), r.get(PUBLISHER_NAME), r.get(WHATSAPP_PHONE), List.of(), null));
     }
 
     boolean isPurged(String code) {
@@ -97,5 +100,40 @@ class LostCaseQueries {
                 Arrays.asList(r.get(SIGHTING.PHOTO_URLS)), r.get(SIGHTING.REPORTER_PERSON_ID),
                 r.get(SIGHTING.REPORTER_DEVICE_HASH), r.get(SIGHTING.CONTACT_PHONE.getName(), String.class),
                 !"visible".equals(r.get(SIGHTING.STATUS)), r.get(SIGHTING.HIGHLIGHTED_BY_OWNER));
+    }
+
+    /**
+     * The owner's claim list shows at most this many: the newest by when each claim was made (L1 design §4.13). Accepted
+     * limit: with more than 50 newer claims, an older open claim (a refreshed one included: a repeat does not move
+     * created_at) is counted in open_claim_count but not listed. Realistic only under spam; ordering open claims first
+     * would lose the index order, so measure the plan before changing it.
+     */
+    static final int MAX_CLAIMS_SHOWN = 50;
+
+    /**
+     * The owner's claims in one query: the newest MAX_CLAIMS_SHOWN of every status, newest first, each row carrying the count
+     * of open, non-stale claims of the whole case. That filtered window (not a total) is the one thing the contract needs
+     * beyond the page: open_claim_count must cover claims past the 50th, and a second statement would break the owner's
+     * ceiling of 4. Non-stale is last_active_at >= now - 7 d (inclusive; ClaimDerivation.STALE_AFTER, pinned by ClaimLeakTest).
+     * Read through recovery_claim_by_case_recent_idx (RecoveryClaimPlanTest). Owner only: CaseReads never calls it for anyone else.
+     */
+    Select<? extends Record> claimsQuery(String code, Instant now) {
+        Field<Integer> openNonStale = DSL.count()
+                .filterWhere(RECOVERY_CLAIM.STATUS.eq(DSL.inline("open"))
+                        .and(RECOVERY_CLAIM.LAST_ACTIVE_AT.ge(ClaimDerivation.staleCutoff(now).atOffset(ZoneOffset.UTC))))
+                .over().as("open_non_stale");
+        return db.select(RECOVERY_CLAIM.ID, RECOVERY_CLAIM.PHONE, RECOVERY_CLAIM.CREATED_AT, RECOVERY_CLAIM.LAST_ACTIVE_AT,
+                         RECOVERY_CLAIM.STATUS, openNonStale)
+                 .from(RECOVERY_CLAIM)
+                 .where(RECOVERY_CLAIM.CASE_CODE.eq(code))
+                 .orderBy(RECOVERY_CLAIM.CREATED_AT.desc(), RECOVERY_CLAIM.ID.desc())
+                 .limit(MAX_CLAIMS_SHOWN);
+    }
+
+    LostCaseFacts.ClaimFacts claims(String code, Instant now) {
+        var rows = claimsQuery(code, now).fetch();
+        int open = rows.isEmpty() ? 0 : rows.getFirst().get("open_non_stale", Integer.class);
+        return new LostCaseFacts.ClaimFacts(rows.map(r -> new LostCaseFacts.ClaimRow(r.get(RECOVERY_CLAIM.ID), r.get(RECOVERY_CLAIM.PHONE),
+                r.get(RECOVERY_CLAIM.CREATED_AT).toInstant(), r.get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant(), r.get(RECOVERY_CLAIM.STATUS))), open);
     }
 }

@@ -38,18 +38,20 @@ class RecoveryClaimService {
     private final LifecycleQueries lifecycle;
     private final LostCaseQueries cases;
     private final CaseAccessPolicy policy;
+    private final OwnerAccess owners;
     private final PhoneNumbers phones;
     private final PhotoAttachments photos;
     private final BodyValidation validation;
     private final TransactionTemplate tx;
     private final Clock clock;
 
-    RecoveryClaimService(RecoveryClaimQueries queries, LifecycleQueries lifecycle, LostCaseQueries cases, CaseAccessPolicy policy,
+    RecoveryClaimService(RecoveryClaimQueries queries, LifecycleQueries lifecycle, LostCaseQueries cases, CaseAccessPolicy policy, OwnerAccess owners,
                          PhoneNumbers phones, PhotoAttachments photos, BodyValidation validation, TransactionTemplate tx, Clock clock) {
         this.queries = queries;
         this.lifecycle = lifecycle;
         this.cases = cases;
         this.policy = policy;
+        this.owners = owners;
         this.phones = phones;
         this.photos = photos;
         this.validation = validation;
@@ -90,6 +92,21 @@ class RecoveryClaimService {
         String wa = ClaimDerivation.whatsappPhone(found.flags(), "active", found.publicPhone());
         return new ClaimCreatedView(id.toString(),
                 wa == null ? null : WhatsappLinks.withText(wa, ClaimDerivation.whatsappText(found.petName(), code)));
+    }
+
+    /**
+     * The owner's verdict (L1 design §4.10). Order: case not_found → forbidden → the claim is on this case (not_found) → the
+     * body. Any case status (a purged case has no row: not_found). Revisable; repeating the stored answer writes nothing.
+     * Confirming never closes the case (only reunite does) and leaves the other claims as they are.
+     */
+    CreatedView answer(String rawCode, String rawClaimId, UUID me, ClaimAnswerRequest body) {
+        String code = OwnerAccess.code(rawCode);
+        RecoveryClaimQueries.AnswerTarget target = owners.require(queries.answerTarget(code, OwnerAccess.id(rawClaimId)),
+                RecoveryClaimQueries.AnswerTarget::createdBy, me);
+        if (target.claimId() == null) throw CaseErrors.notFound("claim");
+        if (!ClaimDerivation.isAnswer(body.status())) throw CaseErrors.invalidField("status", "confirmed or dismissed");
+        if (ClaimDerivation.answerChanges(target.claimStatus(), body.status())) queries.answer(code, target.claimId(), body.status(), clock.instant());
+        return new CreatedView(target.claimId().toString());
     }
 
     /**

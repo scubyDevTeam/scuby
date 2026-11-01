@@ -41,7 +41,7 @@ class LostCaseDerivationTest {
         return new LostCaseFacts("7K3PQ", status, "active".equals(status) ? null : NOW, OWNER,
                 new LostCaseFacts.PetFacts(name, "dog", "small", List.of("black"), null, List.of()),
                 new GeoPoint(6.2442, -75.5812), radius, NOW.minus(Duration.ofDays(2)), placeName,
-                "Carolina Mejía", whatsappPhone, sightings);
+                "Carolina Mejía", whatsappPhone, sightings, null);
     }
 
     static LostCaseFacts luna(List<LostCaseFacts.SightingFacts> sightings) {
@@ -81,7 +81,7 @@ class LostCaseDerivationTest {
         });
         assertThat(view.claims()).isEmpty();
         assertThat(view.pendingCheckin()).isNull();
-        assertThat(view.openClaimCount()).isZero();
+        assertThat(view.openClaimCount()).isNull();
     }
 
     @Test
@@ -172,7 +172,7 @@ class LostCaseDerivationTest {
     void anUnnamedPublisherShowsTheGenericNameNotAnythingFromTheirEmail() {
         var unnamed = new LostCaseFacts("7K3PQ", "active", null, OWNER,
                 new LostCaseFacts.PetFacts("Luna", "dog", "small", List.of("black"), null, List.of()),
-                new GeoPoint(6.2442, -75.5812), 100, NOW, null, null, WA, List.of());
+                new GeoPoint(6.2442, -75.5812), 100, NOW, null, null, WA, List.of(), null);
         assertThat(LostCaseDerivation.derive(unnamed, STRANGER, NOW, ES).contact().displayName()).isEqualTo("Alguien");
         assertThat(LostCaseDerivation.derive(unnamed, STRANGER, NOW, java.util.Locale.ENGLISH).contact().displayName()).isEqualTo("Someone");
     }
@@ -202,5 +202,63 @@ class LostCaseDerivationTest {
                 sighting("01", NOW.minusSeconds(5), NOW.minusSeconds(5), null, OTHER_DEVICE, null, false)));
         LostCaseDerivation.derive(luna(list), STRANGER, NOW, ES);
         assertThat(list.getFirst().id().toString()).endsWith("02");
+    }
+
+    static LostCaseFacts.ClaimRow claim(String id, Duration age, String status) {
+        return claim(id, age, age, status);
+    }
+
+    /** A claim made {@code age} ago whose claimant last said «Lo tengo» {@code idle} ago. */
+    static LostCaseFacts.ClaimRow claim(String id, Duration age, Duration idle, String status) {
+        return new LostCaseFacts.ClaimRow(UUID.fromString("00000000-0000-0000-0000-0000000000" + id), "+573001112233", NOW.minus(age),
+                NOW.minus(idle), status);
+    }
+
+    static final LostCaseFacts.ClaimFacts THREE_CLAIMS = new LostCaseFacts.ClaimFacts(List.of(
+            claim("c1", Duration.ofHours(1), "open"),
+            claim("c2", Duration.ofDays(8), "open"),
+            claim("c3", Duration.ofDays(2), "confirmed")), 1);
+
+    @Test
+    void theOwnerGetsTheClaimsWithTheirWireStatusAndTheOpenCountOnAnActiveCase() {
+        LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(THREE_CLAIMS), OWNER_VIEW, NOW, ES);
+        assertThat(view.claims()).extracting(LostCaseView.ClaimView::status).containsExactly("open", "stale", "confirmed");
+        assertThat(view.claims()).extracting(LostCaseView.ClaimView::id).containsExactly(
+                "00000000-0000-0000-0000-0000000000c1", "00000000-0000-0000-0000-0000000000c2", "00000000-0000-0000-0000-0000000000c3");
+        assertThat(view.claims().getFirst().phone()).isEqualTo("+573001112233");
+        assertThat(view.claims().getFirst().createdAt()).isEqualTo(NOW.minus(Duration.ofHours(1)));
+        assertThat(view.openClaimCount()).isEqualTo(1);
+    }
+
+    @Test
+    void theOwnerOfAClosedCaseStillSeesTheClaimsAndACountOfZero() {
+        var closed = facts("reunited", 100, null, "Luna", null, List.of()).withClaims(THREE_CLAIMS);
+        LostCaseView view = LostCaseDerivation.derive(closed, OWNER_VIEW, NOW, ES);
+        assertThat(view.claims()).hasSize(3);
+        assertThat(view.openClaimCount()).isZero();
+    }
+
+    @Test
+    void aNonOwnerGetsNoClaimsAndANullCountEvenIfTheFactsHadThem() {
+        LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(THREE_CLAIMS), STRANGER, NOW, ES);
+        assertThat(view.claims()).isEmpty();
+        assertThat(view.openClaimCount()).isNull();
+    }
+
+    @Test
+    void aClaimIsStaleByItsLastActivityNotByWhenItWasMade() {
+        var refreshed = new LostCaseFacts.ClaimFacts(List.of(
+                claim("d1", Duration.ofDays(9), Duration.ofHours(1), "open"),      // made 9 days ago, repeated an hour ago
+                claim("d2", Duration.ofDays(2), Duration.ofDays(8), "open")), 1);  // (not producible, but proves the field read)
+        LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(refreshed), OWNER_VIEW, NOW, ES);
+        assertThat(view.claims()).extracting(LostCaseView.ClaimView::status).containsExactly("open", "stale");
+        assertThat(view.claims().getFirst().createdAt()).as("the wire keeps when the claim was made").isEqualTo(NOW.minus(Duration.ofDays(9)));
+    }
+
+    @Test
+    void anOwnerWithNoClaimsLoadedGetsAnEmptyListAndZero() {
+        LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(new LostCaseFacts.ClaimFacts(List.of(), 0)), OWNER_VIEW, NOW, ES);
+        assertThat(view.claims()).isEmpty();
+        assertThat(view.openClaimCount()).isZero();
     }
 }

@@ -35,7 +35,8 @@ final class LostCaseDerivation {
                 new LostCaseView.LastSeenView(owner ? facts.center() : LocationPrecisionDerivation.publicCenter(facts.center()),
                         owner ? facts.radiusM() : Math.max(facts.radiusM(), PUBLIC_RADIUS_FLOOR_M),
                         facts.lastSeenAt(), PublicTextDerivation.placeName(facts.placeName(), locale)),
-                0, sightings, List.of(), null, contact(facts, locale));
+                ClaimDerivation.openClaimCount(owner, facts.status(), facts.claims() == null ? 0 : facts.claims().openNonStale()),
+                sightings, claims(facts, owner, now), null, contact(facts, locale));
     }
 
     private static LostCaseView.SightingView sighting(LostCaseFacts.SightingFacts s, Viewer viewer, boolean owner, Instant now) {
@@ -65,5 +66,14 @@ final class LostCaseDerivation {
         if (!"active".equals(facts.status())) return null;
         String whatsapp = facts.whatsappPhone() == null ? null : PublicTextDerivation.whatsappUrl(facts.whatsappPhone());
         return new LostCaseView.ContactView(PublicTextDerivation.publicName(facts.publisherName(), locale), whatsapp);
+    }
+
+    /** Owner only, in the query's order (newest first); a non-owner gets [] whatever the facts hold. */
+    private static List<LostCaseView.ClaimView> claims(LostCaseFacts facts, boolean owner, Instant now) {
+        if (!owner || facts.claims() == null) return List.of();
+        return facts.claims().newest().stream()
+                .map(c -> new LostCaseView.ClaimView(c.id().toString(), c.phone(), c.createdAt(),
+                        ClaimDerivation.wireStatus(c.status(), c.lastActiveAt(), now)))
+                .toList();
     }
 }
