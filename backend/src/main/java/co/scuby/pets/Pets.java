@@ -2,8 +2,10 @@ package co.scuby.pets;
 
 import co.scuby.platform.modules.ModuleApi;
 import co.scuby.platform.web.ApiException;
+import co.scuby.platform.web.Patch;
 import co.scuby.platform.web.ErrorCode;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -13,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static co.scuby.db.generated.Tables.PET;
@@ -32,6 +36,9 @@ public class Pets {
 
     public record NewPet(String name, Species species, @Nullable Size size, List<Color> colors,
                          @Nullable String marks, @Nullable String chipNumber, List<String> photoUrls) {}
+
+    /** What an edit of a case changes on its pet: photoUrls null = unchanged; marks absent = unchanged, null = cleared. */
+    public record LookChange(@Nullable List<String> photoUrls, Patch<String> marks) {}
 
     private final DSLContext db;
     private final Clock clock;
@@ -82,5 +89,18 @@ public class Pets {
                 RESPONSIBILITY_LINK.ROLE.eq(DSL.inline("owner")),
                 RESPONSIBILITY_LINK.ACTIVE_TO.isNull());
         if (!owned) throw new ApiException(ErrorCode.NOT_FOUND, "no such pet");
+    }
+
+    /**
+     * Writes the sent look fields of a pet, in the caller's transaction. The caller has authorized the write (the owner of
+     * a case of this pet). The pet is shared: the change shows on every case of it, past ones included.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void updateLook(UUID petId, LookChange change) {
+        Map<Field<?>, Object> set = new LinkedHashMap<>();
+        if (change.photoUrls() != null) set.put(PET.PHOTO_URLS, change.photoUrls().toArray(String[]::new));
+        if (change.marks().isPresent()) set.put(PET.MARKS, change.marks().value());
+        if (set.isEmpty()) return;
+        db.update(PET).set(set).where(PET.ID.eq(petId)).execute();
     }
 }
