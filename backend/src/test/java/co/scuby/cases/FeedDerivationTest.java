@@ -15,7 +15,7 @@ class FeedDerivationTest {
 
     static FeedRow row(String code, String photo, String place, int count, Instant last) {
         return new FeedRow(code, "Luna", "cat", "small", List.of("black", "tan"), photo, place,
-                new GeoPoint(6.2442, -75.580392), T, count, last);   // the query already reads the snapped center
+                new GeoPoint(6.2442, -75.580392), T, count, last, null);   // the query already reads the snapped center
     }
 
     @Test
@@ -34,7 +34,7 @@ class FeedDerivationTest {
         assertThat(a.point()).isEqualTo(new GeoPoint(6.2442, -75.580392));   // passed through: snapping happens once, at publish (decision 69)
         assertThat(a.photoUrl()).isEqualTo("http://x/a.jpg");
         assertThat(a.happenedAt()).isEqualTo(T);
-        assertThat(a.possibleFind()).isFalse();
+        assertThat(a.possibleFind()).isNull();
         assertThat(a.sightingsCount()).isEqualTo(2);
         assertThat(a.lastSightingAt()).isEqualTo(T.plusSeconds(60));
         assertThat(a.detail()).isNull();
@@ -47,7 +47,7 @@ class FeedDerivationTest {
 
     @Test
     void englishTextAndAnUnnamedPet() {
-        var unnamed = new FeedRow("CCCCC", null, "dog", null, List.of(), null, null, new GeoPoint(4.7, -74.0), T, 0, null);
+        var unnamed = new FeedRow("CCCCC", null, "dog", null, List.of(), null, null, new GeoPoint(4.7, -74.0), T, 0, null, null);
         FeedView view = FeedDerivation.derive(List.of(unnamed), FeedDerivation.Scope.national, Locale.forLanguageTag("en"));
         assertThat(view.scope()).isEqualTo("national");
         assertThat(view.items().getFirst().title()).isEqualTo("");
@@ -60,5 +60,13 @@ class FeedDerivationTest {
         FeedView view = FeedDerivation.derive(List.of(), FeedDerivation.Scope.national, Locale.forLanguageTag("es"));
         assertThat(view.scope()).isEqualTo("national");
         assertThat(view.items()).isEmpty();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(nullValues = "null", value = {"true", "false", "null"})
+    void possibleFindPassesThroughAsTheQueryComputedIt(Boolean value) {
+        var r = new FeedRow("AAAAA", "Luna", "cat", "small", List.of(), null, null, new GeoPoint(6.2442, -75.580392), T, 0, null, value);
+        assertThat(FeedDerivation.derive(List.of(r), FeedDerivation.Scope.national, Locale.forLanguageTag("es")).items().getFirst().possibleFind())
+                .isEqualTo(value);
     }
 }

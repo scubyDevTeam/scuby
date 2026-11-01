@@ -1,0 +1,56 @@
+package co.scuby.cases;
+
+import co.scuby.support.IntegrationTest;
+import co.scuby.support.MutableClock;
+import co.scuby.support.PlanAssert;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * The correlated open-claim counts of the publisher's feed items and of «Mis casos» (spec §4.13) must not scan every claim:
+ * they go through recovery_claim_by_case_recent_idx or the partial recovery_claim_one_open_per_claimant (both lead with
+ * case_code; which one the planner picks is its call). 2,000 cases of one seed publisher, 62,000 claims.
+ */
+@IntegrationTest
+class ClaimCountPlanTest {
+
+    static final UUID SEED_PUBLISHER = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    @Autowired DSLContext db;
+    @Autowired FeedQueries feed;
+    @Autowired MyCasesQueries myCases;
+
+    @BeforeEach
+    void setUp() {
+        SeedVolume.casesAndSightings(db, 2_000, 2_000);
+        SeedVolume.claims(db, 2_000, 60_000, "C000A", 2_000);
+    }
+
+    @Test
+    void thePublishersFeedBadgeDoesNotScanTheClaims() {
+        var q = feed.nationalQuery(null, 100, SEED_PUBLISHER, MutableClock.START);
+        PlanAssert.assertNoSeqScan(db, q, "recovery_claim");
+        assertReadThroughAClaimIndex(q);
+    }
+
+    @Test
+    void misCasosCountsDoNotScanTheClaims() {
+        var q = myCases.query(SEED_PUBLISHER, MutableClock.START);
+        PlanAssert.assertNoSeqScan(db, q, "recovery_claim");
+        assertReadThroughAClaimIndex(q);
+    }
+
+    /** By index name, as the plan checks require: either of the two indexes leading with case_code. */
+    private void assertReadThroughAClaimIndex(org.jooq.Query q) {
+        assertThat(PlanAssert.plan(db, q)).containsAnyOf(" using recovery_claim_by_case_recent_idx ",
+                " using recovery_claim_one_open_per_claimant ", "Bitmap Index Scan on recovery_claim_");
+        // Correlated on the case: a hashed subplan (all open claims read once) would show no case_code condition.
+        assertThat(PlanAssert.plan(db, q)).contains("Index Cond: (case_code = lost_case.code)");
+    }
+}

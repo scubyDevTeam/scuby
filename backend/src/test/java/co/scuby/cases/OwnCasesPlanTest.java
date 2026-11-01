@@ -35,7 +35,7 @@ class OwnCasesPlanTest {
 
     @Test
     void aPersonsCasesAreReadByIndex() {
-        var q = queries.query(UUID.fromString("00000000-0000-0000-0002-000000000007"));
+        var q = queries.query(UUID.fromString("00000000-0000-0000-0002-000000000007"), co.scuby.support.MutableClock.START);
         PlanAssert.assertUsesIndex(db, q, "lost_case_by_publisher_idx");
         PlanAssert.assertNoSeqScan(db, q, "lost_case");
         PlanAssert.assertNoSeqScan(db, q, "pet");
