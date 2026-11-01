@@ -8,7 +8,6 @@ import co.scuby.platform.db.GeoPoint;
 import co.scuby.platform.db.UniqueViolation;
 import co.scuby.platform.security.Account;
 import co.scuby.platform.security.Caller;
-import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.BodyValidation;
 import co.scuby.uploads.PhotoAttachments;
 import co.scuby.uploads.UploadPurpose;
@@ -27,9 +26,11 @@ import java.util.UUID;
  * staging: outside any transaction) → the status. from_sighting_id is a link, never an error: kept (with the pin's point)
  * only when it is the caller's own visible pin on this case from the last 24 h, else dropped. Then one transaction: the
  * reactivation of an expired case (decision #29; zero rows is not an error, a concurrent claim may have done it) and the
- * one-statement upsert, which inserts the claim or refreshes the caller's open one (a repeat). Empty upsert → the case is
- * not active, and a re-read says why (invalid_transition, active_case_exists): an old claim is never answered on a case
- * that is not active. No rate limit (as #54), no notification, no check-in, no outbox row (L2 derives them from rows).
+ * one-statement upsert, which inserts the claim or refreshes the caller's open one (a repeat). One claim per person per
+ * case (decision #82): when the owner already answered the caller's claim, the pre-read says so and a repeat gets that claim
+ * back with no write (no reactivation either). Empty upsert → the transaction is rolled back and a re-read says why
+ * (invalid_transition, active_case_exists) or, when the owner answered in between, hands the answered claim back: an old
+ * claim is never answered on a case that is not active. Only the pet's newest case is reactivated (decision #81). No rate limit (as #54), no notification, no check-in, no outbox row (L2 derives them from rows).
  */
 @Service
 class RecoveryClaimService {
@@ -63,7 +64,7 @@ class RecoveryClaimService {
         String code = OwnerAccess.code(rawCode);
         UUID me = account.personId();
         Instant now = clock.instant();
-        RecoveryClaimQueries.ClaimCase found = queries.caseForClaim(code)
+        RecoveryClaimQueries.ClaimCase found = queries.caseForClaim(code, me)
                 .orElseThrow(() -> cases.isPurged(code) ? CaseErrors.gone() : CaseErrors.notFound());
         if (policy.isOwner(found.createdBy(), me)) throw CaseErrors.forbidden("the owner cannot claim their own case");
 
@@ -75,24 +76,29 @@ class RecoveryClaimService {
 
         Outcome outcome = LostLifecycleDerivation.check(Action.CLAIM, found.status(), found.resolvedAt(), now);
         if (outcome == Outcome.INVALID_TRANSITION) throw CaseErrors.invalidTransition();
+        if (found.answered()) return view(found.own().id(), found.activePhone(), found.petName(), code);   // decision #82: no write
         GeoPoint claimPoint = link.map(RecoveryClaimQueries.PinForClaim::point).orElse(null);
         UUID claimFrom = link.isPresent() ? UUID.fromString(body.fromSightingId()) : null;
         Optional<UUID> written;
         try {
             written = tx.execute(status -> {
                 if (outcome == Outcome.REACTIVATE) lifecycle.reopen(code, null, now);
-                return queries.upsertIfActive(code, me, phone, body.photos(), claimPoint, claimFrom, now);
+                Optional<UUID> id = queries.upsertIfActive(code, me, phone, body.photos(), claimPoint, claimFrom, now);
+                if (id.isEmpty()) status.setRollbackOnly();   // nothing was claimed: a reactivation alone must not stay
+                return id;
             });
         } catch (RuntimeException e) {
             if (!UniqueViolation.on(e, LifecycleQueries.ACTIVE_PER_PET)) throw e;
             // The other active case was closed again between the violation and this read: the case is still not active.
             throw lifecycle.activeCodeFor(found.petId()).map(CaseErrors::activeCaseExists).orElseGet(CaseErrors::invalidTransition);
         }
+        if (written.isEmpty()) return afterEmptyWrite(code, me, now);
         // A row came back, so the case was active when it was written: the link follows the contact rule on an active case.
-        UUID id = written.orElseThrow(() -> refusalAfterEmptyWrite(code, now));
-        String wa = found.publicPhone();
-        return new ClaimCreatedView(id.toString(),
-                wa == null ? null : WhatsappLinks.withText(wa, ClaimDerivation.whatsappText(found.petName(), code)));
+        return view(written.get(), found.publicPhone(), found.petName(), code);
+    }
+
+    private static ClaimCreatedView view(UUID id, @Nullable String phone, @Nullable String petName, String code) {
+        return new ClaimCreatedView(id.toString(), phone == null ? null : WhatsappLinks.withText(phone, ClaimDerivation.whatsappText(petName, code)));
     }
 
     /**
@@ -122,16 +128,21 @@ class RecoveryClaimService {
                 now));
     }
 
-    /** Nothing written: the case is not active (and could not be reactivated); say why. */
-    private ApiException refusalAfterEmptyWrite(String code, Instant now) {
+    /**
+     * Nothing written: the case is not active (and could not be reactivated), or the owner answered the caller's claim since
+     * the read. Say why, or hand the answered claim back.
+     */
+    private ClaimCreatedView afterEmptyWrite(String code, UUID me, Instant now) {
         LifecycleRow row = lifecycle.load(code).orElse(null);
-        if (row == null) return CaseErrors.notFound();
+        if (row == null) throw CaseErrors.notFound();
         if (LostLifecycleDerivation.check(Action.CLAIM, row.status(), row.resolvedAt(), now) == Outcome.INVALID_TRANSITION) {
-            return CaseErrors.invalidTransition();
+            throw CaseErrors.invalidTransition();
         }
-        if (row.otherActiveCode() != null) return CaseErrors.activeCaseExists(row.otherActiveCode());
-        // Reachable only if the case expired between the pre-read and the write (nothing expires cases in L1; the L2 expiry
-        // job should retry or reactivate here instead of refusing): the case is not active, and invalid_transition says so.
-        return CaseErrors.invalidTransition();
+        if (row.otherActiveCode() != null) throw CaseErrors.activeCaseExists(row.otherActiveCode());
+        RecoveryClaimQueries.ClaimCase fresh = queries.caseForClaim(code, me).orElseThrow(CaseErrors::notFound);
+        if (fresh.answered()) return view(fresh.own().id(), fresh.activePhone(), fresh.petName(), code);
+        // Otherwise the case is no longer claimable: an older case of the pet (only the newest is reactivated), or it expired
+        // between the pre-read and the write (nothing expires cases in L1; the L2 expiry job should retry or reactivate here).
+        throw CaseErrors.invalidTransition();
     }
 }

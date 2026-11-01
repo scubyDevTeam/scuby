@@ -248,12 +248,66 @@ class RecoveryClaimTest {
         assertThat(theClaim().get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant()).isEqualTo(NOW.minus(Duration.ofDays(1)));
     }
 
+    /**
+     * Decision 15: one claim per person per case. After the owner answered, the next «Lo tengo» hands back that same claim
+     * (and the WhatsApp link) with no write: no new row, the answer, the phone and the dates stay, the owner's badge stays off.
+     */
+    @ParameterizedTest
+    @CsvSource({"confirmed", "dismissed"})
+    void afterTheOwnerAnsweredARepeatReturnsTheSameClaimAndWritesNothing(String answer) {
+        UUID answered = cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(1)), answer);
+        var before = theClaim();
+        assertThat(owner.get("/cases/{code}", "7K3PQ").json().get("open_claim_count").asInt()).isZero();
+        ApiResponse r = claim(helper, "7K3PQ", "{\"phone\":\"+573009998877\"}");
+        assertThat(r.status()).isEqualTo(201);
+        assertThat(r.str("/id")).isEqualTo(answered.toString());
+        assertThat(r.str("/whatsapp_url")).isEqualTo(LUNA_URL);
+        assertThat(db.fetchCount(RECOVERY_CLAIM)).as("no new row").isEqualTo(1);
+        assertThat(theClaim()).as("not a column changed").isEqualTo(before);
+        assertThat(theClaim().get(RECOVERY_CLAIM.STATUS)).isEqualTo(answer);
+        ApiResponse ownerView = owner.get("/cases/{code}", "7K3PQ");
+        assertThat(ownerView.json().get("open_claim_count").asInt()).as("the badge stays off").isZero();
+        assertThat(ownerView.json().get("claims")).hasSize(1);
+    }
+
     @Test
-    void afterTheOwnerAnsweredANewClaimIsANewRow() {
-        UUID dismissed = cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(1)), "dismissed");
-        String id = claim("").str("/id");
-        assertThat(id).isNotEqualTo(dismissed.toString());
-        assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(2);
+    void aRepeatAfterTheAnswerHasNoWhatsappLinkWhenTheContactIsPrivate() {
+        cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(1)), "confirmed");
+        db.execute("UPDATE scuby.lost_case SET in_app_only = true WHERE code = '7K3PQ'");
+        ApiResponse r = claim("");
+        assertThat(r.status()).isEqualTo(201);
+        assertThat(r.isNull("/whatsapp_url")).isTrue();
+        assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
+    }
+
+    @Test
+    void aRepeatAfterTheAnswerOnAnExpiredCaseReactivatesNothingAndHasNoLink() {
+        UUID answered = cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(3)), "confirmed");
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(2)));
+        ApiResponse r = claim("");
+        assertThat(r.status()).isEqualTo(201);
+        assertThat(r.str("/id")).isEqualTo(answered.toString());
+        assertThat(r.isNull("/whatsapp_url")).as("the case is not active: no public contact").isTrue();
+        assertThat(luna().get(LOST_CASE.STATUS)).as("a repeat with no write revives nothing").isEqualTo("expired");
+    }
+
+    @Test
+    void aRepeatAfterTheAnswerOnAReunitedCaseIsStillInvalidTransition() {
+        cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(3)), "confirmed");
+        cases.close("7K3PQ", "reunited", NOW.minusSeconds(60));
+        ApiResponse r = claim("");
+        assertThat(r.status()).isEqualTo(409);
+        assertThat(r.errorCode()).isEqualTo("invalid_transition");
+    }
+
+    @Test
+    void anOpenClaimIsStillRefreshedNotReturned() {
+        UUID open = cases.claim("7K3PQ", andres, "+573001112233", NOW.minus(Duration.ofDays(9)), "open");
+        ApiResponse r = claim(helper, "7K3PQ", "{\"phone\":\"+573009998877\"}");
+        assertThat(r.str("/id")).isEqualTo(open.toString());
+        assertThat(theClaim().get(RECOVERY_CLAIM.PHONE)).isEqualTo("+573009998877");
+        assertThat(theClaim().get(RECOVERY_CLAIM.LAST_ACTIVE_AT).toInstant()).isEqualTo(NOW);
+        assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
     }
 
     @Test

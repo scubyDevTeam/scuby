@@ -46,7 +46,7 @@ final class SeedVolume {
         db.execute("""
                 INSERT INTO scuby.person (id, display_name, email, created_at)
                 SELECT ('00000000-0000-0000-0003-' || lpad(g::text, 12, '0'))::uuid, 'C' || g, 'c' || g || '@seed.co', now()
-                FROM generate_series(1, 2000) g ON CONFLICT DO NOTHING""");
+                FROM generate_series(1, 3000) g ON CONFLICT DO NOTHING""");
         db.execute("""
                 INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, last_active_at, answered_at)
                 SELECT gen_random_uuid(), 'C' || upper(lpad(to_hex(1 + g % ?), 4, '0')),
@@ -58,7 +58,7 @@ final class SeedVolume {
                 FROM generate_series(1, ?) g""", cases, cases, claims);
         db.execute("""
                 INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, last_active_at, answered_at)
-                SELECT gen_random_uuid(), ?, ('00000000-0000-0000-0003-' || lpad((1001 + g % 1000)::text, 12, '0'))::uuid,
+                SELECT gen_random_uuid(), ?, ('00000000-0000-0000-0003-' || lpad((1001 + g % 2000)::text, 12, '0'))::uuid,
                        '+573001112233', CASE WHEN g <= 500 THEN 'open' ELSE 'confirmed' END,
                        timestamptz '2026-09-01' + g * interval '1 minute',
                        timestamptz '2026-09-01' + g * interval '1 minute',

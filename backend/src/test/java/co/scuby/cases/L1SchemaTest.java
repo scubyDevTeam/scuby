@@ -131,19 +131,14 @@ class L1SchemaTest {
     }
 
     @Test
-    void onePersonHasAtMostOneOpenClaimPerCase() {
+    void onePersonHasOneClaimPerCaseWhateverItsStatus() {
         claim(claimant, "open", "NULL");
-        assertThatThrownBy(() -> claim(claimant, "open", "NULL")).hasStackTraceContaining("recovery_claim_one_open_per_claimant");
-        claim(owner, "open", "NULL");                                  // another person: allowed (the owner check is the service's)
+        assertThatThrownBy(() -> claim(claimant, "open", "NULL")).hasStackTraceContaining("recovery_claim_one_per_claimant");
+        assertThatThrownBy(() -> claim(claimant, "dismissed", "now()")).as("an answer does not free the slot")
+                .hasStackTraceContaining("recovery_claim_one_per_claimant");
+        claim(owner, "confirmed", "now()");                            // another person: allowed (the owner check is the service's)
+        assertThatThrownBy(() -> claim(owner, "open", "NULL")).hasStackTraceContaining("recovery_claim_one_per_claimant");
         assertThat(db.fetchCount(co.scuby.db.generated.Tables.RECOVERY_CLAIM)).isEqualTo(2);
-    }
-
-    @Test
-    void anAnsweredClaimFreesTheSlotForANewOpenOne() {
-        claim(claimant, "dismissed", "now()");
-        claim(claimant, "confirmed", "now()");
-        claim(claimant, "open", "NULL");
-        assertThat(db.fetchCount(co.scuby.db.generated.Tables.RECOVERY_CLAIM)).isEqualTo(3);
     }
 
     @ParameterizedTest(name = "{0}")

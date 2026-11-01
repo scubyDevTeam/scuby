@@ -22,13 +22,26 @@ import static co.scuby.db.generated.Tables.SIGHTING;
 @Component
 class RecoveryClaimQueries {
 
+    /** The caller's claim on the case, when they have one (at most one: recovery_claim_one_per_claimant). */
+    record OwnClaim(UUID id, String status) {}
+
+    /**
+     * {@code publicPhone}: the number under the public-contact rule whatever the status (a claim may reactivate the case before
+     * the link is built). {@code activePhone}: the same while the case is active (what the case page shows), for an answer that writes nothing.
+     */
     record ClaimCase(String code, UUID createdBy, UUID petId, @Nullable String petName, String status, @Nullable Instant resolvedAt,
-                     @Nullable String publicPhone) {}
+                     @Nullable String publicPhone, @Nullable String activePhone, @Nullable OwnClaim own) {
+        /** The owner already answered the caller's claim on this case: a repeat gets it back untouched (decision #82). */
+        boolean answered() {
+            return own != null && !"open".equals(own.status());
+        }
+    }
 
     record PinForClaim(ClaimDerivation.SightingLink link, GeoPoint point) {}
 
     /** The number, only under the public-contact rule and whatever the status (the claim may reactivate the case first). */
     private static final Field<String> PUBLIC_PHONE = LostCaseQueries.CONTACT_IF_PUBLIC.as("public_phone");
+    private static final Field<String> ACTIVE_PHONE = LostCaseQueries.WHATSAPP_PHONE;
 
     private final DSLContext db;
 
@@ -36,14 +49,17 @@ class RecoveryClaimQueries {
         this.db = db;
     }
 
-    Optional<ClaimCase> caseForClaim(String code) {
+    /** The case, the caller's own claim on it (one statement) and the number under the contact rule. */
+    Optional<ClaimCase> caseForClaim(String code, UUID claimant) {
         return db.select(LOST_CASE.CODE, LOST_CASE.CREATED_BY, LOST_CASE.PET_ID, PET.NAME, LOST_CASE.STATUS, LOST_CASE.RESOLVED_AT,
-                         PUBLIC_PHONE)
+                         PUBLIC_PHONE, ACTIVE_PHONE, RECOVERY_CLAIM.ID, RECOVERY_CLAIM.STATUS)
                  .from(LOST_CASE).join(PET).on(PET.ID.eq(LOST_CASE.PET_ID))
+                 .leftJoin(RECOVERY_CLAIM).on(RECOVERY_CLAIM.CASE_CODE.eq(LOST_CASE.CODE), RECOVERY_CLAIM.CLAIMANT_PERSON_ID.eq(claimant))
                  .where(LOST_CASE.CODE.eq(code))
                  .fetchOptional(r -> new ClaimCase(r.get(LOST_CASE.CODE), r.get(LOST_CASE.CREATED_BY), r.get(LOST_CASE.PET_ID), r.get(PET.NAME),
                          r.get(LOST_CASE.STATUS), r.get(LOST_CASE.RESOLVED_AT) == null ? null : r.get(LOST_CASE.RESOLVED_AT).toInstant(),
-                         r.get(PUBLIC_PHONE)));
+                         r.get(PUBLIC_PHONE), r.get(ACTIVE_PHONE),
+                         r.get(RECOVERY_CLAIM.ID) == null ? null : new OwnClaim(r.get(RECOVERY_CLAIM.ID), r.get(RECOVERY_CLAIM.STATUS))));
     }
 
     record AnswerTarget(UUID createdBy, @Nullable UUID claimId, @Nullable String claimStatus) {}
@@ -77,13 +93,15 @@ class RecoveryClaimQueries {
     }
 
     /**
-     * One statement (no lock): the claim is written only while the case is active. ON CONFLICT on the partial unique index
-     * (one open claim per claimant per case; the predicate is the same inline literal) the caller's open claim — a stale
-     * one included — is refreshed instead: the repeat's phone and last_active_at = now, and the photos, point and link only when the repeat sends them (empty photos, no
-     * point or no link keep the stored ones); its id,
-     * created_at and status stay. A double tap serializes on the index entry and refreshes the one row. Returns the new or
-     * refreshed claim's id; empty when the case is not active (the caller re-reads it to say why), so a claim on a case
-     * that is not active is never answered.
+     * One statement (no lock): the claim is written only while the case is active. ON CONFLICT on the unique index (one claim
+     * per claimant per case, any status) the caller's claim is refreshed instead, but only while it is open — a stale one
+     * included: the repeat's phone and last_active_at = now, and the photos, point and link only when the repeat sends them
+     * (empty photos, no point or no link keep the stored ones); its id, created_at and status stay. A claim the owner already
+     * answered is never touched (the DO UPDATE's WHERE is false, also when the answer commits between the caller's read and
+     * this statement), so there is no second row: the statement returns nothing and the caller hands that claim back. A double
+     * tap serializes on the index entry and refreshes the one row. Returns the new or refreshed claim's id; empty when the
+     * case is not active or the claim is answered (the caller re-reads to say which), so a claim on a case that is not active
+     * is never answered.
      */
     Optional<UUID> upsertIfActive(String code, UUID claimant, String phone, List<String> photos, @Nullable GeoPoint point,
                                   @Nullable UUID fromSighting, Instant now) {
@@ -101,7 +119,6 @@ class RecoveryClaimQueries {
                            .from(LOST_CASE)
                            .where(LOST_CASE.CODE.eq(code), LOST_CASE.STATUS.eq(DSL.inline("active"))))
                  .onConflict(RECOVERY_CLAIM.CASE_CODE, RECOVERY_CLAIM.CLAIMANT_PERSON_ID)
-                 .where(RECOVERY_CLAIM.STATUS.eq(DSL.inline("open")))
                  .doUpdate()
                  .set(RECOVERY_CLAIM.PHONE, DSL.excluded(RECOVERY_CLAIM.PHONE))
                  .set(RECOVERY_CLAIM.PHOTO_URLS, DSL.when(DSL.cardinality(DSL.excluded(RECOVERY_CLAIM.PHOTO_URLS)).gt(0),
@@ -110,6 +127,7 @@ class RecoveryClaimQueries {
                  .set(RECOVERY_CLAIM.LNG, DSL.coalesce(DSL.excluded(RECOVERY_CLAIM.LNG), RECOVERY_CLAIM.LNG))
                  .set(RECOVERY_CLAIM.FROM_SIGHTING_ID, DSL.coalesce(DSL.excluded(RECOVERY_CLAIM.FROM_SIGHTING_ID), RECOVERY_CLAIM.FROM_SIGHTING_ID))
                  .set(RECOVERY_CLAIM.LAST_ACTIVE_AT, DSL.excluded(RECOVERY_CLAIM.LAST_ACTIVE_AT))
+                 .where(RECOVERY_CLAIM.STATUS.eq(DSL.inline("open")))
                  .returning(RECOVERY_CLAIM.ID)
                  .fetchOptional(r -> r.get(RECOVERY_CLAIM.ID));
     }

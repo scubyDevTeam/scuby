@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The correlated open-claim counts of the publisher's feed items and of «Mis casos» (spec §4.13) must not scan every claim:
- * they go through recovery_claim_by_case_recent_idx or the partial recovery_claim_one_open_per_claimant (both lead with
+ * they go through recovery_claim_by_case_recent_idx or the unique recovery_claim_one_per_claimant (both lead with
  * case_code; which one the planner picks is its call). 2,000 cases of one seed publisher, 62,000 claims.
  */
 @IntegrationTest
@@ -49,7 +49,7 @@ class ClaimCountPlanTest {
     /** By index name, as the plan checks require: either of the two indexes leading with case_code. */
     private void assertReadThroughAClaimIndex(org.jooq.Query q) {
         assertThat(PlanAssert.plan(db, q)).containsAnyOf(" using recovery_claim_by_case_recent_idx ",
-                " using recovery_claim_one_open_per_claimant ", "Bitmap Index Scan on recovery_claim_");
+                " using recovery_claim_one_per_claimant ", "Bitmap Index Scan on recovery_claim_");
         // Correlated on the case: every index scan of recovery_claim is followed by an Index Cond on case_code. A hashed
         // subplan (all open claims read once) has none. Scoped to the recovery_claim node lines: the feed's sighting
         // subplans print the same Index Cond text, and plain EXPLAIN never prints "hashed SubPlan" for a CASE branch.

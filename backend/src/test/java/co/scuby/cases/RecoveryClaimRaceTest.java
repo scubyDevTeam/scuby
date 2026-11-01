@@ -113,7 +113,7 @@ class RecoveryClaimRaceTest {
 
     /**
      * Deterministic double tap: the first «Lo tengo» is held uncommitted; the second's upsert waits on the first's entry in
-     * recovery_claim_one_open_per_claimant, then takes the DO UPDATE branch on the committed row: one row, the same id, the
+     * recovery_claim_one_per_claimant, then takes the DO UPDATE branch on the committed row: one row, the same id, the
      * second tap's phone, never a 500.
      */
     @Test
@@ -132,6 +132,50 @@ class RecoveryClaimRaceTest {
         assertThat(r.str("/id")).isEqualTo(first.toString());
         assertThat(db.fetchCount(RECOVERY_CLAIM)).isEqualTo(1);
         assertThat(db.select(RECOVERY_CLAIM.PHONE).from(RECOVERY_CLAIM).fetchOne(RECOVERY_CLAIM.PHONE)).isEqualTo("+573009998877");
+    }
+
+    /**
+     * Deterministic: the owner's dismissal is held uncommitted while the claimant's repeat reads the claim as open and its
+     * upsert waits on that row. After the commit the repeat finds the claim answered: it hands that one back, never a second
+     * row (decision 15) and never a 500.
+     */
+    @Test
+    void aRepeatThatMeetsTheOwnersAnswerInFlightReturnsTheAnsweredClaim() throws Exception {
+        round(0, true);
+        ApiClient helper = clients.newBrowser();
+        UUID andres = accounts.signIn(helper, "andres@correo.co");
+        UUID claim = cases.claim("7K3PQ", andres, "+573001112233", MutableClock.START.minus(Duration.ofHours(2)), "open");
+        contention.hold("UPDATE scuby.recovery_claim SET status = 'dismissed', answered_at = now() WHERE id = ?", claim);
+        Future<ApiResponse> f = pool.submit(() -> helper.post(PATH, "{\"phone\":\"+573009998877\"}", "7K3PQ"));
+        contention.awaitWaiters(1);
+        contention.commit();
+        ApiResponse r = f.get(30, TimeUnit.SECONDS);
+        assertThat(r.status()).as(r.body()).isEqualTo(201);
+        assertThat(r.str("/id")).isEqualTo(claim.toString());
+        assertThat(db.fetchCount(RECOVERY_CLAIM)).as("one claim per person per case").isEqualTo(1);
+        var row = db.selectFrom(RECOVERY_CLAIM).fetchOne();
+        assertThat(row.get(RECOVERY_CLAIM.STATUS)).isEqualTo("dismissed");
+        assertThat(row.get(RECOVERY_CLAIM.PHONE)).as("the answered claim is not refreshed").isEqualTo("+573001112233");
+    }
+
+    /** Free-running: a double tap against the owner's answer on the same claim, many rounds: never a 500, always exactly one row. */
+    @Test
+    void aDoubleTapAgainstTheOwnersAnswerLeavesOneRow() throws Exception {
+        for (int n = 0; n < 8; n++) {
+            round(n, true);
+            ApiClient a = clients.newBrowser();
+            UUID andres = accounts.signIn(a, "andres" + n + "@correo.co");
+            ApiClient b = twinOf(a);
+            UUID claim = cases.claim("7K3PQ", andres, "+573001112233",
+                    MutableClock.START.minus(Duration.ofHours(2)), "open");
+            var barrier = new CyclicBarrier(3);
+            Future<ApiResponse> fa = pool.submit(together(barrier, () -> a.post(PATH, BODY, "7K3PQ")));
+            Future<ApiResponse> fb = pool.submit(together(barrier, () -> b.post(PATH, BODY, "7K3PQ")));
+            Future<ApiResponse> fo = pool.submit(together(barrier, () -> owner.post("/cases/{code}/claims/{claimId}", "{\"status\":\"dismissed\"}", "7K3PQ", claim)));
+            assertThat(List.of(fa.get(30, TimeUnit.SECONDS).status(), fb.get(30, TimeUnit.SECONDS).status(), fo.get(30, TimeUnit.SECONDS).status()))
+                    .as("round %d", n).containsExactly(201, 201, 200);
+            assertThat(db.fetchCount(RECOVERY_CLAIM)).as("round %d", n).isEqualTo(1);
+        }
     }
 
     @Test
