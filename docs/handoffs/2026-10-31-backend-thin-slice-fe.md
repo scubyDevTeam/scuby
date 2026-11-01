@@ -131,6 +131,7 @@ write a spec that depends on any of them being the same against the backend.
 | 9 | A correction's distance is measured from the case's exact point | From the snapped public center | A boundary case only |
 | 10 | `PATCH /cases/{code}` edits found, adoption and help cases, and reopen works on them | `not_found` for every code until those verticals exist | Their screens are built against the mock |
 | 11 | Pets with the same last activity keep insertion order; a claim's stale status is stored by the follow-up loop | Ordered by the pet's creation date; stale is derived from `last_active_at` | Not observable on a screen |
+| 12 | Any newer case of the same pet makes an older expired case non-reopenable (cancelled included) | A newer case that is `cancelled` is ignored: the older expired case can still be reopened, reactivated by a claim and offered as `reopenable_case_code` (#88, amends #81) | Align the mock's newest-case check (`web/src/mocks/`) when convenient; only visible after cancelling a duplicate of an expired case |
 
 ## 3. Contract proposals
 

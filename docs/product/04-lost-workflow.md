@@ -293,7 +293,7 @@ returns that same claim untouched (with the WhatsApp link when the case is activ
 claim, no change of phone or dates, no reactivation of an expired case, and the owner's badge stays off. The owner's
 list shows `last_active_at` as the claim's time and orders by it, newest first (decision #84). On a case that is no
 longer active, a repeat on an open claim gets the case's answer (reactivated inside 30 days — only when it is the
-pet's newest case, decision #81 — or `active_case_exists` with the pet's live case, or `invalid_transition`), never
+pet's newest case, decision #81, where a cancelled newer case does not count, decision #88 — or `active_case_exists` with the pet's live case, or `invalid_transition`), never
 the old claim.
 
 Creating one **opens a contact channel** and **schedules claim check-ins**. It never changes the
@@ -379,7 +379,7 @@ stateDiagram-v2
     expired --> reunited: owner confirms (no reopen first, decision #83)
     active --> expired: 2 consecutive check-ins unanswered
     active --> cancelled: owner deletes (false alarm, duplicate)
-    expired --> active: owner reopens (1 tap, ≤30 days, the pet's newest case only, decision #81)
+    expired --> active: owner reopens (1 tap, ≤30 days, the pet's newest case only, decisions #81 and #88: a cancelled newer case is ignored)
     expired --> active: recovery_claim (≤30 days, the pet's newest case only, decisions #29 and #81)
     reunited --> [*]
     cancelled --> [*]
