@@ -1147,6 +1147,24 @@ describe('help — endings and who hears of them (07 · Rules, Events; 08 · Hel
     )
   })
 
+  it('reopening a case whose pet has another active case is `active_case_exists`', async () => {
+    await asCarolina()
+    const luna = db.cases['7K3PQ']
+    if (luna?.vertical !== 'lost') throw new Error('expected lost')
+    const other = Object.values(db.cases).find(
+      (c) => c.vertical === 'lost' && c.code !== luna.code && c.status === 'active',
+    )
+    if (!other) throw new Error('need a second lost case')
+    Object.assign(luna, {
+      status: 'expired',
+      resolved_at: new Date().toISOString(),
+      pet_id: other.pet_id,
+    })
+    const refused = await failure(call(api.reopenCase, { params: { code: '7K3PQ' } }, asIs))
+    expect(refused.code).toBe('active_case_exists')
+    expect(luna.status).toBe('expired')
+  })
+
   it('past the 30 days it cannot be reopened', async () => {
     await asCarolina()
     later(5 * DAY + 14 * DAY + 2 * DAY)
@@ -2222,6 +2240,16 @@ describe('«Lo tengo» (04 · recovery_claim; decisions #75, #76)', () => {
       pet_id: other.pet_id,
     })
     expect((await failure(claim('7K3PQ'))).code).toBe('active_case_exists')
+  })
+
+  it('a repeat refreshes a stale claim back to open', async () => {
+    const pedro = await asNewcomer('pedro.ruiz@correo.co')
+    await claim('7K3PQ')
+    const row = () => db.recoveryClaims.find((c) => c.claimant_id === pedro.id)
+    later(8 * DAY)
+    await claim('7K3PQ')
+    expect(row()?.status).toBe('open')
+    expect(Date.parse(row()?.stale_at ?? '')).toBeGreaterThan(Date.now())
   })
 
   it('the badge is null in the feed for everyone but the publisher', async () => {

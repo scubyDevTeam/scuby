@@ -315,6 +315,16 @@ export const owner = [
     if (row.status !== 'expired' || !row.resolved_at) fail('invalid_transition')
     const window = row.vertical === 'adoption' ? ADOPTION_REOPEN_WINDOW : REOPEN_WINDOW
     if (Date.now() - ms(row.resolved_at) > window) fail('invalid_transition')
+    if (row.vertical === 'lost') {
+      const other = Object.values(db.cases).find(
+        (c) =>
+          c.vertical === 'lost' &&
+          c.pet_id === row.pet_id &&
+          c.code !== row.code &&
+          c.status === 'active',
+      )
+      if (other) fail('active_case_exists', { case_code: other.code })
+    }
     row.status = 'active'
     row.resolved_at = null
     row.resolution = null
