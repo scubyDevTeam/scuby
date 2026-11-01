@@ -14,7 +14,9 @@ INSERT INTO scuby.pet (id, name, species, size, colors, marks, photo_urls, custo
   -- fixtures.ts:514-523 (pet-luna)
   ('00000000-0000-0000-0000-00000000be01', 'Luna', 'dog', 'small', '{black,tan}',
    'Collar rojo con placa metálica. Mancha blanca en el pecho. Es tímida: no la persigas, llámala por su nombre y agáchate.',
-   '{}', 'claimed', now() - interval '3 days'),
+   -- A published case always has 1 to 6 photos, and the edit form sends the pet's current ones back unchanged: a photo-less Luna
+   -- would make @PLOST-004's edit answer validation_failed ("1 to 6 photos"). The file is backend/e2e/luna.jpg; run-client-e2e.sh PUTs it to /dev-media after the seed.
+   '{http://localhost:8080/dev-media/3970279f75eae82d95440ec1d7e287bd90fb6c6c61899a808768e603773f80db.jpg}', 'claimed', now() - interval '3 days'),
   -- fixtures.ts:558 (pet-toby, from the name list)
   ('00000000-0000-0000-0000-00000000be02', 'Toby', 'dog', 'medium', '{brown}', NULL, '{}', 'claimed', now() - interval '20 days'),
   -- Pelusa, a cat of Carolina's, for the reopen flows (@PLOST-002, @PLOST-004)
