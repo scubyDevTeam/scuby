@@ -77,10 +77,9 @@
 
 `display_name` (prefilled from OAuth, editable; when the person has not chosen one it is a placeholder derived from the address, which is **never shown publicly** — a public case shows «Alguien» until a name is chosen, [04](../product/04-lost-workflow.md) · Contact visibility; sending a name in the profile update, even unchanged, marks it chosen, `person.display_name_chosen`; there is no way back, decision #79) · `photo?` · `email` (login identity, not editable
 in v1) · `phone?` (below) · `city?` (free text, at most 80 characters until a cities table exists, [O34](../open-items.md)) · `bio?`
-(at most 280 characters, plain text, **no links**: `http://`, `https://`, `www.`, `wa.me`, `tel:`, `mailto:`
-and a word ending in a known domain (`.com`, `.co`, `.net`, `.org`, `.io`, `.me`, `.ly`, `.link`, `.app`,
-`.info`, `.biz`, `.xyz`, `.site`, `.online`, `.store`, `.shop`) are refused, case-insensitive, while ordinary
-text such as «Av.Poblado» or «EE.UU.» is accepted, decision #79 — a bio with a WhatsApp link
+(at most 280 characters, plain text, **no links** — the same rule applies to `display_name`, which is shown on every public case, decisions #79 and #80. Refused: `http://`, `https://`, `www.`, `wa.me`, `mailto:` (case-insensitive), `tel:` only when directly followed by `+` or a digit (`tel:+57300…`), and a word ending in a known domain (`.com`, `.co`, `.net`, `.org`, `.io`, `.me`, `.ly`, `.link`, `.app`,
+`.info`, `.biz`, `.xyz`, `.site`, `.online`, `.store`, `.shop`) **only in lowercase**. Accepted: ordinary
+text such as «Av.Poblado», «EE.UU.», «Medellín.Me encanta» or «Tel: 300 123 4567»; a link on another domain or in capitals is an accepted miss. A bio with a WhatsApp link
 bypasses contact prefs; it is a `report` target like any user content) · contact
 prefs · notification toggles. Nothing else — no address, ID, birthday, gender (Ley 1581 rewards
 minimization; nothing needs them).

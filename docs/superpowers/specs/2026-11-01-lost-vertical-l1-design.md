@@ -433,11 +433,15 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
 
 - **Auth:** session (identity's `/me/**` rule). Lives in `identity` beside `GET /me/profile`.
 - PATCH semantics of §3. All rules run after the session check.
-  - `display_name`: trimmed; empty → `validation_failed {display_name}`; 1..80 code points after trimming.
+  - `display_name`: trimmed; empty → `validation_failed {display_name}`; 1..80 code points after trimming; the same
+    no-links rule as the bio (it is shown on every public case) → `validation_failed {display_name}`.
     Sending it, even unchanged, sets `display_name_chosen = true` (the public name stops being «Alguien»,
     decision #48). There is no way back to "not chosen".
-  - `bio`: ≤ 280 code points, or `null`; no links: `ProfileTextDerivation.hasLink` refuses, case-insensitive,
-    `http://`, `https://`, `www.`, `wa.me`, `tel:`, `mailto:` and a word ending in a known domain (`.com`, `.co`, `.net`, `.org`, `.io`, `.me`, `.ly`, `.link`, `.app`, `.info`, `.biz`, `.xyz`, `.site`, `.online`, `.store`, `.shop`; «Av.Poblado» and «EE.UU.» pass) → `validation_failed {bio}`.
+  - `bio`: ≤ 280 code points, or `null`; no links (`ProfileTextDerivation.hasLink`, decisions #79 and #80): refused
+    case-insensitive `http://`, `https://`, `www.`, `wa.me`, `mailto:`, and `tel:` only when directly followed by `+` or a
+    digit; refused only in lowercase, a word ending in a known domain (`.com`, `.co`, `.net`, `.org`, `.io`, `.me`, `.ly`,
+    `.link`, `.app`, `.info`, `.biz`, `.xyz`, `.site`, `.online`, `.store`, `.shop`). «Av.Poblado», «EE.UU.»,
+    «Medellín.Me encanta» and «Tel: 300 123 4567» pass → `validation_failed {bio}`. Accepted misses: other domains, capitals.
   - `city`: free text ≤ 80 code points (the new CHECK), or `null`.
   - `notification_prefs`: all four booleans together (the contract requires them); stored only.
   - `photo_url`: the current `person.photo_url` is accepted as is; another one must pass the photo check

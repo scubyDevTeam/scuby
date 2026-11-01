@@ -92,7 +92,7 @@ Each row gives the behaviour, the decision that owns it (in
 | **"Mine"**: a pin is yours if your account sent it, or if it was sent without an account from this browser, so it stays yours after you sign in. Another person's pin is never yours. | #73 · [api.md](../eng/api.md) · Device identity | Find the claimant's own pin by `mine` to send `from_sighting_id` |
 | **A pin the family hid disappears for its reporter too**, and can no longer be corrected or deleted by them. | #73 | Do not word it as a failed send |
 | **A deleted pin keeps its `client_id`**: a replayed «Lo vi» answers the deleted pin's id. | #73 | Nothing |
-| **Profile rules:** sending a name marks it chosen (it becomes public); the bio refuses clear links (`http(s)://`, `www.`, `wa.me`, `tel:`, `mailto:`, or a word ending in a common domain such as `.com` or `.co`); `city` is at most 80 characters. | #79 · [auth.md](../eng/auth.md) · Profile | Explain a refused bio; send the name only when the person edits it |
+| **Profile rules:** sending a name marks it chosen (it becomes public); the bio and the display name refuse clear links (rule: auth.md · Profile); `city` is at most 80 characters. | #79, #80 · [auth.md](../eng/auth.md) · Profile | Explain a refused bio; send the name only when the person edits it |
 | **Place names are a generic label**: «Zona marcada en el mapa» / "Area marked on the map". The `reverse_geocoding` flag is off and no provider is wired. | [feature-flags.md](../eng/feature-flags.md) · Registry · [backend.md](../eng/backend.md) · Place names | Nothing. Do not assert neighbourhood names (the mock's «Laureles») against the real backend, except on seeded rows. |
 
 Error codes the client can turn into helpful copy:
