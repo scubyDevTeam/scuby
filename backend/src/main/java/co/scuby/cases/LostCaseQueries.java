@@ -74,12 +74,13 @@ class LostCaseQueries {
 
     /**
      * The {@link #MAX_SIGHTINGS_SHOWN} most recent sightings the viewer may see (newest first; the derivation puts them
-     * back oldest first). PUBLIC: hidden and removed pins are not queried, and reporters' numbers are selected as NULL.
+     * back oldest first). PUBLIC: only visible pins are queried, and reporters' numbers are selected as NULL; OWNER: visible and hidden pins (never moderated or deleted ones).
      */
     Select<? extends Record> sightingsQuery(String code, Access access) {
         var phone = access == Access.OWNER ? SIGHTING.CONTACT_PHONE : DSL.castNull(SIGHTING.CONTACT_PHONE).as(SIGHTING.CONTACT_PHONE.getName());
+        // Inline literals. Moderated and reporter-deleted pins reach nobody, the owner included (L1 design §2.2).
         var visibility = access == Access.OWNER
-                ? SIGHTING.STATUS.ne("removed_by_moderation")
+                ? SIGHTING.STATUS.in(DSL.inline("visible"), DSL.inline("hidden_by_owner"))
                 : SIGHTING.STATUS.eq("visible");
         return db.select(SIGHTING.ID, SIGHTING.LAT, SIGHTING.LNG, SIGHTING.SEEN_AT, SIGHTING.CREATED_AT, SIGHTING.NOTE,
                          SIGHTING.PHOTO_URLS, SIGHTING.REPORTER_PERSON_ID, SIGHTING.REPORTER_DEVICE_HASH, phone,
