@@ -72,6 +72,8 @@ class ProfileTextDerivationTest {
         assertThat(ProfileTextDerivation.problems(only("notification_prefs", Patch.of(null)))).isEqualTo(Map.of("notification_prefs", "required"));
         assertThat(ProfileTextDerivation.problems(only("notification_prefs", Patch.of(new NotificationPrefsInput(null, true, true, null)))))
                 .isEqualTo(Map.of("notification_prefs.lost", "required", "notification_prefs.help", "required"));
+        assertThat(ProfileTextDerivation.problems(only("notification_prefs", Patch.of(new NotificationPrefsInput(true, null, null, true)))))
+                .isEqualTo(Map.of("notification_prefs.found", "required", "notification_prefs.adoption", "required"));
     }
 
     @Test
