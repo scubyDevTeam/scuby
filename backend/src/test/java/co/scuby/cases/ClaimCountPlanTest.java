@@ -50,7 +50,17 @@ class ClaimCountPlanTest {
     private void assertReadThroughAClaimIndex(org.jooq.Query q) {
         assertThat(PlanAssert.plan(db, q)).containsAnyOf(" using recovery_claim_by_case_recent_idx ",
                 " using recovery_claim_one_open_per_claimant ", "Bitmap Index Scan on recovery_claim_");
-        // Correlated on the case: a hashed subplan (all open claims read once) would show no case_code condition.
-        assertThat(PlanAssert.plan(db, q)).contains("Index Cond: (case_code = lost_case.code)");
+        // Correlated on the case: every index scan of recovery_claim is followed by an Index Cond on case_code. A hashed
+        // subplan (all open claims read once) has none. Scoped to the recovery_claim node lines: the feed's sighting
+        // subplans print the same Index Cond text, and plain EXPLAIN never prints "hashed SubPlan" for a CASE branch.
+        var lines = PlanAssert.plan(db, q).lines().toList();
+        int scans = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            if (!lines.get(i).contains("Scan") || !lines.get(i).contains("recovery_claim_")) continue;
+            scans++;
+            assertThat(i + 1 < lines.size() ? lines.get(i + 1) : "").as("Index Cond under: " + lines.get(i))
+                    .contains("Index Cond: (case_code = lost_case.code)");
+        }
+        assertThat(scans).as("recovery_claim index scans in the plan").isPositive();
     }
 }

@@ -65,6 +65,7 @@ class FeedStatementsTest {
         assertThat(ownItems).hasSameSizeAs(pubItems);
         for (int i = 0; i < ownItems.size(); i++) {
             assertThat(ownItems.get(i).get("possible_find").isBoolean()).isTrue();
+            assertThat(ownItems.get(i).get("possible_find").asBoolean()).as("no claims in this fixture").isFalse();
             assertThat(pubItems.get(i).get("possible_find").isNull()).isTrue();
             var o = ((tools.jackson.databind.node.ObjectNode) ownItems.get(i).deepCopy());
             var p = ((tools.jackson.databind.node.ObjectNode) pubItems.get(i).deepCopy());

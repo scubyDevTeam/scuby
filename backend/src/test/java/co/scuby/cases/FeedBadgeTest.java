@@ -75,9 +75,9 @@ class FeedBadgeTest {
     void thePublisherSeesTheBadgeOnlyForAnOpenNonStaleClaimAndNullOnOthersItems() {
         ApiResponse feed = carolinaBrowser.get("/feed");
         assertThat(item(feed, "7K3PQ").get("possible_find").asBoolean()).isTrue();
+        assertThat(item(feed, "STL22").get("possible_find").isBoolean()).isTrue();
         assertThat(item(feed, "STL22").get("possible_find").asBoolean()).as("stale does not count").isFalse();
         assertThat(item(feed, "CNF22").get("possible_find").asBoolean()).as("answered does not count").isFalse();
-        assertThat(item(feed, "STL22").get("possible_find").isNull()).isFalse();
         assertThat(item(feed, "RFR22").get("possible_find").asBoolean()).as("made 9 days ago, repeated 2 h ago: fresh").isTrue();
         assertThat(item(feed, "OTH22").get("possible_find").isNull()).as("someone else's item").isTrue();
     }

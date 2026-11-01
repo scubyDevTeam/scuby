@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Locale;
 
+// The response differs per viewer (possible_find is owner-only): any HTTP cache or CDN in front of /feed must vary on the session.
 @ApiComponent
 @RestController
 class FeedController {

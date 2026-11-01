@@ -455,7 +455,7 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
 | Read | Change | Ceiling |
 |---|---|---|
 | `GET /cases/{code}` | Owner only, one more query: `SELECT id, phone, created_at, last_active_at, status, count(*) FILTER (WHERE status = 'open' AND last_active_at >= :now − 7 d) OVER () FROM recovery_claim WHERE case_code = ? ORDER BY created_at DESC, id DESC LIMIT 50`. `LostCaseFacts` gets `@Nullable ClaimFacts` (null for a non-owner: not queried). `LostCaseDerivation`: owner → `claims[]` with the wire status from `ClaimDerivation` (`stale` when due, from `last_active_at`), `open_claim_count` = the count on an active case, else 0; non-owner → `claims: []`, `open_claim_count: null`. `LostCaseView.openClaimCount` becomes `@Nullable Integer`. Sightings query excludes `deleted_by_reporter` for the owner | 3 → **4** (owner: session, case, sightings, claims; a stranger 3, anonymous 2) |
-| `GET /feed` | `possible_find`: for an item whose `created_by` is the caller, `EXISTS` an open non-stale claim (correlated subquery); for every other item, and for anonymous callers, an inline `NULL` | 3, unchanged |
+| `GET /feed` | `possible_find`: for an item whose `created_by` is the caller, an open non-stale claim exists (correlated `LIMIT 1` probe; not `EXISTS`, which Postgres may hash into a scan of every open claim); for every other item, and for anonymous callers, an inline `NULL` | 3, unchanged |
 | `GET /me/cases` | `open_claim_count`: correlated count of open non-stale claims when the case is active, else 0. Stays a non-null int (the list is the caller's own) | 2, unchanged |
 
 ## 5. Package placement and module boundaries

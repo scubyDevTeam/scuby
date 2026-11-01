@@ -14,13 +14,12 @@ class FeedReads {
 
     private final FeedQueries queries;
     private final FeedProperties properties;
-
     private final Clock clock;
 
     FeedReads(FeedQueries queries, FeedProperties properties, Clock clock) {
-        this.clock = clock;
         this.queries = queries;
         this.properties = properties;
+        this.clock = clock;
     }
 
     FeedView feed(FeedQuery query, Caller caller, Locale locale) {
