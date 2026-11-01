@@ -22,6 +22,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -175,6 +176,45 @@ class RecoveryClaimRaceTest {
             assertThat(List.of(fa.get(30, TimeUnit.SECONDS).status(), fb.get(30, TimeUnit.SECONDS).status(), fo.get(30, TimeUnit.SECONDS).status()))
                     .as("round %d", n).containsExactly(201, 201, 200);
             assertThat(db.fetchCount(RECOVERY_CLAIM)).as("round %d", n).isEqualTo(1);
+        }
+    }
+
+    /**
+     * M11: one claimant's repeat «Lo tengo» against the owner's dismissal of that same claim, released by real latches (both
+     * threads parked on a ready latch, then one start latch opens), many rounds. Pins three things: never a 500; at most one row
+     * per (case, claimant); a consistent end state, whichever order won: the claim is dismissed and answered (the owner's
+     * answer is never lost to the repeat), its id is the one both answers name, and the phone is the old one or the repeat's.
+     */
+    @Test
+    void aRepeatRacingTheOwnersDismissNeverFailsLeavesOneRowAndEndsDismissed() throws Exception {
+        for (int n = 0; n < 20; n++) {
+            round(n, true);
+            ApiClient a = clients.newBrowser();
+            UUID andres = accounts.signIn(a, "andres" + n + "@correo.co");
+            UUID claim = cases.claim("7K3PQ", andres, "+573001112233", MutableClock.START.minus(Duration.ofHours(2)), "open");
+            var ready = new CountDownLatch(2);
+            var start = new CountDownLatch(1);
+            Future<ApiResponse> repeat = pool.submit(() -> {
+                ready.countDown(); start.await(10, TimeUnit.SECONDS);
+                return a.post(PATH, "{\"phone\":\"+573009998877\"}", "7K3PQ");
+            });
+            Future<ApiResponse> dismiss = pool.submit(() -> {
+                ready.countDown(); start.await(10, TimeUnit.SECONDS);
+                return owner.post("/cases/{code}/claims/{claimId}", "{\"status\":\"dismissed\"}", "7K3PQ", claim);
+            });
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            ApiResponse r = repeat.get(30, TimeUnit.SECONDS);
+            ApiResponse d = dismiss.get(30, TimeUnit.SECONDS);
+            assertThat(r.status()).as("round %d repeat: %s", n, r.body()).isEqualTo(201);
+            assertThat(d.status()).as("round %d dismiss: %s", n, d.body()).isEqualTo(200);
+            assertThat(r.str("/id")).as("round %d", n).isEqualTo(claim.toString());
+            assertThat(db.fetchCount(RECOVERY_CLAIM, RECOVERY_CLAIM.CASE_CODE.eq("7K3PQ").and(RECOVERY_CLAIM.CLAIMANT_PERSON_ID.eq(andres))))
+                    .as("round %d: at most one row per (case, claimant)", n).isEqualTo(1);
+            var row = db.selectFrom(RECOVERY_CLAIM).fetchOne();
+            assertThat(row.get(RECOVERY_CLAIM.STATUS)).as("round %d", n).isEqualTo("dismissed");
+            assertThat(row.get(RECOVERY_CLAIM.ANSWERED_AT)).as("round %d", n).isNotNull();
+            assertThat(row.get(RECOVERY_CLAIM.PHONE)).as("round %d", n).isIn("+573001112233", "+573009998877");
         }
     }
 
