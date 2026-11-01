@@ -1,6 +1,7 @@
 package co.scuby.cases;
 
 import co.scuby.platform.cache.ClearableCache;
+import co.scuby.platform.db.GeoPoint;
 import co.scuby.platform.flags.FeatureFlags;
 import co.scuby.support.Accounts;
 import co.scuby.support.ApiClient;
@@ -45,6 +46,7 @@ class EditLostTest {
     ApiClient owner;
     ApiClient stranger;
     UUID carolina;
+    UUID strangerId;
     UUID pet;
 
     @BeforeEach
@@ -52,7 +54,7 @@ class EditLostTest {
         owner = clients.newBrowser();
         carolina = accounts.signIn(owner, "carolina@correo.co");
         stranger = clients.newBrowser();
-        accounts.signIn(stranger, "stranger@correo.co");
+        strangerId = accounts.signIn(stranger, "stranger@correo.co");
         cases.luna(carolina);
         pet = cases.petOf("7K3PQ");
         db.update(PET).set(PET.MARKS, "Collar rojo").where(PET.ID.eq(pet)).execute();
@@ -119,18 +121,26 @@ class EditLostTest {
 
     @Test
     void aMovedZoneReSnapsThePublicCenterAndShowsTheGenericPlaceLabel() {
-        assertThat(edit(owner, "7K3PQ", "{\"last_seen_point\":{\"lat\":6.30,\"lng\":-75.60}}").status()).isEqualTo(204);
+        // Both coordinates differ between the exact point and its snapped center, so a leak of either one is caught.
+        GeoPoint exact = new GeoPoint(6.3047, -75.6053);
+        GeoPoint snapped = LocationPrecisionDerivation.publicCenter(exact);
+        assertThat(snapped.lat()).isNotEqualTo(exact.lat());
+        assertThat(snapped.lng()).isNotEqualTo(exact.lng());
+        assertThat(edit(owner, "7K3PQ", "{\"last_seen_point\":{\"lat\":6.3047,\"lng\":-75.6053}}").status()).isEqualTo(204);
         Record row = luna();
-        assertThat(row.get(LOST_CASE.LAST_SEEN_LAT)).isEqualTo(6.30);
-        assertThat(row.get(LOST_CASE.LAST_SEEN_LNG)).isEqualTo(-75.60);
-        assertThat(row.get(LOST_CASE.LAST_SEEN_PUBLIC_LAT)).isEqualTo(6.3);
-        assertThat(row.get(LOST_CASE.LAST_SEEN_PUBLIC_LNG)).isEqualTo(-75.599348);
+        assertThat(row.get(LOST_CASE.LAST_SEEN_LAT)).isEqualTo(exact.lat());
+        assertThat(row.get(LOST_CASE.LAST_SEEN_LNG)).isEqualTo(exact.lng());
+        assertThat(row.get(LOST_CASE.LAST_SEEN_PUBLIC_LAT)).isEqualTo(snapped.lat());
+        assertThat(row.get(LOST_CASE.LAST_SEEN_PUBLIC_LNG)).isEqualTo(snapped.lng());
         assertThat(row.get(LOST_CASE.PLACE_NAME)).isNull();
         ApiResponse pub = clients.newBrowser().get("/cases/{code}", "7K3PQ");
-        assertThat(pub.json().at("/last_seen/center/lat").asDouble()).isEqualTo(6.3);
-        assertThat(pub.json().at("/last_seen/center/lng").asDouble()).isEqualTo(-75.599348);
+        assertThat(pub.json().at("/last_seen/center/lat").asDouble()).isEqualTo(snapped.lat());
+        assertThat(pub.json().at("/last_seen/center/lng").asDouble()).isEqualTo(snapped.lng());
         assertThat(pub.str("/last_seen/place_name")).isEqualTo("Zona marcada en el mapa");
-        assertThat(owner.get("/cases/{code}", "7K3PQ").json().at("/last_seen/center/lng").asDouble()).isEqualTo(-75.60);
+        assertThat(stranger.get("/cases/{code}", "7K3PQ").json().at("/last_seen/center/lat").asDouble()).isEqualTo(snapped.lat());
+        ApiResponse own = owner.get("/cases/{code}", "7K3PQ");
+        assertThat(own.json().at("/last_seen/center/lat").asDouble()).isEqualTo(exact.lat());
+        assertThat(own.json().at("/last_seen/center/lng").asDouble()).isEqualTo(exact.lng());
     }
 
     @Test
@@ -195,6 +205,19 @@ class EditLostTest {
             assertThat(r.json().at("/error/fields").has("photo_urls")).isTrue();
         }
         assertNothingChanged();
+    }
+
+    @Test
+    void aPhotoAlreadyOnAnotherOwnersPetIsRefused() {
+        // The photo is on the stranger's pet, so it is not one of the edited pet's own photos: it needs the caller's upload, which it lacks.
+        String strangersPhoto = Photos.uploaded(stranger, "pet", "stranger-pet-photo");
+        cases.lostCase(strangerId, "OTH22", "Toby", "dog", CaseFixtures.MEDELLIN, 300, "active", NOW.minusSeconds(7200));
+        db.update(PET).set(PET.PHOTO_URLS, new String[] {strangersPhoto}).where(PET.ID.eq(cases.petOf("OTH22"))).execute();
+        ApiResponse r = edit(owner, "7K3PQ", "{\"photo_urls\":[\"" + FIXTURE_PHOTO + "\",\"" + strangersPhoto + "\"]}");
+        assertThat(r.status()).isEqualTo(422);
+        assertThat(r.json().at("/error/fields").has("photo_urls")).isTrue();
+        assertNothingChanged();
+        assertThat(List.of(db.selectFrom(PET).where(PET.ID.eq(cases.petOf("OTH22"))).fetchOne().get(PET.PHOTO_URLS))).containsExactly(strangersPhoto);
     }
 
     @ParameterizedTest(name = "{0}")

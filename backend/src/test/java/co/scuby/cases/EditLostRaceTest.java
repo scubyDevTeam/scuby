@@ -75,12 +75,15 @@ class EditLostRaceTest {
     @Test
     void aCloseCommittedBetweenThePetUpdateAndTheCaseGuardRollsThePetBack() throws Exception {
         contention.hold("UPDATE scuby.lost_case SET status = 'reunited', resolved_at = now(), resolution = 'reunited_home' WHERE code = '7K3PQ'");
-        Future<ApiResponse> f = pool.submit(() -> owner.patch("/lost-cases/{code}", "{\"marks\":\"Collar azul\"}", "7K3PQ"));
+        Future<ApiResponse> f = pool.submit(() -> owner.patch("/lost-cases/{code}", "{\"marks\":\"Collar azul\",\"last_seen_radius_m\":250}", "7K3PQ"));
         contention.awaitWaiters(1);                // the pet is updated; the case guard waits on the held row
         contention.commit();
         ApiResponse r = f.get(30, TimeUnit.SECONDS);
         assertThat(r.status()).isEqualTo(409);
         assertThat(r.errorCode()).isEqualTo("invalid_transition");
         assertThat(marks()).as("the pet change rolled back with the refused guard").isEqualTo("Collar rojo");
+        assertThat(db.select(LOST_CASE.LAST_SEEN_RADIUS_M).from(LOST_CASE).fetchOne(LOST_CASE.LAST_SEEN_RADIUS_M))
+                .as("the closed case's own field did not change").isEqualTo(100.0);
+        assertThat(db.select(LOST_CASE.STATUS).from(LOST_CASE).fetchOne(LOST_CASE.STATUS)).isEqualTo("reunited");
     }
 }
