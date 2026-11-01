@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /**
  * Facts + viewer + time → the LostCase response (design · Responses: facts → derivation → record).
@@ -38,13 +39,26 @@ final class LostCaseDerivation {
     }
 
     private static LostCaseView.SightingView sighting(LostCaseFacts.SightingFacts s, Viewer viewer, boolean owner, Instant now) {
-        boolean mine = (viewer.personId() != null && viewer.personId().equals(s.reporterPersonId()))
-                || viewer.deviceHash().equals(s.reporterDeviceHash());
-        Instant until = s.createdAt().plus(EDIT_WINDOW);
-        Instant editableUntil = mine && !s.hidden() && now.isBefore(until) ? until : null;
+        boolean mine = mine(viewer.personId(), viewer.deviceHash(), s.reporterPersonId(), s.reporterDeviceHash());
+        Instant editableUntil = editable(mine, !s.hidden(), s.createdAt(), now) ? s.createdAt().plus(EDIT_WINDOW) : null;
         return new LostCaseView.SightingView(s.id().toString(), s.point(), s.seenAt(), s.note(), s.photoUrls(),
                 s.reporterPersonId() != null ? "registered" : "anonymous", s.highlighted(),
                 owner ? s.contactPhone() : null, owner && s.hidden(), mine, editableUntil);
+    }
+
+    /**
+     * "Mine" (docs/eng/api.md · Device identity): the pin's reporter is the caller's person, or the pin has no person and
+     * came from the caller's device. Another person's pin is never mine, whatever device sent it; an anonymous pin from
+     * this browser stays mine after its reporter signs in (they may sign in to say «Lo tengo» and keep their pin).
+     */
+    static boolean mine(@Nullable UUID viewerPerson, String viewerDevice, @Nullable UUID reporterPerson, String reporterDevice) {
+        return (viewerPerson != null && viewerPerson.equals(reporterPerson))
+                || (reporterPerson == null && viewerDevice.equals(reporterDevice));
+    }
+
+    /** Correctable and deletable by its reporter: mine, visible, and now before created_at + 15 min (exclusive). */
+    static boolean editable(boolean mine, boolean visible, Instant createdAt, Instant now) {
+        return mine && visible && now.isBefore(createdAt.plus(EDIT_WINDOW));
     }
 
     private static LostCaseView.@Nullable ContactView contact(LostCaseFacts facts, Locale locale) {

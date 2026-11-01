@@ -105,25 +105,56 @@ class LostCaseDerivationTest {
                 .extracting(s -> s.id().substring(34)).containsExactly("01", "02", "03");
     }
 
+    /** Another person, not the viewer (HELPER) and not the owner. */
+    static final UUID SOMEONE_ELSE = UUID.fromString("00000000-0000-0000-0000-00000000000c");
+
+    /**
+     * "Mine" (docs/eng/api.md · Device identity): the viewer's person, or a pin with no person sent from the viewer's
+     * device. Human review: this table is the rule. reporter = ME (the viewer's person, HELPER), OTHER (another person) or
+     * NONE (an anonymous pin); sameDevice = the pin's device hash is the viewer's.
+     */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            // case,                               reporterIsMe, sameDevice, createdMinutesAgo, hidden, mine,  editable
-            "'my device, 5 min ago',               false,        true,       5,                 false,  true,  true",
-            "'my account, other device',           true,         false,      5,                 false,  true,  true",
-            "'mine, exactly 15 min ago',           false,        true,       15,                false,  true,  false",
-            "'mine, 16 min ago',                   false,        true,       16,                false,  true,  false",
-            "'mine but hidden by the owner',       false,        true,       5,                 true,   true,  false",
-            "'someone else',                       false,        false,      5,                 false,  false, false",
+            // case,                                                    viewerSignedIn, reporter, sameDevice, minutesAgo, hidden, mine,  editable
+            "'person match, from another device',                        true,           ME,       false,      5,          false,  true,  true",
+            "'person match, exactly 15 min ago',                         true,           ME,       false,      15,         false,  true,  false",
+            "'anonymous pin from this device, the viewer now signed in', true,           NONE,     true,       5,          false,  true,  true",
+            "'another person''s pin from this device',                   true,           OTHER,    true,       5,          false,  false, false",
+            "'anonymous pin from another device, signed in',             true,           NONE,     false,      5,          false,  false, false",
+            "'no session, anonymous pin from this device',               false,          NONE,     true,       5,          false,  true,  true",
+            "'no session, anonymous pin from another device',            false,          NONE,     false,      5,          false,  false, false",
+            "'no session, a signed-in pin from this device',             false,          ME,       true,       5,          false,  false, false",
+            "'mine but hidden by the owner',                             true,           ME,       true,       5,          true,   true,  false",
+            "'another person, another device',                           true,           OTHER,    false,      5,          false,  false, false",
     })
-    void mineAndTheCorrectionWindow(String label, boolean reporterIsMe, boolean sameDevice, int minutesAgo,
-                                    boolean hidden, boolean mine, boolean editable) {
+    void mineIsTheViewersPersonOrAnAnonymousPinFromTheirDevice(String label, boolean viewerSignedIn, String reporter, boolean sameDevice,
+                                                               int minutesAgo, boolean hidden, boolean mine, boolean editable) {
         Instant created = NOW.minus(Duration.ofMinutes(minutesAgo));
-        var s = sighting("01", created, created, reporterIsMe ? HELPER : null, sameDevice ? MY_DEVICE : OTHER_DEVICE, null, hidden);
+        UUID reporterPerson = switch (reporter) {
+            case "ME" -> HELPER;
+            case "OTHER" -> SOMEONE_ELSE;
+            default -> null;
+        };
+        var s = sighting("01", created, created, reporterPerson, sameDevice ? MY_DEVICE : OTHER_DEVICE, null, hidden);
         // A hidden pin reaches only the owner: in that row the viewer is the owner (but not the reporter).
-        Viewer me = new Viewer(hidden ? Access.OWNER : Access.PUBLIC, HELPER, MY_DEVICE);
-        var view = LostCaseDerivation.derive(luna(List.of(s)), me, NOW, ES).sightings().getFirst();
-        assertThat(view.mine()).isEqualTo(mine);
-        assertThat(view.editableUntil()).isEqualTo(editable ? created.plus(Duration.ofMinutes(15)) : null);
+        Viewer viewer = new Viewer(hidden ? Access.OWNER : Access.PUBLIC, viewerSignedIn ? HELPER : null, MY_DEVICE);
+        var view = LostCaseDerivation.derive(luna(List.of(s)), viewer, NOW, ES).sightings().getFirst();
+        assertThat(view.mine()).as(label).isEqualTo(mine);
+        assertThat(view.editableUntil()).as(label).isEqualTo(editable ? created.plus(Duration.ofMinutes(15)) : null);
+    }
+
+    @Test
+    void theWindowIsExclusiveAtFifteenMinutes() {
+        Instant created = NOW.minus(Duration.ofMinutes(15));
+        assertThat(LostCaseDerivation.editable(true, true, created.plusMillis(1), NOW)).isTrue();
+        assertThat(LostCaseDerivation.editable(true, true, created, NOW)).isFalse();
+        assertThat(LostCaseDerivation.editable(false, true, NOW, NOW)).isFalse();
+        assertThat(LostCaseDerivation.editable(true, false, NOW, NOW)).isFalse();
+        assertThat(LostCaseDerivation.mine(null, MY_DEVICE, null, MY_DEVICE)).isTrue();
+        assertThat(LostCaseDerivation.mine(null, MY_DEVICE, HELPER, MY_DEVICE)).as("a signed-in pin is its person's").isFalse();
+        assertThat(LostCaseDerivation.mine(HELPER, MY_DEVICE, null, MY_DEVICE)).as("an anonymous pin of my browser").isTrue();
+        assertThat(LostCaseDerivation.mine(HELPER, MY_DEVICE, SOMEONE_ELSE, MY_DEVICE)).as("another person's, same device").isFalse();
+        assertThat(LostCaseDerivation.mine(HELPER, OTHER_DEVICE, HELPER, MY_DEVICE)).isTrue();
     }
 
     @ParameterizedTest(name = "status={0} whatsappPhone={1}")
