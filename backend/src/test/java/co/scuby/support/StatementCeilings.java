@@ -20,6 +20,7 @@ final class StatementCeilings {
             Map.entry("POST /me/phone", 5),   // exactly: session lookup, supported_countries, send count, guarded otp upsert, send-log insert. No locks
             Map.entry("POST /me/phone/verify", 6),   // exactly: session lookup, supported_countries, attempt reservation (UPDATE ... RETURNING), conditional delete, person update, person select
             Map.entry("GET /me/profile", 2),       // session lookup + person
+            Map.entry("PATCH /me/profile", 4),   // worst path, ProfileUpdateTest: session, person read (only for a non-null photo_url), upload lookup (a new photo), UPDATE … RETURNING; {} is 2 (session, person read)
             Map.entry("POST /uploads", 2),   // session lookup, upsert (the stored-bytes check is a file or S3 call, not SQL)
             Map.entry("POST /lost-cases", 13),   // worst path: a correct code with a new pet and photos, on a session-cache miss (13, measured by PublishStatementsTest, which pins every path; 10 for a new number on an existing pet). Excludes the process-wide flag snapshot load (+2, once per 30 s)
             Map.entry("GET /cases/{code}", 4),   // the owner, exactly 4 on a session-cache miss (CaseStatementsTest, ClaimLeakTest with 56 claims): session lookup, case (+ pet, publisher), sightings, the owner's claims (L1 design §4.13: up from 3); a signed-in stranger 3, anonymous 2. Excludes the flag snapshot load

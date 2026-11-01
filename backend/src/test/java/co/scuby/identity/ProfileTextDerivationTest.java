@@ -33,7 +33,23 @@ class ProfileTextDerivationTest {
             "'MAILTO:ana@x',                                 true",
             "'mi web: ana.com',                              true",
             "'ana@gmail.com',                                true",
-            "'Hola.Soy',                                     true",
+            "'bit.ly/x',                                     true",
+            "'miweb.com',                                    true",
+            "'Instagram: foo.co',                            true",
+            "'WWW.x.org',                                    true",
+            "'https://x',                                    true",
+            "'wa.me/57300',                                  true",
+            "'MIWEB.COM',                                    true",
+            "'mi tienda: foo.shop',                          true",
+            "'Av.Poblado',                                   false",
+            "'EE.UU.',                                       false",
+            "'caminar.Vivo',                                 false",
+            "'p.ej.',                                        false",
+            "'1.er',                                         false",
+            "'3.5',                                          false",
+            "'Hola.Soy',                                     false",
+            "'Me gusta caminar. Vivo en Bogotá',             false",
+            "'foo.company',                                  false",
             "'Hola. Soy rescatista',                         false",
             "'Pesa 3.5 kg',                                  false",
             "'hotel: Casa Blanca',                           false",
@@ -41,7 +57,7 @@ class ProfileTextDerivationTest {
             "'e.g. gatos',                                   false",
             "'',                                             false",
     })
-    void theBioRefusesLinksAndDomainShapedTokens(String text, boolean link) {
+    void theBioRefusesExplicitLinkFormsAndKnownTldTokensOnly(String text, boolean link) {
         assertThat(ProfileTextDerivation.hasLink(text)).isEqualTo(link);
     }
 

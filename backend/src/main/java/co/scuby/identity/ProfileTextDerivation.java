@@ -9,8 +9,10 @@ import java.util.regex.Pattern;
 
 /**
  * PATCH /me/profile field rules (docs/eng/auth.md · Profile; L1 design §4.12). Pure. The bio has no links: a WhatsApp link
- * in a bio would bypass the case's contact preferences. Refused, case-insensitive: http://, https://, www., wa.me, tel:,
- * mailto: and any domain-shaped token (a word, a dot, two or more letters). Accepted false positives: «Hola.Soy».
+ * in a bio would bypass the case's contact preferences. Refused, case-insensitive, explicit link forms only: http://,
+ * https://, www., wa.me, tel:, mailto:, and a token ending in a known TLD (.com .co .net .org .io .me .ly .link .app .info
+ * .biz .xyz .site .online .store .shop). Accepted on purpose: «Av.Poblado», «EE.UU.», «caminar.Vivo», «p.ej.». Accepted
+ * misses: a link on a TLD outside the list (decision 12: Spanish prose must not be refused).
  */
 final class ProfileTextDerivation {
 
@@ -19,7 +21,8 @@ final class ProfileTextDerivation {
     static final int CITY_MAX = 80;
 
     private static final Pattern LINK = Pattern.compile(
-            "(?iu)(https?://|\\bwww\\.|\\bwa\\.me|\\btel:|\\bmailto:|[\\p{L}\\p{N}_-]+\\.\\p{L}{2,})");
+            "(?iu)(https?://|\\bwww\\.|\\bwa\\.me|\\btel:|\\bmailto:"
+                    + "|[\\p{L}\\p{N}_-]+\\.(?:com|co|net|org|io|me|ly|link|app|info|biz|xyz|site|online|store|shop)(?![\\p{L}\\p{N}]))");
 
     private ProfileTextDerivation() {}
 
