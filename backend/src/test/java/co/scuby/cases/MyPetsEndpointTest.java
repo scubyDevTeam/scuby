@@ -111,7 +111,8 @@ class MyPetsEndpointTest {
         UUID julian = accounts.person("julian@correo.co");
         cases.lostCase(carolina, "TOB22", "Toby", "dog", CaseFixtures.MEDELLIN, 300, "active", daysAgo(10));
         cases.close("TOB22", "expired", daysAgo(3));
-        cases.lostCaseForPet(julian, cases.petOf("TOB22"), "JUL22", "expired", daysAgo(1));   // someone else's expired case of the same pet, resolved later than TOB22 (an unscoped join would offer it)
+        cases.lostCaseForPet(julian, cases.petOf("TOB22"), "JUL22", "expired", daysAgo(20));  // someone else's older expired case of the same pet,
+        cases.close("JUL22", "expired", daysAgo(1));                                          // resolved later than TOB22 (an unscoped join would offer it)
         ApiResponse r = carolinaBrowser.get("/me/pets");
         assertThat(pet(r, "Toby").get("active_case_code").isNull()).isTrue();
         assertThat(pet(r, "Toby").get("reopenable_case_code").asString()).isEqualTo("TOB22");
@@ -154,5 +155,18 @@ class MyPetsEndpointTest {
         ApiResponse twenty = cold();
         assertThat(twenty.json()).hasSize(20);
         assertThat(twenty.statements()).hasSize(2);
+    }
+
+    /** Decision 14: only the pet's newest case is offered for reopening. */
+    @Test
+    void onlyTheNewestCaseOfAPetIsOfferedAsReopenable() {
+        cases.lostCase(carolina, "OLD22", "Toby", "dog", CaseFixtures.MEDELLIN, 300, "active", daysAgo(10));
+        cases.close("OLD22", "expired", daysAgo(9));
+        UUID toby = cases.petOf("OLD22");
+        cases.lostCaseForPet(carolina, toby, "NEW22", "expired", daysAgo(5));
+        ApiResponse r = cold();
+        assertThat(pet(r, "Toby").get("reopenable_case_code").asString()).isEqualTo("NEW22");
+        cases.lostCaseForPet(carolina, toby, "HOME2", "reunited", daysAgo(2));
+        assertThat(pet(cold(), "Toby").get("reopenable_case_code").isNull()).as("the newest is reunited: nothing to offer").isTrue();
     }
 }

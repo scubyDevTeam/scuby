@@ -284,6 +284,20 @@ class RecoveryClaimTest {
         assertThat(db.fetchCount(RECOVERY_CLAIM)).isZero();
     }
 
+    /** Decision 14: an old share link of an expired case, after the pet got a newer case, never revives the old one. */
+    @ParameterizedTest
+    @CsvSource({"reunited", "expired", "cancelled"})
+    void aClaimOnAnOlderExpiredCaseIsInvalidTransitionOnceThePetHasANewerCase(String newerStatus) {
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        cases.lostCaseForPet(carolina, cases.petOf("7K3PQ"), "NEW22", newerStatus, NOW.minus(Duration.ofDays(1)));
+        ApiResponse r = claim("");
+        assertThat(r.status()).isEqualTo(409);
+        assertThat(r.errorCode()).isEqualTo("invalid_transition");
+        assertThat(r.body()).doesNotContain("wa.me");
+        assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("expired");
+        assertThat(db.fetchCount(RECOVERY_CLAIM)).isZero();
+    }
+
     @Test
     void aReactivationThatWouldMakeASecondActiveCaseIsActiveCaseExists() {
         cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));

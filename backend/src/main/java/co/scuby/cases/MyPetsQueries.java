@@ -38,7 +38,8 @@ class MyPetsQueries {
         return db.select(PET.ID, PET.NAME, PET.SPECIES, PET.SIZE, PET.COLORS, PET.MARKS, PET.PHOTO_URLS, PET.CREATED_AT,
                          DSL.max(LOST_CASE.CODE).filterWhere(LOST_CASE.STATUS.eq(DSL.inline("active"))).as("active_case_code"),
                          DSL.arrayAgg(LOST_CASE.CODE).orderBy(LOST_CASE.RESOLVED_AT.desc(), LOST_CASE.CODE.desc())
-                            .filterWhere(LOST_CASE.STATUS.eq(DSL.inline("expired")).and(LOST_CASE.RESOLVED_AT.ge(cutoff)))
+                            .filterWhere(LOST_CASE.STATUS.eq(DSL.inline("expired")).and(LOST_CASE.RESOLVED_AT.ge(cutoff))
+                                    .and(LifecycleQueries.superseded(LOST_CASE).not()))
                             .as("reopenable_codes"),
                          lastActivity.as("last_activity"))
                  .from(RESPONSIBILITY_LINK)

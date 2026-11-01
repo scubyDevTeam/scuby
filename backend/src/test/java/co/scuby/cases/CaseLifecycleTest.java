@@ -275,6 +275,63 @@ class CaseLifecycleTest {
         assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("expired");
     }
 
+    /** Decision 14: only the pet's newest case can come back. The older one answers invalid_transition, whatever happened to the newer. */
+    @ParameterizedTest
+    @CsvSource({"reunited", "expired", "cancelled"})
+    void anOlderExpiredCaseIsNeverReopenedOnceThePetHasANewerCase(String newerStatus) {
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        cases.lostCaseForPet(carolina, cases.petOf("7K3PQ"), "NEW22", newerStatus, NOW.minus(Duration.ofDays(1)));
+        ApiResponse r = reopen(owner, "7K3PQ");
+        assertThat(r.status()).isEqualTo(409);
+        assertThat(r.errorCode()).isEqualTo("invalid_transition");
+        assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("expired");
+    }
+
+    @Test
+    void theNewestExpiredCaseIsStillReopenedWhileTheOlderOneIsNot() {
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        cases.lostCaseForPet(carolina, cases.petOf("7K3PQ"), "OLD22", "expired", NOW.minus(Duration.ofDays(9)));
+        assertThat(reopen(owner, "OLD22").errorCode()).isEqualTo("invalid_transition");
+        assertThat(reopen(owner, "7K3PQ").status()).isEqualTo(200);
+    }
+
+    @Test
+    void whenPublishedAtTiesTheHigherCodeIsTheNewest() {
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        Instant published = luna().get(LOST_CASE.PUBLISHED_AT).toInstant();
+        cases.lostCaseForPet(carolina, cases.petOf("7K3PQ"), "ZZZ22", "expired", published);
+        assertThat(reopen(owner, "7K3PQ").errorCode()).isEqualTo("invalid_transition");
+        assertThat(reopen(owner, "ZZZ22").status()).isEqualTo(200);
+    }
+
+    @Test
+    void theUpdateItselfRefusesASupersededCaseWhateverThePreReadSaid() {
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        cases.lostCaseForPet(carolina, cases.petOf("7K3PQ"), "NEW22", "reunited", NOW.minus(Duration.ofDays(1)));
+        assertThat(queries.reopen("7K3PQ", carolina, NOW)).isFalse();
+        assertThat(queries.reopen("7K3PQ", null, NOW)).as("a claim's reactivation too").isFalse();
+        assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("expired");
+    }
+
+    @Test
+    void reuniteAndReopenLeaveEveryClaimAsItWasAndWriteNoOutboxRow() {
+        cases.claim("7K3PQ", claimant("claimant1@correo.co"), "+573001112233", NOW.minus(Duration.ofDays(1)), "open");
+        cases.claim("7K3PQ", claimant("claimant2@correo.co"), "+573001112244", NOW.minus(Duration.ofDays(9)), "open");   // stale
+        var before = db.selectFrom(co.scuby.db.generated.Tables.RECOVERY_CLAIM).orderBy(co.scuby.db.generated.Tables.RECOVERY_CLAIM.ID).fetch();
+        assertThat(reunite(owner, "7K3PQ", "offline").status()).isEqualTo(200);
+        assertThat(db.selectFrom(co.scuby.db.generated.Tables.RECOVERY_CLAIM).orderBy(co.scuby.db.generated.Tables.RECOVERY_CLAIM.ID).fetch()).as("reunite").isEqualTo(before);
+        db.update(LOST_CASE).set(LOST_CASE.RESOLUTION, (String) null).set(LOST_CASE.RESOLUTION_ATTRIBUTION, (String) null)
+          .where(LOST_CASE.CODE.eq("7K3PQ")).execute();               // back to how expiry leaves a case
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        assertThat(reopen(owner, "7K3PQ").status()).isEqualTo(200);
+        assertThat(db.selectFrom(co.scuby.db.generated.Tables.RECOVERY_CLAIM).orderBy(co.scuby.db.generated.Tables.RECOVERY_CLAIM.ID).fetch()).as("reopen").isEqualTo(before);
+        assertThat(db.fetchCount(co.scuby.db.generated.Tables.OUTBOX_EVENTS)).as("reopen writes no outbox row").isZero();
+    }
+
+    private UUID claimant(String email) {
+        return accounts.signIn(clients.newBrowser(), email);
+    }
+
     // --- who and which code ---
 
     @Test

@@ -89,13 +89,14 @@ class CaseLifecycleService {
 
     /**
      * True when this case is already active (reopen has nothing to do); otherwise invalid_transition first (status or
-     * window), then active_case_exists (spec §4.5); false when it is reopenable.
+     * window), then active_case_exists (spec §4.5), then invalid_transition again for an older case; false when it is reopenable.
      */
     private static boolean alreadyActive(LifecycleRow row, Instant now) {
         Outcome outcome = LostLifecycleDerivation.check(Action.REOPEN, row.status(), row.resolvedAt(), now);
         if (outcome == Outcome.ALREADY_DONE) return true;
         if (outcome != Outcome.ALLOWED) throw CaseErrors.invalidTransition();
         if (row.otherActiveCode() != null) throw CaseErrors.activeCaseExists(row.otherActiveCode());
+        if (row.superseded()) throw CaseErrors.invalidTransition();   // decision #81: only the pet's newest case comes back
         return false;
     }
 }
