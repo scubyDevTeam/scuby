@@ -169,6 +169,15 @@ class EditLostTest {
         db.execute("INSERT INTO scuby.recovery_claim (id, case_code, claimant_person_id, phone, status, created_at, last_active_at) "
                 + "VALUES (gen_random_uuid(), '7K3PQ', ?, '+573001112233', 'open', ?::timestamptz, ?::timestamptz)", andres, NOW.toString(), NOW.toString());
         assertThat(edit(owner, "7K3PQ", "{\"marks\":\"Collar azul\"}").status()).isEqualTo(204);
+        assertThat(db.select(PET.MARKS).from(PET).where(PET.ID.eq(cases.petOf("7K3PQ"))).fetchOne(PET.MARKS)).isEqualTo("Collar azul");
+        assertThat(db.select(co.scuby.db.generated.Tables.RECOVERY_CLAIM.STATUS).from(co.scuby.db.generated.Tables.RECOVERY_CLAIM)
+                .fetchOne(co.scuby.db.generated.Tables.RECOVERY_CLAIM.STATUS)).as("the claim is untouched").isEqualTo("open");
+    }
+
+    @Test
+    void anEditWritesNoOutboxRowAndBroadcastsNothing() {
+        assertThat(edit(owner, "7K3PQ", "{\"marks\":\"Collar azul\",\"last_seen_point\":{\"lat\":6.25,\"lng\":-75.59}}").status()).isEqualTo(204);
+        assertThat(db.fetchCount(co.scuby.db.generated.Tables.OUTBOX_EVENTS)).as("an edit never re-broadcasts: L1 writes no outbox row").isZero();
     }
 
     @Test

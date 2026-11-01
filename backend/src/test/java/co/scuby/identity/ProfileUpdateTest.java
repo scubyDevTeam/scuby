@@ -128,6 +128,7 @@ class ProfileUpdateTest {
     @CsvSource(delimiter = '|', value = {
             "{\"display_name\":\"   \"}                                                         | display_name",
             "{\"display_name\":null}                                                            | display_name",
+            "{\"display_name\":\"wa.me/573001112233\"}                                         | display_name",
             "{\"city\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"} | city",
             "{\"bio\":\"Escríbeme a wa.me/573001112233\"}                                       | bio",
             "{\"bio\":\"Mi web: ana.com\"}                                                      | bio",

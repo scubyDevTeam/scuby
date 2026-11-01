@@ -110,7 +110,8 @@ class ClaimAnswerRaceTest {
             ApiResponse answered = a.get(30, TimeUnit.SECONDS);
             ApiResponse cancelled = b.get(30, TimeUnit.SECONDS);
             assertThat(answered.status()).as("round %d: %s", n, answered.body()).isEqualTo(200);
-            assertThat(cancelled.status()).as("round %d: %s", n, cancelled.body()).isLessThan(500);
+            assertThat(cancelled.status()).as("round %d: %s", n, cancelled.body()).isEqualTo(200);
+            assertThat(db.select(LOST_CASE.STATUS).from(LOST_CASE).fetchOne(LOST_CASE.STATUS)).as("round %d", n).isEqualTo("cancelled");
             assertThat(status(claim)).isEqualTo("confirmed");
         }
     }
