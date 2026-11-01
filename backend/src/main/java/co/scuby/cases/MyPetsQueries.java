@@ -37,7 +37,7 @@ class MyPetsQueries {
         Field<OffsetDateTime> lastActivity = DSL.max(DSL.greatest(LOST_CASE.PUBLISHED_AT, LOST_CASE.RESOLVED_AT));
         return db.select(PET.ID, PET.NAME, PET.SPECIES, PET.SIZE, PET.COLORS, PET.MARKS, PET.PHOTO_URLS, PET.CREATED_AT,
                          DSL.max(LOST_CASE.CODE).filterWhere(LOST_CASE.STATUS.eq(DSL.inline("active"))).as("active_case_code"),
-                         DSL.arrayAgg(LOST_CASE.CODE).orderBy(LOST_CASE.RESOLVED_AT.desc())
+                         DSL.arrayAgg(LOST_CASE.CODE).orderBy(LOST_CASE.RESOLVED_AT.desc(), LOST_CASE.CODE.desc())
                             .filterWhere(LOST_CASE.STATUS.eq(DSL.inline("expired")).and(LOST_CASE.RESOLVED_AT.ge(cutoff)))
                             .as("reopenable_codes"),
                          lastActivity.as("last_activity"))

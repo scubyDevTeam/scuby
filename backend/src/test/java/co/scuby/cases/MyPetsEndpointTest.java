@@ -111,7 +111,7 @@ class MyPetsEndpointTest {
         UUID julian = accounts.person("julian@correo.co");
         cases.lostCase(carolina, "TOB22", "Toby", "dog", CaseFixtures.MEDELLIN, 300, "active", daysAgo(10));
         cases.close("TOB22", "expired", daysAgo(3));
-        cases.lostCaseForPet(julian, cases.petOf("TOB22"), "JUL22", "active", daysAgo(1));   // someone else's active case of the same pet
+        cases.lostCaseForPet(julian, cases.petOf("TOB22"), "JUL22", "expired", daysAgo(1));   // someone else's expired case of the same pet, resolved later than TOB22 (an unscoped join would offer it)
         ApiResponse r = carolinaBrowser.get("/me/pets");
         assertThat(pet(r, "Toby").get("active_case_code").isNull()).isTrue();
         assertThat(pet(r, "Toby").get("reopenable_case_code").asString()).isEqualTo("TOB22");

@@ -413,7 +413,7 @@ session-cache miss, measured and pinned by the endpoint tests (lower them if mea
   ```sql
   SELECT pet.id, pet.name, pet.species, pet.size, pet.colors, pet.marks, pet.photo_urls, pet.created_at,
          max(lc.code) FILTER (WHERE lc.status = 'active')                          AS active_case_code,
-         (array_agg(lc.code ORDER BY lc.resolved_at DESC)
+         (array_agg(lc.code ORDER BY lc.resolved_at DESC, lc.code DESC)
             FILTER (WHERE lc.status = 'expired' AND lc.resolved_at >= :now − 30 d))[1] AS latest_reopenable,
          max(greatest(lc.published_at, lc.resolved_at))                            AS last_activity
   FROM responsibility_link rl
