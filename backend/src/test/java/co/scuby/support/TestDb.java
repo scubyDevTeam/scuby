@@ -27,7 +27,8 @@ public final class TestDb {
             "lost_case",
             "purged_case_code",
             "sighting",
-            "responsibility_link"
+            "responsibility_link",
+            "recovery_claim"
     );
 
     /**
