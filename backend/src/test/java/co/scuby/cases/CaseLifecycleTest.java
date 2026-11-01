@@ -320,7 +320,7 @@ class CaseLifecycleTest {
 
     /** Decision 14: only the pet's newest case can come back. The older one answers invalid_transition, whatever happened to the newer. */
     @ParameterizedTest
-    @CsvSource({"reunited", "expired", "cancelled"})
+    @CsvSource({"reunited", "expired"})
     void anOlderExpiredCaseIsNeverReopenedOnceThePetHasANewerCase(String newerStatus) {
         cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
         cases.lostCaseForPet(carolina, cases.petOf("7K3PQ"), "NEW22", newerStatus, NOW.minus(Duration.ofDays(1)));
@@ -328,6 +328,15 @@ class CaseLifecycleTest {
         assertThat(r.status()).isEqualTo(409);
         assertThat(r.errorCode()).isEqualTo("invalid_transition");
         assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("expired");
+    }
+
+    /** Decision #88: a cancelled case never supersedes an older one (cancelling a duplicate leaves the earlier search reopenable). */
+    @Test
+    void aNewerCancelledCaseDoesNotSupersedeTheOlderExpiredOne() {
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(3)));
+        cases.lostCaseForPet(carolina, cases.petOf("7K3PQ"), "DUP22", "cancelled", NOW.minus(Duration.ofDays(1)));
+        assertThat(reopen(owner, "7K3PQ").status()).isEqualTo(200);
+        assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("active");
     }
 
     @Test

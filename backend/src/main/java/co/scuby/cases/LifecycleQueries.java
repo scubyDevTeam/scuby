@@ -37,11 +37,12 @@ class LifecycleQueries {
     /**
      * The one definition of «a newer case of the same pet exists» (decision #81): newest is the latest published_at, the
      * higher code on a tie. Only the newest case of a pet can be reopened, reactivated by a claim or offered by /me/pets, so
-     * a share link to an older search never revives it. The alias is "newer"; {@code c} is the case being judged.
+     * a share link to an older search never revives it. A newer case that was cancelled never counts (decision #88: cancelling
+     * a duplicate leaves the earlier search the pet's newest); reunited and expired ones do. The alias is "newer"; {@code c} is the case being judged.
      */
     static Condition superseded(LostCase c) {
         LostCase newer = LOST_CASE.as("newer");
-        return DSL.exists(DSL.selectOne().from(newer).where(newer.PET_ID.eq(c.PET_ID),
+        return DSL.exists(DSL.selectOne().from(newer).where(newer.PET_ID.eq(c.PET_ID), newer.STATUS.ne(DSL.inline("cancelled")),
                 newer.PUBLISHED_AT.gt(c.PUBLISHED_AT).or(newer.PUBLISHED_AT.eq(c.PUBLISHED_AT).and(newer.CODE.gt(c.CODE)))));
     }
 

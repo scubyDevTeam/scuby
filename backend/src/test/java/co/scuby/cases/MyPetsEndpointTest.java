@@ -169,4 +169,13 @@ class MyPetsEndpointTest {
         cases.lostCaseForPet(carolina, toby, "HOME2", "reunited", daysAgo(2));
         assertThat(pet(cold(), "Toby").get("reopenable_case_code").isNull()).as("the newest is reunited: nothing to offer").isTrue();
     }
+
+    /** Decision #88: a newer case cancelled as a duplicate does not hide the older expired case. */
+    @Test
+    void aNewerCancelledCaseDoesNotHideTheOlderReopenableOne() {
+        cases.lostCase(carolina, "OLD22", "Toby", "dog", CaseFixtures.MEDELLIN, 300, "active", daysAgo(10));
+        cases.close("OLD22", "expired", daysAgo(9));
+        cases.lostCaseForPet(carolina, cases.petOf("OLD22"), "DUP22", "cancelled", daysAgo(2));
+        assertThat(pet(cold(), "Toby").get("reopenable_case_code").asString()).isEqualTo("OLD22");
+    }
 }
