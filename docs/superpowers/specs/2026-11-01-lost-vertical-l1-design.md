@@ -98,7 +98,6 @@ CREATE TABLE recovery_claim (
   case_code           text NOT NULL REFERENCES lost_case (code),
   claimant_person_id  uuid NOT NULL REFERENCES person (id),
   phone               text NOT NULL CHECK (phone ~ '^\+[1-9][0-9]{6,14}$'),
-  note                text CHECK (length(note) <= 500),
   photo_urls          text[] NOT NULL DEFAULT '{}' CHECK (cardinality(photo_urls) <= 5),
   lat                 double precision CHECK (lat BETWEEN -90 AND 90),
   lng                 double precision CHECK (lng BETWEEN -180 AND 180),
@@ -119,7 +118,7 @@ CREATE UNIQUE INDEX recovery_claim_one_open_per_claimant
 - Keyed by `case_code`, like `sighting` (the product doc's `case_id` is the code).
 - The claimant is always a person (a session is required). There is no device column.
 - `point` is the pair `lat`/`lng`, filled only from `from_sighting_id` (the request carries no point).
-- `note` has no request field in the contract; it stays NULL in L1.
+- No `note` column: the contract's claim request has no note, and a column nothing writes is not added (a later contract change adds it with its migration).
 - `stale` is not a stored status. A claim is stale when `status = 'open'` and `created_at + 7 days` is in
   the past (§3, `ClaimDerivation`).
 - The foreign keys have no `ON DELETE` action: the purge (L2) and account deletion (L2, decision #28)
@@ -626,7 +625,7 @@ Choices this design makes where the product rules are silent, and why.
     reopen inclusive at 30 days (decided).
 15. **`/me/pets` order:** "case activity" is the latest `published_at` or `resolved_at` of the caller's cases
     of that pet; a nameless pet has `name: ""`.
-16. **`recovery_claim.note`** is ≤ 500 code points like a sighting note and stays NULL (no request field).
+16. **No `recovery_claim.note`**: the request has no note field, so no column is added until one exists.
 17. **`MyCases.open_claim_count` stays a non-null int** (always the owner) and the found vertical's
     `open_claim_count` is untouched.
 
