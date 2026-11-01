@@ -12,6 +12,15 @@ import { mediaUrl } from './media'
 const MAX_DISTANCE_M = 30_000
 const BEFORE_CASE = DAY
 
+/**
+ * java.net.URLEncoder.encode(UTF-8) followed by `+` -> `%20`: everything but [A-Za-z0-9.-*_] is percent-encoded.
+ * `encodeURIComponent` also leaves `! ' ( ) ~` alone, which URLEncoder encodes.
+ */
+function waEncode(text: string): string {
+  return encodeURIComponent(text)
+    .replace(/[!'()~]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+}
+
 /** 1 per 15 min and 5 per day per reporter per case; 20 per day per reporter overall (04). */
 function rateLimit(reporter: { id: string | null; key: string }, caseCode: string | null) {
   const mine = db.sightings.filter((s) =>
@@ -143,7 +152,7 @@ export const helpers = [
     return null
   }),
 
-  route(api.claimRecovery, ({ params, body, user }) => {
+  route(api.claimRecovery, ({ params, body, user, reporterKey }) => {
     const code = params.code.toUpperCase()
     if (db.purged.includes(code)) fail('gone')
     const row = findCase(code) ?? fail('not_found')
@@ -179,13 +188,25 @@ export const helpers = [
           (s) =>
             s.id === body.from_sighting_id &&
             s.case_code === row.code &&
-            s.reporter_id === user.id &&
+            // Mine: their person, or an anonymous pin from their device (decision 6).
+            (s.reporter_id === user.id || (s.reporter_id === null && s.reporter_key === reporterKey)) &&
             s.status === 'visible' &&
-            Date.now() - ms(s.created_at) <= DAY,
+            Date.now() - ms(s.created_at) < DAY,
         )
       : undefined
-    const whatsapp = row.contact_prefs.expose_whatsapp && row.phone_has_whatsapp
-    const whatsappUrl = whatsapp ? `https://wa.me/${row.contact_phone.replace('+', '')}` : null
+    // The public-contact rule, evaluated after the reactivation above (the case is active here). The mock's
+    // contact_phone is always the publisher's verified one, so `contact_phone_verified` holds by construction.
+    const whatsapp =
+      row.status === 'active' &&
+      row.contact_prefs.expose_whatsapp &&
+      row.phone_has_whatsapp &&
+      !row.contact_prefs.in_app_only
+    const petName = db.pets.find((p) => p.id === row.pet_id)?.name?.trim()
+    // Same text and encoding as the backend's WhatsappLinks: UTF-8 percent-encoding with spaces as %20.
+    const whatsappText = `Hola, vi tu aviso${petName ? ` de ${petName}` : ''} en Scuby (${row.code}) y creo que lo tengo.`
+    const whatsappUrl = whatsapp
+      ? `https://wa.me/${row.contact_phone.replace('+', '')}?text=${waEncode(whatsappText)}`
+      : null
     // One open claim per person per case: a repeat refreshes their open (or stale) one — the new phone, and
     // it counts as fresh again. What the repeat does not send is kept: empty photos or no link leave the
     // earlier ones.

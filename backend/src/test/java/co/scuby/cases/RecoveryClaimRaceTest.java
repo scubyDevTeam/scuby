@@ -212,4 +212,56 @@ class RecoveryClaimRaceTest {
         assertThat(db.fetchCount(RECOVERY_CLAIM)).isZero();
         assertThat(db.select(LOST_CASE.STATUS).from(LOST_CASE).where(LOST_CASE.CODE.eq("7K3PQ")).fetchOne(LOST_CASE.STATUS)).isEqualTo("expired");
     }
+
+    /**
+     * Deterministic claim vs owner close: the case is expired, an owner's cancel is held uncommitted, and the claim's
+     * reactivation waits on that row. When the cancel commits the reactivation matches nothing and the claim's own upsert
+     * must still see a case that is not active: invalid_transition, no claim, the case stays cancelled.
+     */
+    @Test
+    void aClaimWaitingOnAnUncommittedCancelEndsInvalidTransitionAndNeverReactivatesTheClosedCase() throws Exception {
+        round(0, false);
+        ApiClient helper = signedIn("andres@correo.co");
+        contention.hold("UPDATE scuby.lost_case SET status = 'cancelled', resolved_at = now(), resolution = 'duplicate' WHERE code = '7K3PQ'");
+        Future<ApiResponse> f = pool.submit(() -> helper.post(PATH, BODY, "7K3PQ"));
+        contention.awaitWaiters(1);
+        contention.commit();
+        ApiResponse r = f.get(30, TimeUnit.SECONDS);
+        assertThat(r.status()).as(r.body()).isEqualTo(409);
+        assertThat(r.errorCode()).isEqualTo("invalid_transition");
+        assertThat(db.fetchCount(RECOVERY_CLAIM)).isZero();
+        assertThat(db.select(LOST_CASE.STATUS).from(LOST_CASE).where(LOST_CASE.CODE.eq("7K3PQ")).fetchOne(LOST_CASE.STATUS)).isEqualTo("cancelled");
+    }
+
+    /**
+     * A claim and an owner close (reunite or cancel) released together on an active case. Either the claim landed while the case
+     * was active (201, the case closed after it) or it answers invalid_transition; a closed case is never active again and never
+     * holds an open claim created after the close.
+     */
+    @Test
+    void aClaimRacingAnOwnerCloseIsEitherStoredBeforeTheCloseOrInvalidTransition() throws Exception {
+        for (int n = 0; n < 8; n++) {
+            round(n, true);
+            boolean reunite = n % 2 == 0;
+            ApiClient helper = signedIn("andres" + n + "@correo.co");
+            ApiClient closer = owner;
+            var barrier = new CyclicBarrier(2);
+            Future<ApiResponse> fc = pool.submit(together(barrier, () -> reunite
+                    ? closer.post("/cases/{code}/reunite", "{\"resolution_attribution\":\"offline\"}", "7K3PQ")
+                    : closer.post("/cases/{code}/cancel", "{\"resolution\":\"duplicate\"}", "7K3PQ")));
+            Future<ApiResponse> fl = pool.submit(together(barrier, () -> helper.post(PATH, BODY, "7K3PQ")));
+            ApiResponse closed = fc.get(30, TimeUnit.SECONDS);
+            ApiResponse claimed = fl.get(30, TimeUnit.SECONDS);
+            assertThat(closed.status()).as("round %d: %s", n, closed.body()).isEqualTo(200);
+            assertThat(db.select(LOST_CASE.STATUS).from(LOST_CASE).where(LOST_CASE.CODE.eq("7K3PQ")).fetchOne(LOST_CASE.STATUS))
+                    .as("round %d: the close stays", n).isEqualTo(reunite ? "reunited" : "cancelled");
+            if (claimed.status() == 201) {
+                assertThat(db.fetchCount(RECOVERY_CLAIM)).as("round %d", n).isEqualTo(1);
+            } else {
+                assertThat(claimed.status()).as("round %d: %s", n, claimed.body()).isEqualTo(409);
+                assertThat(claimed.errorCode()).isEqualTo("invalid_transition");
+                assertThat(db.fetchCount(RECOVERY_CLAIM)).as("round %d", n).isZero();
+            }
+        }
+    }
 }

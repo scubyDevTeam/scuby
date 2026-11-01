@@ -391,7 +391,7 @@ describe('the follow-up loop (04 · Schedule)', () => {
       { params: { code: '7K3PQ' }, body: { phone: '+573001112233' } },
       asIs,
     )) as { id: string; whatsapp_url: string | null }
-    expect(claim.whatsapp_url).toBe('https://wa.me/573000000000')
+    expect(claim.whatsapp_url).toMatch(/^https:\/\/wa\.me\/573000000000\?text=Hola%2C%20vi%20tu%20aviso/)
 
     await asCarolina()
     later(25 * HOUR)
@@ -2178,6 +2178,33 @@ describe('«Lo tengo» (04 · recovery_claim; decisions #75, #76)', () => {
   it('a purged code is `gone`', async () => {
     await asNewcomer('pedro.ruiz@correo.co')
     expect((await failure(claim('GONE5'))).code).toBe('gone')
+  })
+
+  it('the WhatsApp link carries the backend text, encoded like URLEncoder with %20 for spaces', async () => {
+    await asNewcomer('pedro.ruiz@correo.co')
+    const row = db.cases['7K3PQ']
+    if (row?.vertical !== 'lost') throw new Error('lost')
+    const pet = db.pets.find((p) => p.id === row.pet_id)
+    if (!pet) throw new Error('pet')
+    pet.name = "Luna (la 'ñ'!)"
+    const url = (await claim('7K3PQ')).whatsapp_url
+    expect(url).toBe(
+      `https://wa.me/${row.contact_phone.replace('+', '')}?text=` +
+        'Hola%2C%20vi%20tu%20aviso%20de%20Luna%20%28la%20%27%C3%B1%27%21%29%20en%20Scuby%20%287K3PQ%29%20y%20creo%20que%20lo%20tengo.',
+    )
+  })
+
+  it('the link follows the public-contact rule: no WhatsApp, no link; in-app only, no link', async () => {
+    await asNewcomer('pedro.ruiz@correo.co')
+    const row = db.cases['7K3PQ']
+    if (row?.vertical !== 'lost') throw new Error('lost')
+    row.contact_prefs = { expose_whatsapp: true, expose_email: false, in_app_only: true }
+    expect((await claim('7K3PQ')).whatsapp_url).toBeNull()
+    row.contact_prefs = { expose_whatsapp: false, expose_email: false, in_app_only: false }
+    expect((await claim('7K3PQ')).whatsapp_url).toBeNull()
+    row.contact_prefs = { expose_whatsapp: true, expose_email: false, in_app_only: false }
+    row.phone_has_whatsapp = false
+    expect((await claim('7K3PQ')).whatsapp_url).toBeNull()
   })
 
   it('a repeat refreshes the open claim: same id, the new phone, one row', async () => {

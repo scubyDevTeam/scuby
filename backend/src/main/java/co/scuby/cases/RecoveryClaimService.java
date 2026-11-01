@@ -85,6 +85,7 @@ class RecoveryClaimService {
             });
         } catch (RuntimeException e) {
             if (!UniqueViolation.on(e, LifecycleQueries.ACTIVE_PER_PET)) throw e;
+            // The other active case was closed again between the violation and this read: the case is still not active.
             throw lifecycle.activeCodeFor(found.petId()).map(CaseErrors::activeCaseExists).orElseGet(CaseErrors::invalidTransition);
         }
         // A row came back, so the case was active when it was written: the link follows the contact rule on an active case.
@@ -129,6 +130,8 @@ class RecoveryClaimService {
             return CaseErrors.invalidTransition();
         }
         if (row.otherActiveCode() != null) return CaseErrors.activeCaseExists(row.otherActiveCode());
+        // Reachable only if the case expired between the pre-read and the write (nothing expires cases in L1; the L2 expiry
+        // job should retry or reactivate here instead of refusing): the case is not active, and invalid_transition says so.
         return CaseErrors.invalidTransition();
     }
 }
