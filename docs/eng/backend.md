@@ -490,17 +490,17 @@ refused publish. A close never waits for an uncommitted sighting; two claims on 
 
 ## Migrations and indexes: kept performance indexes
 
-The performance indexes are those of decisions #53, #61, #66 and #68. Over `sighting`: `sighting_by_case_recent_idx
+The performance indexes are those of decisions #53, #61, #66, #68 and #85. Over `sighting`: `sighting_by_case_recent_idx
 (case_code, seen_at DESC, id DESC) INCLUDE (status)` (decision #68) serves the capped list of a case's sightings
 (a top-N in index order, no sort) and the feed's per-case counts; it is not partial because the owner's list and the
 public one filter status differently. `sighting_replay_key` is an integrity UNIQUE and stays; reads do not use it.
 The migration `V20261030_1040` holds the growth answers and `CaseSightingsPlanTest` the plan check.
-Two more serve the lost vertical's owner reads. `recovery_claim_by_case_recent_idx (case_code, created_at DESC)`
-serves the owner's claim list on every owner view of a case and the correlated open-claim counts of «Mis casos»
-and of the owner's feed items (`V20261101_1030`; `RecoveryClaimPlanTest`, `ClaimCountPlanTest`); the partial UNIQUE
-`recovery_claim_one_open_per_claimant` is the integrity index of «Lo tengo» and stays.
+The lost vertical adds one more performance index (decision #85).
 `responsibility_link_by_person_active_idx (person_id) WHERE active_to IS NULL` serves `GET /me/pets`
-(`V20261101_1040`; `MyPetsPlanTest`).
+(`V20261101_1040`; `MyPetsPlanTest`). The owner's claim list and the open-claim counts of «Mis casos» and of the
+owner's feed items are read through the `case_code` prefix of the integrity UNIQUE `recovery_claim_one_per_claimant
+(case_code, claimant_person_id)` (decision #82; `V20261101_1100`; `RecoveryClaimPlanTest`, `ClaimCountPlanTest`).
+`recovery_claim_by_case_recent_idx` was added in `V20261101_1030` and dropped in `V20261101_1110` (decision #84).
 
 ## Migrations and indexes: partial indexes need literals
 

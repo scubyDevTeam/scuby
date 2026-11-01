@@ -122,7 +122,7 @@ Two invariants enforced at publish:
 | Situation | Behavior |
 |---|---|
 | Selected pet already has an `active` lost case | Block, link to the existing case. Two cases for one animal means two broadcasts and two check-in streams |
-| Selected pet has an `expired` case ≤ 30 days old | Offer reopen instead: «Luna ya tenía un aviso — ¿lo reactivamos?». One tap; sightings and trajectory preserved. Publishing fresh is still allowed if the owner declines |
+| Selected pet has an `expired` case ≤ 30 days old that is the pet's newest case (decision #81) | Offer reopen instead: «Luna ya tenía un aviso — ¿lo reactivamos?». One tap; sightings and trajectory preserved. Publishing fresh is still allowed if the owner declines. An older expired case of the pet is never offered |
 
 #### Location precision
 
@@ -285,12 +285,16 @@ the owner's star covers the need and is explainable in one sentence.
 `point?`, `photos[]`, `from_sighting_id?`, `status: open | confirmed | dismissed`, `created_at`,
 `last_active_at`, `answered_at?`. `stale` is derived, not stored: a claim still open 7 days after the
 claimant's last «Lo tengo» on it (`last_active_at`). The check-in fields (`verifying_since`, `stale_at`)
-arrive with the follow-up loop. One open claim per person per case: «Lo tengo» again, while it is open
-(stale included), refreshes it — the new phone always, and the photos, pin and sighting link when the
-repeat sends them (what it leaves out is kept) — and sets `last_active_at`, so it counts again and the
-owner sees the claimant's current number. The owner's list shows `last_active_at` as the claim's time and orders by it, newest first (decision #84). On a case that is no longer active the repeat gets the
-case's answer (reactivated inside 30 days, or `active_case_exists` with the pet's live case), never the
-old claim.
+arrive with the follow-up loop. One claim per person per case, whatever its status (decision #82): «Lo tengo»
+again, while it is open (stale included), refreshes it — the new phone always, and the photos, pin and sighting
+link when the repeat sends them (what it leaves out is kept) — and sets `last_active_at`, so it counts again and the
+owner sees the claimant's current number. Once the owner has answered it (`confirmed` or `dismissed`), a repeat
+returns that same claim untouched (with the WhatsApp link when the case is active and its contact is public): no new
+claim, no change of phone or dates, no reactivation of an expired case, and the owner's badge stays off. The owner's
+list shows `last_active_at` as the claim's time and orders by it, newest first (decision #84). On a case that is no
+longer active, a repeat on an open claim gets the case's answer (reactivated inside 30 days — only when it is the
+pet's newest case, decision #81 — or `active_case_exists` with the pet's live case, or `invalid_transition`), never
+the old claim.
 
 Creating one **opens a contact channel** and **schedules claim check-ins**. It never changes the
 case status by itself.
@@ -324,7 +328,7 @@ in time they're more likely noise than context. A link that does not
 qualify (another case, older, not theirs, hidden) is ignored: the claim is stored without it.
 
 The owner owes the claim an answer: confirm, dismiss, or «aún verificando». A claim the owner never
-answers goes `stale` automatically at `stale_at` (see schedule): the «posible hallazgo» badge drops
+answers goes `stale` automatically at `stale_at` (the follow-up loop, L2; in L1 `stale` is derived from `last_active_at`, see `recovery_claim` above, and nothing is stored): the «posible hallazgo» badge drops
 and the cadence returns to weekly, but the case stays `active` at full reach. Stale is absence of a
 verdict, not a verdict — the claimant's contact stays attached and the owner can still confirm it
 later (`stale → confirmed`). The answer is revisable
@@ -375,8 +379,8 @@ stateDiagram-v2
     expired --> reunited: owner confirms (no reopen first, decision #83)
     active --> expired: 2 consecutive check-ins unanswered
     active --> cancelled: owner deletes (false alarm, duplicate)
-    expired --> active: owner reopens (1 tap, ≤30 days)
-    expired --> active: recovery_claim (≤30 days, decision #29)
+    expired --> active: owner reopens (1 tap, ≤30 days, the pet's newest case only, decision #81)
+    expired --> active: recovery_claim (≤30 days, the pet's newest case only, decisions #29 and #81)
     reunited --> [*]
     cancelled --> [*]
     expired --> [*]: purge after 30 days
@@ -386,7 +390,7 @@ Four statuses. Deliberate — every candidate fifth state turned out to be deriv
 
 | Rejected state | Why it's derived instead |
 |---|---|
-| `pending_confirmation` | = `EXISTS recovery_claim WHERE status = 'open'`, computed inside the query that already fetches the case (read through the case_code prefix of `recovery_claim_one_per_claimant`). A UI badge ("posible hallazgo") for the owner only, not a status. If it ever shows in profiling, denormalize `open_claim_count` on the case, maintained in the same transaction — still not a status, never a cache layer |
+| `pending_confirmation` | = `EXISTS recovery_claim WHERE status = 'open'` and not stale (7 days after `last_active_at`), computed inside the query that already fetches the case (read through the case_code prefix of `recovery_claim_one_per_claimant`). A UI badge ("posible hallazgo") for the owner only, not a status. If it ever shows in profiling, denormalize `open_claim_count` on the case, maintained in the same transaction — still not a status, never a cache layer |
 | `paused` | v2. No evidence owners want to mute a search mid-search |
 | `draft` | The publish form is one screen; there is nothing to draft |
 | `archived` | A retention phase applied to terminal cases, not a lifecycle state |
@@ -456,7 +460,7 @@ Claim check-ins never count toward the streak — an owner ignoring a bad claim 
 abandoning the search.
 
 `expired` is soft: gone from feed and push, still reachable by direct link (WhatsApp shares stay
-alive), reopenable in one tap for 30 days. After 30 days: purge anonymous sighter contacts, keep the
+alive), reopenable in one tap for 30 days (only the pet's newest case, decision #81). After 30 days: purge anonymous sighter contacts, keep the
 pet record — it's a claimed pet, the owner link continues, and expiry never changes who is
 responsible ([01, rule 7](01-actors-and-entities.md)).
 

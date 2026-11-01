@@ -2,7 +2,7 @@
 
 > Design for the second backend slice: everything an owner and a helper do with a published lost case
 > after it exists: edit, close, reopen, moderate pins, correct or delete one's own pin, «Lo tengo» and
-> its answer, the caller's pets and the profile update. 13 endpoints of the contract. Decided
+> its answer, the caller's pets and the profile update. 12 endpoints of the contract. Decided
 > 2026-11-01. The durable parts land in their owning docs as part of the implementation (§8); this file
 > records the whole design in one place for the plans that implement it. Question ids such as `Q-A4`
 > refer to the question index in the appendix, which restates each question.
@@ -32,7 +32,7 @@ Existing reads change to carry claims: `GET /cases/{code}` (`claims[]`, `open_cl
 
 **Done when:**
 
-1. The 13 endpoints run and every integration-tested response validates against the regenerated
+1. The 12 endpoints run and every integration-tested response validates against the regenerated
    `docs/eng/openapi.json`; `ContractCoverageTest`, ArchUnit and PIT (≥ 80 % on every new `*Derivation`)
    pass in `./mvnw verify`.
 2. The contract change of §6 is merged: `pnpm openapi`, `pnpm test` and `pnpm typecheck` pass in `web/`, and
@@ -556,7 +556,10 @@ and pins the first code of §3 and §4.
 
 `backend/e2e/seed.sql` adds (and truncates `recovery_claim`): the pet Pelusa with an owner link to
 `carolina@correo.co`; an expired lost case `PEL4S` for it, `resolved_at = now() − 3 days`, resolution NULL;
-an open claim on `7K3PQ` by Andrés Rojas, phone `+573114829017`, created 3 hours ago. Expected to start
+an open claim on `7K3PQ` by Andrés Rojas, phone `+573114829017`, created 3 hours ago; and, added at the end of
+the slice, the pets Milo and Kira with the cases `M2TQ4` (active) and `ARCH2` (expired, `resolution` NULL because L1
+has no `no_response` value) that `@HELP-002` and `@HELP-005` open, and a photo for Luna (the edit form sends a pet's
+photos back, and a published case always has at least one). Expected to start
 passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step (§1).
 
 ## 8. Docs to update (with the implementation)
@@ -600,12 +603,12 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 | O37 | Reports leave L1: `POST /reports`, the two auto-hide reasons, «en revisión», with O20 |
 | O38 | Shares leave L1: `POST /cases/{code}/shares` with the L2 worker and the events table; its storage and growth |
 
-**FE handoff:** a new `docs/handoffs/<merge date>-backend-lost-l1-fe.md`, structured like
-`2026-10-31-backend-thin-slice-fe.md`:
+**FE handoff:** the existing `docs/handoffs/2026-10-31-backend-thin-slice-fe.md` was extended (one live handoff,
+not a second file):
 
 - *Product changes:* «Lo tengo» needs a session (tell the user it is for safety; `@HELP-002` and `@HELP-005`
   were given a sign-in step; the claim sheet must ask for sign-in); the badge is owner-only (render nothing
-  for `null`; the claimant's feedback is the claim sheet's success state; the public notice is dead copy); a
+  for `null`; the claimant's feedback is the claim sheet's success state; the public notice was removed); a
   cancelled case page (`status: cancelled`, no contact); idempotent reunite, cancel, reopen and delete; reopen
   and claims can answer `active_case_exists`, a claim on a purged code `gone`, the owner's own claim
   `forbidden` (a per-code table of suggested copy); a repeated claim refreshes the open one under the same id;
@@ -629,7 +632,9 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 | Expiry and purge | Expiry writes `status = 'expired'`, `resolved_at`, and `resolution = 'no_response'` after widening `lost_case_resolution_fits_status`. The purge must handle `recovery_claim` and `sighting` rows (no `ON DELETE` action) and O4 |
 | `answerCheckin` `claim_confirmed` | Calls the same claim answer and then reunite with `platform_claim`; L1's answer never closes |
 | In-app thread for a null `whatsapp_url` | Conversations (`eng/comms.md`) |
-| Account deletion (#28) | Decides `recovery_claim.claimant_person_id` |
+| Account deletion (#28) | Decides `recovery_claim.claimant_person_id`, and what happens to the deleted account's pins: `sighting.reporter_person_id` is `ON DELETE SET NULL`, so under the "mine" rule (decision #73) they become mine by device for whoever shares the browser that sent them (D14 in `open-items.md`) |
+| A claim reactivates an expired case | The owner's contact turns public again and nobody tells the owner (O40). Notify the owner from the claim row in L2 |
+| A moved zone | The place name is the generic label until a provider exists (O39) |
 | Other verticals | `PATCH /cases/{code}` and reopen gain their `CaseKind` implementations |
 
 ## 10. Risks
@@ -641,6 +646,7 @@ passing: `@LINK-001`, and `@PLOST-002`/`@PLOST-004` apart from their Google step
 | A repeat keeps the claim's evidence it does not resend | The phone always updates; empty `photo_urls`, an absent point and an absent `from_sighting_id` keep the stored values, so a plain re-tap never clears earlier photos. Cost: a claimant cannot remove evidence by repeating |
 | A claimant keeps a claim fresh | Anyone can keep their own claim counted by repeating it. The badge is owner-only, so it never reduces reach |
 | A claim can land on a case closed a moment earlier | The `INSERT … SELECT … WHERE status = 'active'` reads its snapshot; a close committing in between does not stop it. Harmless (the badge counts active cases only), the same shape as «Lo vi» against a close; no lock |
+| A claim's reactivation makes the owner's contact public | Any signed-in person with a well-formed mobile can do it, on the pet's newest case only (decision #81). The owner is not told until L2 (O40) |
 | The edit changes the shared pet | Old cases show the new photos and signs |
 | Reopen keeps `published_at` | A reopened case sorts by its old date in the national feed |
 | Known-domain bio rule | A link on a domain outside the list passes; accepted so ordinary prose is never refused |

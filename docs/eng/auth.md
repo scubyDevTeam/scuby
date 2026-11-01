@@ -91,7 +91,7 @@ minimization; nothing needs them).
 | Who | Phone? |
 |---|---|
 | Publishers (any vertical) | **Required, OTP-verified**, at first publish |
-| Anonymous «lo tengo» claimant | Collected, **unverified** — the owner's callback channel |
+| «Lo tengo» claimant (signed in, [decision #75](../product/00-product-map.md)) | Collected, **unverified** — the owner's callback channel |
 | Everyone else (interest, contributions, sightings, threads) | Never asked |
 
 Helpers contacting a poster need no number of their own on file: the `wa.me` deep link opens
