@@ -38,6 +38,7 @@ class CaseLifecycleTest {
     @Autowired Accounts accounts;
     @Autowired CaseFixtures cases;
     @Autowired DSLContext db;
+    @Autowired LifecycleQueries queries;
     @Autowired ObjectProvider<ClearableCache> caches;
 
     ApiClient owner;
@@ -342,5 +343,17 @@ class CaseLifecycleTest {
         assertThat(cold(() -> cancel(owner, "7K3PQ", "duplicate")).statements()).hasSize(3);
         assertThat(cold(() -> cancel(owner, "7K3PQ", "duplicate")).statements()).as("a repeat, answered by the pre-read").hasSize(2);
         assertThat(cold(() -> reopen(owner, "7K3PQ")).statements()).as("refused by the pre-read").hasSize(2);
+    }
+
+    /**
+     * The SQL window clause on its own: the Java pre-read refuses a case outside the window before the UPDATE is ever sent,
+     * so the statement is exercised directly. One microsecond past 30 days, and 31 days: no row is touched.
+     */
+    @ParameterizedTest
+    @CsvSource({"30,1", "31,0"})
+    void theUpdatesOwnWindowClauseRefusesAnExpiredCaseResolvedPastThirtyDays(long days, long extraMicros) {
+        cases.close("7K3PQ", "expired", NOW.minus(Duration.ofDays(days)).minus(extraMicros, java.time.temporal.ChronoUnit.MICROS));
+        assertThat(queries.reopen("7K3PQ", carolina, NOW)).isFalse();
+        assertThat(luna().get(LOST_CASE.STATUS)).isEqualTo("expired");
     }
 }

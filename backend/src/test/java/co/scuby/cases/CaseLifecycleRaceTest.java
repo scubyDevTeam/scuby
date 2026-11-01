@@ -203,6 +203,26 @@ class CaseLifecycleRaceTest {
     }
 
     /**
+     * Pins the reopen UPDATE's `status = 'expired'` guard. A held transaction closes the same row as `reunited`; the
+     * reopen passes its pre-read (expired, uncommitted change invisible), its UPDATE waits on the row, re-checks the guard
+     * after the commit and must match nothing: its re-read finds `reunited`, which is not what the owner asked for, so
+     * invalid_transition. Without the guard the UPDATE would reopen a reunited case.
+     */
+    @Test
+    void aReopenThatMeetsACommittedCloseOfTheSameRowIsInvalidTransitionAndTheStatusStays() throws Exception {
+        cases.close("7K3PQ", "expired", MutableClock.START.minus(Duration.ofDays(2)));
+        contention.hold(HELD_REUNITE);
+        caches.orderedStream().filter(c -> !(c instanceof FeatureFlags)).forEach(ClearableCache::clear);
+        Future<ApiResponse> f = pool.submit(() -> owner.post("/cases/{code}/reopen", null, "7K3PQ"));
+        contention.awaitWaiters(1);
+        contention.commit();
+        ApiResponse r = f.get(30, TimeUnit.SECONDS);
+        assertThat(r.status()).isEqualTo(409);
+        assertThat(r.errorCode()).isEqualTo("invalid_transition");
+        assertThat(status()).as("the guard status = 'expired' kept the reunited case closed").isEqualTo("reunited");
+    }
+
+    /**
      * The reopen passes its pre-read (the rival's active case is not committed), its UPDATE waits on the rival's entry in
      * lost_case_one_active_per_pet, the rival commits, the UPDATE fails on the unique index: active_case_exists naming the
      * rival, never a 500. The longest reopen path: session, pre-read, update, active-code read = the ceiling, 4.
