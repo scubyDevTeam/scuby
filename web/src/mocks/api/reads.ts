@@ -23,10 +23,10 @@ export const reads = [
     return caseView(db, row, user?.id ?? null, reporterKey)
   }),
 
-  route(api.getFeed, ({ query }) => {
+  route(api.getFeed, ({ query, user }) => {
     const near =
       query.lat !== undefined && query.lng !== undefined ? { lat: query.lat, lng: query.lng } : null
-    const feed = feedView(db, near)
+    const feed = feedView(db, near, user?.id ?? null)
     return {
       scope: feed.scope,
       items: feed.items.filter(

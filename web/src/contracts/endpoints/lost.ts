@@ -79,10 +79,10 @@ export const reopenCase = endpoint({
   path: '/cases/:code/reopen',
   summary:
     'Reactivates an expired case: lost, found or a help request up to 30 days after it expired, ' +
-    'an adoption listing up to 90 (adoption timelines are months).',
+    'an adoption listing up to 90 (adoption timelines are months). `active_case_exists` when the pet has another active case.',
   auth: 'session',
   response: createdWire,
-  errors: OWNER_ONLY,
+  errors: [...OWNER_ONLY, 'active_case_exists'],
 })
 
 export const answerRecoveryClaim = endpoint({

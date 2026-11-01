@@ -108,7 +108,7 @@ public class ApiErrorHandler extends ResponseEntityExceptionHandler {
     }
 
     /** Mirrors `spring.jackson.property-naming-strategy: SNAKE_CASE`: fields are named by wire path (docs/eng/api.md · Errors). */
-    private static String wirePath(String javaPath) {
+    static String wirePath(String javaPath) {
         return javaPath.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
     }
 

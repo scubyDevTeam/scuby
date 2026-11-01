@@ -1007,5 +1007,5 @@ export function cases(viewer: 'public' | 'responsible' = 'public'): Record<strin
 
 /** The seeded feed, as a stranger in Medellín gets it. For tests. */
 export function feedItems(): FeedItemWire[] {
-  return feedView(seed(), null).items
+  return feedView(seed(), null, null).items
 }

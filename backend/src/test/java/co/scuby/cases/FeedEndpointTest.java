@@ -110,7 +110,7 @@ class FeedEndpointTest {
         assertThat(r.json().at("/items/0/point/lat").asDouble()).isEqualTo(ONE_KM.lat());
         assertThat(r.json().at("/items/0/sightings_count").asInt()).isEqualTo(1);
         assertThat(r.str("/items/0/last_sighting_at")).isEqualTo("2026-10-14T16:00:00Z");
-        assertThat(r.json().at("/items/0/possible_find").asBoolean()).isFalse();
+        assertThat(r.isNull("/items/0/possible_find")).as("owner-only").isTrue();
         assertThat(r.isNull("/items/0/detail")).isTrue();
         assertThat(r.str("/items/0/photo_url")).endsWith(".jpg");
     }

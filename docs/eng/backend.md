@@ -236,6 +236,15 @@ the bean check accepts can never fail the constraint. A database error is logged
 constraint name only, and the driver's `logServerErrorDetail` is off, so a failing row (a phone
 number) never reaches the logs.
 
+**PATCH bodies and the order of body checks.** A PATCH request record declares each field as
+`platform.web.Patch<T>` (absent / null / a value), filled through Jackson's absent- and null-value hooks
+(`PatchDeserializer`). An endpoint whose error order puts the body after the owner check binds its record
+without `@Valid`, and the service runs `BodyValidation.require` (or a derivation's field rules) at that point;
+only what Jackson cannot read (malformed JSON, a wrong JSON type, an absent required field) is answered before the
+lookups. Enum-valued fields such as `resolution_attribution` bind as strings for that reason.
+**Cross-foundation checks go through `platform` interfaces:** identity checks a profile photo through
+`platform.media.ProfilePhotos`, implemented in uploads, as `RequestAuthenticator` does for the session filter.
+
 **Guardrails that fail the build:** ArchUnit (derivation purity — no Spring, jOOQ, I/O, clock or
 randomness; roles by annotation, including that every `@RestController` is an `@ApiComponent` and every
 `@Scheduled`/`@SqsListener` method sits in a `@WorkerComponent`; the DAG; the declared surface), PIT
@@ -438,6 +447,26 @@ invariant**, not from row or advisory locks:
 - **A sighting only on an active case.** One `INSERT … SELECT … FROM lost_case WHERE code = ? AND status =
   'active'`. A close that commits a moment later is ordered after the sighting, and a close does not
   delay it (it takes `FOR NO KEY UPDATE`, which does not conflict with the key share a foreign key takes).
+- **Lifecycle transitions.** Reunite, cancel, reopen and edit are one conditional `UPDATE … WHERE code = ? AND
+  created_by = ? AND status = …` each; a pre-read classifies the errors, and zero rows after it is the race loser,
+  answered as one re-read classifies. Reunite, cancel, reopen and the reporter's delete are idempotent: a case or
+  pin already in the action's target state answers the same success with no write — on the pre-read, or on the
+  re-read when another request won the race — so a retry never overwrites the first call's resolution; another
+  state is `invalid_transition`. A reopen — or a claim's reactivation — that loses to a publish of the same pet
+  fails on `lost_case_one_active_per_pet`; the unique violation is caught by its constraint name and answered
+  `active_case_exists`, never a `500`. An edit writes the pet first and the case last, as the guard, so a close
+  that commits in between rolls the pet change back.
+- **One open claim per claimant.** «Lo tengo» is one `INSERT … SELECT … FROM lost_case WHERE status = 'active' ON
+  CONFLICT (case_code, claimant_person_id) WHERE status = 'open' DO UPDATE`: a repeat refreshes the open row (the
+  phone and `last_active_at` always; photos, point and link only when the repeat sends them) and returns its id; a
+  double tap serializes on the index entry and leaves one row. Nothing is written, and nothing old is answered, when
+  the case is not active. On an expired case the reactivation and the upsert run in one transaction, so the case
+  row is held only until that write commits.
+- **Accepted, not locked:** a claim or a correction can land on a case closed a moment earlier. The
+  `INSERT … SELECT … WHERE status = 'active'` (and the correction's `EXISTS`) reads its snapshot, and the
+  foreign-key check's `KEY SHARE` does not conflict with the close's `NO KEY UPDATE`, so a close committing in
+  between does not stop it. The outcome is harmless — the badge counts active cases only and the case is
+  closed — the same shape as «Lo vi» against a close. Do not "fix" it with a lock.
 - **The send caps: email exact, SMS overshootable across accounts.** An email is sent only after the guarded upsert
   on the address's single `email_code` row succeeds, and simultaneous starts serialize on that row, so the email
   cooldown and the 10-per-24-h cap hold exactly. The same holds for SMS from one account (one `phone_otp` row).
@@ -449,22 +478,29 @@ invariant**, not from row or advisory locks:
 
 **Where a lock remains.** Application code takes none. The only locks are Postgres' own: the unique-index waits
 above (a second insert waits for the first transaction and then conflicts), the row lock of an `UPDATE`, and
-`FOR UPDATE SKIP LOCKED` in the outbox relay ([outbox-relay.md](outbox-relay.md)). A future path that closes or
-edits a case holds its row only for its own `UPDATE`; it needs a race test against a signed-in sighting, and
-a lock beyond that needs a decision-log row saying why an atomic statement does not do.
+`FOR UPDATE SKIP LOCKED` in the outbox relay ([outbox-relay.md](outbox-relay.md)). A path that closes or
+edits a case holds its row only for its own `UPDATE` and has a race test against a signed-in sighting
+(`CaseLifecycleRaceTest`, `EditLostRaceTest`); a lock beyond that needs a decision-log row saying why an atomic
+statement does not do.
 
-**Race tests** (`CodeRaceTest`, `PublishLostTest`, `SightingRaceTest`) start requests together with a barrier or hold
+**Race tests** (`CodeRaceTest`, `PublishLostTest`, `SightingRaceTest`, `CaseLifecycleRaceTest`, `EditLostRaceTest`, `RecoveryClaimRaceTest`, and the held-row cases of `SightingCorrectionTest` and `SightingDeleteTest`, through `support.Contention`) start requests together with a barrier or hold
 an uncommitted row from another connection, and assert the invariants: a code is never consumed twice, two
 publishes for one pet give one case and one `409` and never a `500`, a correct code is still usable after a
-refused publish.
+refused publish. A close never waits for an uncommitted sighting; two claims on one expired case reactivate it once; a claim and a publish for the same pet leave exactly one active case; a double tap on «Lo tengo» stores one claim; a retried reunite keeps the first attribution; a reopen that meets a claim's reactivation answers 200 with the case active.
 
 ## Migrations and indexes: kept performance indexes
 
-The performance indexes are those of decisions #53, #61, #66 and #68. Over `sighting`: `sighting_by_case_recent_idx
+The performance indexes are those of decisions #53, #61, #66, #68 and #85. Over `sighting`: `sighting_by_case_recent_idx
 (case_code, seen_at DESC, id DESC) INCLUDE (status)` (decision #68) serves the capped list of a case's sightings
 (a top-N in index order, no sort) and the feed's per-case counts; it is not partial because the owner's list and the
 public one filter status differently. `sighting_replay_key` is an integrity UNIQUE and stays; reads do not use it.
 The migration `V20261030_1040` holds the growth answers and `CaseSightingsPlanTest` the plan check.
+The lost vertical adds one more performance index (decision #85).
+`responsibility_link_by_person_active_idx (person_id) WHERE active_to IS NULL` serves `GET /me/pets`
+(`V20261101_1040`; `MyPetsPlanTest`). The owner's claim list and the open-claim counts of «Mis casos» and of the
+owner's feed items are read through the `case_code` prefix of the integrity UNIQUE `recovery_claim_one_per_claimant
+(case_code, claimant_person_id)` (decision #82; `V20261101_1100`; `RecoveryClaimPlanTest`, `ClaimCountPlanTest`).
+`recovery_claim_by_case_recent_idx` was added in `V20261101_1030` and dropped in `V20261101_1110` (decision #84).
 
 ## Migrations and indexes: partial indexes need literals
 

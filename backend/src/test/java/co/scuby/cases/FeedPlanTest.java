@@ -30,7 +30,7 @@ class FeedPlanTest {
 
     @Test
     void theNationalFeedReadsNewestActiveCasesInIndexOrder() {
-        var q = queries.nationalQuery(null, 100);
+        var q = queries.nationalQuery(null, 100, null, co.scuby.support.MutableClock.START);
         PlanAssert.assertUsesIndex(db, q, "lost_case_active_published_idx");
         PlanAssert.assertNoSeqScan(db, q, "lost_case");
         PlanAssert.assertNoSeqScan(db, q, "pet");

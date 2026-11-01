@@ -11,6 +11,6 @@ record FeedView(String scope, List<FeedItem> items) {
 
     record FeedItem(String code, String vertical, String title, String species, @Nullable String summary,
                     String placeName, GeoPoint point, @Nullable String photoUrl, Instant happenedAt,
-                    boolean possibleFind, @Nullable Integer sightingsCount, @Nullable Instant lastSightingAt,
+                    @Nullable Boolean possibleFind, @Nullable Integer sightingsCount, @Nullable Instant lastSightingAt,
                     @Nullable String detail) {}
 }

@@ -3,7 +3,7 @@ import { expect, tags, test } from './test.ts'
 test(
   'a shared link to an active lost case shows who, where and what to do',
   tags('@case-link', '@LINK-001'),
-  async ({ casePage }) => {
+  async ({ casePage, profile }) => {
     await casePage.open('7K3PQ')
 
     await test.step('who is missing, and what a stranger can do', async () => {
@@ -11,7 +11,6 @@ test(
       await expect(casePage.text('Se busca')).toBeVisible()
       await expect(casePage.sawIt).toBeVisible()
       await expect(casePage.haveIt).toBeVisible()
-      await expect(casePage.possibleFind).toBeVisible()
     })
 
     await test.step('the trajectory, newest first', async () => {
@@ -22,6 +21,16 @@ test(
     await test.step('the map loads after the page, on its own, and the family is reachable', async () => {
       await expect(casePage.map).toHaveAttribute('data-map-ready', 'true')
       await expect(casePage.whatsapp).toHaveAttribute('href', /^https:\/\/wa\.me\//)
+    })
+
+    await test.step('its owner, signed in, sees who says they have her', async () => {
+      await profile.open()
+      await profile.signIn.withEmailCode('carolina@correo.co') // the seeded owner of Luna’s case
+      await expect(profile.name('Carolina Mejía')).toBeVisible()
+      await casePage.open('7K3PQ')
+      // The owner's «Posible hallazgo» is the claims list (the page shows it instead of the public badge).
+      await expect(casePage.claims).toBeVisible()
+      await expect(casePage.claims.getByText('+573114829017')).toBeVisible()
     })
   },
 )

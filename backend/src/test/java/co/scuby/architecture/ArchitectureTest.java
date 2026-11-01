@@ -5,7 +5,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 
-/** Guardrails 1–4 on the production code (test classes excluded). */
+/** Guardrails 1–5 on the production code (test classes excluded). */
 @AnalyzeClasses(packages = "co.scuby", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
@@ -50,4 +50,7 @@ class ArchitectureTest {
     void crossFeatureUseIsDeclared(JavaClasses classes) {
         RULES.all().forEach(f -> RULES.moduleApi(f).check(classes));
     }
+
+    @ArchTest
+    void onlyUniqueViolationKnowsThePostgresDriver(JavaClasses classes) { RULES.onlyUniqueViolationKnowsThePostgresDriver().check(classes); }
 }

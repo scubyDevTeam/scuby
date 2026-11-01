@@ -84,19 +84,40 @@ class PublishLostService {
         }
         // No transaction is open here (PublishLostService is not @Transactional): prepare counts a code attempt in
         // its own statement, and a wrong code is invalid_code right now.
-        PublisherPhone.Prepared prepared = publisherPhone.prepare(me, request.phone(), request.otpCode());
+        PublisherPhone.Prepared prepared;
+        try {
+            prepared = publisherPhone.prepare(me, request.phone(), request.otpCode());
+        } catch (ApiException e) {
+            throw wrongCodeOrDoubleTap(e, request);
+        }
         // The place name may be a network call (a reverse geocoder): never inside the transaction (decision #45).
         // It is also computed when this call ends up only sending the SMS code; that is harmless while the
         // namer is a no-op, and a provider will want a cache keyed by the rounded point.
         GeoPoint point = request.lastSeenPoint().toGeoPoint();
         String placeName = placeNames.forNewCase(point, me);
         GeoPoint publicPoint = LocationPrecisionDerivation.publicCenter(point);
-        Object result = tx.execute(status -> publishInTransaction(me, caller, request, now, prepared, point, publicPoint, placeName));
+        Object result;
+        try {
+            result = tx.execute(status -> publishInTransaction(me, caller, request, now, prepared, point, publicPoint, placeName));
+        } catch (ApiException e) {
+            throw wrongCodeOrDoubleTap(e, request);
+        }
         if (result instanceof PublisherPhone.CodeSent sent) {
             publisherPhone.deliver(sent);                 // after execute: no transaction, no pooled connection
             return PublishView.PhoneStep.OTP;
         }
         return result;
+    }
+
+    /**
+     * A double tap of «Publicar» can lose the race after the pre-check: the winner commits (case in, code consumed)
+     * and the loser then finds the code gone. For the user that is never «wrong code»: if the pet now has an active
+     * case, answer active_case_exists. Any other error, or no active case, is the original error. Lock-free re-read.
+     */
+    private ApiException wrongCodeOrDoubleTap(ApiException e, PublishLostRequest request) {
+        if (e.code() != ErrorCode.INVALID_CODE || request.petId() == null) return e;
+        String open = activeCaseQuery(UUID.fromString(request.petId())).fetchOptional(Record1::value1).orElse(null);
+        return open != null ? activeCaseExists(open) : e;
     }
 
     private void requireOwnedAndFree(String petId, UUID me) {

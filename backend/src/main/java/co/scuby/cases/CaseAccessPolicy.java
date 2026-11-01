@@ -12,6 +12,11 @@ import java.util.UUID;
 @Component
 class CaseAccessPolicy {
     Access accessFor(UUID createdBy, Caller caller) {
-        return createdBy.equals(caller.personId()) ? Access.OWNER : Access.PUBLIC;
+        return isOwner(createdBy, caller.personId()) ? Access.OWNER : Access.PUBLIC;
+    }
+
+    /** The owner of a lost case is the person who published it (lost_case.created_by), by session. */
+    boolean isOwner(UUID createdBy, @org.jspecify.annotations.Nullable UUID personId) {
+        return createdBy.equals(personId);
     }
 }

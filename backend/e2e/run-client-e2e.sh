@@ -42,6 +42,10 @@ bash ./build.sh
 for _ in $(seq 1 90); do curl -sf --max-time 2 "http://localhost:$SCUBY_API_PORT/actuator/health" >/dev/null && break; sleep 1; done
 curl -sf --max-time 2 "http://localhost:$SCUBY_API_PORT/actuator/health" >/dev/null || { echo "run-client-e2e.sh: the API did not become healthy on port $SCUBY_API_PORT" >&2; exit 1; }
 "${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U scuby -d scuby < "$here/seed.sql"
+# The photo the seed gives Luna (seed.sql): the edit form sends a pet's photos back, and a case page must be able to show it.
+luna_sha="$(shasum -a 256 "$here/luna.jpg" | cut -d' ' -f1)"
+curl -sf --max-time 10 -X PUT --data-binary "@$here/luna.jpg" -H 'content-type: image/jpeg' "http://localhost:$SCUBY_API_PORT/dev-media/$luna_sha.jpg" >/dev/null \
+  || { echo "run-client-e2e.sh: could not store the seed photo" >&2; exit 1; }
 
 cd "$web"
 # pnpm may not be installed: run the version web/package.json pins through npx.

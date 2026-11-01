@@ -4053,11 +4053,15 @@
     "/cases/{code}/recovery-claims": {
       "post": {
         "operationId": "claimRecovery",
-        "summary": "«Lo tengo» on a lost case. Creates the claim, then answers the channel to the owner. On a case archived less than 30 days ago it reactivates it first (decision #29).",
+        "summary": "«Lo tengo» on a lost case. Needs a session: the claimant is a person, for the owner’s safety (say so in the UI). The case’s owner cannot claim it. Creates the claim, then answers the channel to the owner; a repeated claim by the same person refreshes their open one (the new phone always; photos and pin only when sent; it counts as fresh again) and answers its id; once the owner has answered it, a repeat answers that same claim unchanged (one claim per person per case). A `from_sighting_id` that is not the caller’s own visible pin of the last 24 hours is ignored, never refused. On a case archived less than 30 days ago it reactivates it first (decision #29) when it is the pet’s newest case, unless the pet has another active case (`active_case_exists`).",
         "tags": [
           "cases"
         ],
-        "security": [],
+        "security": [
+          {
+            "session": []
+          }
+        ],
         "parameters": [
           {
             "name": "code",
@@ -4089,6 +4093,26 @@
               }
             }
           },
+          "401": {
+            "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "404": {
             "description": "`error.code`: `not_found`",
             "content": {
@@ -4100,7 +4124,17 @@
             }
           },
           "409": {
-            "description": "`error.code`: `invalid_transition`",
+            "description": "`error.code`: `invalid_transition`, `active_case_exists`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "`error.code`: `gone`",
             "content": {
               "application/json": {
                 "schema": {
@@ -5197,7 +5231,7 @@
     "/cases/{code}/reopen": {
       "post": {
         "operationId": "reopenCase",
-        "summary": "Reactivates an expired case: lost, found or a help request up to 30 days after it expired, an adoption listing up to 90 (adoption timelines are months).",
+        "summary": "Reactivates an expired case: lost, found or a help request up to 30 days after it expired, an adoption listing up to 90 (adoption timelines are months). `active_case_exists` when the pet has another active case.",
         "tags": [
           "cases"
         ],
@@ -5258,7 +5292,7 @@
             }
           },
           "409": {
-            "description": "`error.code`: `invalid_transition`",
+            "description": "`error.code`: `invalid_transition`, `active_case_exists`",
             "content": {
               "application/json": {
                 "schema": {
@@ -6798,7 +6832,10 @@
                   "format": "date-time"
                 },
                 "possible_find": {
-                  "type": "boolean"
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
                 },
                 "sightings_count": {
                   "anyOf": [
@@ -7928,9 +7965,16 @@
             "additionalProperties": false
           },
           "open_claim_count": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "sightings": {
             "type": "array",

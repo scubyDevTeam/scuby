@@ -113,4 +113,34 @@ class MyCasesEndpointTest {
         assertThat(twenty.json()).hasSize(20);
         assertThat(twenty.statements()).hasSize(2);
     }
+
+    @Test
+    void openClaimCountCountsOpenNonStaleClaimsOnActiveCasesOnly() {
+        cases.luna(carolina);                                                                   // active
+        cases.lostCase(carolina, "EXP22", "Toby", "dog", CaseFixtures.MEDELLIN, 300, "active", MutableClock.START.minusSeconds(86_400 * 5));
+        cases.close("EXP22", "expired", MutableClock.START.minusSeconds(86_400));
+        UUID a = accounts.person("andres@correo.co");
+        UUID b = accounts.person("laura@correo.co");
+        cases.claim("7K3PQ", a, "+573001112233", MutableClock.START.minusSeconds(3600), "open");
+        cases.claim("7K3PQ", b, "+573001112244", MutableClock.START.minusSeconds(60), "open");
+        cases.claim("7K3PQ", accounts.person("pedro@correo.co"), "+573001112255", MutableClock.START.minus(java.time.Duration.ofDays(8)), "open");
+        cases.claim("7K3PQ", accounts.person("ana@correo.co"), "+573001112266", MutableClock.START.minusSeconds(60), "dismissed");
+        cases.claim("7K3PQ", accounts.person("julian@correo.co"), "+573001112277", MutableClock.START.minus(java.time.Duration.ofDays(9)),
+                MutableClock.START.minusSeconds(600), "open");                                 // made 9 days ago, repeated 10 min ago: fresh
+        cases.claim("EXP22", a, "+573001112233", MutableClock.START.minusSeconds(3600), "open");
+        ApiResponse r = cold(carolinaBrowser);
+        assertThat(codes(r)).containsExactly("7K3PQ", "EXP22");
+        assertThat(r.json().at("/0/open_claim_count").asInt()).as("two open, one refreshed, one stale, one dismissed").isEqualTo(3);
+        assertThat(r.json().at("/1/open_claim_count").asInt()).as("not active").isZero();
+        assertThat(r.statements()).hasSize(2);
+    }
+
+    @Test
+    void theStaleBoundaryIsInclusiveAtExactlyLastActivePlusSevenDays() {
+        cases.luna(carolina);
+        java.time.Instant edge = MutableClock.START.minus(java.time.Duration.ofDays(7));
+        cases.claim("7K3PQ", accounts.person("andres@correo.co"), "+573001112233", edge, "open");                       // last_active_at + 7d == now: not stale
+        cases.claim("7K3PQ", accounts.person("laura@correo.co"), "+573001112244", edge.minusSeconds(1), "open");        // one second past: stale
+        assertThat(cold(carolinaBrowser).json().at("/0/open_claim_count").asInt()).isEqualTo(1);
+    }
 }

@@ -21,18 +21,17 @@ test(
 test(
   '«La tengo conmigo»: leave a phone, the family is told, WhatsApp opens',
   tags('@helper', '@HELP-002'),
-  async ({ casePage }) => {
-    await test.step('nobody has said they have Milo', async () => {
-      await casePage.open('M2TQ4')
-      await expect(casePage.possibleFind).toHaveCount(0)
+  async ({ casePage, profile }) => {
+    await test.step('«Lo tengo» needs an account: the helper signs in first (decision #75)', async () => {
+      await profile.open()
+      await profile.signIn.withEmailCode('pedro.ruiz@correo.co')
+      await expect(profile.name('Pedro Ruiz')).toBeVisible()
     })
+
+    await casePage.open('M2TQ4')
 
     await test.step('the claim opens WhatsApp with his family', async () => {
       expect(await casePage.claimRecovery('311 482 9017')).toContain('wa.me')
-    })
-
-    await test.step('the claim exists whatever happens in WhatsApp: the page says so', async () => {
-      await expect(casePage.possibleFind).toBeVisible()
     })
   },
 )
@@ -93,7 +92,13 @@ test(
 test(
   '«La tengo conmigo» on an archived notice brings it back to life',
   tags('@helper', '@HELP-005'),
-  async ({ casePage }) => {
+  async ({ casePage, profile }) => {
+    await test.step('«Lo tengo» needs an account: the helper signs in first (decision #75)', async () => {
+      await profile.open()
+      await profile.signIn.withEmailCode('pedro.ruiz@correo.co')
+      await expect(profile.name('Pedro Ruiz')).toBeVisible()
+    })
+
     await test.step('Kira’s notice was archived: no sighting, but «La tengo» is there', async () => {
       await casePage.open('ARCH2')
       await expect(casePage.text('Este aviso fue archivado.')).toBeVisible()
@@ -103,7 +108,7 @@ test(
     await test.step('the claim opens WhatsApp and the notice is active again', async () => {
       expect(await casePage.claimRecovery('311 482 9017')).toContain('wa.me')
       await expect(casePage.text('Este aviso fue archivado.')).toHaveCount(0)
-      await expect(casePage.possibleFind).toBeVisible()
+      // The claim sheet's success state is the claimant's whole feedback: the badge is the owner's only (#76).
     })
   },
 )

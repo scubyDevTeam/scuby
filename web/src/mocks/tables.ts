@@ -187,7 +187,8 @@ export type SightingRow = {
   /** The rate-limit handle for anonymous reporters (device/IP in the real backend). */
   reporter_key: string
   contact_phone: string | null
-  status: 'visible' | 'hidden_by_owner'
+  /** `deleted_by_reporter`: the reporter took it off; it is gone for everyone, the owner included. */
+  status: 'visible' | 'hidden_by_owner' | 'deleted_by_reporter'
   highlighted_by_owner: boolean
   /** The client's replay key, when it sent one: a retry of the same sighting finds this row. */
   client_id?: string
@@ -199,9 +200,15 @@ export type RecoveryClaimRow = {
   phone: string
   claimant_id: string | null
   created_at: string
+  /** The last «Lo tengo» (the first one's `created_at` when absent): the owner sees and orders by this (#84). */
+  last_active_at?: string
   status: 'open' | 'confirmed' | 'dismissed' | 'stale'
   /** No verdict by then and the «posible hallazgo» badge drops (docs/product/04 · Schedule). */
   stale_at: string
+  /** Evidence the claimant sent; a repeat «Lo tengo» without photos keeps these. */
+  photo_urls?: string[]
+  /** The claimant's own recent pin this claim grew out of, when eligible. */
+  from_sighting_id?: string | null
 }
 
 export type OwnershipClaimRow = {

@@ -59,7 +59,20 @@ class FeedStatementsTest {
     void theOwnerGetsExactlyThePublicItemAndNoOwnerOnlyField() {
         ApiResponse pub = cold(clients.newBrowser(), "/feed");
         ApiResponse own = cold(owner, "/feed");
-        assertThat(own.json()).isEqualTo(pub.json());
+        // The one owner-only field is possible_find (decision #76): false for the publisher here, null for the public.
+        var ownItems = (tools.jackson.databind.node.ArrayNode) own.json().get("items");
+        var pubItems = (tools.jackson.databind.node.ArrayNode) pub.json().get("items");
+        assertThat(ownItems).hasSameSizeAs(pubItems);
+        for (int i = 0; i < ownItems.size(); i++) {
+            assertThat(ownItems.get(i).get("possible_find").isBoolean()).isTrue();
+            assertThat(ownItems.get(i).get("possible_find").asBoolean()).as("no claims in this fixture").isFalse();
+            assertThat(pubItems.get(i).get("possible_find").isNull()).isTrue();
+            var o = ((tools.jackson.databind.node.ObjectNode) ownItems.get(i).deepCopy());
+            var p = ((tools.jackson.databind.node.ObjectNode) pubItems.get(i).deepCopy());
+            o.remove("possible_find");
+            p.remove("possible_find");
+            assertThat(o).isEqualTo(p);
+        }
         String body = own.json().toString();
         assertThat(body).doesNotContain("radius").doesNotContain("contact").doesNotContain("phone")
                 .doesNotContain("email").doesNotContain("whatsapp");

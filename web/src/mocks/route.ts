@@ -75,9 +75,20 @@ function parseOrFail(schema: z.ZodMiniType, raw: unknown): unknown {
   throw new Fail('validation_failed', undefined, fields)
 }
 
-async function readBody(endpoint: Endpoint, request: Request): Promise<unknown> {
+/** The request's JSON, or `undefined` when it is not JSON at all (that is always refused up front). */
+async function readRaw(endpoint: Endpoint, request: Request): Promise<unknown> {
   if (endpoint.body === null) return undefined
-  return parseOrFail(endpoint.body, await request.json().catch(() => undefined))
+  return request.json().catch(() => undefined)
+}
+
+export type RouteOptions = {
+  /**
+   * Check the body's fields only when the handler first reads `context.body`, so the handler's lookups
+   * (not_found, forbidden, the claim is on this case) answer first, as the backend's owner endpoints do.
+   * A body that is not JSON is still refused up front. Such a handler must read `context.body`
+   * (never destructure it before the lookups).
+   */
+  lateBody?: boolean
 }
 
 /** Every endpoint that has a handler: a test holds it equal to api.ts. */
@@ -86,6 +97,7 @@ export const routed = new Set<Endpoint>()
 export function route<E extends Endpoint>(
   endpoint: E,
   handle: (context: Context<E>) => WireOf<E> | Promise<WireOf<E>>,
+  options: RouteOptions = {},
 ) {
   routed.add(endpoint)
   const method = endpoint.method.toLowerCase() as 'get' | 'post' | 'patch' | 'delete'
@@ -102,14 +114,22 @@ export function route<E extends Endpoint>(
         const query = endpoint.query
           ? parseOrFail(endpoint.query, Object.fromEntries(new URL(request.url).searchParams))
           : undefined
-        const body = await readBody(endpoint, request)
-        const result = await handle({
+        const raw = await readRaw(endpoint, request)
+        let parsed: { value: unknown } | undefined
+        const context = {
           params: params as ParamsOf<E>,
           query: query as Parsed<E['query']>,
-          body: body as Parsed<E['body']>,
+          // Parsed on first read: up front by default, after the handler's lookups when `lateBody`.
+          get body() {
+            if (endpoint.body === null) return undefined as Parsed<E['body']>
+            parsed ??= { value: parseOrFail(endpoint.body, raw) }
+            return parsed.value as Parsed<E['body']>
+          },
           user: user as Context<E>['user'],
           reporterKey: deviceKey(),
-        })
+        } satisfies Context<E>
+        if (!options.lateBody || (endpoint.body !== null && raw === undefined)) void context.body
+        const result = await handle(context)
 
         if (endpoint.response === null) return new HttpResponse(null, { status: endpoint.status })
         const checked = endpoint.response.safeParse(result)
