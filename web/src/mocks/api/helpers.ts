@@ -2,7 +2,7 @@
 import { api } from '../../contracts/api'
 import type { Point } from '../../contracts/primitives'
 import { db, type FoundRow, findCase, type LostRow, newId, type SightingRow } from '../db'
-import { onClaimOpened, onOwnerInteraction } from '../followup'
+import { CLAIM_STALE, onClaimOpened, onOwnerInteraction } from '../followup'
 import { notify } from '../notify'
 import { fail, route } from '../route'
 import { ago, DAY, distance, HOUR, iso, metres, ms } from '../rules'
@@ -144,20 +144,64 @@ export const helpers = [
   }),
 
   route(api.claimRecovery, ({ params, body, user }) => {
-    const row = findCase(params.code) ?? fail('not_found')
+    const code = params.code.toUpperCase()
+    if (db.purged.includes(code)) fail('gone')
+    const row = findCase(code) ?? fail('not_found')
     if (row.vertical !== 'lost') fail('not_found')
+    // A session is required (the route wrapper answered `unauthorized`); the owner cannot claim their own case.
+    if (row.created_by === user.id) fail('forbidden')
     // Someone holding the animal is stronger evidence of a live search than the owner tapping
-    // «reabrir» (decision #29): inside the 30-day window, a claim reactivates an archived case.
+    // «reabrir» (decision #29): inside the 30-day window, a claim reactivates an archived case —
+    // unless the pet already has another active case.
     const reopens =
       row.status === 'expired' &&
       row.resolved_at !== null &&
       Date.now() - ms(row.resolved_at) <= REOPEN_WINDOW
     if (row.status !== 'active' && !reopens) fail('invalid_transition')
     if (reopens) {
+      const other = Object.values(db.cases).find(
+        (c) =>
+          c.vertical === 'lost' &&
+          c.pet_id === row.pet_id &&
+          c.code !== row.code &&
+          c.status === 'active',
+      )
+      if (other) fail('active_case_exists', { case_code: other.code })
       row.status = 'active'
       row.resolved_at = null
       row.resolution = null
       onOwnerInteraction(row.code)
+    }
+    // The link to the claimant's own sighting: only their own visible pin on this case from the last
+    // 24 hours counts; anything else is ignored and the claim is still created.
+    const sighting = body.from_sighting_id
+      ? db.sightings.find(
+          (s) =>
+            s.id === body.from_sighting_id &&
+            s.case_code === row.code &&
+            s.reporter_id === user.id &&
+            s.status === 'visible' &&
+            Date.now() - ms(s.created_at) <= DAY,
+        )
+      : undefined
+    const whatsapp = row.contact_prefs.expose_whatsapp && row.phone_has_whatsapp
+    const whatsappUrl = whatsapp ? `https://wa.me/${row.contact_phone.replace('+', '')}` : null
+    // One open claim per person per case: a repeat refreshes their open (or stale) one — the new phone, and
+    // it counts as fresh again. What the repeat does not send is kept: empty photos or no link leave the
+    // earlier ones.
+    const mine = db.recoveryClaims.find(
+      (c) =>
+        c.case_code === row.code &&
+        c.claimant_id === user.id &&
+        (c.status === 'open' || c.status === 'stale'),
+    )
+    if (mine) {
+      mine.phone = body.phone
+      if (body.photo_urls.length > 0) mine.photo_urls = body.photo_urls
+      if (sighting) mine.from_sighting_id = sighting.id
+      mine.status = 'open'
+      mine.stale_at = iso(Date.now() + CLAIM_STALE)
+      return { id: mine.id, whatsapp_url: whatsappUrl }
     }
     const id = newId('claim-')
     const staleAt = onClaimOpened(row.code, id)
@@ -165,10 +209,12 @@ export const helpers = [
       id,
       case_code: row.code,
       phone: body.phone,
-      claimant_id: user?.id ?? null,
+      claimant_id: user.id,
       created_at: iso(Date.now()),
       status: 'open',
       stale_at: staleAt,
+      photo_urls: body.photo_urls,
+      from_sighting_id: sighting?.id ?? null,
     })
     const name = db.pets.find((p) => p.id === row.pet_id)?.name ?? 'tu mascota'
     notify(
@@ -177,11 +223,7 @@ export const helpers = [
       `Alguien dice que tiene a ${name}. Ábrelo para contactar.`,
       row.code,
     )
-    const whatsapp = row.contact_prefs.expose_whatsapp && row.phone_has_whatsapp
-    return {
-      id,
-      whatsapp_url: whatsapp ? `https://wa.me/${row.contact_phone.replace('+', '')}` : null,
-    }
+    return { id, whatsapp_url: whatsappUrl }
   }),
 
   route(api.recordShare, ({ params, body }) => {

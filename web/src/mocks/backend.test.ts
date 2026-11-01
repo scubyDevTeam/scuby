@@ -137,7 +137,8 @@ describe('what each viewer gets (04 · Location precision, 05 · withheld detail
     if (luna.vertical !== 'lost') throw new Error('expected lost')
     expect(luna.viewer).toBe('public')
     expect(luna.claims).toEqual([])
-    expect(luna.openClaimCount).toBe(1)
+    // Owner-only: a claim must never reduce reach (docs/product/04 · Rule: a recovery claim must never reduce reach).
+    expect(luna.openClaimCount).toBeNull()
     expect(luna.sightings).toHaveLength(2)
     expect(luna.sightings.every((s) => s.contactPhone === null)).toBe(true)
   })
@@ -149,6 +150,7 @@ describe('what each viewer gets (04 · Location precision, 05 · withheld detail
     if (luna.vertical !== 'lost') throw new Error('expected lost')
     expect(luna.viewer).toBe('owner')
     expect(luna.claims.map((c) => c.phone)).toEqual(['+573114829017'])
+    expect(luna.openClaimCount).toBe(1)
     expect(luna.sightings.filter((s) => s.hidden)).toHaveLength(1)
     expect(luna.sightings.some((s) => s.contactPhone)).toBe(true)
   })
@@ -383,6 +385,7 @@ describe('the owner’s side (04 · state machine)', () => {
 
 describe('the follow-up loop (04 · Schedule)', () => {
   it('a claim asks the owner at +24 h; «sí, es ella» confirms it and closes the case', async () => {
+    await asNewcomer('pedro.ruiz@correo.co') // «Lo tengo» needs a session (decision #75)
     const claim = (await call(
       api.claimRecovery,
       { params: { code: '7K3PQ' }, body: { phone: '+573001112233' } },
@@ -442,7 +445,9 @@ describe('the follow-up loop (04 · Schedule)', () => {
 
   it('two unanswered time-based check-ins expire the case; the claim goes stale on its own', async () => {
     const code = await publishKira()
+    await asNewcomer('pedro.ruiz@correo.co') // the owner cannot claim their own case; a claim needs a session
     await call(api.claimRecovery, { params: { code }, body: { phone: '+573001112233' } }, asIs)
+    await asNewcomer('ana.gomez@correo.co') // back to the owner: only she sees the claims and the inbox
     later(72 * HOUR + 7 * DAY + DAY + HOUR)
     const kiraCase = await caseOf(code)
     if (kiraCase.vertical !== 'lost') throw new Error('expected lost')
@@ -2020,6 +2025,7 @@ describe('«La tengo» on an archived case (decision #29, closes O3)', () => {
     call(api.claimRecovery, { params: { code }, body: { phone: '+573114829017' } }, asIs)
 
   it('reactivates a case archived less than 30 days ago, and tells the owner', async () => {
+    await asNewcomer('pedro.ruiz@correo.co')
     await claim('ARCH2')
     expect(db.cases.ARCH2).toMatchObject({ status: 'active', resolution: null })
     expect(db.recoveryClaims.some((c) => c.case_code === 'ARCH2')).toBe(true)
@@ -2027,6 +2033,7 @@ describe('«La tengo» on an archived case (decision #29, closes O3)', () => {
   })
 
   it('a case archived longer ago, or closed, takes no claim', async () => {
+    await asNewcomer('pedro.ruiz@correo.co')
     db.cases.ARCH2!.resolved_at = new Date(Date.now() - 31 * DAY).toISOString()
     expect((await failure(claim('ARCH2'))).code).toBe('invalid_transition')
     expect((await failure(claim('H4PPY'))).code).toBe('invalid_transition')
@@ -2127,5 +2134,101 @@ describe('photo uploads (docs/eng/api.md · Uploads, media-pipeline §1)', () =>
       ),
     )
     expect(error.code).toBe('validation_failed')
+  })
+})
+
+describe('«Lo tengo» (04 · recovery_claim; decisions #75, #76)', () => {
+  const claim = (code: string) =>
+    call(
+      api.claimRecovery,
+      { params: { code }, body: { phone: '+573001112233' } },
+      asIs,
+    ) as Promise<{
+      id: string
+      whatsapp_url: string | null
+    }>
+
+  it('needs a session', async () => {
+    expect((await failure(claim('7K3PQ'))).code).toBe('unauthorized')
+  })
+
+  it('the owner cannot claim their own case', async () => {
+    await asCarolina()
+    expect((await failure(claim('7K3PQ'))).code).toBe('forbidden')
+  })
+
+  it('a purged code is `gone`', async () => {
+    await asNewcomer('pedro.ruiz@correo.co')
+    expect((await failure(claim('GONE5'))).code).toBe('gone')
+  })
+
+  it('a repeat refreshes the open claim: same id, the new phone, one row', async () => {
+    const pedro = await asNewcomer('pedro.ruiz@correo.co')
+    const first = await claim('7K3PQ')
+    const again = (await call(
+      api.claimRecovery,
+      { params: { code: '7K3PQ' }, body: { phone: '+573009998877' } },
+      asIs,
+    )) as { id: string }
+    expect(again.id).toBe(first.id)
+    const mine = db.recoveryClaims.filter(
+      (c) => c.case_code === '7K3PQ' && c.claimant_id === pedro.id,
+    )
+    expect(mine).toHaveLength(1)
+    expect(mine[0]?.phone).toBe('+573009998877')
+    expect(mine[0]?.status).toBe('open')
+  })
+
+  it('a repeat without photos keeps the earlier ones; one with photos replaces them', async () => {
+    const pedro = await asNewcomer('pedro.ruiz@correo.co')
+    const send = (photo_urls: string[]) =>
+      call(
+        api.claimRecovery,
+        { params: { code: '7K3PQ' }, body: { phone: '+573001112233', photo_urls } },
+        asIs,
+      )
+    const photo = (n: number) => `https://cdn.scuby.test/claims/${n}.jpg`
+    await send([photo(1)])
+    const row = () => db.recoveryClaims.find((c) => c.claimant_id === pedro.id)
+    await send([])
+    expect(row()?.photo_urls).toEqual([photo(1)])
+    await send([photo(2)])
+    expect(row()?.photo_urls).toEqual([photo(2)])
+  })
+
+  it('an ineligible from_sighting_id is ignored and the claim is still created', async () => {
+    const pedro = await asNewcomer('pedro.ruiz@correo.co')
+    const made = await call(
+      api.claimRecovery,
+      { params: { code: '7K3PQ' }, body: { phone: '+573001112233', from_sighting_id: 'not-mine' } },
+      asIs,
+    )
+    expect((made as { id: string }).id).toBeTruthy()
+    const row = db.recoveryClaims.find((c) => c.claimant_id === pedro.id)
+    expect(row?.from_sighting_id).toBeNull()
+  })
+
+  it('a claim on an expired case whose pet has another active case is `active_case_exists`', async () => {
+    await asNewcomer('pedro.ruiz@correo.co')
+    const luna = db.cases['7K3PQ']
+    if (luna?.vertical !== 'lost') throw new Error('expected lost')
+    const other = Object.values(db.cases).find(
+      (c) => c.vertical === 'lost' && c.code !== luna.code && c.status === 'active',
+    )
+    if (!other) throw new Error('need a second lost case')
+    Object.assign(luna, {
+      status: 'expired',
+      resolved_at: new Date().toISOString(),
+      pet_id: other.pet_id,
+    })
+    expect((await failure(claim('7K3PQ'))).code).toBe('active_case_exists')
+  })
+
+  it('the badge is null in the feed for everyone but the publisher', async () => {
+    const anonymous = await call(api.getFeed, { query: {} }, parseFeed)
+    expect(anonymous.items.every((i) => i.possibleFind === null)).toBe(true)
+    await asCarolina()
+    const mine = await call(api.getFeed, { query: {} }, parseFeed)
+    expect(mine.items.find((i) => i.code === '7K3PQ')?.possibleFind).toBe(true)
   })
 })

@@ -64,7 +64,11 @@ export const lostCaseWire = z.object({
     at: timestamp,
     place_name: z.string(),
   }),
-  open_claim_count: z.int().check(z.nonnegative()),
+  /**
+   * Only the owner receives it (null otherwise): a claim must never reduce reach (docs/product/04 · Rule: a recovery
+   * claim must never reduce reach). Open, non-stale claims on an active case; 0 once the case is closed.
+   */
+  open_claim_count: z.nullable(z.int().check(z.nonnegative())),
   sightings: z.array(sightingWire),
   /** Who says they have the animal. Only the owner receives these. */
   claims: z._default(
@@ -135,7 +139,7 @@ export type LostCase = {
     photoUrls: string[]
   }
   lastSeen: { center: { lat: number; lng: number }; radiusM: number; at: Date; placeName: string }
-  openClaimCount: number
+  openClaimCount: number | null
   sightings: Sighting[]
   claims: RecoveryClaim[]
   pendingCheckin: Checkin | null

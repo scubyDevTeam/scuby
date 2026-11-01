@@ -202,6 +202,10 @@ export type RecoveryClaimRow = {
   status: 'open' | 'confirmed' | 'dismissed' | 'stale'
   /** No verdict by then and the «posible hallazgo» badge drops (docs/product/04 · Schedule). */
   stale_at: string
+  /** Evidence the claimant sent; a repeat «Lo tengo» without photos keeps these. */
+  photo_urls?: string[]
+  /** The claimant's own recent pin this claim grew out of, when eligible. */
+  from_sighting_id?: string | null
 }
 
 export type OwnershipClaimRow = {

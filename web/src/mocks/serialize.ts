@@ -91,7 +91,12 @@ function lostView(
       photo_urls: pet.photo_urls,
     },
     last_seen: row.last_seen,
-    open_claim_count: claims.filter((c) => c.status === 'open').length,
+    // Owner-only (decision #76): null for everyone else; 0 once the case is closed.
+    open_claim_count: owner
+      ? row.status === 'active'
+        ? claims.filter((c) => c.status === 'open').length
+        : 0
+      : null,
     sightings: t.sightings
       .filter((s) => s.case_code === row.code && (owner || s.status === 'visible'))
       .sort((a, b) => ms(a.seen_at) - ms(b.seen_at))
@@ -396,8 +401,10 @@ export function caseView(
   return helpView(t, row, viewerId)
 }
 
-function feedItem(t: Tables, row: CaseRow): FeedItem | null {
+function feedItem(t: Tables, row: CaseRow, viewerId: string | null): FeedItem | null {
   if (row.status !== 'active') return null
+  // The badge reaches only the item's publisher (decision #76).
+  const mine = viewerId !== null && row.created_by === viewerId
   const pet = petOf(t, row.pet_id)
   if (row.vertical === 'help') {
     return {
@@ -410,7 +417,7 @@ function feedItem(t: Tables, row: CaseRow): FeedItem | null {
       point: row.location.center,
       photo_url: pet.photo_urls[0] ?? null,
       happened_at: row.published_at,
-      possible_find: false,
+      possible_find: mine ? false : null,
       sightings_count: null,
       last_sighting_at: null,
       detail: needsLine(row),
@@ -428,7 +435,7 @@ function feedItem(t: Tables, row: CaseRow): FeedItem | null {
       point: row.location.center,
       photo_url: pet.photo_urls[0] ?? null,
       happened_at: row.published_at,
-      possible_find: false,
+      possible_find: mine ? false : null,
       sightings_count: null,
       last_sighting_at: null,
       detail: reserved ? 'En proceso' : null,
@@ -445,7 +452,7 @@ function feedItem(t: Tables, row: CaseRow): FeedItem | null {
       point: row.found.center,
       photo_url: pet.photo_urls[0] ?? null,
       happened_at: row.found.at,
-      possible_find: false,
+      possible_find: mine ? false : null,
       sightings_count: null,
       last_sighting_at: null,
       detail: null,
@@ -463,7 +470,9 @@ function feedItem(t: Tables, row: CaseRow): FeedItem | null {
     point: row.last_seen.center,
     photo_url: pet.photo_urls[0] ?? null,
     happened_at: row.last_seen.at,
-    possible_find: t.recoveryClaims.some((c) => c.case_code === row.code && c.status === 'open'),
+    possible_find: mine
+      ? t.recoveryClaims.some((c) => c.case_code === row.code && c.status === 'open')
+      : null,
     sightings_count: sightings.length,
     last_sighting_at: latest,
     detail: null,
@@ -477,11 +486,11 @@ const pointOf = (item: FeedItem) => item.point
  * listing «en proceso» goes after the rest: attention on a pet already spoken for is stolen from
  * the others — the deliberate inverse of lost's never-reduce-reach rule (06).
  */
-export function feedView(t: Tables, near: Point | null): FeedWire {
+export function feedView(t: Tables, near: Point | null, viewerId: string | null): FeedWire {
   const rows = Object.values(t.cases).sort((a, b) => ms(b.published_at) - ms(a.published_at))
   const demoted = (row: CaseRow) => row.vertical === 'adoption' && isReserved(t, row.code)
   const items = [...rows.filter((row) => !demoted(row)), ...rows.filter(demoted)].flatMap(
-    (row) => feedItem(t, row) ?? [],
+    (row) => feedItem(t, row, viewerId) ?? [],
   )
   const center = near ?? DEFAULT_CENTER
   const local = items.filter((item) => metres(pointOf(item), center) <= NEAR_M)
