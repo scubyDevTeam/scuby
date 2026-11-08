@@ -35,3 +35,5 @@ product and engineering source of truth is `docs/`; there is no application code
    to an account that is a member of the `scubyDevTeam` org (work accounts can't push here).
 8. Commit messages start with a type prefix: `feat:` (behaviour), `test:`, `doc:`, `ci:` — one
    kind of change per commit where it can be split.
+9. **Working in `infra/`?** Read [`infra/README.md`](infra/README.md) first: how to change and test
+   it, how to run the sandbox, and what must never be touched or deleted by hand.
