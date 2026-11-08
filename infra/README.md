@@ -27,6 +27,17 @@ infra/
 - **Docker**.
 - Nada más: `sandbox-build.sh` construye el backend con `backend/build.sh`, que corre Maven en un contenedor (solo hace falta Docker; el script necesita un checkout de git).
 
+## Cambiar la infra
+
+1. Editar el módulo en `terraform/modules/` (o el env que lo compone). Un valor que el sandbox
+   necesita distinto va como variable del módulo con el default seguro; el sandbox la sobrescribe.
+2. `terraform fmt -recursive infra/terraform` y `terraform -chdir=infra/terraform/envs/sandbox validate`
+   (la primera vez, `init -backend=false`). Si se tocaron las Lambdas: `npm test` en `infra/lambda/media/`.
+3. Si el cambio toca recursos reales (IAM, red, CloudFront, Lambdas, el deploy), una corrida
+   completa del sandbox (abajo) antes del PR; anotar el resultado en el PR.
+4. Si el cambio deja algo pendiente para staging, una fila en
+   [`staging-rollout.md`](../docs/eng/staging-rollout.md).
+
 ## Correr el sandbox
 
 **Dónde clonar.** El watchdog corre bajo launchd, y macOS (TCC) no deja que un proceso de launchd
@@ -105,3 +116,6 @@ algo o si una comprobación falla, y con 2 si las credenciales no sirven.
 La cuenta del sandbox tiene recursos que **no son de Scuby** y que nada de aquí puede crear,
 modificar ni borrar: la **VPC por defecto** (`vpc-9d15b4e0`) y el bucket **`wc2026-tfstate-itslauyalejo`**.
 Solo se borra lo que lleva `Project=scuby` o lo que creó este estado de Terraform.
+
+**Solo Terraform borra** (`sandbox-destroy.sh`): nunca `aws … delete-*` a mano ni `terraform import`.
+Si el sweep encuentra algo vivo, se reporta con el comando que lo borraría y lo borra una persona.
