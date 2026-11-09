@@ -187,6 +187,21 @@ final class ArchitectureRules {
                 .because("cross-feature use is declared with @ModuleApi");
     }
 
+    /**
+     * 5. The Postgres driver is confined to one domain-free class (platform.db.UniqueViolation, which reads SQLSTATE and the
+     * constraint name, the only locale-proof way to tell a unique violation apart): nothing else imports org.postgresql.
+     */
+    ArchRule onlyUniqueViolationKnowsThePostgresDriver() {
+        return onlyKnowsThePostgresDriver(root + ".platform.db.UniqueViolation");
+    }
+
+    ArchRule onlyKnowsThePostgresDriver(String allowedClass) {
+        return noClasses().that().doNotHaveFullyQualifiedName(allowedClass)
+                .should().dependOnClassesThat(resideInAnyPackage("org.postgresql.."))
+                .allowEmptyShould(true)
+                .because("driver types leak the database into the domain; UniqueViolation is the one place that reads them");
+    }
+
     List<String> foundations() { return foundations; }
 
     List<String> verticals() { return verticals; }

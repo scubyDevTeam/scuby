@@ -17,7 +17,7 @@ import { type AdoptionRow, db, type FoundRow, type HelpRow, type LostRow, newId 
 import { notify } from './notify'
 import { DAY, iso, ms } from './rules'
 
-const CLAIM_STALE = 7 * DAY
+export const CLAIM_STALE = 7 * DAY
 /** An archived request can be reopened for 30 days (07 · The follow-up loop, as in 04). */
 const HELP_REOPEN_WINDOW = 30 * DAY
 

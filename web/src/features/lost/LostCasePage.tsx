@@ -1,5 +1,5 @@
 import type { LostCase, Sighting } from '@contracts/case'
-import { availableActions, hasPossibleFind, type LostAction, pageMode } from '@domain/lost/actions'
+import { availableActions, type LostAction, pageMode } from '@domain/lost/actions'
 import { checkinAnswers, closeAnswersCheckin } from '@domain/lost/checkin'
 import { placeSightings, splitHidden } from '@domain/lost/sightings'
 import { publicArea } from '@domain/shared/geo'
@@ -9,7 +9,7 @@ import { useI18n } from '@i18n/react'
 import { Button, buttonClass } from '@ui/Button'
 import { CaseMap } from '@ui/Map/CaseMap'
 import { Notice } from '@ui/Notice'
-import { Archive, Clock, Flag, PartyPopper, Share2 } from 'lucide-react'
+import { Archive, Flag, PartyPopper, Share2 } from 'lucide-react'
 import { lazy, type ReactNode, Suspense, useState } from 'react'
 import { describePet, formatDayMonth, sightingsCount } from './copy'
 import { SightingTimeline } from './SightingTimeline'
@@ -253,14 +253,6 @@ export function LostCasePage({
             onConfirmed={() => onAction('confirm_reunited')}
           />
         </Suspense>
-      ) : null}
-
-      {mode === 'open' &&
-      lostCase.viewer === 'public' &&
-      hasPossibleFind(lostCase.openClaimCount) ? (
-        <Notice icon={<Clock aria-hidden="true" />} title={t('lost.page.possible_find_title')}>
-          {t('lost.page.possible_find_body')}
-        </Notice>
       ) : null}
 
       {/* Whatever the case's status: a refused send is said, never dropped. */}

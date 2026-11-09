@@ -27,7 +27,8 @@ public final class TestDb {
             "lost_case",
             "purged_case_code",
             "sighting",
-            "responsibility_link"
+            "responsibility_link",
+            "recovery_claim"
     );
 
     /**
@@ -69,6 +70,17 @@ public final class TestDb {
             r.changed(true);
             db.insertInto(FEATURE_FLAGS).set(r).execute();
         }
+    }
+
+    /**
+     * Makes the next call cold: clears the lookup caches (the session lookup) so statement counts include them. Never the
+     * flag snapshot (process-wide, reloaded once per 30 s) and never the dev media store: it is a ClearableCache too, but
+     * its clear() deletes the stored photos, which are data, not a lookup. Only {@link #reset()} clears everything.
+     */
+    public void cold() {
+        caches.orderedStream()
+              .filter(c -> !(c instanceof co.scuby.platform.flags.FeatureFlags) && !c.getClass().getSimpleName().equals("LocalMediaStore"))
+              .forEach(ClearableCache::clear);
     }
 
     public void reset() {

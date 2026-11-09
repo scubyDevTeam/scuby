@@ -52,6 +52,10 @@ public final class ApiClient {
 
     public ApiResponse put(String template, String json, Object... vars) { return call(HttpMethod.PUT, template, json, vars); }
 
+    public ApiResponse patch(String template, String json, Object... vars) { return call(HttpMethod.PATCH, template, json, vars); }
+
+    public ApiResponse delete(String template, Object... vars) { return call(HttpMethod.DELETE, template, null, vars); }
+
     /** A contract endpoint: checked against the contract and its statement ceiling. */
     public ApiResponse call(HttpMethod method, String template, String json, Object... vars) {
         String path = template.contains("?") ? template.substring(0, template.indexOf('?')) : template;

@@ -12,7 +12,6 @@ export class CasePage {
   readonly poster: PosterPage
   readonly map: Locator
   readonly sightings: Locator
-  readonly possibleFind: Locator
   readonly possibleOwner: Locator
   readonly sawIt: Locator
   readonly haveIt: Locator
@@ -37,7 +36,6 @@ export class CasePage {
     this.sightings = page
       .getByRole('list', { name: 'Avistamientos', exact: true })
       .getByRole('listitem')
-    this.possibleFind = page.getByText('Posible hallazgo.')
     this.possibleOwner = page.getByText('Posible dueño.')
     this.sawIt = page.getByRole('button', { name: /La vi/ })
     this.haveIt = page.getByRole('button', { name: 'La tengo conmigo' })

@@ -4,6 +4,7 @@ import co.scuby.platform.roles.ApiComponent;
 import co.scuby.platform.security.Caller;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,5 +28,19 @@ class SightingController {
     @ResponseStatus(HttpStatus.CREATED)
     Created report(@PathVariable String code, Caller caller, @Valid @RequestBody SightingRequest body) {
         return new Created(service.report(code, body, caller).toString());
+    }
+
+    /** correctSighting: 204. Public (the caller's person, or an anonymous pin from their device). Bound without @Valid: the order of spec §4.7 decides. */
+    @PostMapping("/cases/{code}/sightings/{sightingId}/correction")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void correct(@PathVariable String code, @PathVariable String sightingId, Caller caller, @RequestBody SightingCorrectionRequest body) {
+        service.correct(code, sightingId, caller, body);
+    }
+
+    /** deleteSighting: 204. Public; the owner's PATCH on the same path needs a session (CasesSecurityRules names the method). */
+    @DeleteMapping("/cases/{code}/sightings/{sightingId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(@PathVariable String code, @PathVariable String sightingId, Caller caller) {
+        service.delete(code, sightingId, caller);
     }
 }

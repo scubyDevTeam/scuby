@@ -22,7 +22,11 @@ const feedItemWire = z.object({
   point,
   photo_url: z.nullable(z.string()),
   happened_at: timestamp,
-  possible_find: z.boolean(),
+  /**
+   * Only the item's publisher receives it (null otherwise): a claim must never reduce reach (docs/product/04 · Rule: a
+   * recovery claim must never reduce reach).
+   */
+  possible_find: z.nullable(z.boolean()),
   sightings_count: z.nullable(z.int().check(z.nonnegative())),
   last_sighting_at: z.nullable(timestamp),
   /** Adoption: «Sin cuota» and the like. Help: «14 personas ayudaron». */
@@ -45,7 +49,7 @@ export type FeedItem = {
   point: { lat: number; lng: number }
   photoUrl: string | null
   happenedAt: Date
-  possibleFind: boolean
+  possibleFind: boolean | null
   sightingsCount: number | null
   lastSightingAt: Date | null
   detail: string | null

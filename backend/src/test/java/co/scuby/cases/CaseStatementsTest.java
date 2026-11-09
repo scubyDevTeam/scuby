@@ -50,8 +50,17 @@ class CaseStatementsTest {
     }
 
     @Test
-    void ownerReadIsSessionLookupCaseAndSightings() {
-        assertThat(cold(owner).statements()).hasSize(3);
+    void ownerReadIsSessionLookupCaseSightingsAndClaims() {
+        assertThat(cold(owner).statements()).hasSize(4);
+    }
+
+    @Test
+    void aNonOwnerReadNeverQueriesTheClaims() {
+        ApiClient stranger = clients.newBrowser();
+        accounts.signIn(stranger, "stranger@correo.co");
+        assertThat(cold(stranger).statements()).noneMatch(s -> s.contains("recovery_claim"));
+        assertThat(cold(clients.newBrowser()).statements()).noneMatch(s -> s.contains("recovery_claim"));
+        assertThat(cold(owner).statements()).anyMatch(s -> s.contains("\"recovery_claim\""));
     }
 
     @Test

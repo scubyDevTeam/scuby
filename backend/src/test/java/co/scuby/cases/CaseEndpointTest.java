@@ -50,6 +50,7 @@ class CaseEndpointTest {
         assertThat(r.status()).isEqualTo(200);
         assertThat(r.str("/viewer")).isEqualTo("public");
         assertThat(r.json().get("claims")).isEmpty();
+        assertThat(r.isNull("/open_claim_count")).isTrue();
         assertThat(r.isNull("/pending_checkin")).isTrue();
         assertThat(r.json().at("/last_seen/radius_m").asDouble()).isEqualTo(200.0);
         assertThat(r.json().get("sightings")).hasSize(2);
@@ -147,9 +148,9 @@ class CaseEndpointTest {
         for (int i = 0; i < 25; i++) {
             cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, MutableClock.START.minusSeconds(100 + i), MutableClock.START.minusSeconds(100 + i), null, "6".repeat(64), null, "visible");
         }
-        ApiResponse r = owner.get("/cases/{code}", "7K3PQ");    // ApiClient enforces the ceiling (3)
+        ApiResponse r = owner.get("/cases/{code}", "7K3PQ");    // ApiClient enforces the ceiling (4: + the owner's claims)
         assertThat(r.json().get("sightings")).hasSize(28);
-        assertThat(r.statements()).hasSizeLessThanOrEqualTo(3);
+        assertThat(r.statements()).hasSize(4);                   // session, case, sightings, claims — whatever the sighting count
     }
 
     @Test

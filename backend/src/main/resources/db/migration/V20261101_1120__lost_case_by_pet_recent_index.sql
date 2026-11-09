@@ -1,0 +1,18 @@
+-- «A newer case of the same pet exists» (LifecycleQueries.superseded, decision 87, amends 53 and 85) probes lost_case by pet.
+-- The three growth questions (backend/CLAUDE.md):
+--   1. Growth? lost_case grows without bound: one row per publish, never deleted (purged only by the retention job).
+--   2. Frequency? The check runs in load() on every lifecycle action (reopen, reunite, cancel), in every reopen UPDATE, in the claim's
+--      reactivation, and in GET /me/pets once per expired case of the window, on every publish pet picker.
+--   3. Without the index? The only index leading with pet_id is lost_case_one_active_per_pet, partial on status = 'active', so the
+--      planner cannot use it for a probe over expired cases: every evaluation is a sequential scan of lost_case.
+-- Plan before (NewestCasePlanTest, 100,000 cases of 20,000 pets): SubPlan > Seq Scan on lost_case newer (cost about 4,600 per
+-- evaluation, against 0.4 for the row itself). After: Index Only Scan using lost_case_by_pet_recent_idx (cost about 24 per evaluation), and /me/pets reads the caller's cases through it too.
+-- Column order is what the query needs: pet_id is the equality, then published_at DESC, code DESC is the (published_at, code)
+-- tiebreak of «newest» (higher code on a tie), so the probe reads the pet's few rows in index order and stops at the first newer one.
+-- Write cost: one btree entry per case insert (the status change of expiry/reunite/cancel does not touch it: status is not indexed).
+-- Overlaps: lost_case_one_active_per_pet (pet_id) WHERE status = 'active' shares the leading column. It is NOT redundant: it
+-- enforces one live case per pet (integrity, the race-settling arbiter of publish) and this index is not unique and not partial.
+-- For reads the new index could serve the «other active case of this pet» probe too, but that read is already index-served and
+-- bounded to one row, so the partial index stays for integrity only. lost_case_by_publisher_idx (created_by, published_at DESC)
+-- leads with another column. Needs human approval before merge.
+CREATE INDEX lost_case_by_pet_recent_idx ON lost_case (pet_id, published_at DESC, code DESC);

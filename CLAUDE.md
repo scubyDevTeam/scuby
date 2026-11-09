@@ -35,3 +35,8 @@ product and engineering source of truth is `docs/`; there is no application code
    to an account that is a member of the `scubyDevTeam` org (work accounts can't push here).
 8. Commit messages start with a type prefix: `feat:` (behaviour), `test:`, `doc:`, `ci:` — one
    kind of change per commit where it can be split.
+9. **What counts as a decision.** A decision is a choice that changes what a user sees or can do,
+   with a real alternative someone might pick. If the only alternative would be a bug (a double
+   tap that answers «código inválido», a claim sent to a case the owner no longer watches), it is
+   not a decision: pin it with a test, and leave it out of the decision log and out of any list of
+   decisions sent for human review.

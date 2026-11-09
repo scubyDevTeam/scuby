@@ -40,7 +40,7 @@ class CaseSightingsPlanTest {
     @Test
     void theFeedsSightingCountsDoNotScanTheTable() {
         seed();
-        var q = feed.nationalQuery(null, 100);
+        var q = feed.nationalQuery(null, 100, null, co.scuby.support.MutableClock.START);
         PlanAssert.assertNoSeqScan(db, q, "sighting");
         PlanAssert.assertUsesIndex(db, q, "sighting_by_case_recent_idx");
     }

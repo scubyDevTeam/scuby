@@ -3,13 +3,17 @@ package co.scuby.identity;
 import co.scuby.db.generated.tables.records.PersonRecord;
 import co.scuby.platform.web.ApiException;
 import co.scuby.platform.web.ErrorCode;
+import co.scuby.platform.web.Patch;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -89,6 +93,34 @@ class People {
           .set(PERSON.PHONE_VERIFIED_AT, verifiedAt == null ? null : verifiedAt.atOffset(ZoneOffset.UTC))
           .where(PERSON.ID.eq(id))
           .execute();
+    }
+
+    /** A profile update: each Patch absent = unchanged; prefs null = unchanged. */
+    record ProfileChange(Patch<String> displayName, Patch<String> city, Patch<String> bio,
+                         ProfileUpdateRequest.@Nullable NotificationPrefsInput prefs, Patch<String> photoUrl) {}
+
+    /**
+     * One UPDATE … RETURNING with only the sent fields. Sending a display name marks it chosen (decision #48): from then on it
+     * is the public name. There is no way back to "not chosen". Nothing sent: the current row.
+     */
+    Person updateProfile(UUID id, ProfileChange change) {
+        Map<Field<?>, Object> set = new LinkedHashMap<>();
+        if (change.displayName().isPresent()) {
+            set.put(PERSON.DISPLAY_NAME, change.displayName().value());
+            set.put(PERSON.DISPLAY_NAME_CHOSEN, true);
+        }
+        if (change.city().isPresent()) set.put(PERSON.CITY, change.city().value());
+        if (change.bio().isPresent()) set.put(PERSON.BIO, change.bio().value());
+        if (change.prefs() != null) {
+            set.put(PERSON.NOTIFY_LOST, change.prefs().lost());
+            set.put(PERSON.NOTIFY_FOUND, change.prefs().found());
+            set.put(PERSON.NOTIFY_ADOPTION, change.prefs().adoption());
+            set.put(PERSON.NOTIFY_HELP, change.prefs().help());
+        }
+        if (change.photoUrl().isPresent()) set.put(PERSON.PHOTO_URL, change.photoUrl().value());
+        if (set.isEmpty()) return get(id);
+        return db.update(PERSON).set(set).where(PERSON.ID.eq(id)).returning().fetchOptional().map(People::toPerson)
+                 .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHORIZED, "the account no longer exists"));
     }
 
     private static Person toPerson(PersonRecord r) {

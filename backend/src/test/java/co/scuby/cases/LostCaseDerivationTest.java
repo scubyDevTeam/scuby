@@ -41,7 +41,7 @@ class LostCaseDerivationTest {
         return new LostCaseFacts("7K3PQ", status, "active".equals(status) ? null : NOW, OWNER,
                 new LostCaseFacts.PetFacts(name, "dog", "small", List.of("black"), null, List.of()),
                 new GeoPoint(6.2442, -75.5812), radius, NOW.minus(Duration.ofDays(2)), placeName,
-                "Carolina Mejía", whatsappPhone, sightings);
+                "Carolina Mejía", whatsappPhone, sightings, null);
     }
 
     static LostCaseFacts luna(List<LostCaseFacts.SightingFacts> sightings) {
@@ -81,7 +81,7 @@ class LostCaseDerivationTest {
         });
         assertThat(view.claims()).isEmpty();
         assertThat(view.pendingCheckin()).isNull();
-        assertThat(view.openClaimCount()).isZero();
+        assertThat(view.openClaimCount()).isNull();
     }
 
     @Test
@@ -105,25 +105,56 @@ class LostCaseDerivationTest {
                 .extracting(s -> s.id().substring(34)).containsExactly("01", "02", "03");
     }
 
+    /** Another person, not the viewer (HELPER) and not the owner. */
+    static final UUID SOMEONE_ELSE = UUID.fromString("00000000-0000-0000-0000-00000000000c");
+
+    /**
+     * "Mine" (docs/eng/api.md · Device identity): the viewer's person, or a pin with no person sent from the viewer's
+     * device. Human review: this table is the rule. reporter = ME (the viewer's person, HELPER), OTHER (another person) or
+     * NONE (an anonymous pin); sameDevice = the pin's device hash is the viewer's.
+     */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            // case,                               reporterIsMe, sameDevice, createdMinutesAgo, hidden, mine,  editable
-            "'my device, 5 min ago',               false,        true,       5,                 false,  true,  true",
-            "'my account, other device',           true,         false,      5,                 false,  true,  true",
-            "'mine, exactly 15 min ago',           false,        true,       15,                false,  true,  false",
-            "'mine, 16 min ago',                   false,        true,       16,                false,  true,  false",
-            "'mine but hidden by the owner',       false,        true,       5,                 true,   true,  false",
-            "'someone else',                       false,        false,      5,                 false,  false, false",
+            // case,                                                    viewerSignedIn, reporter, sameDevice, minutesAgo, hidden, mine,  editable
+            "'person match, from another device',                        true,           ME,       false,      5,          false,  true,  true",
+            "'person match, exactly 15 min ago',                         true,           ME,       false,      15,         false,  true,  false",
+            "'anonymous pin from this device, the viewer now signed in', true,           NONE,     true,       5,          false,  true,  true",
+            "'another person''s pin from this device',                   true,           OTHER,    true,       5,          false,  false, false",
+            "'anonymous pin from another device, signed in',             true,           NONE,     false,      5,          false,  false, false",
+            "'no session, anonymous pin from this device',               false,          NONE,     true,       5,          false,  true,  true",
+            "'no session, anonymous pin from another device',            false,          NONE,     false,      5,          false,  false, false",
+            "'no session, a signed-in pin from this device',             false,          ME,       true,       5,          false,  false, false",
+            "'mine but hidden by the owner',                             true,           ME,       true,       5,          true,   true,  false",
+            "'another person, another device',                           true,           OTHER,    false,      5,          false,  false, false",
     })
-    void mineAndTheCorrectionWindow(String label, boolean reporterIsMe, boolean sameDevice, int minutesAgo,
-                                    boolean hidden, boolean mine, boolean editable) {
+    void mineIsTheViewersPersonOrAnAnonymousPinFromTheirDevice(String label, boolean viewerSignedIn, String reporter, boolean sameDevice,
+                                                               int minutesAgo, boolean hidden, boolean mine, boolean editable) {
         Instant created = NOW.minus(Duration.ofMinutes(minutesAgo));
-        var s = sighting("01", created, created, reporterIsMe ? HELPER : null, sameDevice ? MY_DEVICE : OTHER_DEVICE, null, hidden);
+        UUID reporterPerson = switch (reporter) {
+            case "ME" -> HELPER;
+            case "OTHER" -> SOMEONE_ELSE;
+            default -> null;
+        };
+        var s = sighting("01", created, created, reporterPerson, sameDevice ? MY_DEVICE : OTHER_DEVICE, null, hidden);
         // A hidden pin reaches only the owner: in that row the viewer is the owner (but not the reporter).
-        Viewer me = new Viewer(hidden ? Access.OWNER : Access.PUBLIC, HELPER, MY_DEVICE);
-        var view = LostCaseDerivation.derive(luna(List.of(s)), me, NOW, ES).sightings().getFirst();
-        assertThat(view.mine()).isEqualTo(mine);
-        assertThat(view.editableUntil()).isEqualTo(editable ? created.plus(Duration.ofMinutes(15)) : null);
+        Viewer viewer = new Viewer(hidden ? Access.OWNER : Access.PUBLIC, viewerSignedIn ? HELPER : null, MY_DEVICE);
+        var view = LostCaseDerivation.derive(luna(List.of(s)), viewer, NOW, ES).sightings().getFirst();
+        assertThat(view.mine()).as(label).isEqualTo(mine);
+        assertThat(view.editableUntil()).as(label).isEqualTo(editable ? created.plus(Duration.ofMinutes(15)) : null);
+    }
+
+    @Test
+    void theWindowIsExclusiveAtFifteenMinutes() {
+        Instant created = NOW.minus(Duration.ofMinutes(15));
+        assertThat(LostCaseDerivation.editable(true, true, created.plusMillis(1), NOW)).isTrue();
+        assertThat(LostCaseDerivation.editable(true, true, created, NOW)).isFalse();
+        assertThat(LostCaseDerivation.editable(false, true, NOW, NOW)).isFalse();
+        assertThat(LostCaseDerivation.editable(true, false, NOW, NOW)).isFalse();
+        assertThat(LostCaseDerivation.mine(null, MY_DEVICE, null, MY_DEVICE)).isTrue();
+        assertThat(LostCaseDerivation.mine(null, MY_DEVICE, HELPER, MY_DEVICE)).as("a signed-in pin is its person's").isFalse();
+        assertThat(LostCaseDerivation.mine(HELPER, MY_DEVICE, null, MY_DEVICE)).as("an anonymous pin of my browser").isTrue();
+        assertThat(LostCaseDerivation.mine(HELPER, MY_DEVICE, SOMEONE_ELSE, MY_DEVICE)).as("another person's, same device").isFalse();
+        assertThat(LostCaseDerivation.mine(HELPER, OTHER_DEVICE, HELPER, MY_DEVICE)).isTrue();
     }
 
     @ParameterizedTest(name = "status={0} whatsappPhone={1}")
@@ -141,7 +172,7 @@ class LostCaseDerivationTest {
     void anUnnamedPublisherShowsTheGenericNameNotAnythingFromTheirEmail() {
         var unnamed = new LostCaseFacts("7K3PQ", "active", null, OWNER,
                 new LostCaseFacts.PetFacts("Luna", "dog", "small", List.of("black"), null, List.of()),
-                new GeoPoint(6.2442, -75.5812), 100, NOW, null, null, WA, List.of());
+                new GeoPoint(6.2442, -75.5812), 100, NOW, null, null, WA, List.of(), null);
         assertThat(LostCaseDerivation.derive(unnamed, STRANGER, NOW, ES).contact().displayName()).isEqualTo("Alguien");
         assertThat(LostCaseDerivation.derive(unnamed, STRANGER, NOW, java.util.Locale.ENGLISH).contact().displayName()).isEqualTo("Someone");
     }
@@ -171,5 +202,63 @@ class LostCaseDerivationTest {
                 sighting("01", NOW.minusSeconds(5), NOW.minusSeconds(5), null, OTHER_DEVICE, null, false)));
         LostCaseDerivation.derive(luna(list), STRANGER, NOW, ES);
         assertThat(list.getFirst().id().toString()).endsWith("02");
+    }
+
+    static LostCaseFacts.ClaimRow claim(String id, Duration age, String status) {
+        return claim(id, age, age, status);
+    }
+
+    /** A claim made {@code age} ago whose claimant last said «Lo tengo» {@code idle} ago. */
+    static LostCaseFacts.ClaimRow claim(String id, Duration age, Duration idle, String status) {
+        return new LostCaseFacts.ClaimRow(UUID.fromString("00000000-0000-0000-0000-0000000000" + id), "+573001112233", NOW.minus(age),
+                NOW.minus(idle), status);
+    }
+
+    static final LostCaseFacts.ClaimFacts THREE_CLAIMS = new LostCaseFacts.ClaimFacts(List.of(
+            claim("c1", Duration.ofHours(1), "open"),
+            claim("c2", Duration.ofDays(8), "open"),
+            claim("c3", Duration.ofDays(2), "confirmed")), 1);
+
+    @Test
+    void theOwnerGetsTheClaimsWithTheirWireStatusAndTheOpenCountOnAnActiveCase() {
+        LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(THREE_CLAIMS), OWNER_VIEW, NOW, ES);
+        assertThat(view.claims()).extracting(LostCaseView.ClaimView::status).containsExactly("open", "stale", "confirmed");
+        assertThat(view.claims()).extracting(LostCaseView.ClaimView::id).containsExactly(
+                "00000000-0000-0000-0000-0000000000c1", "00000000-0000-0000-0000-0000000000c2", "00000000-0000-0000-0000-0000000000c3");
+        assertThat(view.claims().getFirst().phone()).isEqualTo("+573001112233");
+        assertThat(view.claims().getFirst().createdAt()).isEqualTo(NOW.minus(Duration.ofHours(1)));
+        assertThat(view.openClaimCount()).isEqualTo(1);
+    }
+
+    @Test
+    void theOwnerOfAClosedCaseStillSeesTheClaimsAndACountOfZero() {
+        var closed = facts("reunited", 100, null, "Luna", null, List.of()).withClaims(THREE_CLAIMS);
+        LostCaseView view = LostCaseDerivation.derive(closed, OWNER_VIEW, NOW, ES);
+        assertThat(view.claims()).hasSize(3);
+        assertThat(view.openClaimCount()).isZero();
+    }
+
+    @Test
+    void aNonOwnerGetsNoClaimsAndANullCountEvenIfTheFactsHadThem() {
+        LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(THREE_CLAIMS), STRANGER, NOW, ES);
+        assertThat(view.claims()).isEmpty();
+        assertThat(view.openClaimCount()).isNull();
+    }
+
+    @Test
+    void aClaimIsStaleByItsLastActivityNotByWhenItWasMade() {
+        var refreshed = new LostCaseFacts.ClaimFacts(List.of(
+                claim("d1", Duration.ofDays(9), Duration.ofHours(1), "open"),      // made 9 days ago, repeated an hour ago
+                claim("d2", Duration.ofDays(2), Duration.ofDays(8), "open")), 1);  // (not producible, but proves the field read)
+        LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(refreshed), OWNER_VIEW, NOW, ES);
+        assertThat(view.claims()).extracting(LostCaseView.ClaimView::status).containsExactly("open", "stale");
+        assertThat(view.claims().getFirst().createdAt()).as("decision 18: the wire shows the last activity").isEqualTo(NOW.minus(Duration.ofHours(1)));
+    }
+
+    @Test
+    void anOwnerWithNoClaimsLoadedGetsAnEmptyListAndZero() {
+        LostCaseView view = LostCaseDerivation.derive(luna(List.of()).withClaims(new LostCaseFacts.ClaimFacts(List.of(), 0)), OWNER_VIEW, NOW, ES);
+        assertThat(view.claims()).isEmpty();
+        assertThat(view.openClaimCount()).isZero();
     }
 }

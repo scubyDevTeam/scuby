@@ -45,6 +45,8 @@ it, so neither can use an endpoint the contract does not list.
 - **Responses are complete.** The document's response schemas are the output side: every field
   present, `null` rather than absent. Request schemas are the input side: fields with a default
   may be left out.
+- **`Created.id`** is the case's code for a case action (reunite, cancel, reopen) and the row's id for a
+  sighting or claim action (moderate, answer).
 - **Feature flags never reach the wire** ([feature-flags.md](feature-flags.md)): a response says
   the outcome — `phone_step: otp` — never the flag.
 - **Replays are idempotent where the client queues.** «Lo vi» (`POST /cases/:code/sightings`) carries
@@ -66,9 +68,13 @@ Someone without an account is a **device**: an opaque `device` cookie that the A
   carries `Set-Cookie: device=…` — random, ≥ 128 bits, `HttpOnly; Secure; SameSite=Lax; Path=/`, one
   year, renewed when used. The client reads nothing and sends nothing extra: it already sends every
   request with credentials (`api-client/http.ts`). The server keeps only a hash of the value.
-- **What it identifies.** The anonymous reporter or claimant of a sighting or a «lo tengo»: it
-  authorizes correcting or deleting their own sighting inside its window, and marks it `mine` on the
-  case (there are no per-reporter rate limits for now — [04](../product/04-lost-workflow.md) · Validation). It also scopes an anonymous upload slot (*Uploads*).
+- **What it identifies.** The anonymous reporter of a sighting: it authorizes correcting or deleting their
+  own sighting inside its window, and marks it `mine` on the case. A pin is mine when its reporter is the
+  session's person, **or** when it has no person and came from this device (decision #73): another
+  person's pin is never mine on a shared device, and an anonymous pin stays mine after its reporter signs
+  in on the same browser. A «lo tengo» claimant is always a person (decision #75); the same rule decides
+  whether a claim's `from_sighting_id` is the claimant's own pin. There are no per-reporter rate limits for
+  now ([04](../product/04-lost-workflow.md) · Validation). It also scopes an anonymous upload slot (*Uploads*).
 - **Not an account, never a login.** A signed-in session wins when both are present; the cookie
   proves nothing about who someone is, only that this is the same browser. Clearing cookies forgets
   it — the person loses the right to correct what they sent, nothing else. Moving an anonymous
@@ -116,10 +122,10 @@ logs:
 |---|---|---|
 | `validation_failed` | 422 | Body or query breaks the schema; `fields` maps each wire path to what is wrong. A required field that is absent is an error naming it (nested ones by path, e.g. `pet.marks`); an explicit `null` is accepted where the contract allows it (decision #51 in [00](../product/00-product-map.md)) |
 | `unauthorized` | 401 | No session on a `session` endpoint |
-| `forbidden` | 403 | Signed in, but it is someone else's case, claim or notification |
-| `not_found` · `gone` | 404 · 410 | Unknown · purged (a printed poster's code still resolves) |
+| `forbidden` | 403 | Signed in, but it is someone else's case, claim or notification; the owner claiming their own case; a pin that is not the caller's to correct or delete |
+| `not_found` · `gone` | 404 · 410 | Unknown · purged (a printed poster's code still resolves: `GET /cases/:code` and «Lo tengo»; owner actions answer `not_found`) |
 | `invalid_transition` | 409 | The action does not fit the case's status |
-| `active_case_exists` | 409 | The pet already has an active lost case; `details.case_code` |
+| `active_case_exists` | 409 | The pet already has an active lost case (publish, reopen, or a claim that would reactivate a case); `details.case_code` |
 | `invalid_code` · `phone_required` | 422 | The emailed/SMS code is wrong · publishing with no verified number |
 | `sighting_too_far` · `seen_at_in_future` · `seen_at_before_case` | 422 | [04 · Validation](../product/04-lost-workflow.md) |
 | `rate_limited` | 429 | Too many SMS codes requested for one number ([auth.md](auth.md)); an email start never answers it (it answers `204` and sends nothing) |
@@ -228,18 +234,14 @@ lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the 
   Google client id (`web/.env` has a `mock-` one), so the three Google specs (@AUTH-002, @PLOST-002,
   @PLOST-004) cannot run against the backend; they need a documented e2e environment or a backend
   bypass, planned with the phase that adds Google.
-- **@LINK-001** ends its first step ("who is missing, and what a stranger can do") with the
-  «Posible hallazgo» assertion, which needs an open claim, outside the first backend release. A
-  failing `expect` inside a `test.step` still ends the test, so the steps after it (the sightings
-  trajectory among them) never run. Move that assertion to the end of the spec, make it
-  `expect.soft`, or split it into its own `test` (or tag).
 - **`point` comment in `feed.ts`** — it says "public precision, never a doorstep", which is now true: the
   server snaps the center to a ~200 m grid for every feed caller ([04](../product/04-lost-workflow.md) ·
   Location precision, decision #63). The mock's feed still returns exact points.
 - **Paging for `GET /me/cases`** — it returns every case of the caller, with no way to page.
-- **Endpoints the e2e specs need beyond the first backend release** — `/me/pets` (the lost-pet
-  re-publish flow of @PLOST-002 and @PLOST-004), case edit (@PLOST-004), Google sign-in
-  (@AUTH-002, @PLOST-002, @PLOST-004) and claims (the «Posible hallazgo» state of @LINK-001).
+- **Endpoints the e2e specs need** — the backend now implements `/me/pets`, case edit, reopen, claims and the
+  profile update; Google sign-in (@AUTH-002, @PLOST-002, @PLOST-004) is still missing. «Lo tengo» needs a
+  session: @HELP-002 and @HELP-005 sign in by email code before claiming, and the client's claim sheet must
+  ask for sign-in.
 - **Not a proposal: the English look title.** `GET /me/cases` titles a case whose pet has no name
   from species, first colour and size; in English it reads «Dog black, small» (Spanish word order).
   It needs a human copy review («Black dog, small»). The backend owns the text, so this is a copy

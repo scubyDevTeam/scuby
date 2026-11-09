@@ -47,6 +47,7 @@ export function availableActions(state: LostCaseState, viewer: Viewer, now: Date
 }
 
 /** «Posible hallazgo» is a badge derived from an open recovery claim, never a status. */
-export function hasPossibleFind(openClaimCount: number): boolean {
-  return openClaimCount > 0
+export function hasPossibleFind(openClaimCount: number | null): boolean {
+  // null: the viewer is not the owner, who alone sees the badge (decision #76).
+  return (openClaimCount ?? 0) > 0
 }

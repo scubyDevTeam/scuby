@@ -91,9 +91,10 @@ it is exactly the duplicate we don't want. Miss → the found case is created: `
 
 Mirror of `recovery_claim`, same answer loop, reversed trust:
 
-- **Registered only.** A deliberate asymmetry from «lo tengo», which stays anonymous-friendly:
-  there, the anonymous person is doing a favor and holds nothing. Here, they are asking to *take*
-  an animal. Asymmetric stakes, asymmetric identity requirements — and the real owner has the
+- **Registered only.** Like «lo tengo», which also needs a session since
+  [decision #75](00-product-map.md) (the claimant is a person, for the owner's safety). The stakes
+  differ, though: there, the claimant is doing a favor and holds nothing; here, they are asking to
+  *take* an animal, so the claim is the one that hands over a pet — and the real owner has the
   strongest incentive of anyone to do one-tap OAuth.
 - The row is created **before** any contact channel opens.
 - It adds a «posible dueño» badge and accelerates check-ins. It never changes the case status.

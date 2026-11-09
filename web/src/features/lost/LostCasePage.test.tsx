@@ -40,9 +40,9 @@ describe('LostCasePage — active case, seen by a helper', () => {
     expect(onAction.mock.calls).toEqual([['report_sighting'], ['claim_recovery']])
   })
 
-  it('shows the possible-find badge while a claim is open, and keeps the actions', () => {
+  it('a helper never sees the possible-find badge (it is the owner’s, decision #76), and keeps the actions', () => {
     show(lostCase('7K3PQ'))
-    expect(screen.getByText('Posible hallazgo.')).toBeTruthy()
+    expect(screen.queryByText('Posible hallazgo.')).toBeNull()
     expect(screen.getByRole('button', { name: /La vi/ })).toBeTruthy()
   })
 

@@ -159,4 +159,12 @@ class ArchitectureRulesSelfTest {
                 .hasMessageContaining("archfixtures.identity.Internal")
                 .message().doesNotContain("Exposed");
     }
+
+    @Test
+    void aClassOutsideTheAllowedOneUsingThePostgresDriverFailsAndTheAllowedOnePasses() {
+        assertThatThrownBy(() -> RULES.onlyKnowsThePostgresDriver("archfixtures.platform.db.TheAllowedDriverUser").check(FIXTURES))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("archfixtures.cases.UsesDriver")
+                .message().doesNotContain("TheAllowedDriverUser.isIt");
+    }
 }

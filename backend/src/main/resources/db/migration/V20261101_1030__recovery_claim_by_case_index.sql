@@ -1,0 +1,17 @@
+-- Performance index (L1 design §2.4). Growth answers (backend/CLAUDE.md · Migrations and indexes):
+--   1. Can the table grow without bound? Yes: claims are never deleted and «Lo tengo» has no rate limit (decision #54's
+--      reasoning applies), so one case can hold thousands.
+--   2. How often does the query run? On every owner view of a case (LostCaseQueries.claimsQuery: the newest 50 of every
+--      status, ORDER BY created_at DESC, id DESC, plus count(*) FILTER (WHERE status = 'open' AND last_active_at >= now − 7 d)
+--      OVER ()), and per row of «Mis casos» and of the owner's own feed items (the correlated open-claim counts of
+--      MyCasesQueries and FeedQueries).
+--   3. Without it: each runs a full scan of every claim of every case.
+-- Plan before (RecoveryClaimPlanTest, 62,000 claims, ANALYZE): Seq Scan on recovery_claim. Plan after: Bitmap Index Scan on
+-- recovery_claim_by_case_recent_idx (Index Cond: case_code = ?) under a Bitmap Heap Scan, WindowAgg, Sort, Limit: the
+-- open count over () needs every claim of the case, so the index bounds the read to that case's rows, not to the 50.
+-- Write cost: one btree entry (text, timestamptz) per claim insert; status changes and a repeat's refresh (which does not
+-- change created_at) do not touch it.
+-- Overlap: recovery_claim_one_open_per_claimant (case_code, claimant_person_id) WHERE status = 'open' shares the case_code
+-- prefix but is partial (open only), so it serves neither the list nor the count over every status; it stays as the
+-- integrity UNIQUE. Needs human approval before merge.
+CREATE INDEX recovery_claim_by_case_recent_idx ON recovery_claim (case_code, created_at DESC);

@@ -9,4 +9,4 @@ import java.util.List;
 /** One open lost case as the feed needs it (the facts of a feed item). */
 record FeedRow(String code, @Nullable String petName, String species, @Nullable String size, List<String> colors,
                @Nullable String firstPhotoUrl, @Nullable String placeName, GeoPoint center, Instant lastSeenAt,
-               int sightingsCount, @Nullable Instant lastSightingAt) {}
+               int sightingsCount, @Nullable Instant lastSightingAt, @Nullable Boolean possibleFind) {}

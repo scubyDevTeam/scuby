@@ -417,6 +417,47 @@ class PublishLostTest {
         }
     }
 
+    /**
+     * The interleaving behind the double tap's rare «wrong code»: both taps pass the read-only pre-check, the winner
+     * commits (its case is in, the code is consumed), and only then does the loser's prepare look for the code. The
+     * rival transaction below plays the winner and holds its commit while the loser is blocked on the code row, so
+     * the loser's prepare deterministically finds the code gone. The user must still hear active_case_exists.
+     */
+    @Test
+    void aDoubleTapWhoseCodeTheWinnerConsumedFirstIsA409NotAWrongCode() throws Exception {
+        publishVerified();
+        UUID petId = db.select(LOST_CASE.PET_ID).from(LOST_CASE).fetchOne().value1();
+        db.update(LOST_CASE).set(LOST_CASE.STATUS, "expired").execute();
+        String other = "+573001234567";
+        assertThat(api.post("/me/phone", "{\"phone\":\"" + other + "\"}").status()).isEqualTo(204);
+        String body = PublishBodies.withPetId(petId.toString(), other)
+                .replace("\"otp_code\":null", "\"otp_code\":\"" + sms.lastCodeFor(other) + "\"");
+
+        var pool = Executors.newFixedThreadPool(2);
+        var rivalHolds = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try {
+            Future<?> winner = pool.submit(() -> tx.executeWithoutResult(s -> {
+                db.update(LOST_CASE).set(LOST_CASE.STATUS, "active").where(LOST_CASE.PET_ID.eq(petId)).execute();
+                db.deleteFrom(co.scuby.db.generated.Tables.PHONE_OTP).execute();      // the winner consumed the code
+                rivalHolds.countDown();
+                try { release.await(30, TimeUnit.SECONDS); } catch (InterruptedException e) { throw new IllegalStateException(e); }
+            }));
+            assertThat(rivalHolds.await(30, TimeUnit.SECONDS)).isTrue();
+            // The pre-check (read-only) still sees the pet free: the winner has not committed.
+            Future<ApiResponse> loser = pool.submit(() -> publish(body));
+            awaitBlockedOn("phone_otp");           // the loser's prepare waits on the code row
+            release.countDown();
+            winner.get(30, TimeUnit.SECONDS);
+            ApiResponse refused = loser.get(30, TimeUnit.SECONDS);
+            assertThat(refused.status()).as(refused.body()).isEqualTo(409);
+            assertThat(refused.errorCode()).isEqualTo("active_case_exists");
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
     @Test
     void nobodySignedInIsUnauthorized() {
         assertThat(clients.newBrowser().post("/lost-cases", PublishBodies.kira(PHONE, null)).status()).isEqualTo(401);

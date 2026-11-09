@@ -1,7 +1,6 @@
 package co.scuby.cases;
 
 import co.scuby.platform.crypto.Hashing;
-import co.scuby.platform.flags.FeatureFlags;
 import co.scuby.support.Accounts;
 import co.scuby.support.ApiClient;
 import co.scuby.support.ApiClients;
@@ -13,8 +12,6 @@ import co.scuby.support.TestDb;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import co.scuby.platform.cache.ClearableCache;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 
@@ -36,16 +33,10 @@ class PublishStatementsTest {
     @Autowired Accounts accounts;
     @Autowired RecordingSmsSender sms;
     @Autowired DSLContext db;
-    @Autowired ObjectProvider<ClearableCache> caches;
 
     /** Every call starts from empty caches (session lookup, flag snapshot): the honest worst case, as StatementCeilings counts it. */
     private ApiResponse publishCold(ApiClient client, String body) {
-        // The session-lookup cache only. Not the dev media store (it holds the uploaded bytes the photo check looks
-        // for) and not the flag snapshot (process-wide, reloaded once per 30 s: +2 statements on one request in 30 s,
-        // not a per-request cost, so it is left out of the ceilings as everywhere else).
-        caches.orderedStream()
-              .filter(c -> !c.getClass().getSimpleName().contains("MediaStore") && !(c instanceof FeatureFlags))
-              .forEach(ClearableCache::clear);
+        testDb.cold();
         return client.post("/lost-cases", body);
     }
 

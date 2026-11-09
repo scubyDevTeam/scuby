@@ -1,0 +1,14 @@
+-- Performance index (L1 design §2.4). Growth answers (backend/CLAUDE.md · Migrations and indexes):
+--   1. Can the table grow without bound? Yes: it grows with every pet, and links are ended, never deleted.
+--   2. How often does the query run? GET /me/pets (MyPetsQueries.query: WHERE person_id = ? AND role = 'owner' AND
+--      active_to IS NULL) runs on every publish pet picker and every «Mis mascotas» view.
+--   3. Without it: each is a full scan of every link of every person.
+-- Plan before (MyPetsPlanTest, 20,000 links of 1,000 people, ANALYZE): Seq Scan on responsibility_link. Plan after:
+-- Bitmap Heap Scan on responsibility_link fed by a Bitmap Index Scan on responsibility_link_by_person_active_idx
+-- (Recheck Cond: person_id = ? AND active_to IS NULL; role is a filter).
+-- Partial on active_to IS NULL: ended links are never listed. The query writes the predicate with jOOQ isNull(), which
+-- renders as a literal predicate, so the planner can prove it under a generic prepared plan.
+-- Write cost: one entry per active link (one per pet); an ended link leaves the index.
+-- Overlap: responsibility_link_one_active_owner (pet_id) WHERE role = 'owner' AND active_to IS NULL leads with pet_id and
+-- cannot serve a lookup by person. Needs human approval before merge.
+CREATE INDEX responsibility_link_by_person_active_idx ON responsibility_link (person_id) WHERE active_to IS NULL;

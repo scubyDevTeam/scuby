@@ -32,8 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <li>(113) refuses a body the contract rejects → refusesABodyTheContractRejects</li>
  * <li>(128) unauthorized with nobody signed in → unauthorizedWithNobodySignedIn (listMyCases, as the mock;
  *     also MyCasesEndpointTest.nobodySignedInIsUnauthorized)</li>
- * <li>(134) a stranger gets nothing owner-only → aStrangerGetsNothingOwnerOnly — open_claim_count is 0
- *     (no claims in the slice; the mock seeds one); the public radius is floored at 200 m (the server applies the floor)</li>
+ * <li>(134) a stranger gets nothing owner-only → aStrangerGetsNothingOwnerOnly — open_claim_count is null
+ *     (owner-only since L1, as the mock); the public radius is floored at 200 m (the server applies the floor)</li>
  * <li>(145) the owner gets all of it → theOwnerGetsAllOfIt — no claims in the slice</li>
  * <li>(167) gone / not_found → goneAndNotFound</li>
  * <li>(174) feed local around Medellín, newest first → withoutAPointTheFeedIsNational + nearMedellinTheFeedIsLocalNearestFirst —
@@ -157,7 +157,7 @@ class LostParityTest {
         ApiResponse luna = api.get("/cases/{code}", "7K3PQ");
         assertThat(luna.str("/viewer")).isEqualTo("public");
         assertThat(luna.json().get("claims")).isEmpty();
-        assertThat(luna.json().get("open_claim_count").asInt()).isZero();       // override: no claims in the slice (the mock seeds one)
+        assertThat(luna.isNull("/open_claim_count")).isTrue();                 // owner-only since L1 (decision #76), as the mock
         assertThat(luna.json().at("/last_seen/radius_m").asDouble()).isEqualTo(200.0);   // override: floor applied by the server
         assertThat(luna.json().get("sightings")).hasSize(2);
         luna.json().get("sightings").forEach(s -> assertThat(s.get("contact_phone").isNull()).isTrue());

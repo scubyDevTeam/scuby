@@ -122,7 +122,7 @@ Two invariants enforced at publish:
 | Situation | Behavior |
 |---|---|
 | Selected pet already has an `active` lost case | Block, link to the existing case. Two cases for one animal means two broadcasts and two check-in streams |
-| Selected pet has an `expired` case ≤ 30 days old | Offer reopen instead: «Luna ya tenía un aviso — ¿lo reactivamos?». One tap; sightings and trajectory preserved. Publishing fresh is still allowed if the owner declines |
+| Selected pet has an `expired` case ≤ 30 days old that is the pet's newest case (decision #81) | Offer reopen instead: «Luna ya tenía un aviso — ¿lo reactivamos?». One tap; sightings and trajectory preserved. Publishing fresh is still allowed if the owner declines. An older expired case of the pet is never offered |
 
 #### Location precision
 
@@ -161,11 +161,15 @@ one), the signs (`marks`) and where and when it was last seen (`last_seen_point`
 `last_seen_at`) — design «Aviso · editar». The name, species and the rest of the pet stay as they
 are. **An edit never re-broadcasts:** the neighbours were told once, and a corrected zone does not
 tell them again (decision #27). Closed and archived cases cannot be edited; reopening comes first.
+The photos and signs are the **pet's**: an edit changes them on every case of that pet, past ones
+included. A moved last-seen point re-snaps the public center (Location precision) and resets the place
+name to the generic label. `last_seen_at` may be up to 5 minutes ahead; existing sightings are not
+revalidated; an open claim never blocks an edit (decision #72).
 
 ### `sighting`
 `case_id?`, `point`, `seen_at`, `created_at`, `photos[]`, `note`, `source: anonymous | registered`,
 `reporter_person_id?`, `reporter_device_key?`, `reporter_contact?`,
-`status: visible | hidden_by_owner | removed_by_moderation`, `highlighted_by_owner: bool`,
+`status: visible | hidden_by_owner | removed_by_moderation | deleted_by_reporter`, `highlighted_by_owner: bool`,
 `editable_until`.
 
 `case_id` is nullable and may point at a lost **or** found case. A sighting with no case is an
@@ -188,8 +192,8 @@ an owner than a pin with a phone behind it — but far more than the report that
 because the form demanded one. The form *asks* for contact and explains why («el dueño va a querer
 preguntarte en qué esquina exactamente»), and lets it be skipped. `sighting.reported` carries
 `has_contact` so the trade-off is measured, not argued: if contactless pins dominate and owners
-complain, the fix is better ask-copy, not a required field. The phone that IS required stays the
-anonymous «Lo tengo» phone — a claim's entire value is the contact channel; a sighting's is the pin.
+complain, the fix is better ask-copy, not a required field. The phone that IS required is the
+«Lo tengo» claim's — a claim's entire value is the contact channel; a sighting's is the pin.
 
 #### Sightings are never deleted to make room for new ones
 
@@ -213,6 +217,16 @@ new row). The reporter resolves the ambiguity; we never guess.
 saved yet. After submit, the reporter can edit or delete their own sighting until `editable_until`
 (`created_at + 15 min`). Past that it is part of the record; only the owner (hide) or moderation
 (remove) can take it off the map.
+A pin is "mine" when its reporter is my account, or when it has no account and was sent from this
+browser (decision #73): another person's pin is never mine, and an anonymous pin stays mine after I
+sign in here. The pin must still be `visible`: once the owner hides it, it is no longer the reporter's
+to change or withdraw, and it disappears from the reporter's view too. A correction also needs the case
+`active`; a delete does not. **A delete is a status**, `deleted_by_reporter`, never a hard delete: the
+row stays, so its `client_id` stays taken (a replayed «Lo vi» answers it), `sightings_count` stays a
+count of visible pins and a claim's `from_sighting_id` never dangles; the pin reaches nobody, the owner
+included, and deleting it again is a no-op success. The owner hides and highlights pins independently,
+in any case status; a pin moderation removed or its reporter deleted is invisible to the owner too
+(decision #74).
 
 #### Validation
 
@@ -267,44 +281,61 @@ are real signals but they are ranking algorithms, and there is no data to tune t
 the owner's star covers the need and is explainable in one sentence.
 
 ### `recovery_claim`
-`case_id`, `claimant` (person or anonymous contact), `point?`, `photos[]`, `from_sighting_id?`,
-`status: open | confirmed | dismissed | stale`, `verifying_since?`, `stale_at`.
+`case_id` (the case's code), `claimant` (a person: «Lo tengo» needs a session, decision #75), `phone`,
+`point?`, `photos[]`, `from_sighting_id?`, `status: open | confirmed | dismissed`, `created_at`,
+`last_active_at`, `answered_at?`. `stale` is derived, not stored: a claim still open 7 days after the
+claimant's last «Lo tengo» on it (`last_active_at`). The check-in fields (`verifying_since`, `stale_at`)
+arrive with the follow-up loop. One claim per person per case, whatever its status (decision #82): «Lo tengo»
+again, while it is open (stale included), refreshes it — the new phone always, and the photos, pin and sighting
+link when the repeat sends them (what it leaves out is kept) — and sets `last_active_at`, so it counts again and the
+owner sees the claimant's current number. Once the owner has answered it (`confirmed` or `dismissed`), a repeat
+returns that same claim untouched (with the WhatsApp link when the case is active and its contact is public): no new
+claim, no change of phone or dates, no reactivation of an expired case, and the owner's badge stays off. The owner's
+list shows `last_active_at` as the claim's time and orders by it, newest first (decision #84). On a case that is no
+longer active, a repeat on an open claim gets the case's answer (reactivated inside 30 days — only when it is the
+pet's newest case, decision #81, where a cancelled newer case does not count, decision #88 — or `active_case_exists` with the pet's live case, or `invalid_transition`), never
+the old claim.
 
 Creating one **opens a contact channel** and **schedules claim check-ins**. It never changes the
 case status by itself.
 
 #### Rule: «Lo tengo» always creates a claim before it opens a channel
 
-The tempting implementation for anonymous users is a bare WhatsApp deep link: tap, `wa.me/...`, done.
+The tempting implementation is a bare WhatsApp deep link: tap, `wa.me/...`, done.
 That would make the single most common path to a reunion — a stranger on WhatsApp — invisible to the
 system: no «posible hallazgo» badge, no accelerated check-ins, no `stale_at`, no attribution. The
-anonymous path is the high-volume one; it cannot be the one we don't see.
+stranger's path is the high-volume one; it cannot be the one we don't see.
 
 So the button is a one-field sheet, then the handoff:
 
-1. Anonymous: phone number (**required** — unlike a sighting, whose value is the pin, a claim's
-   entire value is the contact channel; a claim nobody can reach is worthless), photo optional →
-   `recovery_claim` row with `claimant = {contact}` → WhatsApp deep link opens with the owner's
-   number and a prefilled message.
-2. Registered: no form — `claimant = person_id` → choose WhatsApp deep link or in-app thread.
+1. Not signed in: the sheet asks to sign in first, and says it is for the owner's safety.
+2. Signed in: phone (**required** — a claim's entire value is the contact channel; a claim nobody can
+   reach is worthless), photos optional → `recovery_claim` row → the WhatsApp deep link with the owner's
+   number and a prefilled message when the owner's contact is public, else the in-app thread. The owner
+   cannot claim their own case.
 
 The row exists before the conversation starts. What happens inside WhatsApp we never see, and
 don't need to: the claim check-ins bring the verdict back to us through the owner.
 
 **From sighting to claim.** The helper who reported «lo vi en el parque» and then caught the dog
 is the natural escalation, and the UX must not make them hunt for their pin. The entry point is the
-same «Lo tengo» button: if a registered user with a visible sighting on this case **< 24h old** taps
-it, the sheet prefills from that sighting — «¿Es donde lo viste hace 20 min?» `[ Sí ]  [ Otro
+same «Lo tengo» button: if a signed-in user with a visible sighting on this case **< 24h old** (theirs by account, or
+sent from this browser without an account) taps it, the sheet prefills from that sighting — «¿Es donde lo viste hace 20 min?» `[ Sí ]  [ Otro
 lugar ]`. Secondary route: their own pin (rendered as «tu avistamiento») carries an «Ahora lo tengo»
 action. Both create the claim with `from_sighting_id` set, which prefills `point` and keeps the
 attribution chain sighting → claim → reunion intact. Older sightings don't prefill; at that distance
-in time they're more likely noise than context.
+in time they're more likely noise than context. A link that does not
+qualify (another case, older, not theirs, hidden) is ignored: the claim is stored without it.
 
 The owner owes the claim an answer: confirm, dismiss, or «aún verificando». A claim the owner never
-answers goes `stale` automatically at `stale_at` (see schedule): the «posible hallazgo» badge drops
+answers goes `stale` automatically at `stale_at` (the follow-up loop, L2; in L1 `stale` is derived from `last_active_at`, see `recovery_claim` above, and nothing is stored): the «posible hallazgo» badge drops
 and the cadence returns to weekly, but the case stays `active` at full reach. Stale is absence of a
 verdict, not a verdict — the claimant's contact stays attached and the owner can still confirm it
-later (`stale → confirmed`).
+later (`stale → confirmed`). The answer is revisable
+(`confirmed ↔ dismissed`) and never closes the case — only reunite does (decision #77). The «posible
+hallazgo» badge and its count are shown **to the owner only** (decision #76; Rule: a recovery claim must
+never reduce reach). Reunite, cancel and reopen are idempotent: repeating one the case already reflects
+is a success that changes nothing (decision #71).
 
 ### `case_checkin`
 `case_id`, `claim_id?`, `trigger: time_based | post_recovery_claim | hold_clock` (the third is
@@ -345,10 +376,11 @@ stateDiagram-v2
     [*] --> active: owner publishes
     active --> active: sighting / recovery_claim / checkin "sigue perdida"
     active --> reunited: owner confirms
+    expired --> reunited: owner confirms (no reopen first, decision #83)
     active --> expired: 2 consecutive check-ins unanswered
     active --> cancelled: owner deletes (false alarm, duplicate)
-    expired --> active: owner reopens (1 tap, ≤30 days)
-    expired --> active: recovery_claim (≤30 days, decision #29)
+    expired --> active: owner reopens (1 tap, ≤30 days, the pet's newest case only, decisions #81 and #88: a cancelled newer case is ignored)
+    expired --> active: recovery_claim (≤30 days, the pet's newest case only, decisions #29 and #81)
     reunited --> [*]
     cancelled --> [*]
     expired --> [*]: purge after 30 days
@@ -358,7 +390,7 @@ Four statuses. Deliberate — every candidate fifth state turned out to be deriv
 
 | Rejected state | Why it's derived instead |
 |---|---|
-| `pending_confirmation` | = `EXISTS recovery_claim WHERE status = 'open'`, computed inside the query that already fetches the case (index on `recovery_claim (case_id, status)`). A UI badge ("posible hallazgo"), not a status. If it ever shows in profiling, denormalize `open_claim_count` on the case, maintained in the same transaction — still not a status, never a cache layer |
+| `pending_confirmation` | = `EXISTS recovery_claim WHERE status = 'open'` and not stale (7 days after `last_active_at`), computed inside the query that already fetches the case (read through the case_code prefix of `recovery_claim_one_per_claimant`). A UI badge ("posible hallazgo") for the owner only, not a status. If it ever shows in profiling, denormalize `open_claim_count` on the case, maintained in the same transaction — still not a status, never a cache layer |
 | `paused` | v2. No evidence owners want to mute a search mid-search |
 | `draft` | The publish form is one screen; there is nothing to draft |
 | `archived` | A retention phase applied to terminal cases, not a lifecycle state |
@@ -383,6 +415,7 @@ which is reversible; `reunited` is not.
 `resolution_attribution: platform_sighting | platform_claim | platform_share | offline | unknown`
 — captured by asking «¿quién te ayudó?» at the reunion moment. This is what makes "real reunions
 per week" a number you can report honestly instead of guess at.
+Written today: `reunited_home` (reunite) and `false_alarm` / `duplicate` (cancel). `no_response` arrives with expiry; `found_deceased` and `gave_up` wait for [O35](../open-items.md).
 
 ---
 
@@ -427,7 +460,7 @@ Claim check-ins never count toward the streak — an owner ignoring a bad claim 
 abandoning the search.
 
 `expired` is soft: gone from feed and push, still reachable by direct link (WhatsApp shares stay
-alive), reopenable in one tap for 30 days. After 30 days: purge anonymous sighter contacts, keep the
+alive), reopenable in one tap for 30 days (only the pet's newest case, decision #81). After 30 days: purge anonymous sighter contacts, keep the
 pet record — it's a claimed pet, the owner link continues, and expiry never changes who is
 responsible ([01, rule 7](01-actors-and-entities.md)).
 
@@ -446,7 +479,7 @@ under **Lost**, keyed by the events listed below. Adding an event here means add
 | View, share the card | ✓ | ✓ |
 | Report a sighting | ✓ — **pin required**; time defaults to now; photo, note, contact optional | ✓ — contact prefilled from profile |
 | Report a publication (abuse) | ✓ — one tap, reason required ([09](09-reporting.md)) | ✓ |
-| "Lo tengo" | ✓ — phone **required** → `recovery_claim` → WhatsApp deep link | ✓ — `recovery_claim` → WhatsApp **or** in-app thread |
+| "Lo tengo" | ✗ — asked to sign in first, for the owner's safety (decision #75) | ✓ — phone **required** → `recovery_claim` → WhatsApp deep link **or** in-app thread |
 | Contact the owner | ✓ — WhatsApp deep link | ✓ — WhatsApp or in-app thread |
 | Earn points / attribution | ✗ | ✓ |
 | Publish a lost case | ✗ | ✓ — OAuth + phone verified |

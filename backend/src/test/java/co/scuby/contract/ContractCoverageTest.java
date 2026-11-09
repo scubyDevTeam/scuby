@@ -93,8 +93,10 @@ class ContractCoverageTest {
         return sessionRoutes.stream().map(o -> DynamicTest.dynamicTest(o.method() + " " + o.path(), () -> {
             ApiClient anonymous = clients.newBrowser();
             // Through the checked client: the answer must also be a contract-shaped 401 within its ceiling.
-            String path = o.path().replaceAll("\\{[^/}]+}", "x");
-            var r = anonymous.call(HttpMethod.valueOf(o.method()), path, o.method().equals("GET") || o.method().equals("DELETE") ? null : "{}");
+            // The template itself (its ceiling and contract entry are keyed by it), with "x" for every path variable.
+            Object[] vars = java.util.regex.Pattern.compile("\\{[^/}]+}").matcher(o.path()).results().map(m -> (Object) "x").toArray();
+            var r = anonymous.call(HttpMethod.valueOf(o.method()), o.path(),
+                    o.method().equals("GET") || o.method().equals("DELETE") ? null : "{}", vars);
             assertThat(r.status()).as("%s %s without a session", o.method(), o.path()).isEqualTo(401);
             assertThat(r.errorCode()).isEqualTo("unauthorized");
         }));
