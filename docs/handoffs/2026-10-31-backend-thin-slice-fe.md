@@ -151,7 +151,7 @@ client holds the pen until the contract moves to `openapi.yaml` (decision #34).
 - The `seen_at` tolerance (the server allows 5 minutes in the future) and the `point` comment in `feed.ts`:
   [api.md](../eng/api.md) · Proposals.
 - `found_deceased` and `gave_up`: which endpoint or field carries them: [O35](../open-items.md).
-- Claim evidence (photos, point, `from_sighting_id`) in the owner's `claims[]`: [O36](../open-items.md).
+- Claim evidence (photos, point, `from_sighting_id`) in the owner's `claims[]`, and an optional `note` on «Lo tengo»: [O36](../open-items.md).
 - The «¿Es donde lo viste…?» prefill from the caller's own recent pin is the client's call (the backend accepts
   `from_sighting_id`). A sighting on the wire has no `created_at`, so use `seen_at` as the proxy for the 24-hour
   rule: a pin seen less than 24 hours ago was created less than 24 hours ago, so it is always eligible. A report
