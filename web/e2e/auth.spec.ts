@@ -1,4 +1,4 @@
-import { expect, tags, test } from './test.ts'
+import { expect, MOCK_ONLY, tags, test } from './test.ts'
 
 test(
   'sign in with an emailed code, land where you were going, and sign out',
@@ -27,7 +27,8 @@ test(
   },
 )
 
-test('sign in with Google', tags('@auth', '@AUTH-002'), async ({ myCases }) => {
+// Mock only: the button needs a real Google client id, which no local or e2e build has.
+test('sign in with Google', tags('@auth', '@AUTH-002', MOCK_ONLY), async ({ myCases }) => {
   await myCases.open()
   await myCases.signIn.withGoogle()
 

@@ -1,5 +1,13 @@
 import type { Locator, Page } from '@playwright/test'
-import { MapPicker, PhoneStep, PhotoPicker, Published, SignIn, whatsappFrom } from './parts.ts'
+import {
+  DEMO_OWNER_EMAIL,
+  MapPicker,
+  PhoneStep,
+  PhotoPicker,
+  Published,
+  SignIn,
+  whatsappFrom,
+} from './parts.ts'
 import { step } from './step.ts'
 
 type Look = { species: string; size?: string; colour?: string }
@@ -36,7 +44,7 @@ export class PublishPage {
   openLostAsDemoOwner() {
     return step('Open «Perdí mi mascota» as the demo owner', async () => {
       await this.page.goto('/publicar/perdido')
-      await this.signIn.withGoogle()
+      await this.signIn.withEmailCode(DEMO_OWNER_EMAIL)
     })
   }
 

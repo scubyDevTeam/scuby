@@ -12,6 +12,8 @@ export default {
   outputDir: process.env.SCUBY_E2E_OUTPUT ?? path.resolve(web, '../backend/e2e/results'),
   fullyParallel: false,
   workers: 1,
+  // Tests only the emulated backend can answer (web/e2e/tags.ts · MOCK_ONLY).
+  grepInvert: /@mock-only/,
   webServer: {
     ...server,
     cwd: web,

@@ -12,6 +12,9 @@ const PNG = Buffer.from(
   'base64',
 )
 
+/** The demo account's address: it owns Luna and an expired Pelusa (src/mocks/fixtures.ts, backend/e2e/seed.sql). */
+export const DEMO_OWNER_EMAIL = 'carolina@correo.co'
+
 /** The sign-in that appears at the first step needing an account (docs/eng/auth.md). */
 export class SignIn {
   readonly page: Page
@@ -30,7 +33,7 @@ export class SignIn {
     })
   }
 
-  /** In the emulation, Google signs into the demo account: it owns Luna and holds a found dog. */
+  /** In the emulation, Google signs into the demo account. No button without a real Google client id. */
   withGoogle() {
     return step('Sign in with Google', async () => {
       await this.page.getByRole('button', { name: 'Continuar con Google' }).click()

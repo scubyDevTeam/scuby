@@ -1,8 +1,9 @@
-import { expect, tags, test } from './test.ts'
+import { expect, MOCK_ONLY, tags, test } from './test.ts'
 
+// Mock only: grouping needs the nine cases of all four verticals; the backend serves lost cases only.
 test(
   'the feed map groups crowded pins, a group opens, and a pin’s card leads to its case',
-  tags('@map', '@MAP-001'),
+  tags('@map', '@MAP-001', MOCK_ONLY),
   async ({ feed, casePage, page }) => {
     await test.step('on a desktop the map groups the cases that crowd, by colour', async () => {
       // A short window: the nine cases of Medellín on a small map, where they crowd.
