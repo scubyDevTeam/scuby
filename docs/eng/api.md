@@ -62,10 +62,10 @@ it, so neither can use an endpoint the contract does not list.
 
 ## Device identity
 
-Someone without an account is a **device**: an opaque `device` cookie that the API sets (decision #35).
+Someone without an account is a **device**: an opaque `__Host-device` cookie that the API sets (decision #35).
 
 - **Set by the API, never by the client.** Any answer to a request that arrives without a valid one
-  carries `Set-Cookie: device=…` — random, ≥ 128 bits, `HttpOnly; Secure; SameSite=Lax; Path=/`, one
+  carries `Set-Cookie: __Host-device=…` — random, ≥ 128 bits, `HttpOnly; Secure; SameSite=Lax; Path=/`, one
   year, renewed when used. The client reads nothing and sends nothing extra: it already sends every
   request with credentials (`api-client/http.ts`). The server keeps only a hash of the value.
 - **What it identifies.** The anonymous reporter of a sighting: it authorizes correcting or deleting their
@@ -132,7 +132,10 @@ logs:
 | `server_error` | 500 | — |
 
 Any endpoint may answer `validation_failed`, `rate_limited` and `server_error`; every other code
-must be in that endpoint's `errors`. The emulated backend enforces this, so the list stays true. One known exception: the real backend also answers `forbidden` to an unsafe request from a disallowed origin, on every endpoint, before it is routed ([backend.md](backend.md) · Security); the contract does not list it yet ([O27](../open-items.md)).
+must be in that endpoint's `errors`, except `unauthorized` on a `session` endpoint and `forbidden` on an
+unsafe one (`POST`, `PATCH`, `DELETE`), which the backend answers to a request from a disallowed origin
+before it is routed ([backend.md](backend.md) · Security). The emulated backend enforces this, so the list
+stays true; `implicitErrors` in `web/src/contracts/endpoint.ts` is the one list both read.
 
 ## Plugging in the real backend
 
@@ -204,8 +207,7 @@ contract change with the feature that needs it. The two that blocked the backend
 
 Contract or client changes the backend needs; each is made on the client side, which owns the pen
 until the contract moves to `openapi.yaml` (decision #34). The backend's first release is the
-lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the caller's own cases. The device cookie rename to
-`__Host-device` is already [O27](../open-items.md).
+lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the caller's own cases.
 
 - **Feed paging** — the feed is capped at 100 items with no way to ask for more.
 - **`phone_step: unverified`** on publish responses — proposed in [O24](../open-items.md).
