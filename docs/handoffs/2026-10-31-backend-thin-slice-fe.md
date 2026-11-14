@@ -215,7 +215,9 @@ bash backend/e2e/run-client-e2e.sh --down                         # remove this 
 The script runs a compose project of its own (`scuby-e2e-<checkout>`, API on `8080`, Postgres on `55433`,
 preview on `4173`), loads `seed.sql`, and runs `web/e2e` through
 [`backend/e2e/playwright.real.config.ts`](../../backend/e2e/playwright.real.config.ts) with
-`VITE_API_MOCK=false`. By default it selects `@auth|@publish-lost|@case-link|@feed|@map|@offline`. Its
+`VITE_API_MOCK=false`. By default it selects `@auth|@publish-lost|@case-link|@feed|@map|@offline`, and the config
+leaves out every test tagged `@mock-only` (`MOCK_ONLY` in `web/e2e/tags.ts`: a test only the emulated backend can
+answer, with the reason beside it). Its
 override [`compose.e2e.yaml`](../../backend/e2e/compose.e2e.yaml) adds `correo.co` and `+573007152284` to the
 test bypass, because the specs sign in with those.
 
@@ -224,36 +226,30 @@ test bypass, because the specs sign in with those.
 the owner signing in by email code (`carolina@correo.co`) and finding the claim in «Posibles hallazgos»; a
 stranger no longer sees «Posible hallazgo.».
 
-Last run (branch `be/lost-l1`, 2026-11-01), the default set plus `@HELP-002` and `@HELP-005`: **18 tests, 11 pass, 7
-fail; no failure is a backend bug.** The first run (branch `be/thin-slice`, 2026-10-31) had 16 tests, 8 pass, 8 fail.
+Last run (2026-11-13, `main` after #41 plus the client's e2e changes), the default set: **13 tests, 13 pass**; three
+more are `@mock-only` and left out. The runs before had 16 tests (8 pass on 2026-10-31) and, with `@HELP-002` and
+`@HELP-005`, 18 tests (11 pass on 2026-11-01); no failure was a backend bug.
 
-| Tag | Title | 2026-10-31 | 2026-11-01 | Why it fails |
-|---|---|---|---|---|
-| @AUTH-001 | email-code sign-in | pass | pass | |
-| @AUTH-002 | sign in with Google | fail | fail | No «Continuar con Google» button (no real Google client id in the build) |
-| @PLOST-001 | publish a lost pet | pass | pass | |
-| @PLOST-002 | reactivate an expired notice | fail | fail | Stops at «Continuar con Google» (30 s timeout). **With the Google step replaced by the email code: pass** (see below) |
-| @PLOST-003 | second sign-in | pass | pass | |
-| @PLOST-004 | two tabs, one backend | fail | fail | Same. **With the Google step replaced by the email code: pass** |
-| @LINK-001 | shared link: who, where, what | fail | pass | |
-| @LINK-002 | reunited case | pass | pass | |
-| @LINK-003 | purged case `GONE5` | pass | pass | |
-| @LINK-004 | share link | pass | pass | |
-| @FEED-001 | browse, filter, open a case | fail | fail | Expects the mock's 9-case feed (lost, found, adoption, help); the backend has lost cases only |
-| @FEED-002 | desktop list and map | fail | fail | Same |
-| @FEED-003 | phone map replaces the list | fail | fail | Same, at the first step |
-| @MAP-001 | grouped pins | fail | fail | Same: `total` 9 expected |
-| @MAP-002 | sighting sheet by keyboard | pass | pass | |
-| @OFFLINE-001 | «Lo vi» with no signal | pass | pass | The queued sighting is replayed once through its `client_id` |
-| @HELP-002 | «La tengo conmigo» | not run | pass | Signs in by email code, opens `M2TQ4`, the claim opens `wa.me` |
-| @HELP-005 | «La tengo» on an archived notice | not run | pass | Opens `ARCH2`: the claim reactivates it |
-
-**@PLOST-002 and @PLOST-004 beyond the Google step.** Run once against the real backend (2026-11-01) with the
-sign-in step of the two page objects that open them (`openLostAsDemoOwner` in `web/e2e/pages/PublishPage.ts` and
-`openAsDemoOwner` in `web/e2e/pages/MyCasesPage.ts`) changed from `this.signIn.withGoogle()` to
-`this.signIn.withEmailCode('carolina@correo.co')`, then reverted: **2 of 2 pass**. @PLOST-002 proves `/me/pets` and the
-reopen from the client, and @PLOST-004 the edit. To repeat it:
-`SCUBY_E2E_GREP='@PLOST-002|@PLOST-004' bash backend/e2e/run-client-e2e.sh` with that temporary edit.
+| Tag | Title | 2026-10-31 | 2026-11-01 | 2026-11-13 | Note |
+|---|---|---|---|---|---|
+| @AUTH-001 | email-code sign-in | pass | pass | pass | |
+| @AUTH-002 | sign in with Google | fail | fail | mock only | No «Continuar con Google» button without a real Google client id ([api.md](../eng/api.md) · Proposals, E2E Google sign-in) |
+| @PLOST-001 | publish a lost pet | pass | pass | pass | |
+| @PLOST-002 | reactivate an expired notice | fail | fail | pass | The demo owner now signs in by email code (`DEMO_OWNER_EMAIL` in `web/e2e/pages/parts.ts`), not Google. Proves `/me/pets` and the reopen |
+| @PLOST-003 | second sign-in | pass | pass | pass | |
+| @PLOST-004 | two tabs, one backend | fail | fail | pass | Same sign-in change. Proves the edit |
+| @LINK-001 | shared link: who, where, what | fail | pass | pass | |
+| @LINK-002 | reunited case | pass | pass | pass | |
+| @LINK-003 | purged case `GONE5` | pass | pass | pass | |
+| @LINK-004 | share link | pass | pass | pass | |
+| @FEED-001 | browse, filter, open a case | fail | fail | mock only | Counts the mock's 9-case feed (lost, found, adoption, help); the backend has lost cases only |
+| @FEED-002 | desktop list and map | fail | fail | pass | Asserts a non-empty list, not 9: it tests the layout |
+| @FEED-003 | phone map replaces the list | fail | fail | pass | Same |
+| @MAP-001 | grouped pins | fail | fail | mock only | Grouping needs the 9 cases |
+| @MAP-002 | sighting sheet by keyboard | pass | pass | pass | |
+| @OFFLINE-001 | «Lo vi» with no signal | pass | pass | pass | The queued sighting is replayed once through its `client_id` |
+| @HELP-002 | «La tengo conmigo» | not run | pass | not run | Signs in by email code, opens `M2TQ4`, the claim opens `wa.me` |
+| @HELP-005 | «La tengo» on an archived notice | not run | pass | not run | Opens `ARCH2`: the claim reactivates it |
 
 ## 6. Suggested next steps for the client
 
@@ -263,8 +259,6 @@ reopen from the client, and @PLOST-004 the edit. To repeat it:
 - **A cross-actor journey spec:** the owner publishes, a stranger sees the case in the feed and sends «Lo vi»,
   and the owner sees the pin. Use two browser contexts, depend on no seed rows, and run it nightly against the
   real backend.
-- **Sign in by email code in the lost-case page objects** (`openLostAsDemoOwner`, `openAsDemoOwner`), or a Google
-  test bypass for e2e, so @AUTH-002, @PLOST-002 and @PLOST-004 can run against the backend
-  ([api.md](../eng/api.md) · Proposals, E2E Google sign-in).
-- **The FEED and MAP specs** assume the mock's mixed 9-case feed. They will pass against the backend only once
-  found, adoption and help exist, or once they assert lost-only content.
+- **Drop `@mock-only` as the backend catches up:** from @FEED-001 and @MAP-001 once found, adoption and help
+  exist, and from @AUTH-002 with a Google test bypass for e2e ([api.md](../eng/api.md) · Proposals, E2E Google
+  sign-in).
