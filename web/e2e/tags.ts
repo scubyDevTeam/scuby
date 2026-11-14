@@ -32,7 +32,18 @@ export const FLOWS = {
 
 export type Flow = keyof typeof FLOWS
 
+/**
+ * A test that only the emulated backend can answer: the run against the real backend leaves it out
+ * (backend/e2e/playwright.real.config.ts). Say why beside each use, and drop it once the backend
+ * can answer.
+ */
+export const MOCK_ONLY = '@mock-only'
+
 /** `{ tag: ['@feed', '@FEED-001'] }` — the details argument of `test()`. */
-export const tags = <F extends Flow>(flow: F, key: `@${(typeof FLOWS)[F]}-${number}`) => ({
-  tag: [flow, key],
+export const tags = <F extends Flow>(
+  flow: F,
+  key: `@${(typeof FLOWS)[F]}-${number}`,
+  ...marks: (typeof MOCK_ONLY)[]
+) => ({
+  tag: [flow, key, ...marks],
 })

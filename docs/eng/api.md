@@ -231,15 +231,15 @@ lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the 
   `+573007152284`, which the backend's test bypass accepts only through an extra compose override.
   Use `*@e2e.scuby.test` and `+57 300 000 00xx` (the bypass defaults) and the override is not needed.
 - **E2E Google sign-in** — the «Continuar con Google» button is hidden when the build has no real
-  Google client id (`web/.env` has a `mock-` one), so the three Google specs (@AUTH-002, @PLOST-002,
-  @PLOST-004) cannot run against the backend; they need a documented e2e environment or a backend
-  bypass, planned with the phase that adds Google.
+  Google client id (`web/.env` has a `mock-` one), so @AUTH-002 is `@mock-only`; it needs a documented
+  e2e environment or a backend bypass, planned with the phase that adds Google. The demo owner's specs
+  sign in by email code, so they run against the backend.
 - **`point` comment in `feed.ts`** — it says "public precision, never a doorstep", which is now true: the
   server snaps the center to a ~200 m grid for every feed caller ([04](../product/04-lost-workflow.md) ·
   Location precision, decision #63). The mock's feed still returns exact points.
 - **Paging for `GET /me/cases`** — it returns every case of the caller, with no way to page.
 - **Endpoints the e2e specs need** — the backend now implements `/me/pets`, case edit, reopen, claims and the
-  profile update; Google sign-in (@AUTH-002, @PLOST-002, @PLOST-004) is still missing. «Lo tengo» needs a
+  profile update; Google sign-in (@AUTH-002) is still missing. «Lo tengo» needs a
   session: @HELP-002 and @HELP-005 sign in by email code before claiming, and the client's claim sheet must
   ask for sign-in.
 - **Not a proposal: the English look title.** `GET /me/cases` titles a case whose pet has no name

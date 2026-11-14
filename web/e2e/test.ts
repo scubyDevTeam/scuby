@@ -14,7 +14,7 @@ import { PublishPage } from './pages/PublishPage.ts'
 import { PushOffer } from './pages/PushOffer.ts'
 
 export { expect } from '@playwright/test'
-export { tags } from './tags.ts'
+export { MOCK_ONLY, tags } from './tags.ts'
 
 type Pages = {
   /** Every test ends with no sideways scroll: a phone screen never pans (frontend.md · layout). */

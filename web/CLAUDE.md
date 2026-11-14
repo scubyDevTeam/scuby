@@ -63,5 +63,7 @@ Enforced by `.dependency-cruiser.cjs`; `pnpm depcruise` fails the build on a vio
   page-object action goes through `step()` (`e2e/pages/step.ts`, a boxed `test.step`); every spec
   groups its phases in `test.step('what this phase shows', …)` with the assertions inside. Every test
   is declared `test(title, tags('@flow', '@KEY-NNN'), …)` — a flow from `e2e/tags.ts` and a key of
-  its own, never reused. A new flow is a new row in `e2e/tags.ts`.
+  its own, never reused. A new flow is a new row in `e2e/tags.ts`. A test only the emulated backend can
+  answer adds `MOCK_ONLY` as a third tag, with the reason in a comment above it: the run against the real
+  backend (`../backend/e2e/run-client-e2e.sh`) leaves it out.
 - The design: `design/reference/` (committed) and `design/screens/` (local, see its README).

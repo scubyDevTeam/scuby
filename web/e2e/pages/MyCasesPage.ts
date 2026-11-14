@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test'
-import { SignIn } from './parts.ts'
+import { DEMO_OWNER_EMAIL, SignIn } from './parts.ts'
 import { step } from './step.ts'
 
 /** `/mis-casos`: everything the signed-in person published. */
@@ -22,7 +22,7 @@ export class MyCasesPage {
   openAsDemoOwner() {
     return step('Open «Mis casos» as the demo owner', async () => {
       await this.open()
-      await this.signIn.withGoogle()
+      await this.signIn.withEmailCode(DEMO_OWNER_EMAIL)
     })
   }
 
