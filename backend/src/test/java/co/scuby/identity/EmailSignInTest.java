@@ -66,6 +66,11 @@ class EmailSignInTest {
     }
 
     @Test
+    void theCodeNeverComesBackInTheResponseByDefault() {
+        assertThat(start("ana@correo.co").raw().getHeader(DevCodeHeader.NAME)).isNull();
+    }
+
+    @Test
     void aSecondSignInReusesTheAccount() {
         start("ana@correo.co");
         String first = verify("ana@correo.co", emails.lastCodeFor("ana@correo.co")).str("/id");

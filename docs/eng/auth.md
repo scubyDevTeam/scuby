@@ -72,6 +72,11 @@
   full addresses or numbers. For e2e runs, addresses on a test
   domain and numbers in a reserved range accept a fixed code and skip the cooldowns and every send
   limit; configuring either under the production profile stops the server at start-up.
+- **Codes in development.** With `scuby.auth.dev-code-header` on (only `application-local.yml`;
+  any deployed profile refuses to start with it), every email or SMS send also returns its code as the
+  `X-Dev-Code` response header, and the web client prints it to the browser console
+  (`api-client/http.ts`). So local sign-in and phone checks need no log reading. It never reaches
+  staging: there it would give any caller the code for any address or number.
 
 ## Profile
 

@@ -65,6 +65,8 @@ public class SecurityConfiguration {
         config.setAllowedOrigins(web.allowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        // Only ever sent locally (identity's DevCodeHeader, refused in deployed profiles); a cross-origin page reads it only if exposed.
+        config.setExposedHeaders(List.of("X-Dev-Code"));
         config.setAllowCredentials(true);
         config.setMaxAge(Duration.ofHours(1));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
