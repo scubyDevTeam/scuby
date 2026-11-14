@@ -227,7 +227,10 @@ is what matters, because it means the mobile scope edits these files and no call
 above them is written once and never asks where it's running. In a native rewrite these are the only files replaced wholesale.
 
 Geolocation is **optional everywhere** — never a validation input (many deny it), only a
-convenience for centering the map and sorting the feed.
+convenience for centering the map and sorting the feed. The feed never prompts (decision #89):
+`getGrantedPosition()` in `platform/location.ts` reads the position only when the permission is
+already `granted`, and the feed falls back to the country's `default_center` from `/config`. The
+screens that need a point (marking a sighting, publishing) ask, with their button as the context.
 
 ### Rule 5 — the map lives behind one component and a lazy boundary
 
