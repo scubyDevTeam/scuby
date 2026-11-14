@@ -3,17 +3,17 @@
 > Decided 2026-08-23. The UI contract below is what screens implement — the design pass for any
 > publish flow reads this doc plus the vertical's Publishing section.
 
-## Sign-in: two doors, no passwords
+## Sign-in: three doors
 
 > `[ Continuar con Google ]`
-> `[ Continuar con mi correo ]`
+> `[ Continuar con mi correo ]` → a code, or «Entrar con contraseña»
 
 - **Google** — one-tap; on Android the account is on-device, no password recall.
 - **Email** — 6-digit code (not a magic link: links open the wrong browser and orphan the PWA
   session). Transactional email (SES/Resend-class, ~$0.10/1000); domain with SPF/DKIM from day one
   or codes land in spam.
-- **No password column exists.** Passwordless is not a shortcut — password auth still requires the
-  same email infrastructure (resets), plus hashing, breach liability, and permanent support load.
+- **Email and password** — an option for whoever wants one, never required (decision #90 in
+  [00](../product/00-product-map.md), amending #16). Mechanics: *Password* below.
 - Accounts are born **lazily** at the first gated action (publish, «es mío», «me interesa»,
   «yo ayudo»). There is never a standalone signup screen.
 - Apple gotcha for later: it returns the user's name **only on first authorization** — capture it
@@ -21,6 +21,29 @@
 - Sessions are long-lived: an opaque token in an httpOnly cookie, stored only as its SHA-256,
   expiring 12 months after sign-in whatever the use (no sliding refresh; decision #43 in
   [00](../product/00-product-map.md)); sign-out ends it at once. Mechanics: [backend.md](backend.md) · Sessions.
+- **Password** *(designed 2026-11-14, not built — for review before the backend starts it)*.
+  - **One endpoint sets it, for every case:** `POST /auth/password/set {email, code, password}`. The
+    `code` is an email sign-in code (`POST /auth/email/start`), so setting a password always proves
+    control of the address first. It covers registration (the account is born here, lazily, like an
+    email-code sign-in), adding a password to an account that has none (one account per email,
+    #58: a Google or email-code account simply gains a password), changing it, and recovering it
+    («¿Olvidaste tu contraseña?» is the same flow). It answers like `POST /auth/email/verify`: the
+    session and the user. Setting a password ends every other session of the account.
+  - **Signing in:** `POST /auth/password/sign-in {email, password}` → the session and the user. A
+    wrong password, an unknown address and an account without a password all answer the same new
+    code, `invalid_credentials` (422), so the answer never says whether an account exists.
+  - **Rules:** 8 to 128 characters, any characters, no composition rules (NIST SP 800-63B); a list
+    of the most common passwords is refused (`validation_failed` on `password`). Stored as Argon2id
+    (Spring Security's `Argon2PasswordEncoder`), never logged, never returned.
+  - **Guessing budget:** failed password checks count with the address's failed code checks: at most
+    10 per address in a rolling 24 h, then even the right password answers `rate_limited` until the
+    oldest failures age out (the same rule as #65). A test-domain address is never capped.
+  - **Client:** the email step offers «Enviarme un código» and «Entrar con contraseña»; the password
+    field has «¿Olvidaste tu contraseña?», which sends a code and asks for it with the new password.
+    The profile offers «Crear contraseña» / «Cambiar contraseña», the same flow. Copy lives in the
+    language files.
+  - **Not in it:** no username, no security questions, no password expiry, no «remember me» (the
+    session already lasts 12 months, #43).
 - **Email code:** 6 digits, stored as a keyed hash, 5-minute expiry, 3 attempts, a 60 s resend
   cooldown while the current code is live and unused (a used or burned code never blocks a new
   one), and **at most 10 sends per address in a rolling 24 h**; there is no cap per device or per IP
