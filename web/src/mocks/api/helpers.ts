@@ -7,7 +7,7 @@ import { CLAIM_STALE, onClaimOpened, onOwnerInteraction } from '../followup'
 import { notify } from '../notify'
 import { fail, route } from '../route'
 import { ago, DAY, distance, HOUR, iso, metres, ms } from '../rules'
-import { EDIT_WINDOW, ownership, REOPEN_WINDOW, superseded } from '../serialize'
+import { ownership, REOPEN_WINDOW, superseded } from '../serialize'
 import { mediaUrl } from './media'
 
 const MAX_DISTANCE_M = 30_000
@@ -22,27 +22,6 @@ function waEncode(text: string): string {
     /[!'()~]/g,
     (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
   )
-}
-
-/** 1 per 15 min and 5 per day per reporter per case; 20 per day per reporter overall (04). */
-function rateLimit(reporter: { id: string | null; key: string }, caseCode: string | null) {
-  const mine = db.sightings.filter((s) =>
-    reporter.id ? s.reporter_id === reporter.id : s.reporter_key === reporter.key,
-  )
-  const since = (window: number) => mine.filter((s) => Date.now() - ms(s.created_at) < window)
-  const here = (rows: SightingRow[]) => rows.filter((s) => s.case_code === caseCode)
-  // «Lo vi otra vez» (04 · Second pin): while the earlier pin can still be corrected, a new one is
-  // not «hace poco» — the 15-minute rule would always refuse the question's own answer. The daily
-  // caps still hold.
-  const lastHere = here(mine).sort((a, b) => ms(b.created_at) - ms(a.created_at))[0]
-  const askedAbout = lastHere !== undefined && Date.now() - ms(lastHere.created_at) < EDIT_WINDOW
-  if (
-    (caseCode && !askedAbout && here(since(15 * 60_000)).length >= 1) ||
-    (caseCode && here(since(DAY)).length >= 5) ||
-    since(DAY).length >= 20
-  ) {
-    fail('rate_limited')
-  }
 }
 
 /** The same checks the form ran, again: the client is not trusted input (04 · Validation). */
@@ -82,14 +61,13 @@ export const helpers = [
     const row = findCase(params.code) ?? fail('not_found')
     if (row.vertical !== 'lost' && row.vertical !== 'found') fail('not_found')
     // A replay (the offline queue retrying a send whose answer never arrived) is the sighting it
-    // already made: the same id, no second row, no rate limit — and whatever the case did since.
+    // already made: the same id, no second row — and whatever the case did since.
     const replayed = body.client_id
       ? db.sightings.find((s) => s.case_code === row.code && s.client_id === body.client_id)
       : undefined
     if (replayed) return { id: replayed.id }
     if (row.status !== 'active') fail('invalid_transition')
     const { seenAt, away } = checkSighting(row, body.point, body.seen_at)
-    rateLimit({ id: user?.id ?? null, key: reporterKey }, row.code)
 
     const id = newId('s-')
     db.sightings.push({
@@ -125,7 +103,6 @@ export const helpers = [
 
   route(api.reportOrphanSighting, ({ body, user, reporterKey }) => {
     if (ms(body.seen_at) > Date.now() + 5 * 60_000) fail('seen_at_in_future')
-    rateLimit({ id: user?.id ?? null, key: reporterKey }, null)
     const id = newId('orphan-')
     db.sightings.push({
       id,

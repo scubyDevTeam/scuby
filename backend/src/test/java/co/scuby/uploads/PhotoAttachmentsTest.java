@@ -47,7 +47,7 @@ class PhotoAttachmentsTest {
         String sha = Hashing.sha256Hex(bytes);
         var slot = api.post("/uploads", UploadsTest.slotBody(purpose, sha, bytes.length));
         if (sendBytes) api.rawBytes(HttpMethod.PUT, "/dev-media/{sha}.jpg", bytes, "image/jpeg", sha);
-        Caller caller = new Caller(null, Hashing.sha256Hex(api.cookie("device").orElseThrow()));
+        Caller caller = new Caller(null, Hashing.sha256Hex(api.cookie("__Host-device").orElseThrow()));
         return Map.entry(slot.str("/url"), caller);
     }
 
@@ -110,7 +110,7 @@ class PhotoAttachmentsTest {
 
     /** The Caller of a browser, with the person it is signed in as (null: anonymous). */
     private Caller callerOf(ApiClient browser, UUID person) {
-        return new Caller(person, Hashing.sha256Hex(browser.cookie("device").orElseThrow()));
+        return new Caller(person, Hashing.sha256Hex(browser.cookie("__Host-device").orElseThrow()));
     }
 
     @Test

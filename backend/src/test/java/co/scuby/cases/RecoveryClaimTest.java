@@ -56,7 +56,7 @@ class RecoveryClaimTest {
         helper = clients.newBrowser();
         helper.get("/config");   // the device cookie, before the sign-in (an anonymous /config is within its ceiling)
         andres = accounts.signIn(helper, "andres@correo.co");
-        helperDevice = Hashing.sha256Hex(helper.cookie("device").orElseThrow());
+        helperDevice = Hashing.sha256Hex(helper.cookie("__Host-device").orElseThrow());
         cases.luna(carolina);
     }
 

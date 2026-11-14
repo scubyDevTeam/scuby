@@ -64,7 +64,7 @@ class SightingCorrectionCloseRaceTest {
         cases.luna(accounts.signIn(owner, "carolina@correo.co"));
         reporter = clients.newBrowser();
         reporter.get("/config");
-        String device = Hashing.sha256Hex(reporter.cookie("device").orElseThrow());
+        String device = Hashing.sha256Hex(reporter.cookie("__Host-device").orElseThrow());
         pin = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, CREATED, CREATED, null, device, null, "visible");
         db.update(SIGHTING).set(SIGHTING.NOTE, "Corría").where(SIGHTING.ID.eq(pin)).execute();
     }

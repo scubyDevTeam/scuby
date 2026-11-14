@@ -68,7 +68,9 @@ describe('QueuedSightings — the reporter’s own unsent «Lo vi», on this dev
     backOnline()
 
     expect(await screen.findByText('No se envió')).toBeTruthy()
-    expect(screen.getByText('Ya registraste un avistamiento hace poco.')).toBeTruthy()
+    expect(
+      screen.getByText('Hay muchos envíos en este momento. Intenta de nuevo en unos minutos.'),
+    ).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Descartar' }))
     await waitFor(() => expect(screen.queryByText('No se envió')).toBeNull())
     vi.unstubAllGlobals()

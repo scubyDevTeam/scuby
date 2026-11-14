@@ -45,8 +45,6 @@ scuby:
     export: ${SCUBY_TELEMETRY_EXPORT:false}
   web:
     allowed-origins: []
-  cookies:
-    secure: true
   flags:
     cache-ttl: 30s
   sms:

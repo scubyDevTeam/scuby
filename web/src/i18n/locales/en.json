@@ -1290,7 +1290,7 @@
       "waiting": "Waiting",
       "not_sent": "Not sent",
       "dismiss": "Dismiss",
-      "too_soon": "You already reported a sighting a moment ago."
+      "rate_limited": "Too many sends right now. Try again in a few minutes."
     },
     "claims": {
       "label": "Possible finds",

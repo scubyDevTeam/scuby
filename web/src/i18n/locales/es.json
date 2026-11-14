@@ -1290,7 +1290,7 @@
       "waiting": "En espera",
       "not_sent": "No se envió",
       "dismiss": "Descartar",
-      "too_soon": "Ya registraste un avistamiento hace poco."
+      "rate_limited": "Hay muchos envíos en este momento. Intenta de nuevo en unos minutos."
     },
     "claims": {
       "label": "Posibles hallazgos",

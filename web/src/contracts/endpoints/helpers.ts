@@ -16,8 +16,8 @@ export const reportSighting = endpoint({
   method: 'POST',
   path: '/cases/:code/sightings',
   summary:
-    '«Lo vi»: a pin on a lost or found case. Visible at once; rate-limited per reporter. A ' +
-    'repeated `client_id` on the same case answers the sighting it created, before any limit.',
+    '«Lo vi»: a pin on a lost or found case. Visible at once. A repeated `client_id` on the ' +
+    'same case answers the sighting it created.',
   auth: 'public',
   body: sightingRequest,
   status: 201,

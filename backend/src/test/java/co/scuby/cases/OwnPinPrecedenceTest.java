@@ -39,7 +39,7 @@ class OwnPinPrecedenceTest {
         cases.lostCase(carolina, "OTH22", "Toby", "dog", CaseFixtures.MEDELLIN, 300, "active", MutableClock.START.minusSeconds(7200));
         reporter = clients.newBrowser();
         reporter.get("/config");
-        String device = Hashing.sha256Hex(reporter.cookie("device").orElseThrow());
+        String device = Hashing.sha256Hex(reporter.cookie("__Host-device").orElseThrow());
         mine = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, CREATED, CREATED, null, device, null, "visible");
         someoneElses = cases.sighting("OTH22", CaseFixtures.MEDELLIN, CREATED, CREATED, null, "7".repeat(64), null, "visible");
     }

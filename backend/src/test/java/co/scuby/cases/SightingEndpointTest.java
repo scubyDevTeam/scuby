@@ -60,7 +60,7 @@ class SightingEndpointTest {
         var row = db.selectFrom(SIGHTING).where(SIGHTING.ID.eq(id)).fetchOne();
         assertThat(row.getStatus()).isEqualTo("visible");
         assertThat(row.getReporterPersonId()).isNull();
-        assertThat(row.getReporterDeviceHash()).isEqualTo(Hashing.sha256Hex(api.cookie("device").orElseThrow()));
+        assertThat(row.getReporterDeviceHash()).isEqualTo(Hashing.sha256Hex(api.cookie("__Host-device").orElseThrow()));
         ApiResponse luna = api.get("/cases/{code}", "7K3PQ");
         assertThat(luna.json().at("/sightings/0/mine").asBoolean()).isTrue();
         assertThat(luna.str("/sightings/0/editable_until")).isEqualTo("2026-10-14T17:15:00Z");

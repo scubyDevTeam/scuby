@@ -16,8 +16,23 @@ export type Endpoint = {
   status: 200 | 201 | 204
   /** Null with 204. */
   response: Schema | null
-  /** Beyond the ones any endpoint can answer: `validation_failed`, `rate_limited`, `server_error`. */
+  /** Beyond the ones every endpoint can answer: see `implicitErrors`. */
   errors: readonly ErrorCode[]
+}
+
+/**
+ * What an endpoint can answer without listing it (api.md · Errors): any endpoint `validation_failed`,
+ * `rate_limited` and `server_error`; a `session` one `unauthorized`; an unsafe one (not `GET`)
+ * `forbidden`, which the API's Origin check answers before routing (backend.md · Security).
+ */
+export function implicitErrors(endpoint: Pick<Endpoint, 'method' | 'auth'>): ErrorCode[] {
+  return [
+    'validation_failed',
+    'rate_limited',
+    'server_error',
+    ...(endpoint.auth === 'session' ? (['unauthorized'] as const) : []),
+    ...(endpoint.method === 'GET' ? [] : (['forbidden'] as const)),
+  ]
 }
 
 type Definition = Pick<Endpoint, 'method' | 'path' | 'summary' | 'auth'> &

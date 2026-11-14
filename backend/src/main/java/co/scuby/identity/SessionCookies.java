@@ -51,7 +51,7 @@ class SessionCookies {
         response.addHeader(HttpHeaders.SET_COOKIE, base("").maxAge(Duration.ZERO).build().toString());
     }
 
-    /** Always Secure: a `__Host-` cookie without it is dropped by browsers, so `scuby.cookies.secure` does not apply here. */
+    /** Always Secure: a `__Host-` cookie without it is dropped by browsers. */
     private ResponseCookie.ResponseCookieBuilder base(String value) {
         return ResponseCookie.from(NAME, value).httpOnly(true).secure(true).sameSite("Lax").path("/");
     }
