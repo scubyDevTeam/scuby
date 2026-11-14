@@ -40,15 +40,17 @@ class EmailCodes {
     private final TestBypass bypass;
     private final CodeHasher hasher;
     private final CodeSends sends;
+    private final DevCodeHeader devCode;
 
     EmailCodes(DSLContext db, Clock clock, EmailSender sender, TestBypass bypass, CodeHasher hasher,
-               CodeSends sends) {
+               CodeSends sends, DevCodeHeader devCode) {
         this.db = db;
         this.clock = clock;
         this.sender = sender;
         this.bypass = bypass;
         this.hasher = hasher;
         this.sends = sends;
+        this.devCode = devCode;
     }
 
     /**
@@ -77,6 +79,7 @@ class EmailCodes {
     /** The network call: never inside a transaction. */
     void deliver(Outgoing outgoing) {
         sender.sendSignInCode(outgoing.email(), outgoing.code());
+        devCode.expose(outgoing.code());
     }
 
     /**

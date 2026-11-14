@@ -10,6 +10,8 @@ scuby:
   web:
     allowed-origins: [ "http://localhost:5173", "http://localhost:4173" ]
   auth:
+    # The code of each email/SMS send also comes back as X-Dev-Code; the web client prints it (auth.md · Codes in development)
+    dev-code-header: true
     test-bypass:
       email-domains: [ "e2e.scuby.test" ]
       sms-prefixes: [ "+5730000000" ]

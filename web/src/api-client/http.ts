@@ -94,6 +94,16 @@ function init(endpoint: Endpoint, body: unknown): RequestInit {
 }
 
 /**
+ * Local development only (docs/eng/auth.md · Codes in development): the backend sends the code of an
+ * email or SMS it just "sent" as `X-Dev-Code`, and it goes to the browser console. A deployed backend
+ * never sends the header.
+ */
+function showDevCode(endpoint: Endpoint, response: Response) {
+  const code = response.headers.get('X-Dev-Code')
+  if (code) console.info(`[dev] código de ${endpoint.method} ${endpoint.path}: ${code}`)
+}
+
+/**
  * One request, described by its contract entry. `parse` turns the wire answer into the type the
  * app uses; an answer it rejects is `unexpected_response`, never a half-read object.
  */
@@ -113,6 +123,7 @@ export async function call<E extends Endpoint, T>(
   } catch {
     throw new ApiError('network')
   }
+  showDevCode(endpoint, response)
   if (!response.ok) throw await failure(response)
 
   try {

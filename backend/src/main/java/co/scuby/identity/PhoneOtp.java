@@ -47,9 +47,10 @@ class PhoneOtp {
     private final SmsProperties limits;
     private final CodeHasher hasher;
     private final CodeSends sends;
+    private final DevCodeHeader devCode;
 
     PhoneOtp(DSLContext db, Clock clock, SmsSender sender, TestBypass bypass, SmsProperties limits,
-             CodeHasher hasher, CodeSends sends) {
+             CodeHasher hasher, CodeSends sends, DevCodeHeader devCode) {
         this.db = db;
         this.clock = clock;
         this.sender = sender;
@@ -57,6 +58,7 @@ class PhoneOtp {
         this.limits = limits;
         this.hasher = hasher;
         this.sends = sends;
+        this.devCode = devCode;
     }
 
     /**
@@ -95,6 +97,7 @@ class PhoneOtp {
     /** The network call: never inside a transaction, never while holding a pooled connection. */
     void deliver(Outgoing outgoing) {
         sender.sendCode(outgoing.phone(), outgoing.code());
+        devCode.expose(outgoing.code());
     }
 
     /**

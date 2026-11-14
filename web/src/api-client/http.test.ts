@@ -20,6 +20,23 @@ const failureOf = async (promise: Promise<unknown>) => {
 const asIs = (raw: unknown) => raw
 
 describe('call', () => {
+  // auth.md · Codes in development: only a local backend sends the header.
+  it('prints a code the local backend sent back, and nothing without one', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 204, headers: { 'X-Dev-Code': '482913' } })),
+    )
+    await call(api.startEmailCode, { body: { email: 'ana@correo.co' } }, asIs)
+    expect(info).toHaveBeenCalledWith(expect.stringContaining('482913'))
+
+    info.mockClear()
+    respond(200, { ok: true })
+    await call(api.getFeed, {}, asIs)
+    expect(info).not.toHaveBeenCalled()
+    info.mockRestore()
+  })
+
   it('builds the path from the contract and sends the defined query params only', async () => {
     respond(200, { ok: true })
     const result = await call(
