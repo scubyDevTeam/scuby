@@ -1,3 +1,4 @@
+import { useSession } from '@api-client/session'
 import type { LostCase, Sighting } from '@contracts/case'
 import type { LostAction } from '@domain/lost/actions'
 import { closeAnswersCheckin } from '@domain/lost/checkin'
@@ -9,12 +10,14 @@ import { withMessages } from '@i18n/locales'
 import { useI18n } from '@i18n/react'
 import { Link } from '@tanstack/react-router'
 import { roundButtonClass } from '@ui/Button'
+import { Notice } from '@ui/Notice'
 import { Sheet } from '@ui/Sheet'
 import { Skeleton } from '@ui/States'
 import { ChevronLeft } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { brand } from '../../../brand'
 import { env } from '../../../env'
+import { LegalLine } from '../../-legal'
 
 // The forms load when their button is tapped: reading the case must not pay for them.
 // Their words come with them (`lost_forms`), as the forms' code does.
@@ -31,6 +34,11 @@ const ClaimForm = lazy(
 const EditLost = lazy(
   withMessages(['lost_forms', 'publish'], () =>
     import('@features/lost/EditLost').then((m) => ({ default: m.EditLost })),
+  ),
+)
+const SignIn = lazy(
+  withMessages(['auth'], () =>
+    import('@features/auth/SignIn').then((m) => ({ default: m.SignIn })),
   ),
 )
 const ownerForms = () => import('@features/lost/OwnerForms')
@@ -55,6 +63,9 @@ const PosterSheet = lazy(
   ),
 )
 
+/** The code the emulated backend accepts (src/mocks/handlers.ts). */
+const DEMO_CODE = '123456'
+
 type Open =
   | 'sighting'
   | 'edit'
@@ -69,6 +80,7 @@ type Open =
 export function LostCaseScreen({ found }: { found: LostCase }) {
   const { t } = useI18n()
   const [sheet, setSheet] = useState<Open>(null)
+  const session = useSession()
   // The pin the reporter is correcting: the sighting form opens on it (04 · Correction window).
   const [correcting, setCorrecting] = useState<Sighting | null>(null)
   // The short link carries no language: posters and shared links reach everyone the same way.
@@ -151,12 +163,24 @@ export function LostCaseScreen({ found }: { found: LostCase }) {
             <EditLost lostCase={found} mapStyleUrl={env.mapStyleUrl} onDone={close} />
           ) : null}
           {sheet === 'claim' ? (
-            <ClaimForm
-              code={found.code}
-              petName={found.pet.name}
-              onDone={close}
-              onOnlySaw={() => setSheet('sighting')}
-            />
+            // A claim is always a person's (decision #75): the account is born here, as for «Es mío».
+            session.data ? (
+              <ClaimForm
+                code={found.code}
+                petName={found.pet.name}
+                onDone={close}
+                onOnlySaw={() => setSheet('sighting')}
+              />
+            ) : (
+              <div className="flex flex-col gap-4">
+                <Notice tone="info">{t('case.lost.claim_sign_in')}</Notice>
+                <SignIn
+                  googleClientId={env.googleClientId}
+                  demoCode={env.apiMock ? DEMO_CODE : undefined}
+                  legal={<LegalLine />}
+                />
+              </div>
+            )
           ) : null}
           {sheet === 'reunite' ? (
             <ReuniteForm

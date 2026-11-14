@@ -131,6 +131,7 @@
     "lost": {
       "sighting_title": "Where did you see {name}?",
       "claim_title": "Do you have {name}?",
+      "claim_sign_in": "“I have it” needs your account, for the family’s safety: that way they know who is writing.",
       "reunite_title": "Is {name} back?",
       "correct_title": "Correct your sighting of {name}",
       "edit_title": "Edit {name}’s notice"

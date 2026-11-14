@@ -1,7 +1,9 @@
+import { useConfig } from '@api-client/actions'
 import { type FeedFilters, useFeed } from '@api-client/cases'
 import type { Species, Vertical } from '@contracts/case'
 import { withMessages } from '@i18n/locales'
 import { useI18n } from '@i18n/react'
+import { getGrantedPosition, type Position } from '@platform/location'
 import { useIsDesktop } from '@platform/viewport'
 import { Button } from '@ui/Button'
 import { Chips, type Option, Segmented } from '@ui/Choice'
@@ -9,7 +11,7 @@ import { FeedMap } from '@ui/Map/FeedMap'
 import { PinCard } from '@ui/Map/PinCard'
 import { Message, Skeleton } from '@ui/States'
 import { MapPinOff, SearchX, WifiOff } from 'lucide-react'
-import { lazy, type ReactNode, Suspense, useMemo, useState } from 'react'
+import { lazy, type ReactNode, Suspense, useEffect, useMemo, useState } from 'react'
 import { FeedCard } from './FeedCard'
 
 // A tapped pin's card, and its words, arrive with the tap.
@@ -20,6 +22,28 @@ const FeedPinCard = lazy(
 )
 
 type All = 'all'
+
+/**
+ * The point the feed is ordered around (decision #41): the device's position when the person already
+ * allowed it, else the country's `default_center` from `/config`. Without either, no point: the
+ * server answers the national feed. `ready` is false until both are settled.
+ */
+function useFeedPoint(): { near: Position | undefined; ready: boolean } {
+  const config = useConfig()
+  const [device, setDevice] = useState<Position | null | undefined>(undefined)
+  useEffect(() => {
+    let live = true
+    getGrantedPosition().then((position) => {
+      if (live) setDevice(position)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+  if (device === undefined) return { near: undefined, ready: false }
+  if (device) return { near: device, ready: true }
+  return { near: config.data?.countries[0].defaultCenter, ready: !config.isPending }
+}
 
 // Labels read `feed.verticals.<value>`, `feed.species.<value>` and `feed.views.<value>`.
 const verticals: { value: Vertical | All; className?: string }[] = [
@@ -60,11 +84,13 @@ export function FeedPage({ brandName, brandMarkUrl, mapStyleUrl, caseLink, banne
   const [view, setView] = useState<'list' | 'map'>('list')
   // A phone shows the list or the map; a desktop has room for both, side by side.
   const isDesktop = useIsDesktop()
+  const point = useFeedPoint()
   const filters: FeedFilters = {
     vertical: vertical === 'all' ? undefined : vertical,
     species: species === 'all' ? undefined : species,
+    near: point.near,
   }
-  const feed = useFeed(filters)
+  const feed = useFeed(filters, point.ready)
   const now = new Date()
   const items = feed.data?.items
   // One array per answer, not per render: the map refits only when the cases change.

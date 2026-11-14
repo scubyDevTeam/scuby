@@ -5,9 +5,24 @@ import { describe, expect, it, vi } from 'vitest'
 import { feedItems } from '../../mocks/fixtures'
 import { FeedPage } from './FeedPage'
 
+const CENTER = { lat: 6.2442, lng: -75.5812 }
+const config = () =>
+  new Response(
+    JSON.stringify({
+      supported_countries: [
+        { code: 'CO', phone_prefix: '+57', mobile_pattern: '^3\\d{9}$', default_center: CENTER },
+      ],
+    }),
+    { status: 200 },
+  )
+
+/** Answers `/config` itself; `respond` answers the feed. Returns the feed's calls only. */
 function show(respond: (url: URL) => Response) {
-  const fetchMock = vi.fn(async (url: URL) => respond(url))
-  vi.stubGlobal('fetch', fetchMock)
+  const feedCalls = vi.fn((url: URL) => respond(url))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL) => (url.pathname.endsWith('/config') ? config() : feedCalls(url))),
+  )
   render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
@@ -20,7 +35,19 @@ function show(respond: (url: URL) => Response) {
       />
     </QueryClientProvider>,
   )
-  return fetchMock
+  return feedCalls
+}
+
+/** The browser says the person already allowed their location, at `position`. */
+function allowLocation(position: { lat: number; lng: number }) {
+  vi.stubGlobal('navigator', {
+    ...navigator,
+    permissions: { query: async () => ({ state: 'granted' }) },
+    geolocation: {
+      getCurrentPosition: (ok: (p: { coords: { latitude: number; longitude: number } }) => void) =>
+        ok({ coords: { latitude: position.lat, longitude: position.lng } }),
+    },
+  })
 }
 
 const feed = (scope: 'local' | 'national', items = feedItems()) =>
@@ -49,8 +76,29 @@ describe('FeedPage', () => {
 
     await waitFor(() => {
       const last = fetchMock.mock.calls.at(-1)?.[0]
-      expect(last?.search).toBe('?vertical=lost&species=cat')
+      expect(last?.searchParams.get('vertical')).toBe('lost')
+      expect(last?.searchParams.get('species')).toBe('cat')
     })
+  })
+
+  // Decision #41: the feed is nearest first around a point; without one it is national for everyone.
+  it('asks around the country’s default center when the location was not allowed', async () => {
+    const fetchMock = show(() => feed('local'))
+    await screen.findAllByRole('article')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const url = fetchMock.mock.calls[0]?.[0]
+    expect(url?.searchParams.get('lat')).toBe(String(CENTER.lat))
+    expect(url?.searchParams.get('lng')).toBe(String(CENTER.lng))
+  })
+
+  it('asks around the device when the location was already allowed, without prompting', async () => {
+    allowLocation({ lat: 4.711, lng: -74.0721 })
+    const fetchMock = show(() => feed('local'))
+    await screen.findAllByRole('article')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const url = fetchMock.mock.calls[0]?.[0]
+    expect(url?.searchParams.get('lat')).toBe('4.711')
+    expect(url?.searchParams.get('lng')).toBe('-74.0721')
   })
 
   it('says so when the feed fell back to the whole country (00 · Geography)', async () => {

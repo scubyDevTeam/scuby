@@ -131,6 +131,7 @@
     "lost": {
       "sighting_title": "¿Dónde viste a {name}?",
       "claim_title": "¿Tienes a {name}?",
+      "claim_sign_in": "«La tengo» se hace con tu cuenta, por la seguridad de la familia: así saben quién les escribe.",
       "reunite_title": "¿{name} ya apareció?",
       "correct_title": "Corregir tu avistamiento de {name}",
       "edit_title": "Editar aviso de {name}"

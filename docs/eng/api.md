@@ -215,11 +215,10 @@ lost-case slice: uploads, publish, the public case, «Lo vi», the feed and the 
   the client's own check rejects any future time.
 - **Nearest-first wording** — the contract's summary says "newest first"; `feed.ts` and
   [02](../product/02-flows.md) say proximity; align them on the rule above.
-- **Feed point** — the client never sends `lat`/`lng` (`FeedPage.tsx` builds the query from
-  `vertical`/`species` only), so the feed is national for everyone. The client should send the
-  device position when the user grants it, else the selected country's `default_center` from
-  `/config`. The server rule is ready; its spatial index (a GiST index on the case's last-seen
-  point) waits for the first request that uses it.
+- **Feed point** — done on the client (2026-11-14, decision #89): every feed request now carries
+  `lat`/`lng`, the device's position or the country's `default_center`. The server's spatial index (a
+  GiST index on the case's public last-seen point, deferred by #69) now has its first caller; whether
+  it is needed is the backend's call under #52.
 - **Publish idempotency** — a double tap on «Publicar» creates two pets and two active cases; add a
   `client_id` to `publishLost`, replayed like a sighting's.
 - **Google with a non-Google address** — when the Google address is not one Google vouches for and no

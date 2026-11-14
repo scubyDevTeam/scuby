@@ -21,17 +21,17 @@ test(
 test(
   '«La tengo conmigo»: leave a phone, the family is told, WhatsApp opens',
   tags('@helper', '@HELP-002'),
-  async ({ casePage, profile }) => {
-    await test.step('«Lo tengo» needs an account: the helper signs in first (decision #75)', async () => {
-      await profile.open()
-      await profile.signIn.withEmailCode('pedro.ruiz@correo.co')
-      await expect(profile.name('Pedro Ruiz')).toBeVisible()
-    })
-
+  async ({ casePage }) => {
     await casePage.open('M2TQ4')
 
+    await test.step('«Lo tengo» asks for an account first, and says why (decision #75)', async () => {
+      await casePage.startClaim()
+      await expect(casePage.claimNeedsAccount).toBeVisible()
+      await casePage.signIn.withEmailCode('pedro.ruiz@correo.co')
+    })
+
     await test.step('the claim opens WhatsApp with his family', async () => {
-      expect(await casePage.claimRecovery('311 482 9017')).toContain('wa.me')
+      expect(await casePage.leaveClaim('311 482 9017')).toContain('wa.me')
     })
   },
 )

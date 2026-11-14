@@ -32,6 +32,7 @@ export const feedQuery = ({ near, ...filters }: FeedFilters) =>
       ),
   })
 
-export function useFeed(filters: FeedFilters) {
-  return useQuery(feedQuery(filters))
+/** `ready: false` holds the request until the feed's point is known, so it is asked once. */
+export function useFeed(filters: FeedFilters, ready = true) {
+  return useQuery({ ...feedQuery(filters), enabled: ready })
 }

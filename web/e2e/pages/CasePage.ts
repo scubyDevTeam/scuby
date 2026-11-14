@@ -15,6 +15,8 @@ export class CasePage {
   readonly possibleOwner: Locator
   readonly sawIt: Locator
   readonly haveIt: Locator
+  /** The claim sheet's note to someone signed out: a claim needs an account. */
+  readonly claimNeedsAccount: Locator
   readonly claimOwnershipButton: Locator
   readonly whatsapp: Locator
   readonly found: Locator
@@ -39,6 +41,7 @@ export class CasePage {
     this.possibleOwner = page.getByText('Posible dueño.')
     this.sawIt = page.getByRole('button', { name: /La vi/ })
     this.haveIt = page.getByRole('button', { name: 'La tengo conmigo' })
+    this.claimNeedsAccount = page.getByText(/«La tengo» se hace con tu cuenta/)
     this.claimOwnershipButton = page.getByRole('button', { name: /Es mío/ })
     this.whatsapp = page.getByRole('link', { name: 'Escribirle por WhatsApp' })
     this.found = page.getByText('Se encontró', { exact: true })
@@ -139,10 +142,22 @@ export class CasePage {
     )
   }
 
-  /** «La tengo conmigo»: answers the WhatsApp URL the claim opened. */
+  /** Opens the claim sheet; signed out, it asks for an account before anything else. */
+  startClaim() {
+    return step('Tap «La tengo conmigo»', () => this.haveIt.click())
+  }
+
+  /** Says «la tengo conmigo», leaving a phone: opens the sheet, then leaves the claim. */
   claimRecovery(phone: string): Promise<string> {
     return step(`Say «la tengo conmigo», leaving ${phone}`, async () => {
       await this.haveIt.click()
+      return this.leaveClaim(phone)
+    })
+  }
+
+  /** In the open claim sheet: leaves the phone and returns the WhatsApp link the claim opens. */
+  leaveClaim(phone: string): Promise<string> {
+    return step(`Leave the claim with ${phone}`, async () => {
       await this.page.getByLabel('Tu celular').fill(phone)
       const url = await whatsappFrom(this.page, () =>
         this.page.getByRole('button', { name: /Avisar y abrir WhatsApp/ }).click(),
