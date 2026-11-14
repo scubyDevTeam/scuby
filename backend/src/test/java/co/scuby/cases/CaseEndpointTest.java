@@ -104,7 +104,7 @@ class CaseEndpointTest {
     void theDeviceThatReportedSeesItsPinAsMine() {
         ApiClient reporter = clients.newBrowser();
         reporter.get("/config");   // receives a device cookie
-        String device = Hashing.sha256Hex(reporter.cookie("device").orElseThrow());
+        String device = Hashing.sha256Hex(reporter.cookie("__Host-device").orElseThrow());
         cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, MutableClock.START.minusSeconds(60), MutableClock.START.minusSeconds(60), null, device, null, "visible");
         ApiResponse r = reporter.get("/cases/{code}", "7K3PQ");
         assertThat(r.str("/sightings/2/editable_until")).isEqualTo("2026-10-14T17:14:00Z");
@@ -222,7 +222,7 @@ class CaseEndpointTest {
     void theOwnersDeviceAfterSignOutIsPublic() {
         owner.get("/cases/{code}", "7K3PQ");   // receives a device cookie
         ApiClient signedOut = clients.newBrowser();
-        signedOut.setCookie("device", owner.cookie("device").orElseThrow());
+        signedOut.setCookie("__Host-device", owner.cookie("__Host-device").orElseThrow());
         ApiResponse r = signedOut.get("/cases/{code}", "7K3PQ");
         assertThat(r.str("/viewer")).isEqualTo("public");
         assertThat(r.json().get("sightings")).allSatisfy(s -> assertThat(s.get("contact_phone").isNull()).isTrue());

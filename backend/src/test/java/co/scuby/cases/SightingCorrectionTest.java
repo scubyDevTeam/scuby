@@ -63,7 +63,7 @@ class SightingCorrectionTest {
         cases.luna(carolina);
         reporter = clients.newBrowser();
         reporter.get("/config");
-        device = Hashing.sha256Hex(reporter.cookie("device").orElseThrow());
+        device = Hashing.sha256Hex(reporter.cookie("__Host-device").orElseThrow());
         pin = cases.sighting("7K3PQ", CaseFixtures.MEDELLIN, CREATED, CREATED, null, device, "+573001112233", "visible");
         db.update(SIGHTING).set(SIGHTING.PHOTO_URLS, new String[] {"http://localhost/dev-media/" + "b".repeat(64) + ".jpg"})
           .set(SIGHTING.NOTE, "Corría").where(SIGHTING.ID.eq(pin)).execute();

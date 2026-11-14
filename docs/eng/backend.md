@@ -297,7 +297,7 @@ largest real body (a publish) is a few KB; photos go to S3, never in JSON. Over 
 `validation_failed` (`422`; the contract has no `413`). `PUT /dev-media` (local and test only) keeps its own size cap.
 `pet.colors` takes at most 7 values, stored once each, with a database `CHECK` on the array size.
 
-**Cookie tossing** (a sibling subdomain setting cookies for the parent domain): how the session cookie resists it, and why the `device` cookie cannot yet, is in [auth.md](auth.md) · Known limitations and risks.
+**Cookie tossing** (a sibling subdomain setting cookies for the parent domain): how both `__Host-` cookies resist it is in [auth.md](auth.md) · Known limitations and risks.
 
 **Caching:** every response carries `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`
 (Spring Security's default, kept on purpose): answers are per viewer, and a CDN must never store

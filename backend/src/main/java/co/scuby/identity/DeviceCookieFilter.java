@@ -18,19 +18,14 @@ import java.util.regex.Pattern;
 
 /**
  * The anonymous identity (decision #35): set by the API, only its hash used server-side. Renewed on
- * unsafe requests (where it is used); never written to the database by this filter.
+ * unsafe requests (where it is used); never written to the database by this filter. A `__Host-` cookie
+ * (always Secure, Path=/, no Domain), so a sibling subdomain cannot plant one (auth.md · Cookie tossing).
  */
 final class DeviceCookieFilter extends OncePerRequestFilter {
 
-    static final String COOKIE = "device";
+    static final String COOKIE = "__Host-device";
     private static final Pattern VALUE = Pattern.compile("^[A-Za-z0-9_-]{43}$");
     private static final Set<String> SAFE = Set.of("GET", "HEAD", "OPTIONS", "TRACE");
-
-    private final CookieProperties cookies;
-
-    DeviceCookieFilter(CookieProperties cookies) {
-        this.cookies = cookies;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -42,7 +37,7 @@ final class DeviceCookieFilter extends OncePerRequestFilter {
         boolean preflight = "OPTIONS".equals(request.getMethod());
         if (!preflight && (!valid || !SAFE.contains(request.getMethod()))) {
             response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from(COOKIE, value)
-                    .httpOnly(true).secure(cookies.secure()).sameSite("Lax").path("/")
+                    .httpOnly(true).secure(true).sameSite("Lax").path("/")
                     .maxAge(Duration.ofDays(365)).build().toString());
         }
         chain.doFilter(request, response);

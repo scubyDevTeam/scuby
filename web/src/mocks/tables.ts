@@ -184,7 +184,7 @@ export type SightingRow = {
   note: string | null
   photo_urls: string[]
   reporter_id: string | null
-  /** The rate-limit handle for anonymous reporters (device/IP in the real backend). */
+  /** The anonymous reporter's device (the `__Host-device` cookie in the real backend): decides `mine`. */
   reporter_key: string
   contact_phone: string | null
   /** `deleted_by_reporter`: the reporter took it off; it is gone for everyone, the owner included. */

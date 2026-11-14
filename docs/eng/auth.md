@@ -183,15 +183,9 @@ Accepted or tracked; each is a deliberate tradeoff, not an oversight.
 
 - **Pre-hijack of a new non-authoritative address.** See the Sign-in bullet "Known limitation, pre-hijack" above ([O33](../open-items.md)).
 
-- **Cookie tossing.** A sibling subdomain can set cookies for the parent domain. The session cookie is
-  `__Host-session` (browsers refuse a `__Host-` cookie that names a `Domain`), and both cookie readers treat a
-  name sent twice as absent, so it cannot be pinned. The device cookie is still `device`: a duplicate pinned
-  by a sibling subdomain makes the server treat every request as a new device, so anonymous ownership is lost
-  and upload slots stop matching. An availability problem; only renaming it `__Host-device` fixes it, which is
-  a contract change on the client side ([O27](../open-items.md)).
-- **Origin check on the contract.** An unsafe request from a disallowed origin answers `forbidden` (`403`) before
-  it reaches the endpoint ([backend.md](backend.md) · Security), but the contract lists no `403` on the auth and
-  phone endpoints ([O27](../open-items.md)).
+- **Cookie tossing.** A sibling subdomain can set cookies for the parent domain. Both cookies are `__Host-`
+  (`__Host-session`, `__Host-device`): browsers refuse one that names a `Domain`, and both cookie readers treat
+  a name sent twice as absent, so neither can be pinned.
 - **Victim lockout.** Anyone can request codes for a number, so five requests in a rolling 24 h lock its real
   owner out of verifying until the oldest of the five is 24 h old. Accepted. The email channel has the same
   shape: three wrong verifies burn the live code, so the next start sends a new one at once; ten such rounds use

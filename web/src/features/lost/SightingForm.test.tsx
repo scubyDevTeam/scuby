@@ -130,12 +130,21 @@ describe('SightingForm — 04 · only the pin is required', () => {
     expect(screen.getByText(/No pudimos obtener tu ubicación/)).toBeTruthy()
   })
 
-  it('shows the rate-limit copy when the server refuses', async () => {
-    show(nearby, { 'POST /cases/7K3PQ/sightings': { status: 429 } })
+  it('shows the rate-limit copy when the server answers `rate_limited`', async () => {
+    show(nearby, {
+      'POST /cases/7K3PQ/sightings': {
+        status: 429,
+        body: { error: { code: 'rate_limited', message: '' } },
+      },
+    })
     await locate()
     await screen.findByText('Punto marcado.')
     send()
-    expect(await screen.findByText('Ya registraste un avistamiento hace poco.')).toBeTruthy()
+    expect(
+      await screen.findByText(
+        'Hay muchos envíos en este momento. Intenta de nuevo en unos minutos.',
+      ),
+    ).toBeTruthy()
   })
 
   it('with no signal it is kept, calmly — «Guardamos tu avistamiento» — and goes by itself', async () => {

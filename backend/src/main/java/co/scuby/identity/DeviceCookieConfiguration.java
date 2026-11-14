@@ -10,8 +10,8 @@ import org.springframework.context.annotation.Configuration;
 class DeviceCookieConfiguration {
 
     @Bean
-    FilterRegistrationBean<DeviceCookieFilter> deviceCookieFilter(CookieProperties cookies) {
-        var registration = new FilterRegistrationBean<>(new DeviceCookieFilter(cookies));
+    FilterRegistrationBean<DeviceCookieFilter> deviceCookieFilter() {
+        var registration = new FilterRegistrationBean<>(new DeviceCookieFilter());
         registration.setOrder(SecurityFilterProperties.DEFAULT_FILTER_ORDER - 10);
         return registration;
     }

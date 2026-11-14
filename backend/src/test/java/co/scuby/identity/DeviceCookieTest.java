@@ -60,18 +60,18 @@ class DeviceCookieTest {
         String planted = "A".repeat(43);
         String real = "B".repeat(43);
         MockHttpServletResponse r = mvc.perform(get("/probe/caller")
-                        .cookie(new Cookie("device", planted), new Cookie("device", real)))
+                        .cookie(new Cookie("__Host-device", planted), new Cookie("__Host-device", real)))
                 .andReturn().getResponse();
-        String issued = r.getHeaders(HttpHeaders.SET_COOKIE).stream().filter(c -> c.startsWith("device=")).findFirst().orElseThrow();
-        assertThat(issued).doesNotStartWith("device=" + planted).doesNotStartWith("device=" + real);
+        String issued = r.getHeaders(HttpHeaders.SET_COOKIE).stream().filter(c -> c.startsWith("__Host-device=")).findFirst().orElseThrow();
+        assertThat(issued).doesNotStartWith("__Host-device=" + planted).doesNotStartWith("__Host-device=" + real);
         assertThat(r.getContentAsString()).doesNotContain(Hashing.sha256Hex(planted)).doesNotContain(Hashing.sha256Hex(real));
     }
 
     @Test
     void aRequestWithoutTheCookieGetsOne() {
         ApiResponse r = clients.newBrowser().raw(HttpMethod.GET, "/probe/caller", null);
-        String cookie = r.setCookies().stream().filter(c -> c.startsWith("device=")).findFirst().orElseThrow();
-        assertThat(cookie).matches("^device=[A-Za-z0-9_-]{43};.*")
+        String cookie = r.setCookies().stream().filter(c -> c.startsWith("__Host-device=")).findFirst().orElseThrow();
+        assertThat(cookie).matches("^__Host-device=[A-Za-z0-9_-]{43};.*")
                 .contains("Path=/").contains("Max-Age=31536000").contains("Secure").contains("HttpOnly").contains("SameSite=Lax");
         assertThat(r.str("/device")).matches("^[0-9a-f]{64}$");
         assertThat(r.json().get("signed_in").asBoolean()).isFalse();
@@ -83,24 +83,24 @@ class DeviceCookieTest {
         String first = browser.raw(HttpMethod.GET, "/probe/caller", null).str("/device");
         ApiResponse again = browser.raw(HttpMethod.GET, "/probe/caller", null);
         assertThat(again.str("/device")).isEqualTo(first);
-        assertThat(again.setCookies()).noneMatch(c -> c.startsWith("device="));
+        assertThat(again.setCookies()).noneMatch(c -> c.startsWith("__Host-device="));
     }
 
     @Test
     void anUnsafeRequestRenewsTheCookie() {
         ApiClient browser = clients.newBrowser();
         browser.raw(HttpMethod.GET, "/probe/caller", null);
-        String value = browser.cookie("device").orElseThrow();
+        String value = browser.cookie("__Host-device").orElseThrow();
         ApiResponse post = browser.raw(HttpMethod.POST, "/probe/caller", null);
-        assertThat(post.setCookies()).anyMatch(c -> c.startsWith("device=" + value + ";"));
+        assertThat(post.setCookies()).anyMatch(c -> c.startsWith("__Host-device=" + value + ";"));
     }
 
     @Test
     void aMalformedCookieIsReplaced() {
         ApiClient browser = clients.newBrowser();
-        browser.setCookie("device", "not-a-token");
+        browser.setCookie("__Host-device", "not-a-token");
         ApiResponse r = browser.raw(HttpMethod.GET, "/probe/caller", null);
-        assertThat(r.setCookies()).anyMatch(c -> c.startsWith("device=") && !c.startsWith("device=not-a-token"));
+        assertThat(r.setCookies()).anyMatch(c -> c.startsWith("__Host-device=") && !c.startsWith("__Host-device=not-a-token"));
     }
 
     @Test
@@ -114,7 +114,7 @@ class DeviceCookieTest {
     void aSecurityRejectedRequestStillGetsTheCookie() {
         ApiResponse r = clients.newBrowser().raw(HttpMethod.GET, "/probe/account", null);
         assertThat(r.status()).isEqualTo(401);
-        assertThat(r.setCookies()).anyMatch(c -> c.startsWith("device="));
+        assertThat(r.setCookies()).anyMatch(c -> c.startsWith("__Host-device="));
     }
 
     @Test
@@ -123,7 +123,7 @@ class DeviceCookieTest {
                 .header("Origin", "http://localhost:4173")
                 .header("Access-Control-Request-Method", "POST")
                 .raw(HttpMethod.OPTIONS, "/probe/caller", null);
-        assertThat(r.setCookies()).noneMatch(c -> c.startsWith("device="));
+        assertThat(r.setCookies()).noneMatch(c -> c.startsWith("__Host-device="));
     }
 
     @Test

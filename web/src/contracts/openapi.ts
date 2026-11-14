@@ -2,6 +2,7 @@
 // hand — `pnpm openapi` writes it to docs/eng/openapi.json and CI fails when it is stale.
 import * as z from 'zod/mini'
 import { api, type Endpoint } from './api'
+import { implicitErrors } from './endpoint'
 import { ERROR_STATUS, type ErrorCode, errorWire } from './errors'
 import { nameSchemas } from './names'
 
@@ -46,14 +47,8 @@ function schema(source: z.ZodMiniType, io: 'input' | 'output'): JsonSchema {
   return tidy(json) as JsonSchema
 }
 
-const ALWAYS: ErrorCode[] = ['validation_failed', 'rate_limited', 'server_error']
-
 function errorResponses(endpoint: Endpoint) {
-  const codes = [
-    ...(endpoint.auth === 'session' ? (['unauthorized'] as const) : []),
-    ...endpoint.errors,
-    ...ALWAYS,
-  ]
+  const codes = [...endpoint.errors, ...implicitErrors(endpoint)]
   const byStatus = new Map<number, ErrorCode[]>()
   for (const code of new Set(codes)) {
     const status = ERROR_STATUS[code]
@@ -196,11 +191,11 @@ export function openApiDocument() {
         device: {
           type: 'apiKey',
           in: 'cookie',
-          name: 'device',
+          name: '__Host-device',
           description:
             'Opaque, httpOnly, set by the API (docs/eng/api.md · Device identity). Identifies an ' +
             'anonymous reporter or claimant: authorizes correcting their own sighting, marks it ' +
-            '`mine`, keys rate limits. Absent or unknown → the API issues a new one.',
+            '`mine`. Absent or unknown → the API issues a new one.',
         },
       },
     },

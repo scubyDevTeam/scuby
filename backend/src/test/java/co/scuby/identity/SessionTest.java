@@ -109,7 +109,7 @@ class SessionTest {
 
     @Test
     void theSessionCookieIsSecureEvenWhenTheDeviceCookieIsNot() {
-        // __Host- cookies must be Secure or browsers drop them; scuby.cookies.secure governs the device cookie only.
+        // __Host- cookies must be Secure or browsers drop them.
         NewSession session = store.create(accounts.person("ana.gomez@correo.co"));
         var issued = new org.springframework.mock.web.MockHttpServletResponse();
         var cleared = new org.springframework.mock.web.MockHttpServletResponse();

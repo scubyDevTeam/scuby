@@ -293,8 +293,8 @@ export function SightingForm({
       {report.isError ? (
         <Notice tone="warning" title={t('lost_forms.sighting_form.failed_title')}>
           {t(
-            report.error instanceof ApiError && report.error.kind === 'rejected'
-              ? 'lost.queued.too_soon'
+            report.error instanceof ApiError && report.error.code === 'rate_limited'
+              ? 'lost.queued.rate_limited'
               : 'common.check_connection',
           )}
         </Notice>

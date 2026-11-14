@@ -96,6 +96,16 @@
           "204": {
             "description": "No content"
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `validation_failed`",
             "content": {
@@ -155,6 +165,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -232,6 +252,16 @@
               }
             }
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `validation_failed`",
             "content": {
@@ -277,6 +307,16 @@
         "responses": {
           "204": {
             "description": "No content"
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "422": {
             "description": "`error.code`: `validation_failed`",
@@ -420,6 +460,16 @@
               }
             }
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `validation_failed`",
             "content": {
@@ -472,6 +522,16 @@
           },
           "401": {
             "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
             "content": {
               "application/json": {
                 "schema": {
@@ -542,6 +602,16 @@
           },
           "401": {
             "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
             "content": {
               "application/json": {
                 "schema": {
@@ -627,6 +697,16 @@
               }
             }
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `invalid_code`, `validation_failed`",
             "content": {
@@ -704,6 +784,16 @@
               }
             }
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `validation_failed`",
             "content": {
@@ -765,6 +855,16 @@
           },
           "401": {
             "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1618,6 +1718,16 @@
               }
             }
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `validation_failed`",
             "content": {
@@ -2460,6 +2570,16 @@
               }
             }
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `validation_failed`",
             "content": {
@@ -2529,6 +2649,16 @@
           },
           "401": {
             "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
             "content": {
               "application/json": {
                 "schema": {
@@ -2615,6 +2745,16 @@
           },
           "401": {
             "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
             "content": {
               "application/json": {
                 "schema": {
@@ -2946,6 +3086,16 @@
               }
             }
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `seen_at_in_future`, `validation_failed`",
             "content": {
@@ -3015,6 +3165,16 @@
           },
           "401": {
             "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
             "content": {
               "application/json": {
                 "schema": {
@@ -3653,7 +3813,7 @@
     "/cases/{code}/sightings": {
       "post": {
         "operationId": "reportSighting",
-        "summary": "«Lo vi»: a pin on a lost or found case. Visible at once; rate-limited per reporter. A repeated `client_id` on the same case answers the sighting it created, before any limit.",
+        "summary": "«Lo vi»: a pin on a lost or found case. Visible at once. A repeated `client_id` on the same case answers the sighting it created.",
         "tags": [
           "cases"
         ],
@@ -3685,6 +3845,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Created"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -4208,6 +4378,16 @@
           "204": {
             "description": "No content"
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `validation_failed`",
             "content": {
@@ -4267,6 +4447,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Created"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -4340,6 +4530,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -4481,6 +4681,16 @@
               }
             }
           },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "422": {
             "description": "`error.code`: `validation_failed`",
             "content": {
@@ -4609,6 +4819,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CheckinLink"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -4826,6 +5046,16 @@
           },
           "401": {
             "description": "`error.code`: `unauthorized`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`error.code`: `forbidden`",
             "content": {
               "application/json": {
                 "schema": {
@@ -10350,8 +10580,8 @@
       "device": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "device",
-        "description": "Opaque, httpOnly, set by the API (docs/eng/api.md · Device identity). Identifies an anonymous reporter or claimant: authorizes correcting their own sighting, marks it `mine`, keys rate limits. Absent or unknown → the API issues a new one."
+        "name": "__Host-device",
+        "description": "Opaque, httpOnly, set by the API (docs/eng/api.md · Device identity). Identifies an anonymous reporter or claimant: authorizes correcting their own sighting, marks it `mine`. Absent or unknown → the API issues a new one."
       }
     }
   }

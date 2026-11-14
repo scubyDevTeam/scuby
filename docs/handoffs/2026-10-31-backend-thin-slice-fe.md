@@ -70,7 +70,7 @@ Each row gives the behaviour, the decision that owns it (in
 | Change | Decision · owning doc | What the client must do |
 |---|---|---|
 | **Google with an address Google does not vouch for, when an account with that email already exists, needs the email code first.** Only `gmail.com`, `googlemail.com`, or a Workspace token whose `hd` equals the email's domain, links an existing account directly. With no account for that address, Google creates it directly (#70). With an existing account, any other address answers `401` with no session, and `401` with a session of a different email. With an email-code session of exactly that address, Google is linked for good, and after that Google alone signs in. | #58, #70 · [auth.md](../eng/auth.md) · Sign-in | **UI and copy:** a "confirm your email" screen («Entra primero con tu código de correo»), needed only when an account with that email already exists, then retry Google from the signed-in session. **Contract:** today the answer is the generic `unauthorized` with no distinct code, so the client cannot tell this narrower case from a rejected token; see the proposal in section 3. |
-| **«Lo vi» has no rate limits**, neither per reporter per case, per reporter overall, nor per IP. They are deferred until real patterns are seen. | #54 · [04](../product/04-lost-workflow.md) · Validation | **Contract and mock:** the sighting endpoint's text ("rate-limited per reporter … before any limit"), the device cookie's text ("keys rate limits"), the mock's limits in `web/src/mocks/api/helpers.ts` (1 per 15 minutes, 5 per case, 20 a day) and the «demasiado pronto» copy (`too_soon`) all still promise them. Remove them ([O27](../open-items.md) item 3). Keep a generic `rate_limited` handler: any endpoint may still answer `429`. |
+| **«Lo vi» has no rate limits**, neither per reporter per case, per reporter overall, nor per IP. They are deferred until real patterns are seen. | #54 · [04](../product/04-lost-workflow.md) · Validation | **Done (2026-11-13):** the contract text, the mock's limits and the «hace poco» copy are gone. A `429` on «Lo vi» shows a generic «intenta de nuevo en unos minutos» (`lost.queued.rate_limited`): any endpoint may still answer it. |
 | **Uploads have no caps**, per caller or per IP. | #55 · [backend.md](../eng/backend.md) · Uploads and media | Nothing. The per-purpose photo counts of [media-pipeline.md](../eng/media-pipeline.md) §1 still apply. |
 | **An unverified phone is never public.** The public case gets a WhatsApp link only if the number is exposed, marked as having WhatsApp, **verified**, not `in_app_only`, and the case is active. With the `publisher_phone_otp` kill switch off, a publish skips the SMS, stores the number unverified, and answers `{code}` at once. The case then has no public phone: only «Lo vi» and in-app contact. | #47 · [04](../product/04-lost-workflow.md) · Contact visibility · [auth.md](../eng/auth.md) · Behind a flag | **UI:** render the case's contact from the response only (`contact.whatsapp_url` may be `null` on an active case). Do not promise «te escribirán por WhatsApp» after a publish that skipped the code entry. **Contract:** `phone_step: unverified` does not exist yet, so the client cannot tell the number went unverified ([O24](../open-items.md)). |
 | **The public name is never derived from the email.** If a person has not chosen a name, the case shows «Alguien» ("Someone" in English). A name supplied by Google counts as chosen. Chosen names are shortened («Carolina M.»). The person's own profile still shows a placeholder built from the address. | #48 · [04](../product/04-lost-workflow.md) · Contact visibility · [auth.md](../eng/auth.md) · Profile | **Nothing in the contract.** `PATCH /me/profile` now exists: until a person sends a name, an email-code publisher shows «Alguien». Sending a name, even unchanged, marks it chosen and makes it public; there is no way back (#79). |
@@ -126,12 +126,11 @@ write a spec that depends on any of them being the same against the backend.
 | 4 | Nobody checks that a photo URL was uploaded by the caller or exists | `validation_failed` on `photo_urls` for a photo not uploaded by the caller for that purpose ([O29](../open-items.md)) | The emulated bucket does not track slots |
 | 5 | A body with a wrong type or a missing field is refused after the lookups, like a bad value | A malformed body (wrong JSON type) is refused before any lookup; a bad value is refused after them | Only a body that is not JSON at all is told apart; the screens cannot send the rest |
 | 6 | The public name is the display name from the start | The name is «Alguien» until the person sends one, and sending it marks it chosen (#48, #79) | The mock does not model `display_name_chosen` |
-| 7 | «Lo vi» is limited (1 per 15 minutes per case, 5 per case a day, 20 a day) | No limits (#54) | Remove them from the mock with the contract text ([O27](../open-items.md) item 3) |
-| 8 | The feed substitutes Medellín when no point is sent, returns exact public centers and every sighting | National feed, snapped centers, 200 sightings (#41, #63, #64) | See the product-change rows above |
-| 9 | A correction's distance is measured from the case's exact point | From the snapped public center | A boundary case only |
-| 10 | `PATCH /cases/{code}` edits found, adoption and help cases, and reopen works on them | `not_found` for every code until those verticals exist | Their screens are built against the mock |
-| 11 | Pets with the same last activity keep insertion order; a claim's stale status is stored by the follow-up loop | Ordered by the pet's creation date; stale is derived from `last_active_at` | Not observable on a screen |
-| 12 | Any newer case of the same pet makes an older expired case non-reopenable (cancelled included) | A newer case that is `cancelled` is ignored: the older expired case can still be reopened, reactivated by a claim and offered as `reopenable_case_code` (#88, amends #81) | Align the mock's newest-case check (`web/src/mocks/`) when convenient; only visible after cancelling a duplicate of an expired case |
+| 7 | The feed substitutes Medellín when no point is sent, returns exact public centers and every sighting | National feed, snapped centers, 200 sightings (#41, #63, #64) | See the product-change rows above |
+| 8 | A correction's distance is measured from the case's exact point | From the snapped public center | A boundary case only |
+| 9 | `PATCH /cases/{code}` edits found, adoption and help cases, and reopen works on them | `not_found` for every code until those verticals exist | Their screens are built against the mock |
+| 10 | Pets with the same last activity keep insertion order; a claim's stale status is stored by the follow-up loop | Ordered by the pet's creation date; stale is derived from `last_active_at` | Not observable on a screen |
+| 11 | Any newer case of the same pet makes an older expired case non-reopenable (cancelled included) | A newer case that is `cancelled` is ignored: the older expired case can still be reopened, reactivated by a claim and offered as `reopenable_case_code` (#88, amends #81) | Align the mock's newest-case check (`web/src/mocks/`) when convenient; only visible after cancelling a duplicate of an expired case |
 
 ## 3. Contract proposals
 
@@ -143,11 +142,8 @@ client holds the pen until the contract moves to `openapi.yaml` (decision #34).
 - Feed paging, and paging for `GET /me/cases`: [api.md](../eng/api.md) · Proposals.
 - `phone_step: unverified` on publish responses: [O24](../open-items.md).
 - `client_id` on `publishLost` (publish idempotency): [api.md](../eng/api.md) · Proposals.
-- Rename the device cookie to `__Host-device`, and list the `Origin` check's `403`: [O27](../open-items.md)
-  items 1 and 2.
 - A distinct error code for "sign in with your email code first" on `/auth/google` (only when an account with that email exists):
   [api.md](../eng/api.md) · Proposals (Google with a non-Google address).
-- Remove the «Lo vi» limits from the contract text and the mock: [O27](../open-items.md) item 3.
 - The `seen_at` tolerance (the server allows 5 minutes in the future) and the `point` comment in `feed.ts`:
   [api.md](../eng/api.md) · Proposals.
 - `found_deceased` and `gave_up`: which endpoint or field carries them: [O35](../open-items.md).
@@ -177,8 +173,8 @@ bash backend/run-local.sh down     # stops this checkout's project
 - **CORS:** only `http://localhost:5173` (`pnpm dev`) and `http://localhost:4173` (the e2e preview build),
   with credentials (`backend/src/main/resources/application-local.yml`).
 - **Point the client at it:** `VITE_API_MOCK=false VITE_API_URL=http://localhost:8080 pnpm dev` in `web/`.
-  Cookies are `Secure` (the session is `__Host-session`). Chrome and Firefox accept them on `http://localhost`;
-  older Safari may not (`backend/src/main/java/co/scuby/identity/CookieProperties.java`).
+  Cookies are `Secure` (`__Host-session`, `__Host-device`). Chrome and Firefox accept them on `http://localhost`;
+  older Safari may not.
 - **Test identities:** any `*@e2e.scuby.test` address and any `+57 300 000 00xx` number accept the fixed code
   `123456`. They skip cooldowns and caps, and no SMS is "sent" to them. For any other address or number, the
   code is written to the backend log with the recipient masked (decision #46): an email as its first

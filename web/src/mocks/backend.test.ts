@@ -238,22 +238,14 @@ describe('«Lo vi» (04 · Validation)', () => {
     expect((await failure(sighting(fields()))).code).toBe(code)
   })
 
-  it('is rate-limited: five per reporter per case a day', async () => {
-    for (let i = 0; i < 5; i++) await sighting()
-    expect((await failure(sighting())).code).toBe('rate_limited')
-    later(25 * HOUR)
-    await sighting()
-  })
-
-  it('«Lo vi otra vez» inside the earlier pin’s correction window is not «hace poco» (04)', async () => {
-    await sighting()
-    later(60_000)
-    await sighting()
+  // Decision #54: no limit per reporter, per case or overall, like the backend.
+  it('is not rate-limited: a reporter can send many in a row', async () => {
+    for (let i = 0; i < 25; i++) await sighting()
   })
 
   // The offline queue resends until it hears back (frontend.md · Risks §6): an answer lost on a
-  // weak signal must not become a second pin, nor a 429 that tells the reporter it failed.
-  it('a replay with the same `client_id` is the same sighting: one row, the same id, no limit', async () => {
+  // weak signal must not become a second pin.
+  it('a replay with the same `client_id` is the same sighting: one row, the same id', async () => {
     const before = db.sightings.length
     const first = (await sighting({ client_id: 'c0ffee-replay-1' })) as { id: string }
     later(60_000)

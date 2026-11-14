@@ -4,6 +4,7 @@
 import { delay, HttpResponse, http, type JsonBodyType } from 'msw'
 import type * as z from 'zod/mini'
 import type { Endpoint, ParamsOf, WireOf } from '../contracts/api'
+import { implicitErrors } from '../contracts/endpoint'
 import { ERROR_STATUS, type ErrorCode } from '../contracts/errors'
 import { env } from '../env'
 import { type PersonRow, persist, restore, snapshot } from './db'
@@ -41,7 +42,6 @@ export type Context<E extends Endpoint> = {
 }
 
 /** Any endpoint may answer these; the rest must be listed in its `errors`. */
-const ALWAYS: ErrorCode[] = ['validation_failed', 'rate_limited', 'server_error']
 
 function errorResponse(code: ErrorCode, message: string, extra: Partial<Fail> = {}) {
   return HttpResponse.json(
@@ -140,11 +140,7 @@ export function route<E extends Endpoint>(
         if (!(error instanceof Fail)) {
           return violation(endpoint, error instanceof Error ? error.message : String(error))
         }
-        const allowed = [
-          ...ALWAYS,
-          ...endpoint.errors,
-          ...(endpoint.auth === 'session' ? ['unauthorized'] : []),
-        ]
+        const allowed = [...endpoint.errors, ...implicitErrors(endpoint)]
         if (!allowed.includes(error.code)) {
           return violation(endpoint, `answered «${error.code}», which its errors do not list`)
         }
