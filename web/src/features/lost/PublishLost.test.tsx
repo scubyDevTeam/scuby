@@ -129,6 +129,20 @@ describe('PublishLost — auth.md · the phone step', () => {
     expect(second).toMatchObject({ phone: '+573007152284', otp_code: '123456' })
   })
 
+  // No replay key on the publish yet (api.md · Proposals): a second send while one is in flight
+  // would be a second pet and a second case. The button is disabled, and the code field leaves, while it sends.
+  it('a double tap on «Publicar» sends one publish', async () => {
+    const calls = show(veteran, { 'POST /lost-cases': { status: 201, body: { code: 'NEW23' } } })
+    fillWho()
+    await fillWhere()
+    await screen.findByText('+573007152284')
+    const button = publishButton()
+    fireEvent.click(button)
+    fireEvent.click(button)
+    await screen.findByText('¡Aviso publicado!')
+    expect(posts(calls)).toHaveLength(1)
+  })
+
   it('shows no code field until the server asks for one', async () => {
     show(newcomer)
     fillWho()
